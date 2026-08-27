@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "CLEANO",
+    "slug": "cleano-customer",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "cleano",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "bundleIdentifier": "com.cleano.customer",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "com.cleano.customer",
+      "adaptiveIcon": {
+        "backgroundColor": "#00af5f"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-location",
+      "expo-image-picker"
+    ]
+  }
+}

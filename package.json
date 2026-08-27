@@ -1,0 +1,22 @@
+{
+  "name": "cleano",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "clean": "turbo clean",
+    "dev:customer": "turbo dev --filter=customer-app",
+    "dev:driver": "turbo dev --filter=driver-app",
+    "dev:admin": "turbo dev --filter=admin-dashboard"
+  },
+  "devDependencies": {
+    "turbo": "^2.4.0"
+  },
+  "packageManager": "npm@10.0.0"
+}
