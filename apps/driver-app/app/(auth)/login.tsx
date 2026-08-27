@@ -6,8 +6,10 @@ import { colors } from '../../src/theme'
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const { signInWithOtp } = useAuth()
+  const [usePassword, setUsePassword] = useState(false)
+  const { signInWithOtp, signInWithPassword } = useAuth()
   const router = useRouter()
 
   const handleSendOtp = async () => {
@@ -17,6 +19,15 @@ export default function LoginScreen() {
     setLoading(false)
     if (error) { Alert.alert('خطأ', error); return }
     router.push({ pathname: '/(auth)/verify', params: { email } })
+  }
+
+  const handlePasswordLogin = async () => {
+    if (!email.includes('@')) { Alert.alert('خطأ', 'أدخل بريد إلكتروني صحيح'); return }
+    if (!password) { Alert.alert('خطأ', 'أدخل كلمة المرور'); return }
+    setLoading(true)
+    const { error } = await signInWithPassword(email, password)
+    setLoading(false)
+    if (error) { Alert.alert('خطأ', error) }
   }
 
   return (
@@ -45,8 +56,27 @@ export default function LoginScreen() {
             textAlign="left"
           />
 
-          <TouchableOpacity style={[s.button, loading && s.buttonDisabled]} onPress={handleSendOtp} disabled={loading}>
-            <Text style={s.buttonText}>{loading ? 'جاري الإرسال...' : 'دخول'}</Text>
+          {usePassword && (
+            <>
+              <Text style={s.label}>كلمة المرور</Text>
+              <TextInput
+                style={s.input}
+                placeholder="********"
+                placeholderTextColor={colors.navy[300]}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                textAlign="left"
+              />
+            </>
+          )}
+
+          <TouchableOpacity style={[s.button, loading && s.buttonDisabled]} onPress={usePassword ? handlePasswordLogin : handleSendOtp} disabled={loading}>
+            <Text style={s.buttonText}>{loading ? 'جاري الدخول...' : 'دخول'}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => setUsePassword(!usePassword)}>
+            <Text style={s.switchText}>{usePassword ? 'دخول بـ OTP' : 'دخول بكلمة مرور'}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -83,4 +113,5 @@ const s = StyleSheet.create({
   },
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  switchText: { color: colors.navy[200], fontSize: 14, textAlign: 'center' as const, marginTop: 8, textDecorationLine: 'underline' as const },
 })
