@@ -11,10 +11,11 @@
     "ios": "expo run:ios"
   },
   "dependencies": {
-"@react-navigation/native": "^7.0.0",
+    "@react-navigation/native": "^7.0.0",
     "@supabase/supabase-js": "^2.45.0",
     "expo": "~52.0.0",
     "expo-device": "^57.0.1",
+    "expo-linking": "~7.0.5",
     "expo-location": "~18.0.0",
     "expo-notifications": "^57.0.15",
     "expo-router": "~4.0.0",
