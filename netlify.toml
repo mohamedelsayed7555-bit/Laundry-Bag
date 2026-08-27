@@ -1,0 +1,7 @@
+[build]
+  base = "apps/admin-dashboard"
+  command = "npm install --legacy-peer-deps && npx next build"
+  publish = ".next"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
