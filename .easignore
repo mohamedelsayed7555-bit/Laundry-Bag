@@ -1,0 +1,9 @@
+node_modules
+.next
+.expo
+dist
+.git
+_deploy_files.json
+_deploy_files_slim.json
+_deploy_final.json
+_gen_deploy.js
