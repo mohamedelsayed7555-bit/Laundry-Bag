@@ -1,5 +1,5 @@
 [build]
-  command = "npm run build"
+  command = "npx next build"
   publish = ".next"
 
 [[plugins]]
