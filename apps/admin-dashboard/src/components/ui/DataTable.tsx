@@ -1,8 +1,9 @@
 'use client'
 
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
-import { Inbox } from 'lucide-react'
+import { Inbox, ChevronRight, ChevronLeft } from 'lucide-react'
 
 interface Column<T> {
   key: string
@@ -15,13 +16,22 @@ interface DataTableProps<T> {
   columns: Column<T>[]
   data: T[]
   emptyMessage?: string
+  pageSize?: number
 }
 
 export default function DataTable<T extends Record<string, any>>({
   columns,
   data,
   emptyMessage = 'لا توجد بيانات',
+  pageSize = 10,
 }: DataTableProps<T>) {
+  const [page, setPage] = useState(0)
+  const totalPages = Math.ceil(data.length / pageSize)
+  const paged = data.slice(page * pageSize, (page + 1) * pageSize)
+
+  const canPrev = page > 0
+  const canNext = page < totalPages - 1
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -47,7 +57,7 @@ export default function DataTable<T extends Record<string, any>>({
             </tr>
           </thead>
           <tbody className="divide-y divide-surface-border/40">
-            {data.length === 0 ? (
+            {paged.length === 0 ? (
               <tr>
                 <td colSpan={columns.length} className="px-5 py-16 text-center">
                   <div className="flex flex-col items-center gap-3">
@@ -59,7 +69,7 @@ export default function DataTable<T extends Record<string, any>>({
                 </td>
               </tr>
             ) : (
-              data.map((item, i) => (
+              paged.map((item, i) => (
                 <motion.tr
                   key={i}
                   initial={{ opacity: 0 }}
@@ -78,6 +88,50 @@ export default function DataTable<T extends Record<string, any>>({
           </tbody>
         </table>
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-5 py-3 border-t border-surface-border/60">
+          <span className="text-xs text-gray-400">
+            عرض {page * pageSize + 1}–{Math.min((page + 1) * pageSize, data.length)} من {data.length}
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPage(p => p - 1)}
+              disabled={!canPrev}
+              className={cn(
+                'w-8 h-8 flex items-center justify-center rounded-lg transition-all text-sm',
+                canPrev ? 'hover:bg-surface-muted text-gray-600' : 'text-gray-300 cursor-not-allowed'
+              )}
+            >
+              <ChevronRight size={16} />
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => (
+              <button
+                key={i}
+                onClick={() => setPage(i)}
+                className={cn(
+                  'w-8 h-8 flex items-center justify-center rounded-lg text-xs font-medium transition-all',
+                  page === i
+                    ? 'bg-navy-900 text-white shadow-premium-md'
+                    : 'hover:bg-surface-muted text-gray-500'
+                )}
+              >
+                {i + 1}
+              </button>
+            ))}
+            <button
+              onClick={() => setPage(p => p + 1)}
+              disabled={!canNext}
+              className={cn(
+                'w-8 h-8 flex items-center justify-center rounded-lg transition-all text-sm',
+                canNext ? 'hover:bg-surface-muted text-gray-600' : 'text-gray-300 cursor-not-allowed'
+              )}
+            >
+              <ChevronLeft size={16} />
+            </button>
+          </div>
+        </div>
+      )}
     </motion.div>
   )
 }
