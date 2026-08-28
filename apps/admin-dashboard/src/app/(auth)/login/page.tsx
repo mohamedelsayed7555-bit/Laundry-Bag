@@ -159,11 +159,17 @@ export default function AdminLoginPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setError('حدث خطأ'); setLoading(false); return }
 
-    const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single()
+    const { data: profile } = await supabase.from('users').select('role, is_active').eq('id', user.id).single()
     const allowedRoles = ['admin', 'super_admin', 'manager', 'accountant']
     if (!allowedRoles.includes(profile?.role)) {
       await supabase.auth.signOut()
       setError('غير مصرح لك بالدخول — هذه اللوحة للمسؤولين فقط')
+      setLoading(false)
+      return
+    }
+    if (profile?.is_active === false) {
+      await supabase.auth.signOut()
+      setError('تم تعطيل حسابك — تواصل مع المسؤول')
       setLoading(false)
       return
     }
