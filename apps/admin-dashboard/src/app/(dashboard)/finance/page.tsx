@@ -57,7 +57,7 @@ export default function FinancePage() {
     const { data } = await query
     const all = data ?? []
     const revenue = all.reduce((s, o) => s + (o.total ?? 0), 0)
-    const paid = all.filter(o => o.payment_status === 'paid').reduce((s, o) => s + (o.total ?? 0), 0)
+    const paid = all.filter(o => o.payment_status === 'confirmed').reduce((s, o) => s + (o.total ?? 0), 0)
     setStats({ revenue, paid, unpaid: revenue - paid, ordersCount: all.length })
     setOrders(all)
     setLoading(false)
@@ -74,8 +74,9 @@ export default function FinancePage() {
   const paymentLabel: Record<string, string> = { cash: 'كاش', instapay: 'إنستاباي', wallet: 'محفظة' }
 
   async function markPaid(id: string) {
-    await supabase.from('orders').update({ payment_status: 'paid' }).eq('id', id)
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, payment_status: 'paid' } : o))
+    const { error } = await supabase.from('orders').update({ payment_status: 'confirmed' }).eq('id', id)
+    if (error) { console.error('markPaid error:', error); toast('حدث خطأ: ' + error.message, 'error'); return }
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, payment_status: 'confirmed' } : o))
     toast('تم تأكيد الدفع بنجاح')
     setStats(prev => {
       const order = orders.find(o => o.id === id)
@@ -90,8 +91,8 @@ export default function FinancePage() {
     { key: 'total', label: 'المبلغ', render: (item: any) => <span className="font-semibold">{item.total?.toFixed(2)} ج.م</span> },
     { key: 'payment_method', label: 'طريقة الدفع', render: (item: any) => paymentLabel[item.payment_method] ?? item.payment_method },
     { key: 'payment_status', label: 'حالة الدفع', render: (item: any) => (
-      <Badge variant={item.payment_status === 'paid' ? 'success' : item.payment_status === 'refunded' ? 'danger' : 'warning'}>
-        {item.payment_status === 'paid' ? 'مدفوع' : item.payment_status === 'refunded' ? 'مسترد' : 'غير مدفوع'}
+      <Badge variant={item.payment_status === 'confirmed' ? 'success' : item.payment_status === 'refunded' ? 'danger' : 'warning'}>
+        {item.payment_status === 'confirmed' ? 'مدفوع' : item.payment_status === 'refunded' ? 'مسترد' : 'غير مدفوع'}
       </Badge>
     )},
     { key: 'date', label: 'التاريخ', render: (item: any) => (
@@ -101,7 +102,7 @@ export default function FinancePage() {
       </div>
     )},
     { key: 'actions', label: '', render: (item: any) => (
-      item.payment_status !== 'paid' ? (
+      item.payment_status !== 'confirmed' ? (
         <button onClick={() => markPaid(item.id)} className="text-[11px] bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg font-medium hover:bg-emerald-100 transition-colors">
           تأكيد الدفع
         </button>
@@ -162,7 +163,7 @@ export default function FinancePage() {
 
       {/* Payment status filter */}
       <div className="flex gap-2">
-        {[{ key: 'all', label: 'الكل' }, { key: 'pending', label: 'غير مدفوع' }, { key: 'paid', label: 'مدفوع' }].map(f => (
+        {[{ key: 'all', label: 'الكل' }, { key: 'pending', label: 'غير مدفوع' }, { key: 'confirmed', label: 'مدفوع' }].map(f => (
           <button key={f.key} onClick={() => setPayFilter(f.key)}
             className={`px-3 py-2 rounded-lg text-[11px] font-medium transition-all ${payFilter === f.key ? 'bg-navy-900 text-white shadow-premium-md' : 'bg-white text-gray-500 hover:bg-surface-muted border border-surface-border/60'}`}>
             {f.label}
