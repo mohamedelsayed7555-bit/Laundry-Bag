@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import StatCard from '@/components/ui/StatCard'
 import DataTable from '@/components/ui/DataTable'
@@ -12,6 +13,9 @@ import {
   Truck,
   TrendingUp,
   ShoppingBag,
+  ArrowUpLeft,
+  Sparkles,
+  Activity,
 } from 'lucide-react'
 import { ORDER_STATUS_LABELS } from '@cleano/shared-types'
 import type { Order } from '@cleano/shared-types'
@@ -32,6 +36,33 @@ const statusBadge = (status: string) => {
     <Badge variant={map[status] ?? 'neutral'}>
       {ORDER_STATUS_LABELS[status as keyof typeof ORDER_STATUS_LABELS] ?? status}
     </Badge>
+  )
+}
+
+function SkeletonLoader() {
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="bg-white rounded-2xl p-5 border border-surface-border/60">
+            <div className="skeleton w-10 h-10 rounded-xl mb-4" />
+            <div className="skeleton w-20 h-7 mb-2" />
+            <div className="skeleton w-16 h-3" />
+          </div>
+        ))}
+      </div>
+      <div className="bg-white rounded-2xl p-6 border border-surface-border/60">
+        <div className="skeleton w-32 h-5 mb-6" />
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="flex gap-4 mb-4">
+            <div className="skeleton w-20 h-4 flex-shrink-0" />
+            <div className="skeleton w-28 h-4 flex-shrink-0" />
+            <div className="skeleton flex-1 h-4" />
+            <div className="skeleton w-16 h-4 flex-shrink-0" />
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -102,13 +133,13 @@ export default function DashboardPage() {
     {
       key: 'items_count',
       label: 'القطع',
-      render: (item: any) => <span>{item.items_count} قطعة</span>,
+      render: (item: any) => <span className="text-gray-600">{item.items_count} قطعة</span>,
     },
     {
       key: 'total',
       label: 'المبلغ',
       render: (item: any) => (
-        <span className="font-semibold">{item.total?.toFixed(2)} ج.م</span>
+        <span className="font-semibold text-gray-800">{item.total?.toFixed(2)} ج.م</span>
       ),
     },
     {
@@ -127,77 +158,51 @@ export default function DashboardPage() {
     },
   ]
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
+  if (loading) return <SkeletonLoader />
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-bold text-gray-800">نظرة عامة</h2>
-        <p className="text-sm text-gray-400">ملخص أداء المنصة</p>
-      </div>
+      <motion.div
+        initial={{ opacity: 0, y: -5 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="flex items-center justify-between"
+      >
+        <div>
+          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+            نظرة عامة
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-primary-50 text-primary-600 text-[10px] font-semibold">
+              <Activity size={10} />
+              مباشر
+            </span>
+          </h2>
+          <p className="text-sm text-gray-400 mt-0.5">ملخص أداء المنصة</p>
+        </div>
+      </motion.div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <StatCard
-          label="إجمالي الإيرادات"
-          value={`${stats.totalRevenue.toLocaleString()} ج.م`}
-          change="+12.5%"
-          changeType="up"
-          icon={DollarSign}
-          color="green"
-        />
-        <StatCard
-          label="إجمالي الطلبات"
-          value={stats.totalOrders}
-          change="+8.7%"
-          changeType="up"
-          icon={ClipboardList}
-          color="blue"
-        />
-        <StatCard
-          label="العملاء"
-          value={stats.totalCustomers}
-          change="-0.4%"
-          changeType="down"
-          icon={Users}
-          color="purple"
-        />
-        <StatCard
-          label="السائقين"
-          value={stats.totalDrivers}
-          icon={Truck}
-          color="orange"
-        />
-        <StatCard
-          label="طلبات نشطة"
-          value={stats.activeOrders}
-          icon={ShoppingBag}
-          color="cyan"
-        />
-        <StatCard
-          label="تم التوصيل"
-          value={stats.deliveredToday}
-          change="+18.3%"
-          changeType="up"
-          icon={TrendingUp}
-          color="green"
-        />
+        <StatCard label="إجمالي الإيرادات" value={`${stats.totalRevenue.toLocaleString()} ج.م`} change="+12.5%" changeType="up" icon={DollarSign} color="green" index={0} />
+        <StatCard label="إجمالي الطلبات" value={stats.totalOrders} change="+8.7%" changeType="up" icon={ClipboardList} color="blue" index={1} />
+        <StatCard label="العملاء" value={stats.totalCustomers} change="-0.4%" changeType="down" icon={Users} color="purple" index={2} />
+        <StatCard label="السائقين" value={stats.totalDrivers} icon={Truck} color="orange" index={3} />
+        <StatCard label="طلبات نشطة" value={stats.activeOrders} icon={ShoppingBag} color="cyan" index={4} />
+        <StatCard label="تم التوصيل" value={stats.deliveredToday} change="+18.3%" changeType="up" icon={TrendingUp} color="green" index={5} />
       </div>
 
-      <div>
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.3 }}
+      >
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-800">آخر الطلبات</h3>
-          <a href="/orders" className="text-sm text-primary-500 hover:text-primary-600 font-medium">
-            عرض الكل ←
+          <a href="/orders" className="inline-flex items-center gap-1 text-sm text-primary-500 hover:text-primary-600 font-medium transition-colors">
+            عرض الكل
+            <ArrowUpLeft size={14} />
           </a>
         </div>
         <DataTable columns={orderColumns} data={recentOrders} emptyMessage="لا توجد طلبات بعد" />
-      </div>
+      </motion.div>
     </div>
   )
 }

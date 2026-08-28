@@ -1,9 +1,11 @@
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native'
+import { useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { colors } from '../../src/theme'
 
 export default function ProfileScreen() {
   const { profile, signOut } = useAuth()
+  const router = useRouter()
 
   const handleSignOut = () => {
     Alert.alert('تسجيل الخروج', 'هل أنت متأكد؟', [
@@ -40,6 +42,20 @@ export default function ProfileScreen() {
         </View>
       </View>
 
+      <View style={s.menuSection}>
+        <TouchableOpacity style={s.menuItem} onPress={() => router.push('/edit-profile')}>
+          <Text style={s.menuIcon}>✏️</Text>
+          <Text style={s.menuText}>تعديل البيانات</Text>
+          <Text style={s.menuArrow}>←</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={s.menuItem} onPress={() => router.push('/addresses')}>
+          <Text style={s.menuIcon}>📍</Text>
+          <Text style={s.menuText}>عناويني</Text>
+          <Text style={s.menuArrow}>←</Text>
+        </TouchableOpacity>
+      </View>
+
       <TouchableOpacity style={s.logoutBtn} onPress={handleSignOut}>
         <Text style={s.logoutText}>تسجيل الخروج</Text>
       </TouchableOpacity>
@@ -66,13 +82,21 @@ const s = StyleSheet.create({
     borderRadius: 20, marginTop: 12,
   },
   codeText: { color: colors.primary, fontWeight: '700', fontSize: 13 },
-  statsRow: { flexDirection: 'row', gap: 12, marginBottom: 24 },
+  statsRow: { flexDirection: 'row', gap: 12, marginBottom: 20 },
   statCard: {
     flex: 1, backgroundColor: colors.navy[800], borderRadius: 16, padding: 20,
     alignItems: 'center', borderWidth: 1, borderColor: colors.navy[700],
   },
   statValue: { fontSize: 20, fontWeight: 'bold', color: '#fff' },
   statLabel: { fontSize: 12, color: colors.navy[300], marginTop: 4 },
+  menuSection: { gap: 8, marginBottom: 24 },
+  menuItem: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.navy[800],
+    borderRadius: 14, padding: 16, borderWidth: 1, borderColor: colors.navy[700],
+  },
+  menuIcon: { fontSize: 20, marginLeft: 12 },
+  menuText: { flex: 1, fontSize: 15, color: '#fff', fontWeight: '600' },
+  menuArrow: { fontSize: 18, color: colors.navy[400] },
   logoutBtn: {
     borderWidth: 1.5, borderColor: colors.danger, borderRadius: 14,
     padding: 14, alignItems: 'center',

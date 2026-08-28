@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert } from 'react-native'
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert, Linking } from 'react-native'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { supabase } from '../../src/lib/supabase'
 import { useRealtimeDriverOrders } from '../../src/hooks/useRealtimeOrders'
@@ -26,17 +26,20 @@ const serviceLabel: Record<string, string> = {
   wash: 'غسيل', iron: 'كي', wash_iron: 'غسيل وكي', dry_clean: 'تنظيف جاف',
 }
 
+type Filter = 'active' | 'completed' | 'all'
+
 export default function DriverOrdersScreen() {
   const { profile } = useAuth()
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [filter, setFilter] = useState<Filter>('active')
 
   const loadOrders = useCallback(async () => {
     if (!profile) return
     const { data } = await supabase
       .from('orders')
-      .select('*, customer:users!orders_customer_id_fkey(name, phone, customer_code)')
+      .select('*, customer:users!orders_customer_id_fkey(name, phone, customer_code), address:addresses(label, building, floor, apartment, landmark, lat, lng)')
       .eq('driver_id', profile.id)
       .not('status', 'in', '("cancelled","refunded")')
       .order('created_at', { ascending: false })
@@ -62,12 +65,24 @@ export default function DriverOrdersScreen() {
     }
   }
 
+  function openNavigation(addr: any) {
+    if (!addr?.lat || !addr?.lng) {
+      Alert.alert('خطأ', 'لا يوجد موقع محدد لهذا العنوان')
+      return
+    }
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${addr.lat},${addr.lng}`
+    Linking.openURL(url)
+  }
+
   const activeOrders = orders.filter(o => !['delivered'].includes(o.status))
   const completedOrders = orders.filter(o => o.status === 'delivered')
+
+  const filteredOrders = filter === 'active' ? activeOrders : filter === 'completed' ? completedOrders : orders
 
   const renderOrder = ({ item }: { item: any }) => {
     const status = statusConfig[item.status] ?? { label: item.status, color: '#999', icon: '❓' }
     const action = nextAction[item.status]
+    const addr = item.address
 
     return (
       <View style={s.orderCard}>
@@ -83,6 +98,21 @@ export default function DriverOrdersScreen() {
           <Text style={s.customerName}>👤 {item.customer?.name}</Text>
           <Text style={s.customerPhone}>📞 {item.customer?.phone ?? '—'}</Text>
         </View>
+
+        {addr && (
+          <View style={s.addressBox}>
+            <View style={s.addressHeader}>
+              <Text style={s.addressLabel}>📍 {addr.label}</Text>
+              <TouchableOpacity style={s.navBtn} onPress={() => openNavigation(addr)}>
+                <Text style={s.navBtnText}>🧭 اتجاهات</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={s.addressDetail}>
+              {[addr.building && `مبنى ${addr.building}`, addr.floor && `ط${addr.floor}`, addr.apartment && `ش${addr.apartment}`].filter(Boolean).join(' - ')}
+            </Text>
+            {addr.landmark && <Text style={s.addressDetail}>📌 {addr.landmark}</Text>}
+          </View>
+        )}
 
         <View style={s.orderDetails}>
           <View style={s.detailRow}>
@@ -114,6 +144,12 @@ export default function DriverOrdersScreen() {
             <Text style={s.actionText}>{action.label}</Text>
           </TouchableOpacity>
         )}
+
+        {item.customer?.phone && (item.status === 'assigned' || item.status === 'delivering') && (
+          <TouchableOpacity style={s.callBtn} onPress={() => Linking.openURL(`tel:${item.customer.phone}`)}>
+            <Text style={s.callBtnText}>📞 اتصل بالعميل</Text>
+          </TouchableOpacity>
+        )}
       </View>
     )
   }
@@ -128,6 +164,14 @@ export default function DriverOrdersScreen() {
         <View style={s.avatar}>
           <Text style={s.avatarText}>{profile?.name?.[0] ?? '؟'}</Text>
         </View>
+      </View>
+
+      <View style={s.filterRow}>
+        {([['active', 'النشطة'], ['completed', 'المكتملة'], ['all', 'الكل']] as [Filter, string][]).map(([key, label]) => (
+          <TouchableOpacity key={key} style={[s.filterBtn, filter === key && s.filterActive]} onPress={() => setFilter(key)}>
+            <Text style={[s.filterText, filter === key && s.filterTextActive]}>{label}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       <View style={s.statsRow}>
@@ -149,14 +193,14 @@ export default function DriverOrdersScreen() {
         <View style={s.emptyCard}>
           <Text style={s.emptyText}>جاري التحميل...</Text>
         </View>
-      ) : orders.length === 0 ? (
+      ) : filteredOrders.length === 0 ? (
         <View style={s.emptyCard}>
           <Text style={s.emptyIcon}>📋</Text>
-          <Text style={s.emptyText}>لا توجد طلبات مسندة إليك حالياً</Text>
+          <Text style={s.emptyText}>{filter === 'completed' ? 'لا توجد طلبات مكتملة' : 'لا توجد طلبات نشطة'}</Text>
         </View>
       ) : (
         <FlatList
-          data={orders}
+          data={filteredOrders}
           renderItem={renderOrder}
           keyExtractor={item => item.id}
           contentContainerStyle={{ gap: 12, paddingBottom: 20 }}
@@ -178,6 +222,13 @@ const s = StyleSheet.create({
     backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center',
   },
   avatarText: { fontSize: 18, color: '#fff', fontWeight: 'bold' },
+
+  filterRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  filterBtn: { flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center', backgroundColor: colors.navy[800], borderWidth: 1, borderColor: colors.navy[700] },
+  filterActive: { backgroundColor: colors.primary + '20', borderColor: colors.primary },
+  filterText: { fontSize: 13, color: colors.navy[300], fontWeight: '600' },
+  filterTextActive: { color: colors.primary },
+
   statsRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
   statCard: {
     flex: 1, backgroundColor: colors.navy[800], borderRadius: 16, padding: 16,
@@ -199,6 +250,17 @@ const s = StyleSheet.create({
   },
   customerName: { fontSize: 13, color: '#fff', fontWeight: '600' },
   customerPhone: { fontSize: 13, color: colors.navy[200] },
+
+  addressBox: {
+    backgroundColor: colors.navy[700] + '40', borderRadius: 12, padding: 12, marginBottom: 12,
+    borderWidth: 1, borderColor: colors.navy[600],
+  },
+  addressHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  addressLabel: { fontSize: 13, color: '#fff', fontWeight: '600' },
+  navBtn: { backgroundColor: colors.primary + '20', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  navBtnText: { fontSize: 11, color: colors.primary, fontWeight: '700' },
+  addressDetail: { fontSize: 11, color: colors.navy[200], marginTop: 2 },
+
   orderDetails: { gap: 6, marginBottom: 8 },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between' },
   detailLabel: { fontSize: 12, color: colors.navy[300] },
@@ -206,6 +268,8 @@ const s = StyleSheet.create({
   notes: { fontSize: 12, color: colors.navy[200], marginTop: 8, marginBottom: 4 },
   actionBtn: { borderRadius: 14, padding: 14, alignItems: 'center', marginTop: 12 },
   actionText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  callBtn: { borderWidth: 1, borderColor: colors.accent, borderRadius: 12, padding: 10, alignItems: 'center', marginTop: 8 },
+  callBtnText: { fontSize: 13, color: colors.accent, fontWeight: '600' },
   emptyCard: {
     backgroundColor: colors.navy[800], borderRadius: 20, padding: 40,
     alignItems: 'center', borderWidth: 1, borderColor: colors.navy[700],

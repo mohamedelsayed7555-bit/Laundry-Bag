@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl } from 'react-native'
+import { useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { supabase } from '../../src/lib/supabase'
 import { useRealtimeOrders } from '../../src/hooks/useRealtimeOrders'
@@ -26,6 +27,7 @@ export default function OrdersScreen() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
+  const router = useRouter()
   const loadOrders = useCallback(async () => {
     if (!profile) return
     const { data } = await supabase
@@ -46,7 +48,7 @@ export default function OrdersScreen() {
   const renderOrder = ({ item }: { item: any }) => {
     const status = statusConfig[item.status] ?? statusConfig.pending
     return (
-      <View style={s.orderCard}>
+      <TouchableOpacity style={s.orderCard} activeOpacity={0.7} onPress={() => router.push(`/order/${item.id}`)}>
         <View style={s.orderHeader}>
           <Text style={s.orderNumber}>{item.order_number}</Text>
           <View style={[s.statusBadge, { backgroundColor: status.color + '20' }]}>
@@ -77,7 +79,7 @@ export default function OrdersScreen() {
         </View>
 
         <Text style={s.date}>{new Date(item.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}</Text>
-      </View>
+      </TouchableOpacity>
     )
   }
 

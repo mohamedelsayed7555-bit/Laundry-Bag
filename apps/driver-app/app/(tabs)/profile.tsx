@@ -1,15 +1,20 @@
 import { useEffect, useState } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Switch } from 'react-native'
+import { useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { supabase } from '../../src/lib/supabase'
 import { colors } from '../../src/theme'
 
 export default function DriverProfileScreen() {
-  const { profile, signOut } = useAuth()
+  const { profile, signOut, refreshProfile } = useAuth()
+  const router = useRouter()
   const [stats, setStats] = useState({ total: 0, delivered: 0, earnings: 0 })
+  const [isOnline, setIsOnline] = useState(profile?.is_active ?? false)
+  const [toggling, setToggling] = useState(false)
 
   useEffect(() => {
     if (profile) {
+      setIsOnline(profile.is_active)
       supabase.from('orders').select('status, total').eq('driver_id', profile.id).then(({ data }) => {
         const orders = data ?? []
         const delivered = orders.filter(o => o.status === 'delivered')
@@ -21,6 +26,20 @@ export default function DriverProfileScreen() {
       })
     }
   }, [profile])
+
+  async function toggleAvailability(value: boolean) {
+    if (!profile) return
+    setToggling(true)
+    setIsOnline(value)
+    const { error } = await supabase.from('users').update({ is_active: value }).eq('id', profile.id)
+    if (error) {
+      setIsOnline(!value)
+      Alert.alert('خطأ', 'حدث خطأ أثناء تغيير الحالة')
+    } else {
+      await refreshProfile()
+    }
+    setToggling(false)
+  }
 
   const handleSignOut = () => {
     Alert.alert('تسجيل الخروج', 'هل أنت متأكد؟', [
@@ -44,6 +63,23 @@ export default function DriverProfileScreen() {
         </View>
       </View>
 
+      <View style={s.onlineCard}>
+        <View style={s.onlineRow}>
+          <View style={s.onlineInfo}>
+            <View style={[s.statusDot, { backgroundColor: isOnline ? colors.success : colors.danger }]} />
+            <Text style={s.onlineLabel}>{isOnline ? 'متاح للطلبات' : 'غير متاح'}</Text>
+          </View>
+          <Switch
+            value={isOnline}
+            onValueChange={toggleAvailability}
+            disabled={toggling}
+            trackColor={{ false: colors.navy[600], true: colors.primary + '60' }}
+            thumbColor={isOnline ? colors.primary : colors.navy[400]}
+          />
+        </View>
+        <Text style={s.onlineHint}>{isOnline ? 'ستصلك طلبات جديدة' : 'لن تصلك طلبات جديدة'}</Text>
+      </View>
+
       <View style={s.statsRow}>
         <View style={s.statCard}>
           <Text style={s.statValue}>{stats.total}</Text>
@@ -59,27 +95,28 @@ export default function DriverProfileScreen() {
         </View>
       </View>
 
-      <View style={s.infoCard}>
-        <View style={s.infoRow}>
-          <Text style={s.infoLabel}>الحالة</Text>
-          <View style={[s.statusDot, { backgroundColor: profile?.is_active ? colors.success : colors.danger }]} />
-          <Text style={[s.infoValue, { color: profile?.is_active ? colors.success : colors.danger }]}>
-            {profile?.is_active ? 'متاح' : 'غير متاح'}
-          </Text>
-        </View>
-        {profile?.vehicle_type && (
+      <View style={s.menuSection}>
+        <TouchableOpacity style={s.menuItem} onPress={() => router.push('/edit-profile')}>
+          <Text style={s.menuIcon}>✏️</Text>
+          <Text style={s.menuText}>تعديل البيانات</Text>
+          <Text style={s.menuArrow}>←</Text>
+        </TouchableOpacity>
+      </View>
+
+      {profile?.vehicle_type && (
+        <View style={s.infoCard}>
           <View style={s.infoRow}>
             <Text style={s.infoLabel}>المركبة</Text>
             <Text style={s.infoValue}>{profile.vehicle_type === 'motorcycle' ? 'موتوسيكل' : profile.vehicle_type === 'car' ? 'سيارة' : 'فان'}</Text>
           </View>
-        )}
-        {profile?.vehicle_number && (
-          <View style={s.infoRow}>
-            <Text style={s.infoLabel}>رقم المركبة</Text>
-            <Text style={s.infoValue}>{profile.vehicle_number}</Text>
-          </View>
-        )}
-      </View>
+          {profile?.vehicle_number && (
+            <View style={s.infoRow}>
+              <Text style={s.infoLabel}>رقم المركبة</Text>
+              <Text style={s.infoValue}>{profile.vehicle_number}</Text>
+            </View>
+          )}
+        </View>
+      )}
 
       <TouchableOpacity style={s.logoutBtn} onPress={handleSignOut}>
         <Text style={s.logoutText}>تسجيل الخروج</Text>
@@ -93,7 +130,7 @@ const s = StyleSheet.create({
   title: { fontSize: 22, fontWeight: 'bold', color: '#fff', marginBottom: 24 },
   card: {
     alignItems: 'center', backgroundColor: colors.navy[800], borderRadius: 20,
-    padding: 28, borderWidth: 1, borderColor: colors.navy[700], marginBottom: 20,
+    padding: 28, borderWidth: 1, borderColor: colors.navy[700], marginBottom: 16,
   },
   avatar: {
     width: 72, height: 72, borderRadius: 36,
@@ -106,6 +143,17 @@ const s = StyleSheet.create({
     backgroundColor: colors.accent, paddingHorizontal: 16, paddingVertical: 4, borderRadius: 12, marginTop: 12,
   },
   roleText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+
+  onlineCard: {
+    backgroundColor: colors.navy[800], borderRadius: 16, padding: 16,
+    borderWidth: 1, borderColor: colors.navy[700], marginBottom: 16,
+  },
+  onlineRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  onlineInfo: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  statusDot: { width: 10, height: 10, borderRadius: 5 },
+  onlineLabel: { fontSize: 15, color: '#fff', fontWeight: '700' },
+  onlineHint: { fontSize: 11, color: colors.navy[300], marginTop: 6 },
+
   statsRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
   statCard: {
     flex: 1, backgroundColor: colors.navy[800], borderRadius: 16, padding: 16,
@@ -113,14 +161,23 @@ const s = StyleSheet.create({
   },
   statValue: { fontSize: 20, fontWeight: 'bold', color: '#fff' },
   statLabel: { fontSize: 10, color: colors.navy[300], marginTop: 4 },
+
+  menuSection: { gap: 8, marginBottom: 16 },
+  menuItem: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.navy[800],
+    borderRadius: 14, padding: 16, borderWidth: 1, borderColor: colors.navy[700],
+  },
+  menuIcon: { fontSize: 20, marginLeft: 12 },
+  menuText: { flex: 1, fontSize: 15, color: '#fff', fontWeight: '600' },
+  menuArrow: { fontSize: 18, color: colors.navy[400] },
+
   infoCard: {
     backgroundColor: colors.navy[800], borderRadius: 16, padding: 20,
-    borderWidth: 1, borderColor: colors.navy[700], marginBottom: 24, gap: 12,
+    borderWidth: 1, borderColor: colors.navy[700], marginBottom: 16, gap: 12,
   },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   infoLabel: { fontSize: 13, color: colors.navy[300], flex: 1 },
   infoValue: { fontSize: 13, color: '#fff', fontWeight: '600' },
-  statusDot: { width: 8, height: 8, borderRadius: 4 },
   logoutBtn: {
     borderWidth: 1.5, borderColor: colors.danger, borderRadius: 14,
     padding: 14, alignItems: 'center',

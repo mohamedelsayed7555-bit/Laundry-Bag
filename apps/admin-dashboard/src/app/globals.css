@@ -13,12 +13,15 @@
 body {
   font-family: 'Cairo', sans-serif;
   direction: rtl;
-  background-color: #f0f2f5;
+  background-color: #f8f9fc;
+  color: #1e2747;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -27,7 +30,7 @@ body {
 
 ::-webkit-scrollbar-thumb {
   background: #c1c5d0;
-  border-radius: 3px;
+  border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -41,4 +44,51 @@ body {
 
 .animate-slide-in {
   animation: slide-in 0.3s ease-out;
+}
+
+@layer utilities {
+  .glass {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .glass-dark {
+    background: rgba(14, 20, 40, 0.8);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .premium-border {
+    border: 1px solid #e5e7ef;
+  }
+
+  .text-gradient {
+    background: linear-gradient(135deg, #00af5f 0%, #7c5cfc 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    background: #e5e7ef;
+    border-radius: 8px;
+  }
+
+  .skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%);
+    animation: shimmer 2s ease-in-out infinite;
+    transform: translateX(-100%);
+  }
+
+  @keyframes shimmer {
+    100% { transform: translateX(100%); }
+  }
 }

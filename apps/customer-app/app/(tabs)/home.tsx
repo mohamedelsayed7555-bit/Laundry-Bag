@@ -79,7 +79,7 @@ export default function HomeScreen() {
         recentOrders.map(order => {
           const status = statusConfig[order.status] ?? statusConfig.pending
           return (
-            <TouchableOpacity key={order.id} style={s.orderCard} onPress={() => router.push('/(tabs)/orders')}>
+            <TouchableOpacity key={order.id} style={s.orderCard} onPress={() => router.push(`/order/${order.id}`)}>
               <View style={s.orderRow}>
                 <Text style={s.orderNumber}>{order.order_number}</Text>
                 <View style={[s.statusBadge, { backgroundColor: status.color + '20' }]}>

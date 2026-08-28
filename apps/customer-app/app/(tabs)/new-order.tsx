@@ -27,10 +27,20 @@ export default function NewOrderScreen() {
   const [notes, setNotes] = useState('')
   const [prices, setPrices] = useState<any[]>([])
   const [saving, setSaving] = useState(false)
+  const [addresses, setAddresses] = useState<any[]>([])
+  const [selectedAddress, setSelectedAddress] = useState<any>(null)
 
   useEffect(() => {
     supabase.from('prices').select('*').eq('is_active', true).then(({ data }) => setPrices(data ?? []))
-  }, [])
+    if (profile) {
+      supabase.from('addresses').select('*').eq('user_id', profile.id).order('is_default', { ascending: false })
+        .then(({ data }) => {
+          setAddresses(data ?? [])
+          const def = data?.find((a: any) => a.is_default) ?? data?.[0]
+          if (def) setSelectedAddress(def)
+        })
+    }
+  }, [profile])
 
   const estimatedPrice = () => {
     const matching = prices.filter(p => p.service_type === serviceType)
@@ -51,6 +61,7 @@ export default function NewOrderScreen() {
       notes: notes || null,
       status: 'pending',
       payment_status: 'pending',
+      address_id: selectedAddress?.id || null,
     })
     setSaving(false)
     if (error) {
@@ -65,6 +76,26 @@ export default function NewOrderScreen() {
   return (
     <ScrollView style={s.container} contentContainerStyle={s.content}>
       <Text style={s.title}>طلب جديد</Text>
+
+      <Text style={s.sectionTitle}>عنوان الاستلام</Text>
+      {addresses.length === 0 ? (
+        <TouchableOpacity style={s.addAddressBtn} onPress={() => router.push('/addresses')}>
+          <Text style={s.addAddressText}>📍 إضافة عنوان جديد</Text>
+        </TouchableOpacity>
+      ) : (
+        <View style={s.addressList}>
+          {addresses.map(addr => (
+            <TouchableOpacity key={addr.id} onPress={() => setSelectedAddress(addr)}
+              style={[s.addressCard, selectedAddress?.id === addr.id && s.addressSelected]}>
+              <Text style={s.addressLabel}>📍 {addr.label}</Text>
+              {addr.building && <Text style={s.addressDetail}>{addr.building}{addr.floor ? ` - ط${addr.floor}` : ''}{addr.apartment ? ` - ش${addr.apartment}` : ''}</Text>}
+            </TouchableOpacity>
+          ))}
+          <TouchableOpacity onPress={() => router.push('/addresses')}>
+            <Text style={s.manageAddressText}>إدارة العناوين</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <Text style={s.sectionTitle}>نوع الخدمة</Text>
       <View style={s.grid}>
@@ -154,4 +185,18 @@ const s = StyleSheet.create({
   },
   submitDisabled: { opacity: 0.6 },
   submitText: { fontSize: 18, fontWeight: '700', color: '#fff' },
+  addAddressBtn: {
+    backgroundColor: colors.navy[800], borderRadius: 16, padding: 16, alignItems: 'center',
+    borderWidth: 1.5, borderColor: colors.primary, borderStyle: 'dashed',
+  },
+  addAddressText: { color: colors.primary, fontSize: 14, fontWeight: '600' },
+  addressList: { gap: 8 },
+  addressCard: {
+    backgroundColor: colors.navy[800], borderRadius: 12, padding: 12,
+    borderWidth: 1.5, borderColor: colors.navy[700],
+  },
+  addressSelected: { borderColor: colors.primary, backgroundColor: colors.primary + '10' },
+  addressLabel: { fontSize: 14, fontWeight: '600', color: '#fff' },
+  addressDetail: { fontSize: 11, color: colors.navy[300], marginTop: 2 },
+  manageAddressText: { color: colors.accent, fontSize: 12, fontWeight: '600', textAlign: 'center', marginTop: 8 },
 })

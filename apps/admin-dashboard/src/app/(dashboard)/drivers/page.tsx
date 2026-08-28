@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import DataTable from '@/components/ui/DataTable'
 import Badge from '@/components/ui/Badge'
@@ -70,7 +71,7 @@ export default function DriversPage() {
   const columns = [
     { key: 'name', label: 'السائق', render: (item: any) => (
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-xs font-bold">{item.name?.[0]}</div>
+        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-xs font-bold shadow-premium">{item.name?.[0]}</div>
         <span className="font-medium">{item.name}</span>
       </div>
     )},
@@ -80,70 +81,75 @@ export default function DriversPage() {
     { key: 'is_active', label: 'الحالة', render: (item: any) => <Badge variant={item.is_active ? 'success' : 'danger'}>{item.is_active ? 'متاح' : 'غير متاح'}</Badge> },
     { key: 'actions', label: '', render: (item: any) => (
       <div className="flex gap-1">
-        <button onClick={() => setDetailItem(item)} className="p-1.5 hover:bg-gray-100 rounded-lg transition"><Eye size={14} className="text-gray-500" /></button>
-        <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-gray-100 rounded-lg transition"><Edit2 size={14} className="text-gray-500" /></button>
-        <button onClick={() => toggleActive(item.id, item.is_active)} className="p-1.5 hover:bg-gray-100 rounded-lg transition"><Power size={14} className={item.is_active ? 'text-red-400' : 'text-green-500'} /></button>
+        <button onClick={() => setDetailItem(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Eye size={14} className="text-gray-400" /></button>
+        <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Edit2 size={14} className="text-gray-400" /></button>
+        <button onClick={() => toggleActive(item.id, item.is_active)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Power size={14} className={item.is_active ? 'text-red-400' : 'text-green-500'} /></button>
       </div>
     )},
   ]
 
+  const inputClass = "w-full p-3 border border-surface-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all"
+
   const formFields = (
     <>
       <div>
-        <label className="block text-sm font-medium text-gray-600 mb-1">الاسم</label>
-        <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20" />
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">الاسم</label>
+        <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required className={inputClass} />
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-600 mb-1">الهاتف</label>
-        <input type="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} dir="ltr" className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20" />
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">الهاتف</label>
+        <input type="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} dir="ltr" className={inputClass} />
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-600 mb-1">البريد الإلكتروني</label>
-        <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} dir="ltr" className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20" />
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">البريد الإلكتروني</label>
+        <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} dir="ltr" className={inputClass} />
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-600 mb-1">نوع المركبة</label>
-        <select value={form.vehicle_type} onChange={e => setForm({ ...form, vehicle_type: e.target.value })} className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20">
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">نوع المركبة</label>
+        <select value={form.vehicle_type} onChange={e => setForm({ ...form, vehicle_type: e.target.value })} className={inputClass}>
           <option value="motorcycle">موتوسيكل</option><option value="car">سيارة</option><option value="van">فان</option>
         </select>
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-600 mb-1">رقم المركبة</label>
-        <input type="text" value={form.vehicle_number} onChange={e => setForm({ ...form, vehicle_number: e.target.value })} dir="ltr" className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20" />
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">رقم المركبة</label>
+        <input type="text" value={form.vehicle_number} onChange={e => setForm({ ...form, vehicle_number: e.target.value })} dir="ltr" className={inputClass} />
       </div>
     </>
   )
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div><h2 className="text-xl font-bold text-gray-800">إدارة السائقين</h2><p className="text-sm text-gray-400">{drivers.length} سائق</p></div>
+    <div className="space-y-5">
+      <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Truck className="w-5 h-5 text-orange-500" /> إدارة السائقين</h2>
+          <p className="text-sm text-gray-400 mt-0.5">{drivers.length} سائق</p>
+        </div>
         <button onClick={() => { setForm({ name: '', phone: '', email: '', vehicle_type: 'motorcycle', vehicle_number: '' }); setShowAdd(true) }}
-          className="flex items-center gap-2 bg-primary-500 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-primary-600 transition shadow-lg shadow-primary-500/25">
+          className="flex items-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:shadow-glow-green transition-all duration-300">
           <Plus size={16} /> سائق جديد
         </button>
-      </div>
+      </motion.div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatCard label="إجمالي السائقين" value={drivers.length} icon={Truck} color="blue" />
-        <StatCard label="متاح" value={activeDrivers} icon={CheckCircle} color="green" />
-        <StatCard label="في مهمة" value={0} icon={Clock} color="orange" />
-        <StatCard label="غير متاح" value={drivers.length - activeDrivers} icon={XCircle} color="red" />
+        <StatCard label="إجمالي السائقين" value={drivers.length} icon={Truck} color="blue" index={0} />
+        <StatCard label="متاح" value={activeDrivers} icon={CheckCircle} color="green" index={1} />
+        <StatCard label="في مهمة" value={0} icon={Clock} color="orange" index={2} />
+        <StatCard label="غير متاح" value={drivers.length - activeDrivers} icon={XCircle} color="red" index={3} />
       </div>
 
-      <div className="relative">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className="relative max-w-md">
         <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
         <input type="text" placeholder="بحث بالاسم أو الهاتف..." value={search} onChange={e => setSearch(e.target.value)}
-          className="w-full max-w-md pr-10 pl-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition" />
-      </div>
+          className="w-full pr-10 pl-4 py-2.5 bg-white border border-surface-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all" />
+      </motion.div>
 
-      {loading ? <div className="flex items-center justify-center h-32"><div className="w-6 h-6 border-3 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>
+      {loading ? <div className="flex items-center justify-center h-32"><div className="w-7 h-7 border-[3px] border-primary-500 border-t-transparent rounded-full animate-spin" /></div>
         : <DataTable columns={columns} data={filtered} emptyMessage="لا يوجد سائقين" />}
 
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="سائق جديد">
         <form onSubmit={handleAdd} className="space-y-4">
           {formFields}
-          <button type="submit" disabled={saving} className="w-full bg-primary-500 text-white p-3 rounded-xl font-semibold hover:bg-primary-600 disabled:opacity-50 transition">
+          <button type="submit" disabled={saving} className="w-full bg-gradient-to-l from-primary-500 to-primary-600 text-white p-3 rounded-xl font-semibold hover:shadow-glow-green disabled:opacity-50 transition-all">
             {saving ? 'جاري الحفظ...' : 'إضافة السائق'}
           </button>
         </form>
@@ -152,7 +158,7 @@ export default function DriversPage() {
       <Modal open={!!editItem} onClose={() => setEditItem(null)} title="تعديل السائق">
         <form onSubmit={handleEdit} className="space-y-4">
           {formFields}
-          <button type="submit" disabled={saving} className="w-full bg-primary-500 text-white p-3 rounded-xl font-semibold hover:bg-primary-600 disabled:opacity-50 transition">
+          <button type="submit" disabled={saving} className="w-full bg-gradient-to-l from-primary-500 to-primary-600 text-white p-3 rounded-xl font-semibold hover:shadow-glow-green disabled:opacity-50 transition-all">
             {saving ? 'جاري الحفظ...' : 'حفظ التعديلات'}
           </button>
         </form>
@@ -162,15 +168,21 @@ export default function DriversPage() {
         {detailItem && (
           <div className="space-y-4">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-2xl font-bold">{detailItem.name?.[0]}</div>
-              <div><h4 className="text-lg font-bold">{detailItem.name}</h4><Badge variant={detailItem.is_active ? 'success' : 'danger'}>{detailItem.is_active ? 'متاح' : 'غير متاح'}</Badge></div>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-xl font-bold shadow-premium-md">{detailItem.name?.[0]}</div>
+              <div><h4 className="text-lg font-bold text-gray-800">{detailItem.name}</h4><Badge variant={detailItem.is_active ? 'success' : 'danger'}>{detailItem.is_active ? 'متاح' : 'غير متاح'}</Badge></div>
             </div>
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div><span className="text-gray-400">الهاتف:</span> <span className="font-medium">{detailItem.phone ?? '—'}</span></div>
-              <div><span className="text-gray-400">البريد:</span> <span className="font-medium">{detailItem.email ?? '—'}</span></div>
-              <div><span className="text-gray-400">المركبة:</span> <span className="font-medium">{vehicleLabel[detailItem.vehicle_type] ?? '—'}</span></div>
-              <div><span className="text-gray-400">رقم المركبة:</span> <span className="font-medium">{detailItem.vehicle_number ?? '—'}</span></div>
-              <div><span className="text-gray-400">تاريخ الانضمام:</span> <span className="font-medium">{new Date(detailItem.created_at).toLocaleDateString('ar-EG')}</span></div>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: 'الهاتف', value: detailItem.phone ?? '—' },
+                { label: 'البريد', value: detailItem.email ?? '—' },
+                { label: 'المركبة', value: vehicleLabel[detailItem.vehicle_type] ?? '—' },
+                { label: 'رقم المركبة', value: detailItem.vehicle_number ?? '—' },
+              ].map((item, i) => (
+                <div key={i} className="bg-surface-muted/50 rounded-xl p-3">
+                  <p className="text-[10px] text-gray-400 mb-0.5">{item.label}</p>
+                  <p className="text-sm font-semibold text-gray-800">{item.value}</p>
+                </div>
+              ))}
             </div>
           </div>
         )}

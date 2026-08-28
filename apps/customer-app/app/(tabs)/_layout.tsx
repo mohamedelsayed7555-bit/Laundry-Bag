@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router'
-import { Home, ClipboardList, PlusCircle, MessageCircle, User } from 'lucide-react-native'
+import { Home, ClipboardList, PlusCircle, Bell, User } from 'lucide-react-native'
 import { colors } from '../../src/theme'
 
 export default function TabsLayout() {
@@ -48,8 +48,8 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="messages"
         options={{
-          title: 'الرسائل',
-          tabBarIcon: ({ color, size }) => <MessageCircle size={size} color={color} />,
+          title: 'الإشعارات',
+          tabBarIcon: ({ color, size }) => <Bell size={size} color={color} />,
         }}
       />
       <Tabs.Screen

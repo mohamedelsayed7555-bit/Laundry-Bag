@@ -1,0 +1,214 @@
+import { useEffect, useState } from 'react'
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Alert, Modal } from 'react-native'
+import { useRouter } from 'expo-router'
+import { useAuth } from '../src/contexts/AuthContext'
+import { supabase } from '../src/lib/supabase'
+import { colors } from '../src/theme'
+
+export default function AddressesScreen() {
+  const { profile } = useAuth()
+  const router = useRouter()
+  const [addresses, setAddresses] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showModal, setShowModal] = useState(false)
+  const [editing, setEditing] = useState<any>(null)
+  const [form, setForm] = useState({ label: '', building: '', floor: '', apartment: '', landmark: '', notes: '' })
+
+  useEffect(() => { loadAddresses() }, [profile])
+
+  async function loadAddresses() {
+    if (!profile) return
+    const { data } = await supabase.from('addresses').select('*').eq('user_id', profile.id).order('is_default', { ascending: false })
+    setAddresses(data ?? [])
+    setLoading(false)
+  }
+
+  function openAdd() {
+    setEditing(null)
+    setForm({ label: '', building: '', floor: '', apartment: '', landmark: '', notes: '' })
+    setShowModal(true)
+  }
+
+  function openEdit(addr: any) {
+    setEditing(addr)
+    setForm({
+      label: addr.label || '',
+      building: addr.building || '',
+      floor: addr.floor || '',
+      apartment: addr.apartment || '',
+      landmark: addr.landmark || '',
+      notes: addr.notes || '',
+    })
+    setShowModal(true)
+  }
+
+  async function handleSave() {
+    if (!form.label.trim()) { Alert.alert('خطأ', 'أدخل اسم العنوان'); return }
+    if (!profile) return
+
+    const payload = {
+      user_id: profile.id,
+      label: form.label.trim(),
+      building: form.building.trim() || null,
+      floor: form.floor.trim() || null,
+      apartment: form.apartment.trim() || null,
+      landmark: form.landmark.trim() || null,
+      notes: form.notes.trim() || null,
+      lat: 30.0444,
+      lng: 31.2357,
+      is_default: addresses.length === 0,
+    }
+
+    if (editing) {
+      await supabase.from('addresses').update(payload).eq('id', editing.id)
+    } else {
+      await supabase.from('addresses').insert(payload)
+    }
+    setShowModal(false)
+    loadAddresses()
+  }
+
+  async function handleDelete(id: string) {
+    Alert.alert('حذف العنوان', 'هل أنت متأكد؟', [
+      { text: 'إلغاء', style: 'cancel' },
+      { text: 'حذف', style: 'destructive', onPress: async () => {
+        await supabase.from('addresses').delete().eq('id', id)
+        loadAddresses()
+      }},
+    ])
+  }
+
+  async function setDefault(id: string) {
+    if (!profile) return
+    await supabase.from('addresses').update({ is_default: false }).eq('user_id', profile.id)
+    await supabase.from('addresses').update({ is_default: true }).eq('id', id)
+    loadAddresses()
+  }
+
+  return (
+    <View style={s.container}>
+      <View style={s.headerRow}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Text style={s.backText}>→ رجوع</Text>
+        </TouchableOpacity>
+        <Text style={s.title}>عناويني</Text>
+        <TouchableOpacity onPress={openAdd}>
+          <Text style={s.addText}>+ إضافة</Text>
+        </TouchableOpacity>
+      </View>
+
+      {loading ? (
+        <Text style={s.emptyText}>جاري التحميل...</Text>
+      ) : addresses.length === 0 ? (
+        <View style={s.emptyCard}>
+          <Text style={{ fontSize: 40, marginBottom: 12 }}>📍</Text>
+          <Text style={s.emptyText}>لا توجد عناوين محفوظة</Text>
+          <TouchableOpacity style={s.addBtn} onPress={openAdd}>
+            <Text style={s.addBtnText}>إضافة عنوان</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          data={addresses}
+          keyExtractor={i => i.id}
+          contentContainerStyle={{ gap: 12, paddingBottom: 20 }}
+          renderItem={({ item }) => (
+            <View style={s.card}>
+              <View style={s.cardHeader}>
+                <View style={s.labelRow}>
+                  <Text style={s.cardLabel}>📍 {item.label}</Text>
+                  {item.is_default && <View style={s.defaultBadge}><Text style={s.defaultText}>افتراضي</Text></View>}
+                </View>
+                <TouchableOpacity onPress={() => openEdit(item)}>
+                  <Text style={s.editText}>تعديل</Text>
+                </TouchableOpacity>
+              </View>
+              {item.building && <Text style={s.cardDetail}>المبنى: {item.building}</Text>}
+              {item.floor && <Text style={s.cardDetail}>الطابق: {item.floor}</Text>}
+              {item.apartment && <Text style={s.cardDetail}>الشقة: {item.apartment}</Text>}
+              {item.landmark && <Text style={s.cardDetail}>علامة مميزة: {item.landmark}</Text>}
+              <View style={s.cardActions}>
+                {!item.is_default && (
+                  <TouchableOpacity onPress={() => setDefault(item.id)}>
+                    <Text style={s.actionText}>تعيين كافتراضي</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity onPress={() => handleDelete(item.id)}>
+                  <Text style={[s.actionText, { color: colors.danger }]}>حذف</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        />
+      )}
+
+      <Modal visible={showModal} animationType="slide" transparent>
+        <View style={s.modalOverlay}>
+          <View style={s.modalContent}>
+            <Text style={s.modalTitle}>{editing ? 'تعديل العنوان' : 'إضافة عنوان'}</Text>
+            <FormField label="اسم العنوان *" value={form.label} onChange={v => setForm(f => ({ ...f, label: v }))} placeholder="مثال: البيت، الشغل" />
+            <FormField label="المبنى" value={form.building} onChange={v => setForm(f => ({ ...f, building: v }))} placeholder="رقم أو اسم المبنى" />
+            <View style={s.row}>
+              <View style={{ flex: 1 }}><FormField label="الطابق" value={form.floor} onChange={v => setForm(f => ({ ...f, floor: v }))} placeholder="3" /></View>
+              <View style={{ flex: 1 }}><FormField label="الشقة" value={form.apartment} onChange={v => setForm(f => ({ ...f, apartment: v }))} placeholder="12" /></View>
+            </View>
+            <FormField label="علامة مميزة" value={form.landmark} onChange={v => setForm(f => ({ ...f, landmark: v }))} placeholder="بجوار مسجد..." />
+            <FormField label="ملاحظات" value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} placeholder="تفاصيل إضافية" />
+
+            <View style={s.modalActions}>
+              <TouchableOpacity style={s.modalCancel} onPress={() => setShowModal(false)}>
+                <Text style={s.modalCancelText}>إلغاء</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.modalSave} onPress={handleSave}>
+                <Text style={s.modalSaveText}>حفظ</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  )
+}
+
+function FormField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder: string }) {
+  return (
+    <View style={{ marginBottom: 12 }}>
+      <Text style={s.fieldLabel}>{label}</Text>
+      <TextInput style={s.fieldInput} value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={colors.navy[400]} textAlign="right" />
+    </View>
+  )
+}
+
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.navy[900], padding: 20, paddingTop: 56 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  backText: { color: colors.primary, fontSize: 16, fontWeight: '600' },
+  title: { fontSize: 20, fontWeight: 'bold', color: '#fff' },
+  addText: { color: colors.accent, fontSize: 14, fontWeight: '700' },
+  emptyCard: { backgroundColor: colors.navy[800], borderRadius: 20, padding: 40, alignItems: 'center', borderWidth: 1, borderColor: colors.navy[700] },
+  emptyText: { fontSize: 15, color: colors.navy[300], textAlign: 'center' },
+  addBtn: { backgroundColor: colors.primary, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 10, marginTop: 16 },
+  addBtnText: { color: '#fff', fontWeight: '700' },
+  card: { backgroundColor: colors.navy[800], borderRadius: 16, padding: 16, borderWidth: 1, borderColor: colors.navy[700] },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  labelRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cardLabel: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  defaultBadge: { backgroundColor: colors.primary + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
+  defaultText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
+  editText: { color: colors.accent, fontSize: 13, fontWeight: '600' },
+  cardDetail: { fontSize: 12, color: colors.navy[200], marginBottom: 2 },
+  cardActions: { flexDirection: 'row', gap: 16, marginTop: 12, borderTopWidth: 1, borderTopColor: colors.navy[700], paddingTop: 10 },
+  actionText: { color: colors.primary, fontSize: 12, fontWeight: '600' },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: colors.navy[800], borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '80%' },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: '#fff', marginBottom: 20, textAlign: 'center' },
+  row: { flexDirection: 'row', gap: 12 },
+  fieldLabel: { fontSize: 12, color: colors.navy[200], marginBottom: 4, textAlign: 'right' },
+  fieldInput: { backgroundColor: colors.navy[700], borderRadius: 10, padding: 12, color: '#fff', fontSize: 14 },
+  modalActions: { flexDirection: 'row', gap: 12, marginTop: 20 },
+  modalCancel: { flex: 1, borderWidth: 1, borderColor: colors.navy[500], borderRadius: 12, padding: 14, alignItems: 'center' },
+  modalCancelText: { color: colors.navy[200], fontWeight: '600' },
+  modalSave: { flex: 2, backgroundColor: colors.primary, borderRadius: 12, padding: 14, alignItems: 'center' },
+  modalSaveText: { color: '#fff', fontWeight: '700' },
+})

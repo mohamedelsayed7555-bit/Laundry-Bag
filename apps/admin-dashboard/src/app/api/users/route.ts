@@ -10,6 +10,13 @@ export async function POST(request: NextRequest) {
   const body = await request.json()
   const { name, phone, email, role, tier, vehicle_type, vehicle_number } = body
 
+  if (email) {
+    const { data: existing } = await supabaseAdmin.from('users').select('id').eq('email', email).maybeSingle()
+    if (existing) {
+      return NextResponse.json({ error: 'البريد الإلكتروني مستخدم بالفعل' }, { status: 400 })
+    }
+  }
+
   const password = Math.random().toString(36).slice(-10) + 'A1!'
 
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({

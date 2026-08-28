@@ -6,6 +6,7 @@ import DataTable from '@/components/ui/DataTable'
 import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
 import { MapPin, Plus, Edit2, Power } from 'lucide-react'
+import { motion } from 'framer-motion'
 import { useToast } from '@/components/ui/Toast'
 
 export default function BranchesPage() {
@@ -61,8 +62,8 @@ export default function BranchesPage() {
     { key: 'is_active', label: 'الحالة', render: (item: any) => <Badge variant={item.is_active ? 'success' : 'danger'}>{item.is_active ? 'نشط' : 'معطل'}</Badge> },
     { key: 'actions', label: '', render: (item: any) => (
       <div className="flex gap-1">
-        <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-gray-100 rounded-lg transition"><Edit2 size={14} className="text-gray-500" /></button>
-        <button onClick={() => toggleActive(item.id, item.is_active)} className="p-1.5 hover:bg-gray-100 rounded-lg transition"><Power size={14} className={item.is_active ? 'text-red-400' : 'text-green-500'} /></button>
+        <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Edit2 size={14} className="text-gray-500" /></button>
+        <button onClick={() => toggleActive(item.id, item.is_active)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Power size={14} className={item.is_active ? 'text-red-400' : 'text-green-500'} /></button>
       </div>
     )},
   ]
@@ -70,35 +71,35 @@ export default function BranchesPage() {
   const formFields = (
     <>
       <div>
-        <label className="block text-sm font-medium text-gray-600 mb-1">اسم الفرع</label>
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">اسم الفرع</label>
         <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required
-          className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20" />
+          className="w-full p-3 border border-surface-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all" />
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-600 mb-1">العنوان</label>
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">العنوان</label>
         <input type="text" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })}
-          className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20" />
+          className="w-full p-3 border border-surface-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all" />
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-600 mb-1">الهاتف</label>
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">الهاتف</label>
         <input type="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} dir="ltr"
-          className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20" />
+          className="w-full p-3 border border-surface-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all" />
       </div>
     </>
   )
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><MapPin className="w-5 h-5" /> إدارة الفروع</h2>
-          <p className="text-sm text-gray-400">{branches.length} فرع</p>
+          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><MapPin className="w-5 h-5 text-blue-500" /> إدارة الفروع</h2>
+          <p className="text-sm text-gray-400 mt-0.5">{branches.length} فرع</p>
         </div>
         <button onClick={() => { setForm({ name: '', address: '', phone: '' }); setShowAdd(true) }}
-          className="flex items-center gap-2 bg-primary-500 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-primary-600 transition shadow-lg shadow-primary-500/25">
+          className="flex items-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:shadow-glow-green transition-all duration-300">
           <Plus size={16} /> فرع جديد
         </button>
-      </div>
+      </motion.div>
 
       {loading ? <div className="flex items-center justify-center h-32"><div className="w-6 h-6 border-3 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>
         : <DataTable columns={columns} data={branches} emptyMessage="لا توجد فروع" />}
@@ -106,7 +107,7 @@ export default function BranchesPage() {
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="فرع جديد">
         <form onSubmit={handleAdd} className="space-y-4">
           {formFields}
-          <button type="submit" disabled={saving} className="w-full bg-primary-500 text-white p-3 rounded-xl font-semibold hover:bg-primary-600 disabled:opacity-50 transition">
+          <button type="submit" disabled={saving} className="w-full bg-gradient-to-l from-primary-500 to-primary-600 text-white p-3 rounded-xl font-semibold hover:shadow-glow-green disabled:opacity-50 transition-all">
             {saving ? 'جاري الحفظ...' : 'إضافة الفرع'}
           </button>
         </form>
@@ -115,7 +116,7 @@ export default function BranchesPage() {
       <Modal open={!!editItem} onClose={() => setEditItem(null)} title="تعديل الفرع">
         <form onSubmit={handleEdit} className="space-y-4">
           {formFields}
-          <button type="submit" disabled={saving} className="w-full bg-primary-500 text-white p-3 rounded-xl font-semibold hover:bg-primary-600 disabled:opacity-50 transition">
+          <button type="submit" disabled={saving} className="w-full bg-gradient-to-l from-primary-500 to-primary-600 text-white p-3 rounded-xl font-semibold hover:shadow-glow-green disabled:opacity-50 transition-all">
             {saving ? 'جاري الحفظ...' : 'حفظ التعديلات'}
           </button>
         </form>

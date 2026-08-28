@@ -1,6 +1,8 @@
 'use client'
 
+import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
+import { Inbox } from 'lucide-react'
 
 interface Column<T> {
   key: string
@@ -21,16 +23,21 @@ export default function DataTable<T extends Record<string, any>>({
   emptyMessage = 'لا توجد بيانات',
 }: DataTableProps<T>) {
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+      className="bg-white rounded-2xl shadow-premium border border-surface-border/60 overflow-hidden"
+    >
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="bg-gray-50/80">
+            <tr className="border-b border-surface-border/60">
               {columns.map((col) => (
                 <th
                   key={col.key}
                   className={cn(
-                    'px-5 py-3 text-xs font-semibold text-gray-500 text-right',
+                    'px-5 py-3.5 text-[11px] font-semibold text-gray-400 text-right uppercase tracking-wider',
                     col.className
                   )}
                 >
@@ -39,27 +46,38 @@ export default function DataTable<T extends Record<string, any>>({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-50">
+          <tbody className="divide-y divide-surface-border/40">
             {data.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="px-5 py-12 text-center text-gray-400 text-sm">
-                  {emptyMessage}
+                <td colSpan={columns.length} className="px-5 py-16 text-center">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-surface-muted flex items-center justify-center">
+                      <Inbox size={22} className="text-gray-300" />
+                    </div>
+                    <p className="text-sm text-gray-400">{emptyMessage}</p>
+                  </div>
                 </td>
               </tr>
             ) : (
               data.map((item, i) => (
-                <tr key={i} className="hover:bg-gray-50/50 transition-colors">
+                <motion.tr
+                  key={i}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.2, delay: Math.min(i * 0.03, 0.3) }}
+                  className="group hover:bg-surface-muted/50 transition-colors duration-150"
+                >
                   {columns.map((col) => (
                     <td key={col.key} className={cn('px-5 py-3.5 text-sm text-gray-700', col.className)}>
                       {col.render ? col.render(item) : item[col.key]}
                     </td>
                   ))}
-                </tr>
+                </motion.tr>
               ))
             )}
           </tbody>
         </table>
       </div>
-    </div>
+    </motion.div>
   )
 }

@@ -6,6 +6,7 @@ import DataTable from '@/components/ui/DataTable'
 import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
 import { Package, Plus, Edit2, AlertTriangle } from 'lucide-react'
+import { motion } from 'framer-motion'
 import StatCard from '@/components/ui/StatCard'
 import { useToast } from '@/components/ui/Toast'
 
@@ -67,57 +68,57 @@ export default function InventoryPage() {
         : <Badge variant="success">متوفر</Badge>
     )},
     { key: 'actions', label: '', render: (item: any) => (
-      <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-gray-100 rounded-lg transition"><Edit2 size={14} className="text-gray-500" /></button>
+      <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Edit2 size={14} className="text-gray-500" /></button>
     )},
   ]
 
   const formFields = (
     <>
       <div>
-        <label className="block text-sm font-medium text-gray-600 mb-1">اسم الصنف</label>
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">اسم الصنف</label>
         <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required
-          className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20" />
+          className="w-full p-3 border border-surface-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all" />
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-600 mb-1">التصنيف</label>
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">التصنيف</label>
         <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}
-          className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20">
+          className="w-full p-3 border border-surface-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all">
           <option value="detergent">منظفات</option><option value="packaging">تغليف</option>
           <option value="equipment">معدات</option><option value="chemicals">كيماويات</option><option value="other">أخرى</option>
         </select>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium text-gray-600 mb-1">الكمية</label>
+          <label className="block text-xs font-medium text-gray-500 mb-1.5">الكمية</label>
           <input type="number" min={0} value={form.quantity} onChange={e => setForm({ ...form, quantity: +e.target.value })}
-            className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20" />
+            className="w-full p-3 border border-surface-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-600 mb-1">الوحدة</label>
+          <label className="block text-xs font-medium text-gray-500 mb-1.5">الوحدة</label>
           <input type="text" value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })}
-            className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20" />
+            className="w-full p-3 border border-surface-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all" />
         </div>
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-600 mb-1">الحد الأدنى (للتنبيه)</label>
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">الحد الأدنى (للتنبيه)</label>
         <input type="number" min={0} value={form.min_quantity} onChange={e => setForm({ ...form, min_quantity: +e.target.value })}
-          className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20" />
+          className="w-full p-3 border border-surface-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all" />
       </div>
     </>
   )
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Package className="w-5 h-5" /> المخزون</h2>
-          <p className="text-sm text-gray-400">إدارة المواد والمستلزمات</p>
+          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Package className="w-5 h-5 text-cyan-500" /> المخزون</h2>
+          <p className="text-sm text-gray-400 mt-0.5">إدارة المواد والمستلزمات</p>
         </div>
         <button onClick={() => { setForm({ name: '', category: 'detergent', quantity: 0, unit: 'لتر', min_quantity: 5 }); setShowAdd(true) }}
-          className="flex items-center gap-2 bg-primary-500 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-primary-600 transition shadow-lg shadow-primary-500/25">
+          className="flex items-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:shadow-glow-green transition-all duration-300">
           <Plus size={16} /> صنف جديد
         </button>
-      </div>
+      </motion.div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatCard label="إجمالي الأصناف" value={items.length} icon={Package} color="blue" />
@@ -131,7 +132,7 @@ export default function InventoryPage() {
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="صنف جديد">
         <form onSubmit={handleAdd} className="space-y-4">
           {formFields}
-          <button type="submit" disabled={saving} className="w-full bg-primary-500 text-white p-3 rounded-xl font-semibold hover:bg-primary-600 disabled:opacity-50 transition">
+          <button type="submit" disabled={saving} className="w-full bg-gradient-to-l from-primary-500 to-primary-600 text-white p-3 rounded-xl font-semibold hover:shadow-glow-green disabled:opacity-50 transition-all">
             {saving ? 'جاري الحفظ...' : 'إضافة الصنف'}
           </button>
         </form>
@@ -140,7 +141,7 @@ export default function InventoryPage() {
       <Modal open={!!editItem} onClose={() => setEditItem(null)} title="تعديل الصنف">
         <form onSubmit={handleEdit} className="space-y-4">
           {formFields}
-          <button type="submit" disabled={saving} className="w-full bg-primary-500 text-white p-3 rounded-xl font-semibold hover:bg-primary-600 disabled:opacity-50 transition">
+          <button type="submit" disabled={saving} className="w-full bg-gradient-to-l from-primary-500 to-primary-600 text-white p-3 rounded-xl font-semibold hover:shadow-glow-green disabled:opacity-50 transition-all">
             {saving ? 'جاري الحفظ...' : 'حفظ التعديلات'}
           </button>
         </form>
