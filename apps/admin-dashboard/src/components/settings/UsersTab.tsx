@@ -147,7 +147,8 @@ export default function UsersTab() {
   }
 
   async function toggleActive(user: SystemUser) {
-    await supabase.from('users').update({ is_active: !user.is_active }).eq('id', user.id)
+    const { error } = await supabase.from('users').update({ is_active: !user.is_active }).eq('id', user.id)
+    if (error) { console.error('toggleActive error:', error); toast('حدث خطأ: ' + error.message); return }
     loadUsers()
     toast(user.is_active ? 'تم تعطيل المستخدم' : 'تم تفعيل المستخدم')
   }
