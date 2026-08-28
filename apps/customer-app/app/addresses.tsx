@@ -1,9 +1,13 @@
-import { useEffect, useState } from 'react'
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Alert, Modal } from 'react-native'
+import { useEffect, useState, useRef } from 'react'
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Alert, Modal, ActivityIndicator, Platform } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../src/contexts/AuthContext'
 import { supabase } from '../src/lib/supabase'
 import { colors } from '../src/theme'
+import MapView, { Marker, Region } from 'react-native-maps'
+import * as Location from 'expo-location'
+
+const CAIRO: Region = { latitude: 30.0444, longitude: 31.2357, latitudeDelta: 0.05, longitudeDelta: 0.05 }
 
 export default function AddressesScreen() {
   const { profile } = useAuth()
@@ -13,6 +17,9 @@ export default function AddressesScreen() {
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<any>(null)
   const [form, setForm] = useState({ label: '', building: '', floor: '', apartment: '', landmark: '', notes: '' })
+  const [pin, setPin] = useState({ latitude: CAIRO.latitude, longitude: CAIRO.longitude })
+  const [locatingMe, setLocatingMe] = useState(false)
+  const mapRef = useRef<MapView>(null)
 
   useEffect(() => { loadAddresses() }, [profile])
 
@@ -26,6 +33,7 @@ export default function AddressesScreen() {
   function openAdd() {
     setEditing(null)
     setForm({ label: '', building: '', floor: '', apartment: '', landmark: '', notes: '' })
+    setPin({ latitude: CAIRO.latitude, longitude: CAIRO.longitude })
     setShowModal(true)
   }
 
@@ -39,7 +47,27 @@ export default function AddressesScreen() {
       landmark: addr.landmark || '',
       notes: addr.notes || '',
     })
+    setPin({ latitude: addr.lat ?? CAIRO.latitude, longitude: addr.lng ?? CAIRO.longitude })
     setShowModal(true)
+  }
+
+  async function useMyLocation() {
+    setLocatingMe(true)
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync()
+      if (status !== 'granted') {
+        Alert.alert('صلاحية الموقع', 'يرجى السماح بالوصول للموقع من الإعدادات')
+        setLocatingMe(false)
+        return
+      }
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High })
+      const coord = { latitude: loc.coords.latitude, longitude: loc.coords.longitude }
+      setPin(coord)
+      mapRef.current?.animateToRegion({ ...coord, latitudeDelta: 0.005, longitudeDelta: 0.005 }, 500)
+    } catch {
+      Alert.alert('خطأ', 'لم نتمكن من تحديد موقعك')
+    }
+    setLocatingMe(false)
   }
 
   async function handleSave() {
@@ -54,8 +82,8 @@ export default function AddressesScreen() {
       apartment: form.apartment.trim() || null,
       landmark: form.landmark.trim() || null,
       notes: form.notes.trim() || null,
-      lat: 30.0444,
-      lng: 31.2357,
+      lat: pin.latitude,
+      lng: pin.longitude,
       is_default: addresses.length === 0,
     }
 
@@ -146,6 +174,26 @@ export default function AddressesScreen() {
         <View style={s.modalOverlay}>
           <View style={s.modalContent}>
             <Text style={s.modalTitle}>{editing ? 'تعديل العنوان' : 'إضافة عنوان'}</Text>
+
+            {/* Map */}
+            <Text style={s.fieldLabel}>حدد الموقع على الخريطة</Text>
+            <View style={s.mapContainer}>
+              <MapView
+                ref={mapRef}
+                style={s.map}
+                initialRegion={{ ...pin, latitudeDelta: 0.01, longitudeDelta: 0.01 }}
+                onPress={(e) => setPin(e.nativeEvent.coordinate)}
+              >
+                <Marker coordinate={pin} draggable onDragEnd={(e) => setPin(e.nativeEvent.coordinate)} />
+              </MapView>
+              <TouchableOpacity style={s.myLocBtn} onPress={useMyLocation} disabled={locatingMe}>
+                {locatingMe
+                  ? <ActivityIndicator size="small" color={colors.primary} />
+                  : <Text style={s.myLocText}>📍 موقعي الحالي</Text>
+                }
+              </TouchableOpacity>
+            </View>
+
             <FormField label="اسم العنوان *" value={form.label} onChange={v => setForm(f => ({ ...f, label: v }))} placeholder="مثال: البيت، الشغل" />
             <FormField label="المبنى" value={form.building} onChange={v => setForm(f => ({ ...f, building: v }))} placeholder="رقم أو اسم المبنى" />
             <View style={s.row}>
@@ -201,8 +249,8 @@ const s = StyleSheet.create({
   actionText: { color: colors.primary, fontSize: 12, fontWeight: '600' },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: colors.navy[800], borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '80%' },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: '#fff', marginBottom: 20, textAlign: 'center' },
+  modalContent: { backgroundColor: colors.navy[800], borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '90%' },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: '#fff', marginBottom: 16, textAlign: 'center' },
   row: { flexDirection: 'row', gap: 12 },
   fieldLabel: { fontSize: 12, color: colors.navy[200], marginBottom: 4, textAlign: 'right' },
   fieldInput: { backgroundColor: colors.navy[700], borderRadius: 10, padding: 12, color: '#fff', fontSize: 14 },
@@ -211,4 +259,13 @@ const s = StyleSheet.create({
   modalCancelText: { color: colors.navy[200], fontWeight: '600' },
   modalSave: { flex: 2, backgroundColor: colors.primary, borderRadius: 12, padding: 14, alignItems: 'center' },
   modalSaveText: { color: '#fff', fontWeight: '700' },
+
+  mapContainer: { height: 200, borderRadius: 16, overflow: 'hidden', marginBottom: 16, position: 'relative' },
+  map: { flex: 1 },
+  myLocBtn: {
+    position: 'absolute', bottom: 10, left: 10,
+    backgroundColor: colors.navy[800] + 'ee', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8,
+    borderWidth: 1, borderColor: colors.navy[600],
+  },
+  myLocText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
 })

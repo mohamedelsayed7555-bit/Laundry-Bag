@@ -1,10 +1,24 @@
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native'
+import { useEffect, useState } from 'react'
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Image } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
+import { supabase } from '../../src/lib/supabase'
 import { colors } from '../../src/theme'
 
 export default function ProfileScreen() {
   const { profile, signOut } = useAuth()
+  const [activeSub, setActiveSub] = useState<any>(null)
+
+  useEffect(() => {
+    if (!profile) return
+    supabase
+      .from('subscriptions')
+      .select('*, plans(name)')
+      .eq('user_id', profile.id)
+      .eq('status', 'active')
+      .single()
+      .then(({ data }) => setActiveSub(data))
+  }, [profile])
   const router = useRouter()
 
   const handleSignOut = () => {
@@ -19,9 +33,13 @@ export default function ProfileScreen() {
       <Text style={s.title}>حسابي</Text>
 
       <View style={s.card}>
-        <View style={s.avatar}>
-          <Text style={s.avatarText}>{profile?.name?.[0] ?? '؟'}</Text>
-        </View>
+        {profile?.avatar_url ? (
+          <Image source={{ uri: profile.avatar_url }} style={s.avatarImg} />
+        ) : (
+          <View style={s.avatar}>
+            <Text style={s.avatarText}>{profile?.name?.[0] ?? '؟'}</Text>
+          </View>
+        )}
         <Text style={s.name}>{profile?.name}</Text>
         <Text style={s.phone}>{profile?.phone}</Text>
         {profile?.customer_code && (
@@ -54,6 +72,16 @@ export default function ProfileScreen() {
           <Text style={s.menuText}>عناويني</Text>
           <Text style={s.menuArrow}>←</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity style={s.menuItem} onPress={() => router.push('/plans')}>
+          <Text style={s.menuIcon}>👑</Text>
+          <Text style={s.menuText}>الباقات والاشتراك</Text>
+          {activeSub ? (
+            <Text style={s.subBadge}>{activeSub.plans?.name}</Text>
+          ) : (
+            <Text style={s.menuArrow}>←</Text>
+          )}
+        </TouchableOpacity>
       </View>
 
       <TouchableOpacity style={s.logoutBtn} onPress={handleSignOut}>
@@ -75,6 +103,7 @@ const s = StyleSheet.create({
     backgroundColor: colors.accent, justifyContent: 'center', alignItems: 'center', marginBottom: 16,
   },
   avatarText: { fontSize: 28, color: '#fff', fontWeight: 'bold' },
+  avatarImg: { width: 72, height: 72, borderRadius: 36 },
   name: { fontSize: 20, fontWeight: '700', color: '#fff' },
   phone: { fontSize: 14, color: colors.navy[200], marginTop: 4 },
   codeBadge: {
@@ -102,4 +131,5 @@ const s = StyleSheet.create({
     padding: 14, alignItems: 'center',
   },
   logoutText: { color: colors.danger, fontSize: 16, fontWeight: '600' },
+  subBadge: { fontSize: 11, color: colors.primary, fontWeight: '700', backgroundColor: colors.primary + '20', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8 },
 })

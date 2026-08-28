@@ -48,11 +48,7 @@ export default function MessagesScreen() {
       otherIds.add(otherId)
     }
 
-    const { data: users } = await supabase
-      .from('users')
-      .select('id, name')
-      .in('id', [...otherIds])
-
+    const { data: users } = await supabase.from('users').select('id, name').in('id', [...otherIds])
     const userMap = new Map<string, string>()
     for (const u of users ?? []) userMap.set(u.id, u.name)
 
@@ -64,7 +60,7 @@ export default function MessagesScreen() {
       convos.push({
         order_id: orderId,
         other_id: otherId,
-        other_name: userMap.get(otherId) ?? 'سائق',
+        other_name: userMap.get(otherId) ?? 'عميل',
         last_message: last.body,
         last_time: last.created_at,
         unread,
@@ -81,7 +77,7 @@ export default function MessagesScreen() {
   useEffect(() => {
     if (!profile) return
     const channel = supabase
-      .channel('user-messages')
+      .channel('driver-messages')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${profile.id}` }, () => load())
       .subscribe()
     return () => { supabase.removeChannel(channel) }
@@ -97,7 +93,7 @@ export default function MessagesScreen() {
         <View style={s.emptyCard}>
           <Text style={s.emptyIcon}>💬</Text>
           <Text style={s.emptyText}>لا توجد محادثات</Text>
-          <Text style={s.emptySubText}>ستظهر هنا محادثاتك مع السائقين</Text>
+          <Text style={s.emptySubText}>ستظهر هنا محادثاتك مع العملاء</Text>
         </View>
       ) : (
         <FlatList
@@ -159,10 +155,10 @@ const s = StyleSheet.create({
   },
   convoUnread: { backgroundColor: colors.navy[700], borderColor: colors.primary + '40' },
   avatar: {
-    width: 48, height: 48, borderRadius: 24, backgroundColor: colors.primary + '25',
+    width: 48, height: 48, borderRadius: 24, backgroundColor: colors.accent + '25',
     justifyContent: 'center', alignItems: 'center', marginLeft: 12,
   },
-  avatarText: { fontSize: 18, fontWeight: '700', color: colors.primary },
+  avatarText: { fontSize: 18, fontWeight: '700', color: colors.accent },
   convoContent: { flex: 1 },
   convoHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   convoName: { fontSize: 15, fontWeight: '700', color: colors.navy[100] },

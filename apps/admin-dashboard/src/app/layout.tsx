@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'CLEANO - لوحة التحكم',
+  title: 'Laundry Bag - لوحة التحكم',
   description: 'لوحة تحكم إدارة خدمات الغسيل والكوي',
 }
 

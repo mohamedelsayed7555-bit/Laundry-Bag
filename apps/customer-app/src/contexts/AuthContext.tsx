@@ -13,6 +13,7 @@ interface AuthContextType extends AuthState {
   signInWithOtp: (email: string) => Promise<{ error: string | null }>
   verifyOtp: (email: string, token: string) => Promise<{ error: string | null }>
   signInWithPassword: (email: string, password: string) => Promise<{ error: string | null }>
+  signUp: (email: string, password: string, name: string, phone: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
 }
@@ -67,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signInWithOtp(email: string) {
-    const { error } = await supabase.auth.signInWithOtp({ email })
+    const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } })
     return { error: error?.message ?? null }
   }
 
@@ -105,6 +106,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null }
   }
 
+  async function signUp(email: string, password: string, name: string, phone: string) {
+    const { error, data } = await supabase.auth.signUp({ email, password })
+    if (error) return { error: error.message }
+
+    if (data.user) {
+      await supabase.from('users').upsert({
+        id: data.user.id,
+        email,
+        name,
+        phone,
+        role: 'customer',
+        is_active: true,
+      })
+    }
+
+    return { error: null }
+  }
+
   async function signOut() {
     await supabase.auth.signOut()
     setState({ session: null, profile: null, loading: false })
@@ -117,7 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ ...state, signInWithOtp, verifyOtp, signInWithPassword, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ ...state, signInWithOtp, verifyOtp, signInWithPassword, signUp, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   )

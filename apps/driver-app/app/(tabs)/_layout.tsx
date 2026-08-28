@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router'
-import { ClipboardList, MapPin, User } from 'lucide-react-native'
+import { ClipboardList, MapPin, MessageCircle, User } from 'lucide-react-native'
 import { colors } from '../../src/theme'
 
 export default function TabsLayout() {
@@ -22,6 +22,7 @@ export default function TabsLayout() {
     >
       <Tabs.Screen name="orders" options={{ title: 'الطلبات', tabBarIcon: ({ color, size }) => <ClipboardList size={size} color={color} /> }} />
       <Tabs.Screen name="map" options={{ title: 'الخريطة', tabBarIcon: ({ color, size }) => <MapPin size={size} color={color} /> }} />
+      <Tabs.Screen name="messages" options={{ title: 'المحادثات', tabBarIcon: ({ color, size }) => <MessageCircle size={size} color={color} /> }} />
       <Tabs.Screen name="profile" options={{ title: 'حسابي', tabBarIcon: ({ color, size }) => <User size={size} color={color} /> }} />
     </Tabs>
   )

@@ -118,7 +118,7 @@ export default function Sidebar({ collapsed, onToggleCollapse }: { collapsed?: b
                 exit={{ opacity: 0, width: 0 }}
                 className="overflow-hidden"
               >
-                <h1 className="text-lg font-bold text-white tracking-wider whitespace-nowrap">CLEANO</h1>
+                <h1 className="text-lg font-bold text-white tracking-wider whitespace-nowrap">Laundry Bag</h1>
               </motion.div>
             )}
           </AnimatePresence>

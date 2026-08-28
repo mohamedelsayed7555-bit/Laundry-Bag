@@ -21,7 +21,7 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [orgName, setOrgName] = useState('CLEANO')
+  const [orgName, setOrgName] = useState('Laundry Bag')
   const [orgPhone, setOrgPhone] = useState('+201000000000')
   const [editValues, setEditValues] = useState<Record<string, string>>({})
   const [showAdd, setShowAdd] = useState(false)

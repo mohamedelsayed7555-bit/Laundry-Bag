@@ -226,10 +226,10 @@ export default function AdminLoginPage() {
         <div className="relative z-10">
           <div className="flex items-center gap-4 mb-2">
             <div className="w-12 h-12 bg-gradient-to-br from-primary-400 to-primary-600 rounded-2xl flex items-center justify-center shadow-glow-green">
-              <span className="text-xl font-black text-white">C</span>
+              <span className="text-xl font-black text-white">LB</span>
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white tracking-widest">CLEANO</h1>
+              <h1 className="text-2xl font-bold text-white tracking-widest">Laundry Bag</h1>
               <p className="text-xs text-primary-400 font-medium tracking-wider">MANAGEMENT PLATFORM</p>
             </div>
           </div>
@@ -297,16 +297,16 @@ export default function AdminLoginPage() {
           style={{ background: 'linear-gradient(to bottom, rgba(10,22,40,0.8), transparent)' }}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-primary-400 to-primary-600 rounded-xl flex items-center justify-center shadow-glow-green">
-              <span className="text-lg font-black text-white">C</span>
+              <span className="text-lg font-black text-white">LB</span>
             </div>
-            <h1 className="text-xl font-bold text-white tracking-widest">CLEANO</h1>
+            <h1 className="text-xl font-bold text-white tracking-widest">Laundry Bag</h1>
           </div>
         </div>
 
         <div className="relative w-full max-w-sm px-6 animate-scale-in z-10">
           <div className="text-center mb-8 lg:mb-10">
             <div className="lg:hidden w-14 h-14 bg-gradient-to-br from-primary-400 to-primary-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-glow-green">
-              <span className="text-xl font-black text-white">C</span>
+              <span className="text-xl font-black text-white">LB</span>
             </div>
             <h2 className="text-2xl font-bold text-white mb-1">Welcome back</h2>
             <p className="text-navy-400 text-sm">Sign in to your admin dashboard</p>
@@ -360,7 +360,7 @@ export default function AdminLoginPage() {
 
           <div className="mt-8 pt-6 border-t border-white/[0.04]">
             <p className="text-center text-navy-500 text-xs">
-              Powered by <span className="text-primary-500 font-semibold">CLEANO</span> Platform
+              Powered by <span className="text-primary-500 font-semibold">Laundry Bag</span> Platform
             </p>
           </div>
         </div>

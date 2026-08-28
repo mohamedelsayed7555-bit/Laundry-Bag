@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, KeyboardAvoidingView, Platform } from 'react-native'
-import { useRouter } from 'expo-router'
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, KeyboardAvoidingView, Platform, Image } from 'react-native'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { colors } from '../../src/theme'
 
@@ -8,36 +7,23 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [usePassword, setUsePassword] = useState(false)
-  const { signInWithOtp, signInWithPassword } = useAuth()
-  const router = useRouter()
+  const { signInWithPassword } = useAuth()
 
-  const handleSendOtp = async () => {
-    if (!email.includes('@')) { Alert.alert('خطأ', 'أدخل بريد إلكتروني صحيح'); return }
-    setLoading(true)
-    const { error } = await signInWithOtp(email)
-    setLoading(false)
-    if (error) { Alert.alert('خطأ', error); return }
-    router.push({ pathname: '/(auth)/verify', params: { email } })
-  }
-
-  const handlePasswordLogin = async () => {
+  const handleLogin = async () => {
     if (!email.includes('@')) { Alert.alert('خطأ', 'أدخل بريد إلكتروني صحيح'); return }
     if (!password) { Alert.alert('خطأ', 'أدخل كلمة المرور'); return }
     setLoading(true)
     const { error } = await signInWithPassword(email, password)
     setLoading(false)
-    if (error) { Alert.alert('خطأ', error) }
+    if (error) Alert.alert('خطأ', error)
   }
 
   return (
     <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={s.content}>
         <View style={s.header}>
-          <View style={s.logoIcon}>
-            <Text style={s.logoIconText}>C</Text>
-          </View>
-          <Text style={s.logo}>CLEANO</Text>
+          <Image source={require('../../assets/logo.png')} style={s.logoImage} resizeMode="contain" />
+          <Text style={s.logo}>Laundry Bag</Text>
           <View style={s.badge}>
             <Text style={s.badgeText}>تطبيق السائق</Text>
           </View>
@@ -56,28 +42,22 @@ export default function LoginScreen() {
             textAlign="left"
           />
 
-          {usePassword && (
-            <>
-              <Text style={s.label}>كلمة المرور</Text>
-              <TextInput
-                style={s.input}
-                placeholder="********"
-                placeholderTextColor={colors.navy[300]}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                textAlign="left"
-              />
-            </>
-          )}
+          <Text style={s.label}>كلمة المرور</Text>
+          <TextInput
+            style={s.input}
+            placeholder="••••••••"
+            placeholderTextColor={colors.navy[300]}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            textAlign="left"
+          />
 
-          <TouchableOpacity style={[s.button, loading && s.buttonDisabled]} onPress={usePassword ? handlePasswordLogin : handleSendOtp} disabled={loading}>
-            <Text style={s.buttonText}>{loading ? 'جاري الدخول...' : 'دخول'}</Text>
+          <TouchableOpacity style={[s.button, loading && s.buttonDisabled]} onPress={handleLogin} disabled={loading}>
+            <Text style={s.buttonText}>{loading ? 'جاري الدخول...' : 'تسجيل دخول'}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => setUsePassword(!usePassword)}>
-            <Text style={s.switchText}>{usePassword ? 'دخول بـ OTP' : 'دخول بكلمة مرور'}</Text>
-          </TouchableOpacity>
+          <Text style={s.hint}>يتم إنشاء حسابك بواسطة الإدارة فقط</Text>
         </View>
       </View>
     </KeyboardAvoidingView>
@@ -88,13 +68,7 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.navy[900] },
   content: { flex: 1, justifyContent: 'center', paddingHorizontal: 24 },
   header: { alignItems: 'center', marginBottom: 48 },
-  logoIcon: {
-    width: 72, height: 72, borderRadius: 20,
-    backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center',
-    marginBottom: 16, shadowColor: colors.primary, shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3, shadowRadius: 16, elevation: 12,
-  },
-  logoIconText: { fontSize: 32, fontWeight: '900', color: '#fff' },
+  logoImage: { width: 120, height: 120, marginBottom: 16 },
   logo: { fontSize: 36, fontWeight: '800', color: '#fff', letterSpacing: 2 },
   badge: {
     backgroundColor: colors.accent, paddingHorizontal: 16, paddingVertical: 4, borderRadius: 12, marginTop: 10,
@@ -113,5 +87,5 @@ const s = StyleSheet.create({
   },
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  switchText: { color: colors.navy[200], fontSize: 14, textAlign: 'center' as const, marginTop: 8, textDecorationLine: 'underline' as const },
+  hint: { fontSize: 12, color: colors.navy[400], textAlign: 'center', marginTop: 4 },
 })

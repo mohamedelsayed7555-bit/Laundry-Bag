@@ -215,6 +215,13 @@ export default function OrderDetailsScreen() {
           <Text style={s.cancelText}>إلغاء الطلب</Text>
         </TouchableOpacity>
       )}
+
+      {!canCancel && order.status !== 'cancelled' && order.status !== 'delivered' && (
+        <View style={s.noCancelCard}>
+          <Text style={s.noCancelText}>⚠️ لا يمكن إلغاء الطلب في حالة "{status.label}"</Text>
+          <Text style={s.noCancelSub}>يمكن الإلغاء فقط قبل بدء المعالجة. تواصل مع السائق عبر المحادثة لأي استفسار.</Text>
+        </View>
+      )}
     </ScrollView>
   )
 }
@@ -291,4 +298,11 @@ const s = StyleSheet.create({
     padding: 16, alignItems: 'center', marginTop: 8,
   },
   cancelText: { color: colors.danger, fontSize: 16, fontWeight: '700' },
+
+  noCancelCard: {
+    backgroundColor: colors.warning + '12', borderRadius: 14, padding: 16, marginTop: 8,
+    borderWidth: 1, borderColor: colors.warning + '30',
+  },
+  noCancelText: { fontSize: 14, fontWeight: '700', color: colors.warning, marginBottom: 6 },
+  noCancelSub: { fontSize: 12, color: colors.navy[300], lineHeight: 18 },
 })
