@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { BarChart3, TrendingUp, Users, Truck, Calendar, RotateCcw } from 'lucide-react'
 import { motion } from 'framer-motion'
 import StatCard from '@/components/ui/StatCard'
+import PermissionGate from '@/components/ui/PermissionGate'
 
 const today = () => new Date().toISOString().split('T')[0]
 const monthStart = () => { const d = new Date(); d.setDate(1); return d.toISOString().split('T')[0] }
@@ -83,6 +84,7 @@ export default function ReportsPage() {
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>
 
   return (
+    <PermissionGate permission="reports.view">
     <div className="space-y-6">
       <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
         <div>
@@ -161,5 +163,6 @@ export default function ReportsPage() {
         </div>
       </div>
     </div>
+    </PermissionGate>
   )
 }

@@ -53,6 +53,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq('id', session.user.id)
       .single()
 
+    if (data && data.is_active === false) {
+      await supabase.auth.signOut()
+      setState({ session: null, profile: null, loading: false })
+      return
+    }
+
     setState({
       session,
       profile: data as User | null,
@@ -66,17 +72,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function verifyOtp(email: string, token: string) {
-    const { error } = await supabase.auth.verifyOtp({
+    const { error, data } = await supabase.auth.verifyOtp({
       email,
       token,
       type: 'email',
     })
-    return { error: error?.message ?? null }
+    if (error) return { error: error.message }
+
+    if (data.user) {
+      const { data: profile } = await supabase.from('users').select('is_active').eq('id', data.user.id).single()
+      if (profile && profile.is_active === false) {
+        await supabase.auth.signOut()
+        return { error: 'تم تعطيل حسابك — تواصل مع الإدارة' }
+      }
+    }
+
+    return { error: null }
   }
 
   async function signInWithPassword(email: string, password: string) {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    return { error: error?.message ?? null }
+    const { error, data } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) return { error: error.message }
+
+    if (data.user) {
+      const { data: profile } = await supabase.from('users').select('is_active').eq('id', data.user.id).single()
+      if (profile && profile.is_active === false) {
+        await supabase.auth.signOut()
+        return { error: 'تم تعطيل حسابك — تواصل مع الإدارة' }
+      }
+    }
+
+    return { error: null }
   }
 
   async function signOut() {

@@ -14,6 +14,8 @@ import {
   ArrowRight,
 } from 'lucide-react'
 import { useToast } from '@/components/ui/Toast'
+import Tooltip from '@/components/ui/Tooltip'
+import PermissionGate from '@/components/ui/PermissionGate'
 import { ORDER_STATUS_LABELS, SERVICE_TYPE_LABELS } from '@cleano/shared-types'
 import type { OrderStatus, ServiceType } from '@cleano/shared-types'
 
@@ -126,15 +128,18 @@ export default function OrdersPage() {
     { key: 'driver', label: 'السائق', render: (item: any) => item.driver?.name ?? <span className="text-gray-300">—</span> },
     { key: 'status', label: 'الحالة', render: (item: any) => <Badge variant={statusVariant[item.status] ?? 'neutral'}>{ORDER_STATUS_LABELS[item.status as OrderStatus] ?? item.status}</Badge> },
     { key: 'actions', label: '', render: (item: any) => (
-      <button onClick={() => setDetail(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors">
-        <Eye size={15} className="text-gray-400 hover:text-gray-600" />
-      </button>
+      <Tooltip content="عرض التفاصيل">
+        <button onClick={() => setDetail(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors">
+          <Eye size={15} className="text-gray-400 hover:text-gray-600" />
+        </button>
+      </Tooltip>
     )},
   ]
 
   const inputClass = "w-full p-3 border border-surface-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all"
 
   return (
+    <PermissionGate permission="orders.view">
     <div className="space-y-5">
       <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
         <div>
@@ -235,30 +240,30 @@ export default function OrdersPage() {
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="طلب جديد">
         <form onSubmit={handleAddOrder} className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">العميل</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">العميل <span className="text-red-400">*</span></label>
             <select value={form.customer_id} onChange={e => setForm({ ...form, customer_id: e.target.value })} required className={inputClass}>
               <option value="">اختر عميل...</option>
               {customers.map(c => <option key={c.id} value={c.id}>{c.name} ({c.customer_code})</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">الخدمة</label>
-            <select value={form.service_type} onChange={e => setForm({ ...form, service_type: e.target.value })} className={inputClass}>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">الخدمة <span className="text-red-400">*</span></label>
+            <select value={form.service_type} onChange={e => setForm({ ...form, service_type: e.target.value })} required className={inputClass}>
               <option value="wash">غسيل</option><option value="iron">كوي</option>
               <option value="wash_iron">غسيل وكوي</option><option value="dry_clean">تنظيف جاف</option>
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">عدد القطع</label>
-            <input type="number" min={1} value={form.items_count} onChange={e => setForm({ ...form, items_count: +e.target.value })} className={inputClass} />
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">عدد القطع <span className="text-red-400">*</span></label>
+            <input type="number" min={1} value={form.items_count} onChange={e => setForm({ ...form, items_count: +e.target.value })} required className={inputClass} />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">المبلغ (ج.م)</label>
-            <input type="number" min={0} step="0.01" value={form.total} onChange={e => setForm({ ...form, total: +e.target.value })} className={inputClass} />
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">المبلغ (ج.م) <span className="text-red-400">*</span></label>
+            <input type="number" min={0} step="0.01" value={form.total} onChange={e => setForm({ ...form, total: +e.target.value })} required className={inputClass} />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">ملاحظات</label>
-            <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={2} className={inputClass + ' resize-none'} />
+            <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={2} className={inputClass + ' resize-none'} placeholder="اختياري" />
           </div>
           <button type="submit" disabled={saving}
             className="w-full bg-gradient-to-l from-primary-500 to-primary-600 text-white p-3 rounded-xl font-semibold hover:shadow-glow-green disabled:opacity-50 transition-all">
@@ -267,5 +272,6 @@ export default function OrdersPage() {
         </form>
       </Modal>
     </div>
+    </PermissionGate>
   )
 }

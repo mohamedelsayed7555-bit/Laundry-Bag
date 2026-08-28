@@ -8,6 +8,8 @@ import Modal from '@/components/ui/Modal'
 import { MapPin, Plus, Edit2, Power } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useToast } from '@/components/ui/Toast'
+import Tooltip from '@/components/ui/Tooltip'
+import PermissionGate from '@/components/ui/PermissionGate'
 
 export default function BranchesPage() {
   const [branches, setBranches] = useState<any[]>([])
@@ -62,8 +64,8 @@ export default function BranchesPage() {
     { key: 'is_active', label: 'الحالة', render: (item: any) => <Badge variant={item.is_active ? 'success' : 'danger'}>{item.is_active ? 'نشط' : 'معطل'}</Badge> },
     { key: 'actions', label: '', render: (item: any) => (
       <div className="flex gap-1">
-        <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Edit2 size={14} className="text-gray-500" /></button>
-        <button onClick={() => toggleActive(item.id, item.is_active)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Power size={14} className={item.is_active ? 'text-red-400' : 'text-green-500'} /></button>
+        <Tooltip content="تعديل"><button onClick={() => openEdit(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Edit2 size={14} className="text-gray-500" /></button></Tooltip>
+        <Tooltip content={item.is_active ? 'تعطيل' : 'تفعيل'}><button onClick={() => toggleActive(item.id, item.is_active)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Power size={14} className={item.is_active ? 'text-red-400' : 'text-green-500'} /></button></Tooltip>
       </div>
     )},
   ]
@@ -71,13 +73,13 @@ export default function BranchesPage() {
   const formFields = (
     <>
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1.5">اسم الفرع</label>
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">اسم الفرع <span className="text-red-400">*</span></label>
         <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required
           className="w-full p-3 border border-surface-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all" />
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1.5">العنوان</label>
-        <input type="text" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })}
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">العنوان <span className="text-red-400">*</span></label>
+        <input type="text" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} required
           className="w-full p-3 border border-surface-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all" />
       </div>
       <div>
@@ -89,6 +91,7 @@ export default function BranchesPage() {
   )
 
   return (
+    <PermissionGate permission="settings.view">
     <div className="space-y-6">
       <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
         <div>
@@ -122,5 +125,6 @@ export default function BranchesPage() {
         </form>
       </Modal>
     </div>
+    </PermissionGate>
   )
 }

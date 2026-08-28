@@ -320,23 +320,26 @@ export default function AdminLoginPage() {
 
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-navy-300 mb-2">Email Address</label>
+              <label className="block text-sm font-medium text-navy-300 mb-2">Email Address <span className="text-red-400">*</span></label>
               <input
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder="admin@cleano.com"
+                required
                 className="w-full p-3.5 bg-navy-800/40 border border-navy-600/40 rounded-xl text-white placeholder-navy-500 focus:outline-none focus:ring-2 focus:ring-primary-500/40 focus:border-primary-500/40 transition-all"
                 dir="ltr"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-navy-300 mb-2">Password</label>
+              <label className="block text-sm font-medium text-navy-300 mb-2">Password <span className="text-red-400">*</span></label>
               <input
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••"
+                required
+                minLength={6}
                 className="w-full p-3.5 bg-navy-800/40 border border-navy-600/40 rounded-xl text-white placeholder-navy-500 focus:outline-none focus:ring-2 focus:ring-primary-500/40 focus:border-primary-500/40 transition-all"
                 dir="ltr"
               />

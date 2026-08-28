@@ -9,6 +9,8 @@ import { Package, Plus, Edit2, AlertTriangle } from 'lucide-react'
 import { motion } from 'framer-motion'
 import StatCard from '@/components/ui/StatCard'
 import { useToast } from '@/components/ui/Toast'
+import Tooltip from '@/components/ui/Tooltip'
+import PermissionGate from '@/components/ui/PermissionGate'
 
 export default function InventoryPage() {
   const [items, setItems] = useState<any[]>([])
@@ -68,20 +70,20 @@ export default function InventoryPage() {
         : <Badge variant="success">متوفر</Badge>
     )},
     { key: 'actions', label: '', render: (item: any) => (
-      <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Edit2 size={14} className="text-gray-500" /></button>
+      <Tooltip content="تعديل"><button onClick={() => openEdit(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Edit2 size={14} className="text-gray-500" /></button></Tooltip>
     )},
   ]
 
   const formFields = (
     <>
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1.5">اسم الصنف</label>
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">اسم الصنف <span className="text-red-400">*</span></label>
         <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required
           className="w-full p-3 border border-surface-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all" />
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1.5">التصنيف</label>
-        <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">التصنيف <span className="text-red-400">*</span></label>
+        <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} required
           className="w-full p-3 border border-surface-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all">
           <option value="detergent">منظفات</option><option value="packaging">تغليف</option>
           <option value="equipment">معدات</option><option value="chemicals">كيماويات</option><option value="other">أخرى</option>
@@ -89,13 +91,13 @@ export default function InventoryPage() {
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1.5">الكمية</label>
-          <input type="number" min={0} value={form.quantity} onChange={e => setForm({ ...form, quantity: +e.target.value })}
+          <label className="block text-xs font-medium text-gray-500 mb-1.5">الكمية <span className="text-red-400">*</span></label>
+          <input type="number" min={0} value={form.quantity} onChange={e => setForm({ ...form, quantity: +e.target.value })} required
             className="w-full p-3 border border-surface-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all" />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1.5">الوحدة</label>
-          <input type="text" value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })}
+          <label className="block text-xs font-medium text-gray-500 mb-1.5">الوحدة <span className="text-red-400">*</span></label>
+          <input type="text" value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} required
             className="w-full p-3 border border-surface-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all" />
         </div>
       </div>
@@ -108,6 +110,7 @@ export default function InventoryPage() {
   )
 
   return (
+    <PermissionGate permission="settings.view">
     <div className="space-y-6">
       <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
         <div>
@@ -147,5 +150,6 @@ export default function InventoryPage() {
         </form>
       </Modal>
     </div>
+    </PermissionGate>
   )
 }

@@ -9,6 +9,8 @@ import Modal from '@/components/ui/Modal'
 import StatCard from '@/components/ui/StatCard'
 import { Search, Plus, Edit2, Power, Eye, Truck, CheckCircle, Clock, XCircle } from 'lucide-react'
 import { useToast } from '@/components/ui/Toast'
+import Tooltip from '@/components/ui/Tooltip'
+import PermissionGate from '@/components/ui/PermissionGate'
 
 export default function DriversPage() {
   const [drivers, setDrivers] = useState<any[]>([])
@@ -81,9 +83,9 @@ export default function DriversPage() {
     { key: 'is_active', label: 'الحالة', render: (item: any) => <Badge variant={item.is_active ? 'success' : 'danger'}>{item.is_active ? 'متاح' : 'غير متاح'}</Badge> },
     { key: 'actions', label: '', render: (item: any) => (
       <div className="flex gap-1">
-        <button onClick={() => setDetailItem(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Eye size={14} className="text-gray-400" /></button>
-        <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Edit2 size={14} className="text-gray-400" /></button>
-        <button onClick={() => toggleActive(item.id, item.is_active)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Power size={14} className={item.is_active ? 'text-red-400' : 'text-green-500'} /></button>
+        <Tooltip content="عرض التفاصيل"><button onClick={() => setDetailItem(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Eye size={14} className="text-gray-400" /></button></Tooltip>
+        <Tooltip content="تعديل"><button onClick={() => openEdit(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Edit2 size={14} className="text-gray-400" /></button></Tooltip>
+        <Tooltip content={item.is_active ? 'تعطيل' : 'تفعيل'}><button onClick={() => toggleActive(item.id, item.is_active)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Power size={14} className={item.is_active ? 'text-red-400' : 'text-green-500'} /></button></Tooltip>
       </div>
     )},
   ]
@@ -93,16 +95,16 @@ export default function DriversPage() {
   const formFields = (
     <>
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1.5">الاسم</label>
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">الاسم <span className="text-red-400">*</span></label>
         <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required className={inputClass} />
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1.5">الهاتف</label>
-        <input type="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} dir="ltr" className={inputClass} />
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">الهاتف <span className="text-red-400">*</span></label>
+        <input type="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} required dir="ltr" className={inputClass} />
       </div>
       <div>
         <label className="block text-xs font-medium text-gray-500 mb-1.5">البريد الإلكتروني</label>
-        <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} dir="ltr" className={inputClass} />
+        <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} dir="ltr" className={inputClass} placeholder="اختياري" />
       </div>
       <div>
         <label className="block text-xs font-medium text-gray-500 mb-1.5">نوع المركبة</label>
@@ -118,6 +120,7 @@ export default function DriversPage() {
   )
 
   return (
+    <PermissionGate permission="drivers.view">
     <div className="space-y-5">
       <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
         <div>
@@ -188,5 +191,6 @@ export default function DriversPage() {
         )}
       </Modal>
     </div>
+    </PermissionGate>
   )
 }

@@ -10,6 +10,8 @@ import type { ServiceType } from '@cleano/shared-types'
 import { Plus, Edit2, Power, Tag } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useToast } from '@/components/ui/Toast'
+import Tooltip from '@/components/ui/Tooltip'
+import PermissionGate from '@/components/ui/PermissionGate'
 
 const serviceVariant: Record<string, 'success' | 'info' | 'purple' | 'warning'> = {
   wash: 'info', iron: 'warning', wash_iron: 'purple', dry_clean: 'success',
@@ -70,8 +72,8 @@ export default function PricesPage() {
     { key: 'is_active', label: 'الحالة', render: (item: any) => <Badge variant={item.is_active ? 'success' : 'danger'}>{item.is_active ? 'نشط' : 'معطل'}</Badge> },
     { key: 'actions', label: '', render: (item: any) => (
       <div className="flex gap-1">
-        <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Edit2 size={14} className="text-gray-400" /></button>
-        <button onClick={() => toggleActive(item.id, item.is_active)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Power size={14} className={item.is_active ? 'text-red-400' : 'text-green-500'} /></button>
+        <Tooltip content="تعديل"><button onClick={() => openEdit(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Edit2 size={14} className="text-gray-400" /></button></Tooltip>
+        <Tooltip content={item.is_active ? 'تعطيل' : 'تفعيل'}><button onClick={() => toggleActive(item.id, item.is_active)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Power size={14} className={item.is_active ? 'text-red-400' : 'text-green-500'} /></button></Tooltip>
       </div>
     )},
   ]
@@ -79,20 +81,20 @@ export default function PricesPage() {
   const formFields = (
     <>
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1.5">نوع القطعة</label>
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">نوع القطعة <span className="text-red-400">*</span></label>
         <input type="text" value={form.item_type} onChange={e => setForm({ ...form, item_type: e.target.value })} required
           placeholder="مثال: قميص، بنطلون، بدلة..." className="w-full p-3 border border-surface-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all" />
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1.5">نوع الخدمة</label>
-        <select value={form.service_type} onChange={e => setForm({ ...form, service_type: e.target.value })}
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">نوع الخدمة <span className="text-red-400">*</span></label>
+        <select value={form.service_type} onChange={e => setForm({ ...form, service_type: e.target.value })} required
           className="w-full p-3 border border-surface-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all">
           <option value="wash">غسيل</option><option value="iron">كوي</option>
           <option value="wash_iron">غسيل وكوي</option><option value="dry_clean">تنظيف جاف</option>
         </select>
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1.5">السعر (ج.م)</label>
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">السعر (ج.م) <span className="text-red-400">*</span></label>
         <input type="number" min={0} step={0.5} value={form.price} onChange={e => setForm({ ...form, price: +e.target.value })} required
           className="w-full p-3 border border-surface-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all" dir="ltr" />
       </div>
@@ -100,6 +102,7 @@ export default function PricesPage() {
   )
 
   return (
+    <PermissionGate permission="finance.view">
     <div className="space-y-6">
       <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
         <div>
@@ -133,5 +136,6 @@ export default function PricesPage() {
         </form>
       </Modal>
     </div>
+    </PermissionGate>
   )
 }

@@ -8,6 +8,8 @@ import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
 import { Search, Plus, Edit2, Power, Users } from 'lucide-react'
 import { useToast } from '@/components/ui/Toast'
+import Tooltip from '@/components/ui/Tooltip'
+import PermissionGate from '@/components/ui/PermissionGate'
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<any[]>([])
@@ -87,8 +89,8 @@ export default function CustomersPage() {
     { key: 'is_active', label: 'الحالة', render: (item: any) => <Badge variant={item.is_active ? 'success' : 'danger'}>{item.is_active ? 'نشط' : 'معطل'}</Badge> },
     { key: 'actions', label: '', render: (item: any) => (
       <div className="flex gap-1">
-        <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Edit2 size={14} className="text-gray-400 hover:text-gray-600" /></button>
-        <button onClick={() => toggleActive(item.id, item.is_active)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Power size={14} className={item.is_active ? 'text-red-400' : 'text-green-500'} /></button>
+        <Tooltip content="تعديل"><button onClick={() => openEdit(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Edit2 size={14} className="text-gray-400 hover:text-gray-600" /></button></Tooltip>
+        <Tooltip content={item.is_active ? 'تعطيل' : 'تفعيل'}><button onClick={() => toggleActive(item.id, item.is_active)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Power size={14} className={item.is_active ? 'text-red-400' : 'text-green-500'} /></button></Tooltip>
       </div>
     )},
   ]
@@ -98,16 +100,16 @@ export default function CustomersPage() {
   const formFields = (
     <>
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1.5">الاسم</label>
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">الاسم <span className="text-red-400">*</span></label>
         <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required className={inputClass} />
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1.5">الهاتف</label>
-        <input type="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} dir="ltr" className={inputClass} />
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">الهاتف <span className="text-red-400">*</span></label>
+        <input type="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} required dir="ltr" className={inputClass} />
       </div>
       <div>
         <label className="block text-xs font-medium text-gray-500 mb-1.5">البريد الإلكتروني</label>
-        <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} dir="ltr" className={inputClass} />
+        <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} dir="ltr" className={inputClass} placeholder="اختياري" />
       </div>
       <div>
         <label className="block text-xs font-medium text-gray-500 mb-1.5">المستوى</label>
@@ -120,6 +122,7 @@ export default function CustomersPage() {
   )
 
   return (
+    <PermissionGate permission="customers.view">
     <div className="space-y-5">
       <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
         <div>
@@ -161,5 +164,6 @@ export default function CustomersPage() {
         </form>
       </Modal>
     </div>
+    </PermissionGate>
   )
 }

@@ -7,6 +7,8 @@ import Badge from '@/components/ui/Badge'
 import { Crown, Plus, Edit2, Power, Users, Zap, Star, Gem } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useToast } from '@/components/ui/Toast'
+import Tooltip from '@/components/ui/Tooltip'
+import PermissionGate from '@/components/ui/PermissionGate'
 
 const tierConfig: Record<string, { icon: typeof Crown; color: string; gradient: string }> = {
   individual: { icon: Users, color: 'text-blue-500', gradient: 'from-blue-500 to-blue-600' },
@@ -119,11 +121,11 @@ export default function PlansPage() {
     <form onSubmit={handleSave} className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1.5">اسم الباقة</label>
+          <label className="block text-xs font-medium text-gray-500 mb-1.5">اسم الباقة <span className="text-red-400">*</span></label>
           <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required className={inputClass} placeholder="مثلاً: شنطة 100 قطعة" />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1.5">الفئة</label>
+          <label className="block text-xs font-medium text-gray-500 mb-1.5">الفئة <span className="text-red-400">*</span></label>
           <select value={form.tier} onChange={e => setForm({ ...form, tier: e.target.value })} className={inputClass}>
             <option value="individual">فردي</option>
             <option value="couple">زوجي</option>
@@ -138,7 +140,7 @@ export default function PlansPage() {
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1.5">عدد القطع / شهر</label>
+          <label className="block text-xs font-medium text-gray-500 mb-1.5">عدد القطع / شهر <span className="text-red-400">*</span></label>
           <input type="number" min={1} value={form.items_per_month} onChange={e => setForm({ ...form, items_per_month: +e.target.value })} required className={inputClass} />
         </div>
         <div className="flex items-end pb-1">
@@ -182,6 +184,7 @@ export default function PlansPage() {
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>
 
   return (
+    <PermissionGate permission="plans.manage">
     <div className="space-y-6">
       <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
         <div>
@@ -249,12 +252,16 @@ export default function PlansPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <button onClick={() => openEdit(plan)} className="p-1.5 rounded-lg hover:bg-white/20 transition-colors">
-                    <Edit2 size={14} className="text-white/80" />
-                  </button>
-                  <button onClick={() => toggleActive(plan)} className="p-1.5 rounded-lg hover:bg-white/20 transition-colors">
-                    <Power size={14} className={plan.is_active ? 'text-white' : 'text-white/40'} />
-                  </button>
+                  <Tooltip content="تعديل الباقة">
+                    <button onClick={() => openEdit(plan)} className="p-1.5 rounded-lg hover:bg-white/20 transition-colors">
+                      <Edit2 size={14} className="text-white/80" />
+                    </button>
+                  </Tooltip>
+                  <Tooltip content={plan.is_active ? 'تعطيل الباقة' : 'تفعيل الباقة'}>
+                    <button onClick={() => toggleActive(plan)} className="p-1.5 rounded-lg hover:bg-white/20 transition-colors">
+                      <Power size={14} className={plan.is_active ? 'text-white' : 'text-white/40'} />
+                    </button>
+                  </Tooltip>
                 </div>
               </div>
 
@@ -342,5 +349,6 @@ export default function PlansPage() {
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="باقة جديدة">{formContent}</Modal>
       <Modal open={!!editPlan} onClose={() => setEditPlan(null)} title="تعديل الباقة">{formContent}</Modal>
     </div>
+    </PermissionGate>
   )
 }

@@ -8,6 +8,7 @@ import {
   ScrollText, ShoppingBag, Users, Crown, Settings, Search,
   ArrowRightLeft, UserPlus, UserMinus, Truck, Plus, Edit2, Trash2, Power, Filter,
 } from 'lucide-react'
+import PermissionGate from '@/components/ui/PermissionGate'
 
 interface AuditLog {
   id: string
@@ -131,6 +132,7 @@ export default function AuditPage() {
   const uniqueEntities = [...new Set(logs.map(l => l.entity_type))]
 
   return (
+    <PermissionGate permission="audit.view">
     <div className="space-y-5">
       <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
         <div>
@@ -256,5 +258,6 @@ export default function AuditPage() {
         </div>
       )}
     </div>
+    </PermissionGate>
   )
 }

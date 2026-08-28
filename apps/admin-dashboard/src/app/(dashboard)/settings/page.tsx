@@ -7,6 +7,7 @@ import { motion } from 'framer-motion'
 import Modal from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/Toast'
 import UsersTab from '@/components/settings/UsersTab'
+import PermissionGate from '@/components/ui/PermissionGate'
 
 const tabs = [
   { key: 'general', label: 'عام', icon: Settings },
@@ -161,6 +162,7 @@ export default function SettingsPage() {
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>
 
   return (
+    <PermissionGate permission="settings.view">
     <div className="space-y-6">
       <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
         <div>
@@ -389,5 +391,6 @@ export default function SettingsPage() {
         </form>
       </Modal>
     </div>
+    </PermissionGate>
   )
 }

@@ -6,6 +6,8 @@ import StatCard from '@/components/ui/StatCard'
 import DataTable from '@/components/ui/DataTable'
 import Badge from '@/components/ui/Badge'
 import { DollarSign, TrendingUp, TrendingDown, CreditCard, Calendar, RotateCcw } from 'lucide-react'
+import Tooltip from '@/components/ui/Tooltip'
+import PermissionGate from '@/components/ui/PermissionGate'
 import { motion } from 'framer-motion'
 import { useToast } from '@/components/ui/Toast'
 
@@ -103,9 +105,11 @@ export default function FinancePage() {
     )},
     { key: 'actions', label: '', render: (item: any) => (
       item.payment_status !== 'confirmed' ? (
-        <button onClick={() => markPaid(item.id)} className="text-[11px] bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg font-medium hover:bg-emerald-100 transition-colors">
-          تأكيد الدفع
-        </button>
+        <Tooltip content="تأكيد استلام المبلغ">
+          <button onClick={() => markPaid(item.id)} className="text-[11px] bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg font-medium hover:bg-emerald-100 transition-colors">
+            تأكيد الدفع
+          </button>
+        </Tooltip>
       ) : null
     )},
   ]
@@ -121,6 +125,7 @@ export default function FinancePage() {
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>
 
   return (
+    <PermissionGate permission="finance.view">
     <div className="space-y-6">
       <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
         <div>
@@ -173,5 +178,6 @@ export default function FinancePage() {
 
       <DataTable columns={columns} data={filtered} emptyMessage="لا توجد معاملات" />
     </div>
+    </PermissionGate>
   )
 }

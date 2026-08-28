@@ -21,48 +21,65 @@ import {
   LogOut,
   ChevronLeft,
   Sparkles,
+  X,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import Tooltip from '@/components/ui/Tooltip'
+import { useAuth, ROUTE_PERMISSIONS } from '@/lib/auth-context'
+import { useLang } from '@/lib/language-context'
 
-const navGroups = [
-  {
-    label: 'القائمة الرئيسية',
-    items: [
-      { label: 'الرئيسية', href: '/', icon: LayoutDashboard },
-      { label: 'الطلبات', href: '/orders', icon: ClipboardList },
-    ],
-  },
-  {
-    label: 'إدارة الموارد',
-    items: [
-      { label: 'العملاء', href: '/customers', icon: Users },
-      { label: 'السائقين', href: '/drivers', icon: Truck },
-      { label: 'الفروع', href: '/branches', icon: MapPin },
-    ],
-  },
-  {
-    label: 'العمليات المالية',
-    items: [
-      { label: 'الأسعار', href: '/prices', icon: Tag },
-      { label: 'الباقات', href: '/plans', icon: Crown },
-      { label: 'المالية', href: '/finance', icon: DollarSign },
-      { label: 'المخزون', href: '/inventory', icon: Package },
-    ],
-  },
-  {
-    label: 'التحليلات',
-    items: [
-      { label: 'التقارير', href: '/reports', icon: BarChart3 },
-      { label: 'سجل النشاطات', href: '/audit', icon: ScrollText },
-      { label: 'الإعدادات', href: '/settings', icon: Settings },
-    ],
-  },
-]
+function useNavGroups() {
+  const { t } = useLang()
+  return [
+    {
+      label: t.sidebar.mainMenu,
+      items: [
+        { label: t.sidebar.home, href: '/', icon: LayoutDashboard },
+        { label: t.sidebar.orders, href: '/orders', icon: ClipboardList },
+      ],
+    },
+    {
+      label: t.sidebar.resourceManagement,
+      items: [
+        { label: t.sidebar.customers, href: '/customers', icon: Users },
+        { label: t.sidebar.drivers, href: '/drivers', icon: Truck },
+        { label: t.sidebar.branches, href: '/branches', icon: MapPin },
+      ],
+    },
+    {
+      label: t.sidebar.financialOps,
+      items: [
+        { label: t.sidebar.prices, href: '/prices', icon: Tag },
+        { label: t.sidebar.plans, href: '/plans', icon: Crown },
+        { label: t.sidebar.finance, href: '/finance', icon: DollarSign },
+        { label: t.sidebar.inventory, href: '/inventory', icon: Package },
+      ],
+    },
+    {
+      label: t.sidebar.analytics,
+      items: [
+        { label: t.sidebar.reports, href: '/reports', icon: BarChart3 },
+        { label: t.sidebar.auditLog, href: '/audit', icon: ScrollText },
+        { label: t.sidebar.settings, href: '/settings', icon: Settings },
+      ],
+    },
+  ]
+}
 
-export default function Sidebar({ collapsed, onToggleCollapse }: { collapsed?: boolean; onToggleCollapse?: () => void } = {}) {
+interface SidebarProps {
+  collapsed?: boolean
+  onToggleCollapse?: () => void
+  mobileOpen?: boolean
+  onMobileClose?: () => void
+}
+
+export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onMobileClose }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
+  const { hasPermission } = useAuth()
+  const { t } = useLang()
+  const navGroups = useNavGroups()
   const [internalCollapsed, setInternalCollapsed] = useState(false)
   const isCollapsed = collapsed ?? internalCollapsed
   const toggleCollapse = onToggleCollapse ?? (() => setInternalCollapsed(c => !c))
@@ -74,12 +91,13 @@ export default function Sidebar({ collapsed, onToggleCollapse }: { collapsed?: b
 
   const sidebarWidth = isCollapsed ? 'w-[72px]' : 'w-[260px]'
 
-  return (
+  const sidebarContent = (
     <motion.aside
       layout
       className={cn(
-        'fixed right-0 top-0 h-screen flex flex-col z-50 transition-all duration-300',
-        sidebarWidth
+        'h-screen flex flex-col z-50 transition-all duration-300',
+        mobileOpen ? 'w-[260px]' : sidebarWidth,
+        !mobileOpen && 'fixed right-0 top-0 hidden md:flex'
       )}
       style={{
         background: 'linear-gradient(180deg, #0e1428 0%, #0a0f1e 50%, #0e1428 100%)',
@@ -92,9 +110,9 @@ export default function Sidebar({ collapsed, onToggleCollapse }: { collapsed?: b
 
       <div className={cn(
         'relative flex items-center border-b border-white/[0.06] transition-all duration-300',
-        isCollapsed ? 'justify-center p-4 h-[72px]' : 'justify-between p-5 h-[72px]'
+        (isCollapsed && !mobileOpen) ? 'justify-center p-4 h-[72px]' : 'justify-between p-5 h-[72px]'
       )}>
-        <div className={cn('flex items-center gap-3', isCollapsed && 'justify-center')}>
+        <div className={cn('flex items-center gap-3', (isCollapsed && !mobileOpen) && 'justify-center')}>
           <div className="relative">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center shadow-glow-green">
               <Sparkles size={18} className="text-white" />
@@ -102,7 +120,7 @@ export default function Sidebar({ collapsed, onToggleCollapse }: { collapsed?: b
             <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-primary-400 rounded-full animate-pulse-slow" />
           </div>
           <AnimatePresence>
-            {!isCollapsed && (
+            {(!isCollapsed || mobileOpen) && (
               <motion.div
                 initial={{ opacity: 0, width: 0 }}
                 animate={{ opacity: 1, width: 'auto' }}
@@ -114,15 +132,22 @@ export default function Sidebar({ collapsed, onToggleCollapse }: { collapsed?: b
             )}
           </AnimatePresence>
         </div>
-        {!isCollapsed && (
+        {mobileOpen ? (
+          <button
+            onClick={onMobileClose}
+            className="p-1.5 rounded-lg hover:bg-white/[0.06] text-navy-400 hover:text-white transition-colors"
+          >
+            <X size={18} />
+          </button>
+        ) : !isCollapsed ? (
           <button
             onClick={toggleCollapse}
             className="p-1.5 rounded-lg hover:bg-white/[0.06] text-navy-400 hover:text-white transition-colors"
           >
             <ChevronLeft size={16} className="rotate-180" />
           </button>
-        )}
-        {isCollapsed && (
+        ) : null}
+        {isCollapsed && !mobileOpen && (
           <button
             onClick={toggleCollapse}
             className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-navy-800 border border-white/10 rounded-full flex items-center justify-center text-navy-400 hover:text-white hover:bg-navy-700 transition-all shadow-md z-10"
@@ -133,10 +158,16 @@ export default function Sidebar({ collapsed, onToggleCollapse }: { collapsed?: b
       </div>
 
       <nav className="flex-1 py-3 px-2.5 space-y-4 overflow-y-auto relative">
-        {navGroups.map((group) => (
+        {navGroups.map((group) => {
+          const visibleItems = group.items.filter(item => {
+            const perm = ROUTE_PERMISSIONS[item.href]
+            return !perm || hasPermission(perm)
+          })
+          if (visibleItems.length === 0) return null
+          return (
           <div key={group.label}>
             <AnimatePresence>
-              {!isCollapsed && (
+              {(!isCollapsed || mobileOpen) && (
                 <motion.p
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -148,18 +179,19 @@ export default function Sidebar({ collapsed, onToggleCollapse }: { collapsed?: b
               )}
             </AnimatePresence>
             <div className="space-y-0.5">
-              {group.items.map((item) => {
+              {visibleItems.map((item) => {
                 const isActive = pathname === item.href ||
                   (item.href !== '/' && pathname.startsWith(item.href))
                 const Icon = item.icon
 
-                return (
+                const linkEl = (
                   <Link
                     key={item.href}
                     href={item.href}
+                    onClick={mobileOpen ? onMobileClose : undefined}
                     className={cn(
                       'group relative flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-200',
-                      isCollapsed ? 'justify-center p-2.5' : 'px-3 py-2.5',
+                      (isCollapsed && !mobileOpen) ? 'justify-center p-2.5' : 'px-3 py-2.5',
                       isActive
                         ? 'text-white'
                         : 'text-navy-300 hover:text-white hover:bg-white/[0.04]'
@@ -180,7 +212,7 @@ export default function Sidebar({ collapsed, onToggleCollapse }: { collapsed?: b
                       <Icon size={18} />
                     </span>
                     <AnimatePresence>
-                      {!isCollapsed && (
+                      {(!isCollapsed || mobileOpen) && (
                         <motion.span
                           initial={{ opacity: 0, width: 0 }}
                           animate={{ opacity: 1, width: 'auto' }}
@@ -191,40 +223,57 @@ export default function Sidebar({ collapsed, onToggleCollapse }: { collapsed?: b
                         </motion.span>
                       )}
                     </AnimatePresence>
-                    {isActive && !isCollapsed && (
+                    {isActive && (!isCollapsed || mobileOpen) && (
                       <div className="absolute left-3 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-primary-400 z-10" />
                     )}
                   </Link>
                 )
+
+                return (isCollapsed && !mobileOpen) ? (
+                  <Tooltip key={item.href} content={item.label} side="left">
+                    {linkEl}
+                  </Tooltip>
+                ) : <div key={item.href}>{linkEl}</div>
               })}
             </div>
           </div>
-        ))}
+          )
+        })}
       </nav>
 
       <div className="relative p-2.5 border-t border-white/[0.06]">
-        <button
-          onClick={handleSignOut}
-          className={cn(
-            'flex items-center gap-3 rounded-xl text-sm text-navy-400 hover:bg-red-500/10 hover:text-red-400 w-full transition-all duration-200',
-            isCollapsed ? 'justify-center p-2.5' : 'px-3 py-2.5'
-          )}
-        >
-          <LogOut size={18} />
-          <AnimatePresence>
-            {!isCollapsed && (
-              <motion.span
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="whitespace-nowrap"
-              >
-                تسجيل الخروج
-              </motion.span>
-            )}
-          </AnimatePresence>
-        </button>
+        {(isCollapsed && !mobileOpen) ? (
+          <Tooltip content={t.sidebar.signOut} side="left">
+            <button
+              onClick={handleSignOut}
+              className="flex items-center justify-center p-2.5 rounded-xl text-sm text-navy-400 hover:bg-red-500/10 hover:text-red-400 w-full transition-all duration-200"
+            >
+              <LogOut size={18} />
+            </button>
+          </Tooltip>
+        ) : (
+          <button
+            onClick={handleSignOut}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-navy-400 hover:bg-red-500/10 hover:text-red-400 w-full transition-all duration-200"
+          >
+            <LogOut size={18} />
+            <span className="whitespace-nowrap">{t.sidebar.signOut}</span>
+          </button>
+        )}
       </div>
     </motion.aside>
   )
+
+  if (mobileOpen) {
+    return (
+      <>
+        <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={onMobileClose} />
+        <div className="fixed right-0 top-0 z-50 md:hidden">
+          {sidebarContent}
+        </div>
+      </>
+    )
+  }
+
+  return sidebarContent
 }

@@ -12,12 +12,56 @@
 
 body {
   font-family: 'Cairo', sans-serif;
-  direction: rtl;
   background-color: #f8f9fc;
   color: #1e2747;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.3s, color 0.3s;
 }
+
+html.dark body {
+  background-color: #0f1729;
+  color: #e2e8f0;
+}
+
+html.dark .bg-white { background-color: #1a2332 !important; }
+html.dark .bg-surface { background-color: #0f1729 !important; }
+html.dark .bg-white\/80 { background-color: rgba(26, 35, 50, 0.85) !important; }
+html.dark .bg-surface-muted { background-color: #1e293b !important; }
+html.dark .bg-surface-muted\/80 { background-color: rgba(26, 35, 50, 0.8) !important; }
+html.dark .bg-surface-muted\/30 { background-color: rgba(26, 35, 50, 0.3) !important; }
+
+html.dark .text-gray-800 { color: #e2e8f0 !important; }
+html.dark .text-gray-700 { color: #cbd5e1 !important; }
+html.dark .text-gray-600 { color: #94a3b8 !important; }
+html.dark .text-gray-500 { color: #94a3b8 !important; }
+html.dark .text-gray-400 { color: #64748b !important; }
+html.dark .text-gray-300 { color: #64748b !important; }
+
+html.dark .border-surface-border\/60 { border-color: rgba(255,255,255,0.08) !important; }
+html.dark .border-surface-border\/40 { border-color: rgba(255,255,255,0.06) !important; }
+html.dark .border-gray-200 { border-color: rgba(255,255,255,0.1) !important; }
+
+html.dark .shadow-premium { box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.2) !important; }
+html.dark .shadow-premium-md { box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.15) !important; }
+
+html.dark .divide-surface-border\/40 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(255,255,255,0.06) !important; }
+
+html.dark input, html.dark select, html.dark textarea {
+  background-color: #1a2332 !important;
+  color: #e2e8f0 !important;
+  border-color: rgba(255,255,255,0.1) !important;
+}
+
+html.dark .bg-emerald-50 { background-color: rgba(16,185,129,0.1) !important; }
+html.dark .bg-purple-100 { background-color: rgba(124,92,252,0.15) !important; }
+html.dark .bg-blue-100 { background-color: rgba(59,130,246,0.15) !important; }
+html.dark .bg-amber-100 { background-color: rgba(245,158,11,0.15) !important; }
+html.dark .bg-gray-100 { background-color: rgba(100,116,139,0.15) !important; }
+html.dark .bg-red-50 { background-color: rgba(239,68,68,0.1) !important; }
+html.dark .bg-orange-50 { background-color: rgba(245,158,11,0.1) !important; }
+
+html.dark .hover\:bg-surface-muted:hover { background-color: #1e293b !important; }
 
 ::-webkit-scrollbar {
   width: 5px;

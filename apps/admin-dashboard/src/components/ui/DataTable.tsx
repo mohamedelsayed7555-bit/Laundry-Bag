@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { Inbox, ChevronRight, ChevronLeft } from 'lucide-react'
+import Tooltip from '@/components/ui/Tooltip'
 
 interface Column<T> {
   key: string
@@ -95,16 +96,18 @@ export default function DataTable<T extends Record<string, any>>({
             عرض {page * pageSize + 1}–{Math.min((page + 1) * pageSize, data.length)} من {data.length}
           </span>
           <div className="flex items-center gap-1">
-            <button
-              onClick={() => setPage(p => p - 1)}
-              disabled={!canPrev}
-              className={cn(
-                'w-8 h-8 flex items-center justify-center rounded-lg transition-all text-sm',
-                canPrev ? 'hover:bg-surface-muted text-gray-600' : 'text-gray-300 cursor-not-allowed'
-              )}
-            >
-              <ChevronRight size={16} />
-            </button>
+            <Tooltip content="الصفحة السابقة">
+              <button
+                onClick={() => setPage(p => p - 1)}
+                disabled={!canPrev}
+                className={cn(
+                  'w-8 h-8 flex items-center justify-center rounded-lg transition-all text-sm',
+                  canPrev ? 'hover:bg-surface-muted text-gray-600' : 'text-gray-300 cursor-not-allowed'
+                )}
+              >
+                <ChevronRight size={16} />
+              </button>
+            </Tooltip>
             {Array.from({ length: totalPages }, (_, i) => (
               <button
                 key={i}
@@ -119,16 +122,18 @@ export default function DataTable<T extends Record<string, any>>({
                 {i + 1}
               </button>
             ))}
-            <button
-              onClick={() => setPage(p => p + 1)}
-              disabled={!canNext}
-              className={cn(
-                'w-8 h-8 flex items-center justify-center rounded-lg transition-all text-sm',
-                canNext ? 'hover:bg-surface-muted text-gray-600' : 'text-gray-300 cursor-not-allowed'
-              )}
-            >
-              <ChevronLeft size={16} />
-            </button>
+            <Tooltip content="الصفحة التالية">
+              <button
+                onClick={() => setPage(p => p + 1)}
+                disabled={!canNext}
+                className={cn(
+                  'w-8 h-8 flex items-center justify-center rounded-lg transition-all text-sm',
+                  canNext ? 'hover:bg-surface-muted text-gray-600' : 'text-gray-300 cursor-not-allowed'
+                )}
+              >
+                <ChevronLeft size={16} />
+              </button>
+            </Tooltip>
           </div>
         </div>
       )}

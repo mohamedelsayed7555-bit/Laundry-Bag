@@ -8,8 +8,9 @@ import Badge from '@/components/ui/Badge'
 import { useToast } from '@/components/ui/Toast'
 import {
   Users, Plus, Edit2, Power, Shield, ShieldCheck, ShieldAlert,
-  Truck, UserCircle, Save, Search, Eye, EyeOff,
+  Truck, UserCircle, Save, Search, Eye, EyeOff, Camera, Key, Mail,
 } from 'lucide-react'
+import Tooltip from '@/components/ui/Tooltip'
 
 interface SystemUser {
   id: string
@@ -20,6 +21,7 @@ interface SystemUser {
   is_active: boolean
   created_at: string
   permissions: string[] | null
+  avatar_url: string | null
 }
 
 const roleConfig: Record<string, { label: string; icon: typeof Shield; variant: 'success' | 'warning' | 'danger' | 'info' | 'purple' | 'neutral'; color: string }> = {
@@ -73,6 +75,8 @@ export default function UsersTab() {
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const { toast } = useToast()
 
   useEffect(() => { loadUsers() }, [])
@@ -89,6 +93,8 @@ export default function UsersTab() {
 
   function openAdd() {
     setForm(emptyForm)
+    setAvatarFile(null)
+    setAvatarPreview(null)
     setShowAdd(true)
   }
 
@@ -97,7 +103,27 @@ export default function UsersTab() {
       name: user.name, email: user.email, password: '', phone: user.phone || '',
       role: user.role, permissions: user.permissions || roleDefaults[user.role] || [],
     })
+    setAvatarFile(null)
+    setAvatarPreview(user.avatar_url || null)
     setEditUser(user)
+  }
+
+  function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 2 * 1024 * 1024) { toast('حجم الصورة يجب أن يكون أقل من 2MB', 'warning'); return }
+    setAvatarFile(file)
+    setAvatarPreview(URL.createObjectURL(file))
+  }
+
+  async function uploadAvatar(userId: string): Promise<string | null> {
+    if (!avatarFile) return null
+    const ext = avatarFile.name.split('.').pop()
+    const path = `${userId}.${ext}`
+    const { error } = await supabase.storage.from('avatars').upload(path, avatarFile, { upsert: true })
+    if (error) { console.error('Avatar upload error:', error); return null }
+    const { data } = supabase.storage.from('avatars').getPublicUrl(path)
+    return data.publicUrl + '?t=' + Date.now()
   }
 
   function openPermissions(user: SystemUser) {
@@ -111,6 +137,27 @@ export default function UsersTab() {
 
     if (editUser) {
       const update: any = { name: form.name, phone: form.phone || null, role: form.role, permissions: form.permissions }
+
+      const avatarUrl = await uploadAvatar(editUser.id)
+      if (avatarUrl) update.avatar_url = avatarUrl
+
+      const emailChanged = form.email !== editUser.email
+      const passwordChanged = form.password.length > 0
+
+      if (emailChanged || passwordChanged) {
+        const authUpdate: any = { userId: editUser.id }
+        if (emailChanged) authUpdate.email = form.email
+        if (passwordChanged) authUpdate.password = form.password
+        const res = await fetch('/api/update-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(authUpdate),
+        })
+        const result = await res.json()
+        if (result.error) { setSaving(false); toast(result.error, 'error'); return }
+        if (emailChanged) update.email = form.email
+      }
+
       const { error } = await supabase.from('users').update(update).eq('id', editUser.id)
       setSaving(false)
       if (!error) { setEditUser(null); loadUsers(); toast('تم تعديل المستخدم') }
@@ -124,11 +171,16 @@ export default function UsersTab() {
         body: JSON.stringify({ email: form.email, password: form.password, name: form.name, phone: form.phone, role: form.role, permissions: form.permissions }),
       })
       const result = await res.json()
-      setSaving(false)
 
       if (result.error) {
+        setSaving(false)
         toast(result.error, 'error')
       } else {
+        if (avatarFile && result.id) {
+          const avatarUrl = await uploadAvatar(result.id)
+          if (avatarUrl) await supabase.from('users').update({ avatar_url: avatarUrl }).eq('id', result.id)
+        }
+        setSaving(false)
         setShowAdd(false)
         setForm(emptyForm)
         loadUsers()
@@ -230,8 +282,12 @@ export default function UsersTab() {
             return (
               <motion.div key={user.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }}
                 className={`flex items-center gap-4 px-5 py-4 hover:bg-surface-muted/30 transition-colors ${!user.is_active ? 'opacity-50' : ''}`}>
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-400 to-accent-purple/80 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                  {user.name?.[0] ?? '?'}
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-400 to-accent-purple/80 flex items-center justify-center text-white font-bold text-sm flex-shrink-0 overflow-hidden">
+                  {user.avatar_url ? (
+                    <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
+                  ) : (
+                    user.name?.[0] ?? '?'
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
@@ -242,15 +298,21 @@ export default function UsersTab() {
                   <p className="text-xs text-gray-400">{user.email} {user.phone ? `• ${user.phone}` : ''}</p>
                 </div>
                 <div className="flex items-center gap-1">
-                  <button onClick={() => openPermissions(user)} className="p-1.5 rounded-lg hover:bg-surface-muted transition-colors" title="الصلاحيات">
-                    <Shield size={14} className="text-gray-400 hover:text-purple-500" />
-                  </button>
-                  <button onClick={() => openEdit(user)} className="p-1.5 rounded-lg hover:bg-surface-muted transition-colors" title="تعديل">
-                    <Edit2 size={14} className="text-gray-400 hover:text-blue-500" />
-                  </button>
-                  <button onClick={() => toggleActive(user)} className="p-1.5 rounded-lg hover:bg-surface-muted transition-colors" title={user.is_active ? 'تعطيل' : 'تفعيل'}>
-                    <Power size={14} className={user.is_active ? 'text-emerald-400 hover:text-red-400' : 'text-gray-300 hover:text-emerald-400'} />
-                  </button>
+                  <Tooltip content="الصلاحيات">
+                    <button onClick={() => openPermissions(user)} className="p-1.5 rounded-lg hover:bg-surface-muted transition-colors">
+                      <Shield size={14} className="text-gray-400 hover:text-purple-500" />
+                    </button>
+                  </Tooltip>
+                  <Tooltip content="تعديل">
+                    <button onClick={() => openEdit(user)} className="p-1.5 rounded-lg hover:bg-surface-muted transition-colors">
+                      <Edit2 size={14} className="text-gray-400 hover:text-blue-500" />
+                    </button>
+                  </Tooltip>
+                  <Tooltip content={user.is_active ? 'تعطيل الحساب' : 'تفعيل الحساب'}>
+                    <button onClick={() => toggleActive(user)} className="p-1.5 rounded-lg hover:bg-surface-muted transition-colors">
+                      <Power size={14} className={user.is_active ? 'text-emerald-400 hover:text-red-400' : 'text-gray-300 hover:text-emerald-400'} />
+                    </button>
+                  </Tooltip>
                 </div>
               </motion.div>
             )
@@ -261,33 +323,45 @@ export default function UsersTab() {
       {/* Add/Edit Modal */}
       <Modal open={showAdd || !!editUser} onClose={() => { setShowAdd(false); setEditUser(null) }} title={editUser ? 'تعديل مستخدم' : 'مستخدم جديد'}>
         <form onSubmit={handleSave} className="space-y-4">
+          <div className="flex justify-center">
+            <label className="relative cursor-pointer group">
+              <div className="w-20 h-20 rounded-2xl overflow-hidden bg-gradient-to-br from-primary-400 to-accent-purple/80 flex items-center justify-center text-white font-bold text-2xl">
+                {avatarPreview ? (
+                  <img src={avatarPreview} alt="avatar" className="w-full h-full object-cover" />
+                ) : (
+                  form.name?.[0] ?? '?'
+                )}
+              </div>
+              <div className="absolute inset-0 rounded-2xl bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <Camera size={20} className="text-white" />
+              </div>
+              <input type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
+            </label>
+          </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">الاسم</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">الاسم <span className="text-red-400">*</span></label>
             <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required className={inputClass} />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">البريد الإلكتروني</label>
-            <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required disabled={!!editUser}
-              className={inputClass + (editUser ? ' bg-surface-muted/50 text-gray-400 cursor-not-allowed' : '')} />
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">البريد الإلكتروني <span className="text-red-400">*</span></label>
+            <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required className={inputClass} />
           </div>
-          {!editUser && (
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">كلمة المرور</label>
-              <div className="relative">
-                <input type={showPassword ? 'text' : 'password'} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} required minLength={6}
-                  className={inputClass + ' pl-10'} placeholder="6 أحرف على الأقل" />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">{editUser ? 'كلمة المرور الجديدة' : 'كلمة المرور'} {!editUser && <span className="text-red-400">*</span>}</label>
+            <div className="relative">
+              <input type={showPassword ? 'text' : 'password'} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} {...(!editUser ? { required: true } : {})} minLength={6}
+                className={inputClass + ' pl-10'} placeholder={editUser ? 'اتركها فارغة إن لم ترد التغيير' : '6 أحرف على الأقل'} />
+              <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
             </div>
-          )}
+          </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">رقم الهاتف</label>
             <input type="text" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className={inputClass} placeholder="اختياري" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">الدور</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">الدور <span className="text-red-400">*</span></label>
             <select value={form.role} onChange={e => applyRoleDefaults(e.target.value)} className={inputClass}>
               <option value="super_admin">مدير عام — كل الصلاحيات</option>
               <option value="admin">مدير — كل الصلاحيات</option>
