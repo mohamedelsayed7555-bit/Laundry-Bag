@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import StatCard from '@/components/ui/StatCard'
 import DataTable from '@/components/ui/DataTable'
 import Badge from '@/components/ui/Badge'
-import { DollarSign, TrendingUp, TrendingDown, CreditCard, Calendar, RotateCcw } from 'lucide-react'
+import { DollarSign, TrendingUp, TrendingDown, CreditCard, Calendar, RotateCcw, Crown } from 'lucide-react'
 import Tooltip from '@/components/ui/Tooltip'
 import PermissionGate from '@/components/ui/PermissionGate'
 import { motion } from 'framer-motion'
@@ -15,12 +15,14 @@ const today = () => new Date().toISOString().split('T')[0]
 const monthStart = () => { const d = new Date(); d.setDate(1); return d.toISOString().split('T')[0] }
 
 type DatePreset = 'all' | 'today' | 'week' | 'month' | 'custom'
+type SourceFilter = 'all' | 'orders' | 'subscriptions'
 
 export default function FinancePage() {
-  const [stats, setStats] = useState({ revenue: 0, paid: 0, unpaid: 0, ordersCount: 0 })
-  const [orders, setOrders] = useState<any[]>([])
+  const [stats, setStats] = useState({ revenue: 0, paid: 0, unpaid: 0, ordersCount: 0, subsRevenue: 0, subsCount: 0 })
+  const [rows, setRows] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [payFilter, setPayFilter] = useState('all')
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all')
   const [preset, setPreset] = useState<DatePreset>('all')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
@@ -48,49 +50,108 @@ export default function FinancePage() {
   }
 
   async function load() {
-    let query = supabase.from('orders')
+    const { from, to } = getDateRange()
+
+    // Load orders
+    let oQuery = supabase.from('orders')
       .select('*, customer:users!orders_customer_id_fkey(name, customer_code)')
       .order('created_at', { ascending: false })
+    if (from) oQuery = oQuery.gte('created_at', from)
+    if (to) oQuery = oQuery.lte('created_at', to)
+    const { data: ordersData } = await oQuery
 
-    const { from, to } = getDateRange()
-    if (from) query = query.gte('created_at', from)
-    if (to) query = query.lte('created_at', to)
+    // Load subscriptions
+    let sQuery = supabase.from('subscriptions')
+      .select('*, user:users!subscriptions_user_id_fkey(name, customer_code), plan:plans(name, price)')
+      .order('created_at', { ascending: false })
+    if (from) sQuery = sQuery.gte('created_at', from)
+    if (to) sQuery = sQuery.lte('created_at', to)
+    const { data: subsData } = await sQuery
 
-    const { data } = await query
-    const all = data ?? []
-    const revenue = all.reduce((s, o) => s + (o.total ?? 0), 0)
-    const paid = all.filter(o => o.payment_status === 'confirmed').reduce((s, o) => s + (o.total ?? 0), 0)
-    setStats({ revenue, paid, unpaid: revenue - paid, ordersCount: all.length })
-    setOrders(all)
+    const allOrders = ordersData ?? []
+    const allSubs = (subsData ?? []).filter((s: any) => s.status !== 'pending')
+
+    const orderRevenue = allOrders.reduce((s, o) => s + (o.total ?? 0), 0)
+    const paid = allOrders.filter(o => o.payment_status === 'confirmed').reduce((s, o) => s + (o.total ?? 0), 0)
+    const subsRevenue = allSubs.reduce((s: number, sub: any) => s + (sub.plan?.price ?? 0), 0)
+
+    setStats({
+      revenue: orderRevenue + subsRevenue,
+      paid,
+      unpaid: orderRevenue - paid,
+      ordersCount: allOrders.length,
+      subsRevenue,
+      subsCount: allSubs.length,
+    })
+
+    // Merge into unified rows
+    const orderRows = allOrders.map((o: any) => ({
+      ...o,
+      _source: 'order' as const,
+      _amount: o.total ?? 0,
+      _customerName: o.customer?.name ?? '—',
+      _customerCode: o.customer?.customer_code,
+      _date: o.created_at,
+    }))
+
+    const subRows = allSubs.map((s: any) => ({
+      ...s,
+      _source: 'subscription' as const,
+      _amount: s.plan?.price ?? 0,
+      _customerName: s.user?.name ?? '—',
+      _customerCode: s.user?.customer_code,
+      _date: s.created_at,
+      payment_status: s.status === 'active' ? 'confirmed' : 'pending',
+      payment_method: 'subscription',
+    }))
+
+    const merged = [...orderRows, ...subRows].sort((a, b) =>
+      new Date(b._date).getTime() - new Date(a._date).getTime()
+    )
+
+    setRows(merged)
     setLoading(false)
   }
 
   function resetFilters() {
     setPreset('all')
     setPayFilter('all')
+    setSourceFilter('all')
     setDateFrom('')
     setDateTo('')
   }
 
-  const filtered = payFilter === 'all' ? orders : orders.filter(o => o.payment_status === payFilter)
-  const paymentLabel: Record<string, string> = { cash: 'كاش', instapay: 'إنستاباي', wallet: 'محفظة' }
+  let filtered = rows
+  if (sourceFilter !== 'all') filtered = filtered.filter(r => r._source === (sourceFilter === 'orders' ? 'order' : 'subscription'))
+  if (payFilter !== 'all') filtered = filtered.filter(r => r.payment_status === payFilter)
+
+  const paymentLabel: Record<string, string> = { cash: 'كاش', instapay: 'إنستاباي', wallet: 'محفظة', subscription: 'اشتراك' }
 
   async function markPaid(id: string) {
     const { error } = await supabase.from('orders').update({ payment_status: 'confirmed' }).eq('id', id)
-    if (error) { console.error('markPaid error:', error); toast('حدث خطأ: ' + error.message, 'error'); return }
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, payment_status: 'confirmed' } : o))
+    if (error) { toast('حدث خطأ: ' + error.message, 'error'); return }
+    setRows(prev => prev.map(r => r.id === id ? { ...r, payment_status: 'confirmed' } : r))
     toast('تم تأكيد الدفع بنجاح')
     setStats(prev => {
-      const order = orders.find(o => o.id === id)
-      const amount = order?.total ?? 0
+      const row = rows.find(r => r.id === id)
+      const amount = row?._amount ?? 0
       return { ...prev, paid: prev.paid + amount, unpaid: prev.unpaid - amount }
     })
   }
 
   const columns = [
-    { key: 'order_number', label: 'رقم الطلب', render: (item: any) => <span className="font-bold text-navy-800">{item.order_number}</span> },
-    { key: 'customer', label: 'العميل', render: (item: any) => item.customer?.name ?? '—' },
-    { key: 'total', label: 'المبلغ', render: (item: any) => <span className="font-semibold">{item.total?.toFixed(2)} ج.م</span> },
+    { key: 'source', label: 'النوع', render: (item: any) => (
+      item._source === 'subscription'
+        ? <Badge variant="warning"><span className="flex items-center gap-1">👑 اشتراك</span></Badge>
+        : <Badge variant="info">🧺 طلب</Badge>
+    )},
+    { key: 'ref', label: 'المرجع', render: (item: any) => (
+      <span className="font-bold text-navy-800">
+        {item._source === 'order' ? item.order_number : item.plan?.name ?? '—'}
+      </span>
+    )},
+    { key: 'customer', label: 'العميل', render: (item: any) => item._customerName },
+    { key: 'total', label: 'المبلغ', render: (item: any) => <span className="font-semibold">{item._amount?.toFixed(2)} ج.م</span> },
     { key: 'payment_method', label: 'طريقة الدفع', render: (item: any) => paymentLabel[item.payment_method] ?? item.payment_method },
     { key: 'payment_status', label: 'حالة الدفع', render: (item: any) => (
       <Badge variant={item.payment_status === 'confirmed' ? 'success' : item.payment_status === 'refunded' ? 'danger' : 'warning'}>
@@ -99,12 +160,12 @@ export default function FinancePage() {
     )},
     { key: 'date', label: 'التاريخ', render: (item: any) => (
       <div>
-        <span className="text-xs text-gray-600">{new Date(item.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
-        <p className="text-[10px] text-gray-400">{new Date(item.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</p>
+        <span className="text-xs text-gray-600">{new Date(item._date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+        <p className="text-[10px] text-gray-400">{new Date(item._date).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</p>
       </div>
     )},
     { key: 'actions', label: '', render: (item: any) => (
-      item.payment_status !== 'confirmed' ? (
+      item._source === 'order' && item.payment_status !== 'confirmed' ? (
         <Tooltip content="تأكيد استلام المبلغ">
           <button onClick={() => markPaid(item.id)} className="text-[11px] bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg font-medium hover:bg-emerald-100 transition-colors">
             تأكيد الدفع
@@ -132,7 +193,7 @@ export default function FinancePage() {
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><DollarSign className="w-5 h-5 text-emerald-500" /> المالية</h2>
           <p className="text-sm text-gray-400 mt-0.5">ملخص الإيرادات والمدفوعات</p>
         </div>
-        {(preset !== 'all' || payFilter !== 'all') && (
+        {(preset !== 'all' || payFilter !== 'all' || sourceFilter !== 'all') && (
           <button onClick={resetFilters} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-500 transition-colors">
             <RotateCcw size={14} /> إعادة تعيين
           </button>
@@ -159,21 +220,32 @@ export default function FinancePage() {
         )}
       </motion.div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <StatCard label="إجمالي الإيرادات" value={`${stats.revenue.toLocaleString()} ج.م`} icon={DollarSign} color="green" />
-        <StatCard label="المدفوع" value={`${stats.paid.toLocaleString()} ج.م`} icon={TrendingUp} color="blue" />
+        <StatCard label="المدفوع (طلبات)" value={`${stats.paid.toLocaleString()} ج.م`} icon={TrendingUp} color="blue" />
         <StatCard label="غير مدفوع" value={`${stats.unpaid.toLocaleString()} ج.م`} icon={TrendingDown} color="orange" />
+        <StatCard label="إيرادات الاشتراكات" value={`${stats.subsRevenue.toLocaleString()} ج.م`} icon={Crown} color="yellow" />
         <StatCard label="عدد الطلبات" value={stats.ordersCount} icon={CreditCard} color="purple" />
       </div>
 
-      {/* Payment status filter */}
-      <div className="flex gap-2">
-        {[{ key: 'all', label: 'الكل' }, { key: 'pending', label: 'غير مدفوع' }, { key: 'confirmed', label: 'مدفوع' }].map(f => (
-          <button key={f.key} onClick={() => setPayFilter(f.key)}
-            className={`px-3 py-2 rounded-lg text-[11px] font-medium transition-all ${payFilter === f.key ? 'bg-navy-900 text-white shadow-premium-md' : 'bg-white text-gray-500 hover:bg-surface-muted border border-surface-border/60'}`}>
-            {f.label}
-          </button>
-        ))}
+      {/* Source + Payment filters */}
+      <div className="flex flex-wrap gap-4">
+        <div className="flex gap-1.5">
+          {([['all', 'الكل'], ['orders', '🧺 الطلبات'], ['subscriptions', '👑 الاشتراكات']] as [SourceFilter, string][]).map(([key, label]) => (
+            <button key={key} onClick={() => setSourceFilter(key)}
+              className={`px-3 py-2 rounded-lg text-[11px] font-medium transition-all ${sourceFilter === key ? 'bg-navy-900 text-white shadow-premium-md' : 'bg-white text-gray-500 hover:bg-surface-muted border border-surface-border/60'}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-1.5">
+          {[{ key: 'all', label: 'الكل' }, { key: 'pending', label: 'غير مدفوع' }, { key: 'confirmed', label: 'مدفوع' }].map(f => (
+            <button key={f.key} onClick={() => setPayFilter(f.key)}
+              className={`px-3 py-2 rounded-lg text-[11px] font-medium transition-all ${payFilter === f.key ? 'bg-navy-900 text-white shadow-premium-md' : 'bg-white text-gray-500 hover:bg-surface-muted border border-surface-border/60'}`}>
+              {f.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <DataTable columns={columns} data={filtered} emptyMessage="لا توجد معاملات" />
