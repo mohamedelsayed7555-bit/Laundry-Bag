@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Linking, Platform } from 'react-native'
-import MapView, { Marker } from 'react-native-maps'
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { View, Text, StyleSheet, TouchableOpacity, Linking, Platform } from 'react-native'
+import { WebView } from 'react-native-webview'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { supabase } from '../../src/lib/supabase'
 import { colors } from '../../src/theme'
@@ -19,10 +19,43 @@ const statusLabels: Record<string, string> = {
   delivering: 'جاري التوصيل',
 }
 
+function buildMapHTML(orders: any[], center: { lat: number; lng: number }) {
+  const markers = orders.map(o => {
+    const color = statusColors[o.status] ?? '#999'
+    const label = statusLabels[o.status] ?? o.status
+    return `L.circleMarker([${o.address.lat}, ${o.address.lng}], {
+      radius: 10, fillColor: '${color}', color: '#fff', weight: 2, fillOpacity: 0.9
+    }).addTo(map).bindPopup('<b>${o.order_number}</b><br>${o.customer?.name ?? ""}<br>${label}')
+    .on('click', function() { window.ReactNativeWebView.postMessage(JSON.stringify({type:'select',id:'${o.id}'})); });`
+  }).join('\n')
+
+  return `<!DOCTYPE html>
+<html><head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  * { margin: 0; padding: 0; }
+  #map { width: 100vw; height: 100vh; }
+  .leaflet-control-attribution { display: none !important; }
+</style>
+</head><body>
+<div id="map"></div>
+<script>
+  var map = L.map('map').setView([${center.lat}, ${center.lng}], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19
+  }).addTo(map);
+  ${markers}
+</script>
+</body></html>`
+}
+
 export default function MapScreen() {
   const { profile } = useAuth()
   const [orders, setOrders] = useState<any[]>([])
   const [selected, setSelected] = useState<any>(null)
+  const webviewRef = useRef<WebView>(null)
 
   const load = useCallback(async () => {
     if (!profile) return
@@ -47,11 +80,18 @@ export default function MapScreen() {
     Linking.openURL(url)
   }
 
-  const defaultRegion = {
-    latitude: orders.length > 0 ? orders[0].address.lat : 30.0444,
-    longitude: orders.length > 0 ? orders[0].address.lng : 31.2357,
-    latitudeDelta: 0.05,
-    longitudeDelta: 0.05,
+  const center = orders.length > 0
+    ? { lat: orders[0].address.lat, lng: orders[0].address.lng }
+    : { lat: 30.0444, lng: 31.2357 }
+
+  const handleMessage = (event: any) => {
+    try {
+      const msg = JSON.parse(event.nativeEvent.data)
+      if (msg.type === 'select') {
+        const order = orders.find(o => o.id === msg.id)
+        if (order) setSelected(order)
+      }
+    } catch {}
   }
 
   return (
@@ -62,23 +102,18 @@ export default function MapScreen() {
       </View>
 
       <View style={s.mapContainer}>
-        <MapView
-          style={s.map}
-          initialRegion={defaultRegion}
-          showsUserLocation
-          showsMyLocationButton
-        >
-          {orders.map(order => (
-            <Marker
-              key={order.id}
-              coordinate={{ latitude: order.address.lat, longitude: order.address.lng }}
-              title={`${order.order_number} - ${order.customer?.name}`}
-              description={statusLabels[order.status] ?? order.status}
-              pinColor={statusColors[order.status] ?? '#999'}
-              onPress={() => setSelected(order)}
-            />
-          ))}
-        </MapView>
+        {orders.length > 0 || true ? (
+          <WebView
+            ref={webviewRef}
+            source={{ html: buildMapHTML(orders, center) }}
+            style={s.map}
+            onMessage={handleMessage}
+            javaScriptEnabled
+            domStorageEnabled
+            startInLoadingState
+            originWhitelist={['*']}
+          />
+        ) : null}
       </View>
 
       {selected && (

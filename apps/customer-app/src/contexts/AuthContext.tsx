@@ -1,12 +1,19 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { Alert, Platform } from 'react-native'
 import { supabase } from '../lib/supabase'
+import * as SecureStore from 'expo-secure-store'
+import * as LocalAuthentication from 'expo-local-authentication'
 import type { Session } from '@supabase/supabase-js'
 import type { User } from '../shared/types'
+
+const BIO_CREDS_KEY = 'bio_credentials'
 
 interface AuthState {
   session: Session | null
   profile: User | null
   loading: boolean
+  biometricEnabled: boolean
+  biometricAvailable: boolean
 }
 
 interface AuthContextType extends AuthState {
@@ -16,6 +23,8 @@ interface AuthContextType extends AuthState {
   signUp: (email: string, password: string, name: string, phone: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
+  toggleBiometric: (enable: boolean, email?: string, password?: string) => Promise<boolean>
+  signInWithBiometric: () => Promise<{ error: string | null }>
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
@@ -25,9 +34,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     session: null,
     profile: null,
     loading: true,
+    biometricEnabled: false,
+    biometricAvailable: false,
   })
 
   useEffect(() => {
+    checkBiometricStatus()
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         fetchProfile(session)
@@ -40,12 +53,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session) {
         fetchProfile(session)
       } else {
-        setState({ session: null, profile: null, loading: false })
+        setState(s => ({ ...s, session: null, profile: null, loading: false }))
       }
     })
 
     return () => subscription.unsubscribe()
   }, [])
+
+  async function checkBiometricStatus() {
+    try {
+      const compatible = await LocalAuthentication.hasHardwareAsync()
+      const enrolled = compatible ? await LocalAuthentication.isEnrolledAsync() : false
+      const saved = await SecureStore.getItemAsync(BIO_CREDS_KEY)
+      setState(s => ({
+        ...s,
+        biometricAvailable: compatible && enrolled,
+        biometricEnabled: !!(compatible && enrolled && saved),
+      }))
+    } catch {
+      setState(s => ({ ...s, biometricAvailable: false, biometricEnabled: false }))
+    }
+  }
 
   async function fetchProfile(session: Session) {
     const { data } = await supabase
@@ -56,15 +84,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (data && data.is_active === false) {
       await supabase.auth.signOut()
-      setState({ session: null, profile: null, loading: false })
+      setState(s => ({ ...s, session: null, profile: null, loading: false }))
       return
     }
 
-    setState({
+    setState(s => ({
+      ...s,
       session,
       profile: data as User | null,
       loading: false,
-    })
+    }))
   }
 
   async function signInWithOtp(email: string) {
@@ -73,11 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function verifyOtp(email: string, token: string) {
-    const { error, data } = await supabase.auth.verifyOtp({
-      email,
-      token,
-      type: 'email',
-    })
+    const { error, data } = await supabase.auth.verifyOtp({ email, token, type: 'email' })
     if (error) return { error: error.message }
 
     if (data.user) {
@@ -126,7 +151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signOut() {
     await supabase.auth.signOut()
-    setState({ session: null, profile: null, loading: false })
+    setState(s => ({ ...s, session: null, profile: null, loading: false }))
   }
 
   async function refreshProfile() {
@@ -135,8 +160,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function toggleBiometric(enable: boolean, email?: string, password?: string): Promise<boolean> {
+    if (enable) {
+      if (!email || !password) return false
+      try {
+        await SecureStore.setItemAsync(BIO_CREDS_KEY, JSON.stringify({ email, password }))
+        setState(s => ({ ...s, biometricEnabled: true }))
+        return true
+      } catch {
+        return false
+      }
+    } else {
+      try {
+        await SecureStore.deleteItemAsync(BIO_CREDS_KEY)
+        setState(s => ({ ...s, biometricEnabled: false }))
+        return true
+      } catch {
+        return false
+      }
+    }
+  }
+
+  async function signInWithBiometric(): Promise<{ error: string | null }> {
+    try {
+      const savedRaw = await SecureStore.getItemAsync(BIO_CREDS_KEY)
+      if (!savedRaw) return { error: 'البصمة غير مفعّلة' }
+
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'سجّل دخول بالبصمة',
+        cancelLabel: 'إلغاء',
+        disableDeviceFallback: false,
+      })
+
+      if (!result.success) return { error: 'فشل التحقق بالبصمة' }
+
+      const { email, password } = JSON.parse(savedRaw)
+      return signInWithPassword(email, password)
+    } catch {
+      return { error: 'حدث خطأ أثناء التحقق بالبصمة' }
+    }
+  }
+
   return (
-    <AuthContext.Provider value={{ ...state, signInWithOtp, verifyOtp, signInWithPassword, signUp, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{
+      ...state, signInWithOtp, verifyOtp, signInWithPassword, signUp,
+      signOut, refreshProfile, toggleBiometric, signInWithBiometric,
+    }}>
       {children}
     </AuthContext.Provider>
   )

@@ -15,7 +15,8 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [serverError, setServerError] = useState('')
-  const { signInWithPassword, signUp } = useAuth()
+  const { signInWithPassword, signUp, signInWithBiometric, biometricEnabled, biometricAvailable } = useAuth()
+  const [bioLoading, setBioLoading] = useState(false)
 
   function clearError(field: string) {
     setErrors(prev => { const n = { ...prev }; delete n[field]; return n })
@@ -150,6 +151,24 @@ export default function LoginScreen() {
             </Text>
           </TouchableOpacity>
 
+          {!isSignUp && biometricEnabled && (
+            <TouchableOpacity
+              style={[s.bioButton, bioLoading && s.buttonDisabled]}
+              onPress={async () => {
+                setBioLoading(true)
+                setServerError('')
+                const { error } = await signInWithBiometric()
+                setBioLoading(false)
+                if (error) setServerError(error)
+              }}
+              disabled={bioLoading}
+            >
+              <Text style={s.bioButtonText}>
+                {bioLoading ? 'جاري التحقق...' : '🔐 تسجيل دخول بالبصمة'}
+              </Text>
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity onPress={() => { setIsSignUp(!isSignUp); setErrors({}); setServerError('') }}>
             <Text style={s.switchText}>
               {isSignUp ? 'عندك حساب؟ سجّل دخول' : 'مستخدم جديد؟ أنشئ حساب'}
@@ -209,4 +228,9 @@ const s = StyleSheet.create({
     color: colors.accent, fontSize: 14, textAlign: 'center', marginTop: 8,
     textDecorationLine: 'underline',
   },
+  bioButton: {
+    borderWidth: 1.5, borderColor: colors.primary, borderRadius: 14, padding: 16,
+    alignItems: 'center', marginTop: 8,
+  },
+  bioButtonText: { color: colors.primary, fontSize: 16, fontWeight: '700' },
 })

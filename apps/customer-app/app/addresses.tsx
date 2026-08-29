@@ -4,10 +4,44 @@ import { useRouter } from 'expo-router'
 import { useAuth } from '../src/contexts/AuthContext'
 import { supabase } from '../src/lib/supabase'
 import { colors } from '../src/theme'
-import MapView, { Marker, Region } from 'react-native-maps'
+import { WebView } from 'react-native-webview'
 import * as Location from 'expo-location'
 
-const CAIRO: Region = { latitude: 30.0444, longitude: 31.2357, latitudeDelta: 0.05, longitudeDelta: 0.05 }
+const CAIRO = { latitude: 30.0444, longitude: 31.2357 }
+
+function buildPickerMapHTML(lat: number, lng: number) {
+  return `<!DOCTYPE html>
+<html><head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
+<style>
+  * { margin: 0; padding: 0; }
+  #map { width: 100vw; height: 100vh; }
+  .leaflet-control-attribution { display: none !important; }
+</style>
+</head><body>
+<div id="map"></div>
+<script>
+  var map = L.map('map').setView([${lat}, ${lng}], 15);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+  var marker = L.marker([${lat}, ${lng}], { draggable: true }).addTo(map);
+  marker.on('dragend', function(e) {
+    var ll = e.target.getLatLng();
+    window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'pin', lat: ll.lat, lng: ll.lng }));
+  });
+  map.on('click', function(e) {
+    marker.setLatLng(e.latlng);
+    window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'pin', lat: e.latlng.lat, lng: e.latlng.lng }));
+  });
+  window.setCenter = function(lat, lng) {
+    marker.setLatLng([lat, lng]);
+    map.setView([lat, lng], 17);
+    window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'pin', lat: lat, lng: lng }));
+  };
+<\/script>
+</body></html>`
+}
 
 export default function AddressesScreen() {
   const { profile } = useAuth()
@@ -19,7 +53,7 @@ export default function AddressesScreen() {
   const [form, setForm] = useState({ label: '', building: '', floor: '', apartment: '', landmark: '', notes: '' })
   const [pin, setPin] = useState({ latitude: CAIRO.latitude, longitude: CAIRO.longitude })
   const [locatingMe, setLocatingMe] = useState(false)
-  const mapRef = useRef<MapView>(null)
+  const webviewRef = useRef<WebView>(null)
 
   useEffect(() => { loadAddresses() }, [profile])
 
@@ -63,11 +97,20 @@ export default function AddressesScreen() {
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High })
       const coord = { latitude: loc.coords.latitude, longitude: loc.coords.longitude }
       setPin(coord)
-      mapRef.current?.animateToRegion({ ...coord, latitudeDelta: 0.005, longitudeDelta: 0.005 }, 500)
+      webviewRef.current?.injectJavaScript(`window.setCenter(${coord.latitude}, ${coord.longitude}); true;`)
     } catch {
       Alert.alert('خطأ', 'لم نتمكن من تحديد موقعك')
     }
     setLocatingMe(false)
+  }
+
+  const handleMapMessage = (event: any) => {
+    try {
+      const msg = JSON.parse(event.nativeEvent.data)
+      if (msg.type === 'pin') {
+        setPin({ latitude: msg.lat, longitude: msg.lng })
+      }
+    } catch {}
   }
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
@@ -180,17 +223,20 @@ export default function AddressesScreen() {
           <ScrollView style={s.modalContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <Text style={s.modalTitle}>{editing ? 'تعديل العنوان' : 'إضافة عنوان'}</Text>
 
-            {/* Map */}
             <Text style={s.fieldLabel}>حدد الموقع على الخريطة</Text>
             <View style={s.mapContainer}>
-              <MapView
-                ref={mapRef}
+              <WebView
+                ref={webviewRef}
+                source={{ html: buildPickerMapHTML(pin.latitude, pin.longitude) }}
                 style={s.map}
-                initialRegion={{ ...pin, latitudeDelta: 0.01, longitudeDelta: 0.01 }}
-                onPress={(e) => setPin(e.nativeEvent.coordinate)}
-              >
-                <Marker coordinate={pin} draggable onDragEnd={(e) => setPin(e.nativeEvent.coordinate)} />
-              </MapView>
+                onMessage={handleMapMessage}
+                javaScriptEnabled
+                domStorageEnabled
+                startInLoadingState
+                originWhitelist={['*']}
+                scrollEnabled={false}
+                nestedScrollEnabled
+              />
               <TouchableOpacity style={s.myLocBtn} onPress={useMyLocation} disabled={locatingMe}>
                 {locatingMe
                   ? <ActivityIndicator size="small" color={colors.primary} />

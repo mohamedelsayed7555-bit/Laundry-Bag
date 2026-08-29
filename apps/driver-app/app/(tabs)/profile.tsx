@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Switch } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Switch, ScrollView, TextInput, Modal } from 'react-native'
 import Animated, { FadeInDown } from 'react-native-reanimated'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
@@ -7,11 +7,15 @@ import { supabase } from '../../src/lib/supabase'
 import { colors } from '../../src/theme'
 
 export default function DriverProfileScreen() {
-  const { profile, signOut, refreshProfile } = useAuth()
+  const { profile, signOut, refreshProfile, biometricEnabled, biometricAvailable, toggleBiometric } = useAuth()
   const router = useRouter()
   const [stats, setStats] = useState({ total: 0, delivered: 0, earnings: 0 })
   const [isOnline, setIsOnline] = useState(profile?.is_active ?? false)
   const [toggling, setToggling] = useState(false)
+  const [showBioModal, setShowBioModal] = useState(false)
+  const [bioEmail, setBioEmail] = useState('')
+  const [bioPassword, setBioPassword] = useState('')
+  const [bioSaving, setBioSaving] = useState(false)
 
   useEffect(() => {
     if (profile) {
@@ -50,7 +54,7 @@ export default function DriverProfileScreen() {
   }
 
   return (
-    <View style={s.container}>
+    <ScrollView style={s.container} contentContainerStyle={s.contentContainer} showsVerticalScrollIndicator={false}>
       <Animated.Text entering={FadeInDown.duration(500)} style={s.title}>حسابي</Animated.Text>
 
       <Animated.View entering={FadeInDown.duration(500).delay(100)} style={s.card}>
@@ -102,6 +106,28 @@ export default function DriverProfileScreen() {
           <Text style={s.menuText}>تعديل البيانات</Text>
           <Text style={s.menuArrow}>←</Text>
         </TouchableOpacity>
+
+        {biometricAvailable && (
+          <View style={s.menuItem}>
+            <Text style={s.menuIcon}>🔐</Text>
+            <Text style={s.menuText}>تسجيل دخول بالبصمة</Text>
+            <Switch
+              value={biometricEnabled}
+              onValueChange={async (val) => {
+                if (val) {
+                  setBioEmail(profile?.email ?? '')
+                  setBioPassword('')
+                  setShowBioModal(true)
+                } else {
+                  await toggleBiometric(false)
+                  Alert.alert('تم', 'تم إلغاء تسجيل الدخول بالبصمة')
+                }
+              }}
+              trackColor={{ false: colors.navy[600], true: colors.primary + '60' }}
+              thumbColor={biometricEnabled ? colors.primary : colors.navy[400]}
+            />
+          </View>
+        )}
       </Animated.View>
 
       {profile?.vehicle_type && (
@@ -126,12 +152,49 @@ export default function DriverProfileScreen() {
         <Text style={s.logoutText}>تسجيل الخروج</Text>
       </TouchableOpacity>
       </Animated.View>
-    </View>
+
+      <Modal visible={showBioModal} animationType="slide" transparent>
+        <View style={s.bioModalOverlay}>
+          <View style={s.bioModalContent}>
+            <Text style={s.bioModalTitle}>تفعيل البصمة</Text>
+            <Text style={s.bioModalHint}>أدخل كلمة المرور لتفعيل تسجيل الدخول بالبصمة</Text>
+            <Text style={s.bioFieldLabel}>البريد الإلكتروني</Text>
+            <TextInput style={s.bioInput} value={bioEmail} onChangeText={setBioEmail} keyboardType="email-address" autoCapitalize="none" textAlign="left" />
+            <Text style={s.bioFieldLabel}>كلمة المرور</Text>
+            <TextInput style={s.bioInput} value={bioPassword} onChangeText={setBioPassword} secureTextEntry textAlign="left" />
+            <View style={s.bioModalActions}>
+              <TouchableOpacity style={s.bioModalCancel} onPress={() => setShowBioModal(false)}>
+                <Text style={s.bioModalCancelText}>إلغاء</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.bioModalSave, bioSaving && { opacity: 0.6 }]}
+                disabled={bioSaving}
+                onPress={async () => {
+                  if (!bioEmail || !bioPassword) { Alert.alert('تنبيه', 'أدخل البريد وكلمة المرور'); return }
+                  setBioSaving(true)
+                  const ok = await toggleBiometric(true, bioEmail, bioPassword)
+                  setBioSaving(false)
+                  if (ok) {
+                    setShowBioModal(false)
+                    Alert.alert('تم', 'تم تفعيل تسجيل الدخول بالبصمة بنجاح')
+                  } else {
+                    Alert.alert('خطأ', 'فشل تفعيل البصمة')
+                  }
+                }}
+              >
+                <Text style={s.bioModalSaveText}>{bioSaving ? 'جاري...' : 'تفعيل'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </ScrollView>
   )
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.navy[900], padding: 20, paddingTop: 60 },
+  container: { flex: 1, backgroundColor: colors.navy[900] },
+  contentContainer: { padding: 20, paddingTop: 60, paddingBottom: 40 },
   title: { fontSize: 22, fontWeight: 'bold', color: '#fff', marginBottom: 24 },
   card: {
     alignItems: 'center', backgroundColor: colors.navy[800], borderRadius: 20,
@@ -188,4 +251,15 @@ const s = StyleSheet.create({
     padding: 14, alignItems: 'center',
   },
   logoutText: { color: colors.danger, fontSize: 16, fontWeight: '600' },
+  bioModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 24 },
+  bioModalContent: { backgroundColor: colors.navy[800], borderRadius: 20, padding: 24 },
+  bioModalTitle: { fontSize: 18, fontWeight: '700', color: '#fff', textAlign: 'center', marginBottom: 8 },
+  bioModalHint: { fontSize: 13, color: colors.navy[300], textAlign: 'center', marginBottom: 20 },
+  bioFieldLabel: { fontSize: 12, color: colors.navy[200], marginBottom: 4, textAlign: 'right' },
+  bioInput: { backgroundColor: colors.navy[700], borderRadius: 10, padding: 12, color: '#fff', fontSize: 14, marginBottom: 12 },
+  bioModalActions: { flexDirection: 'row', gap: 12, marginTop: 8 },
+  bioModalCancel: { flex: 1, borderWidth: 1, borderColor: colors.navy[500], borderRadius: 12, padding: 14, alignItems: 'center' },
+  bioModalCancelText: { color: colors.navy[200], fontWeight: '600' },
+  bioModalSave: { flex: 2, backgroundColor: colors.primary, borderRadius: 12, padding: 14, alignItems: 'center' },
+  bioModalSaveText: { color: '#fff', fontWeight: '700' },
 })

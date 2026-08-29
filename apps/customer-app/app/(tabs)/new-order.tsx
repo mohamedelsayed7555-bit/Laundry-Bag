@@ -135,10 +135,11 @@ export default function NewOrderScreen() {
       items_count: totalItems,
       subtotal: totalPrice,
       total: orderTotal,
-      payment_method: useSubscription ? 'subscription' : paymentMethod,
+      payment_method: useSubscription ? 'cash' : paymentMethod,
       notes: notes || null,
       status: 'pending',
-      payment_status: useSubscription ? 'paid' : 'pending',
+      payment_status: useSubscription ? 'confirmed' : 'pending',
+      subscription_id: useSubscription ? activeSub.id : null,
       address_id: selectedAddress?.id || null,
       delivery_location: selectedAddress ? { lat: selectedAddress.lat, lng: selectedAddress.lng, label: selectedAddress.label } : {},
     })

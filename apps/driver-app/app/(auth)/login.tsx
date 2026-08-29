@@ -9,7 +9,8 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [serverError, setServerError] = useState('')
-  const { signInWithPassword } = useAuth()
+  const { signInWithPassword, signInWithBiometric, biometricEnabled } = useAuth()
+  const [bioLoading, setBioLoading] = useState(false)
 
   function clearError(field: string) {
     setErrors(prev => { const n = { ...prev }; delete n[field]; return n })
@@ -81,6 +82,24 @@ export default function LoginScreen() {
             <Text style={s.buttonText}>{loading ? 'جاري الدخول...' : 'تسجيل دخول'}</Text>
           </TouchableOpacity>
 
+          {biometricEnabled && (
+            <TouchableOpacity
+              style={[s.bioButton, bioLoading && s.buttonDisabled]}
+              onPress={async () => {
+                setBioLoading(true)
+                setServerError('')
+                const { error } = await signInWithBiometric()
+                setBioLoading(false)
+                if (error) setServerError(error)
+              }}
+              disabled={bioLoading}
+            >
+              <Text style={s.bioButtonText}>
+                {bioLoading ? 'جاري التحقق...' : '🔐 تسجيل دخول بالبصمة'}
+              </Text>
+            </TouchableOpacity>
+          )}
+
           <Text style={s.hint}>يتم إنشاء حسابك بواسطة الإدارة فقط</Text>
         </View>
       </View>
@@ -125,4 +144,9 @@ const s = StyleSheet.create({
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: '#fff', fontSize: 18, fontWeight: '700' },
   hint: { fontSize: 12, color: colors.navy[400], textAlign: 'center', marginTop: 4 },
+  bioButton: {
+    borderWidth: 1.5, borderColor: colors.primary, borderRadius: 14, padding: 16,
+    alignItems: 'center',
+  },
+  bioButtonText: { color: colors.primary, fontSize: 16, fontWeight: '700' },
 })
