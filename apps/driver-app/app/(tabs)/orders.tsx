@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert, Linking } from 'react-native'
+import { useRouter } from 'expo-router'
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { supabase } from '../../src/lib/supabase'
@@ -32,6 +33,7 @@ type Filter = 'active' | 'completed' | 'all'
 
 export default function DriverOrdersScreen() {
   const { profile } = useAuth()
+  const router = useRouter()
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -99,21 +101,31 @@ export default function DriverOrdersScreen() {
 
           <View style={s.customerInfo}>
             <Text style={s.customerName}>👤 {item.customer?.name}</Text>
-            <Text style={s.customerPhone}>📞 {item.customer?.phone ?? '—'}</Text>
+            {item.customer?.phone ? (
+              <TouchableOpacity onPress={() => Linking.openURL(`tel:${item.customer.phone}`)}>
+                <Text style={s.customerPhoneLink}>📞 {item.customer.phone}</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={s.customerPhone}>📞 —</Text>
+            )}
           </View>
 
-          {addr && (
+          {(addr || item.delivery_location?.lat) && (
             <View style={s.addressBox}>
               <View style={s.addressHeader}>
-                <Text style={s.addressLabel}>📍 {addr.label}</Text>
-                <TouchableOpacity style={s.navBtn} onPress={() => openNavigation(addr)}>
+                <Text style={s.addressLabel}>📍 {addr?.label || item.delivery_location?.label || 'موقع العميل'}</Text>
+                <TouchableOpacity style={s.navBtn} onPress={() => openNavigation(addr || item.delivery_location)}>
                   <Text style={s.navBtnText}>🧭 اتجاهات</Text>
                 </TouchableOpacity>
               </View>
-              <Text style={s.addressDetail}>
-                {[addr.building && `مبنى ${addr.building}`, addr.floor && `ط${addr.floor}`, addr.apartment && `ش${addr.apartment}`].filter(Boolean).join(' - ')}
-              </Text>
-              {addr.landmark && <Text style={s.addressDetail}>📌 {addr.landmark}</Text>}
+              {addr && (
+                <>
+                  <Text style={s.addressDetail}>
+                    {[addr.building && `مبنى ${addr.building}`, addr.floor && `ط${addr.floor}`, addr.apartment && `ش${addr.apartment}`].filter(Boolean).join(' - ')}
+                  </Text>
+                  {addr.landmark && <Text style={s.addressDetail}>📌 {addr.landmark}</Text>}
+                </>
+              )}
             </View>
           )}
 
@@ -148,11 +160,16 @@ export default function DriverOrdersScreen() {
             </TouchableOpacity>
           )}
 
-          {item.customer?.phone && (item.status === 'assigned' || item.status === 'delivering') && (
-            <TouchableOpacity style={s.callBtn} onPress={() => Linking.openURL(`tel:${item.customer.phone}`)}>
-              <Text style={s.callBtnText}>📞 اتصل بالعميل</Text>
+          <View style={s.contactRow}>
+            <TouchableOpacity style={s.msgBtn} onPress={() => router.push(`/chat/${item.id}`)}>
+              <Text style={s.msgBtnText}>💬 رسالة</Text>
             </TouchableOpacity>
-          )}
+            {item.customer?.phone && (
+              <TouchableOpacity style={s.callBtn} onPress={() => Linking.openURL(`tel:${item.customer.phone}`)}>
+                <Text style={s.callBtnText}>📞 اتصال</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </Animated.View>
     )
@@ -274,8 +291,12 @@ const s = StyleSheet.create({
   notes: { fontSize: 12, color: colors.navy[200], marginTop: 8, marginBottom: 4 },
   actionBtn: { borderRadius: 14, padding: 14, alignItems: 'center', marginTop: 12 },
   actionText: { fontSize: 15, fontWeight: '700', color: '#fff' },
-  callBtn: { borderWidth: 1, borderColor: colors.accent, borderRadius: 12, padding: 10, alignItems: 'center', marginTop: 8 },
+  contactRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  msgBtn: { flex: 1, borderWidth: 1, borderColor: colors.primary, borderRadius: 12, padding: 10, alignItems: 'center' },
+  msgBtnText: { fontSize: 13, color: colors.primary, fontWeight: '600' },
+  callBtn: { flex: 1, borderWidth: 1, borderColor: colors.accent, borderRadius: 12, padding: 10, alignItems: 'center' },
   callBtnText: { fontSize: 13, color: colors.accent, fontWeight: '600' },
+  customerPhoneLink: { fontSize: 13, color: colors.primary, fontWeight: '600', textDecorationLine: 'underline' },
   emptyCard: {
     backgroundColor: colors.navy[800], borderRadius: 20, padding: 40,
     alignItems: 'center', borderWidth: 1, borderColor: colors.navy[700],

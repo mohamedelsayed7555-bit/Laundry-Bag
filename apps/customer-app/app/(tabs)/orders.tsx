@@ -82,6 +82,12 @@ export default function OrdersScreen() {
           </View>
 
           <Text style={s.date}>{new Date(item.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}</Text>
+
+          {item.driver_id && !['delivered', 'cancelled'].includes(item.status) && (
+            <TouchableOpacity style={s.msgBtn} onPress={() => router.push(`/chat/${item.id}`)}>
+              <Text style={s.msgBtnText}>💬 رسالة السائق</Text>
+            </TouchableOpacity>
+          )}
         </TouchableOpacity>
       </Animated.View>
     )
@@ -140,4 +146,6 @@ const s = StyleSheet.create({
   emptyIcon: { fontSize: 40, marginBottom: 12 },
   emptyText: { fontSize: 15, color: colors.navy[300] },
   emptySubText: { fontSize: 12, color: colors.navy[400], marginTop: 8 },
+  msgBtn: { borderWidth: 1, borderColor: colors.primary, borderRadius: 12, padding: 10, alignItems: 'center', marginTop: 12 },
+  msgBtnText: { fontSize: 13, color: colors.primary, fontWeight: '600' },
 })

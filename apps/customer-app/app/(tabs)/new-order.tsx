@@ -155,7 +155,7 @@ export default function NewOrderScreen() {
 
     setSaving(false)
     if (error) {
-      Alert.alert('خطأ', 'حدث خطأ أثناء إنشاء الطلب')
+      Alert.alert('خطأ', error.message || 'حدث خطأ أثناء إنشاء الطلب')
     } else {
       const msg = useSubscription
         ? `تم إنشاء طلبك بنجاح!\nتم خصم ${totalItems} قطعة من باقتك (متبقي ${subRemaining! - totalItems})`
