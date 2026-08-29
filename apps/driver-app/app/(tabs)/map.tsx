@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Linking, Platform } from 'react-native'
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps'
+import MapView, { Marker } from 'react-native-maps'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { supabase } from '../../src/lib/supabase'
 import { colors } from '../../src/theme'
@@ -64,7 +64,6 @@ export default function MapScreen() {
       <View style={s.mapContainer}>
         <MapView
           style={s.map}
-          provider={PROVIDER_GOOGLE}
           initialRegion={defaultRegion}
           showsUserLocation
           showsMyLocationButton

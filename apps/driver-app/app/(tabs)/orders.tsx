@@ -1,9 +1,11 @@
 import { useEffect, useState, useCallback } from 'react'
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert, Linking } from 'react-native'
+import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { supabase } from '../../src/lib/supabase'
 import { useRealtimeDriverOrders } from '../../src/hooks/useRealtimeOrders'
 import { colors } from '../../src/theme'
+import { SkeletonOrderCard } from '../../src/components/Skeleton'
 
 const statusConfig: Record<string, { label: string; color: string; icon: string }> = {
   assigned: { label: 'بانتظار الاستلام', color: '#3b82f6', icon: '📋' },
@@ -79,84 +81,86 @@ export default function DriverOrdersScreen() {
 
   const filteredOrders = filter === 'active' ? activeOrders : filter === 'completed' ? completedOrders : orders
 
-  const renderOrder = ({ item }: { item: any }) => {
+  const renderOrder = ({ item, index }: { item: any; index: number }) => {
     const status = statusConfig[item.status] ?? { label: item.status, color: '#999', icon: '❓' }
     const action = nextAction[item.status]
     const addr = item.address
 
     return (
-      <View style={s.orderCard}>
-        <View style={s.orderHeader}>
-          <Text style={s.orderNumber}>{item.order_number}</Text>
-          <View style={[s.statusBadge, { backgroundColor: status.color + '20' }]}>
-            <Text style={{ fontSize: 12 }}>{status.icon}</Text>
-            <Text style={[s.statusText, { color: status.color }]}>{status.label}</Text>
-          </View>
-        </View>
-
-        <View style={s.customerInfo}>
-          <Text style={s.customerName}>👤 {item.customer?.name}</Text>
-          <Text style={s.customerPhone}>📞 {item.customer?.phone ?? '—'}</Text>
-        </View>
-
-        {addr && (
-          <View style={s.addressBox}>
-            <View style={s.addressHeader}>
-              <Text style={s.addressLabel}>📍 {addr.label}</Text>
-              <TouchableOpacity style={s.navBtn} onPress={() => openNavigation(addr)}>
-                <Text style={s.navBtnText}>🧭 اتجاهات</Text>
-              </TouchableOpacity>
+      <Animated.View entering={FadeInRight.duration(400).delay(index * 80)}>
+        <View style={s.orderCard}>
+          <View style={s.orderHeader}>
+            <Text style={s.orderNumber}>{item.order_number}</Text>
+            <View style={[s.statusBadge, { backgroundColor: status.color + '20' }]}>
+              <Text style={{ fontSize: 12 }}>{status.icon}</Text>
+              <Text style={[s.statusText, { color: status.color }]}>{status.label}</Text>
             </View>
-            <Text style={s.addressDetail}>
-              {[addr.building && `مبنى ${addr.building}`, addr.floor && `ط${addr.floor}`, addr.apartment && `ش${addr.apartment}`].filter(Boolean).join(' - ')}
-            </Text>
-            {addr.landmark && <Text style={s.addressDetail}>📌 {addr.landmark}</Text>}
           </View>
-        )}
 
-        <View style={s.orderDetails}>
-          <View style={s.detailRow}>
-            <Text style={s.detailLabel}>الخدمة</Text>
-            <Text style={s.detailValue}>{serviceLabel[item.service_type] ?? item.service_type}</Text>
+          <View style={s.customerInfo}>
+            <Text style={s.customerName}>👤 {item.customer?.name}</Text>
+            <Text style={s.customerPhone}>📞 {item.customer?.phone ?? '—'}</Text>
           </View>
-          <View style={s.detailRow}>
-            <Text style={s.detailLabel}>القطع</Text>
-            <Text style={s.detailValue}>{item.items_count}</Text>
+
+          {addr && (
+            <View style={s.addressBox}>
+              <View style={s.addressHeader}>
+                <Text style={s.addressLabel}>📍 {addr.label}</Text>
+                <TouchableOpacity style={s.navBtn} onPress={() => openNavigation(addr)}>
+                  <Text style={s.navBtnText}>🧭 اتجاهات</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={s.addressDetail}>
+                {[addr.building && `مبنى ${addr.building}`, addr.floor && `ط${addr.floor}`, addr.apartment && `ش${addr.apartment}`].filter(Boolean).join(' - ')}
+              </Text>
+              {addr.landmark && <Text style={s.addressDetail}>📌 {addr.landmark}</Text>}
+            </View>
+          )}
+
+          <View style={s.orderDetails}>
+            <View style={s.detailRow}>
+              <Text style={s.detailLabel}>الخدمة</Text>
+              <Text style={s.detailValue}>{serviceLabel[item.service_type] ?? item.service_type}</Text>
+            </View>
+            <View style={s.detailRow}>
+              <Text style={s.detailLabel}>القطع</Text>
+              <Text style={s.detailValue}>{item.items_count}</Text>
+            </View>
+            <View style={s.detailRow}>
+              <Text style={s.detailLabel}>المبلغ</Text>
+              <Text style={[s.detailValue, { color: colors.primary, fontWeight: '700' }]}>{item.total?.toFixed(2)} ج.م</Text>
+            </View>
+            <View style={s.detailRow}>
+              <Text style={s.detailLabel}>الدفع</Text>
+              <Text style={s.detailValue}>{item.payment_method === 'cash' ? 'كاش' : item.payment_method === 'instapay' ? 'إنستاباي' : 'محفظة'}</Text>
+            </View>
           </View>
-          <View style={s.detailRow}>
-            <Text style={s.detailLabel}>المبلغ</Text>
-            <Text style={[s.detailValue, { color: colors.primary, fontWeight: '700' }]}>{item.total?.toFixed(2)} ج.م</Text>
-          </View>
-          <View style={s.detailRow}>
-            <Text style={s.detailLabel}>الدفع</Text>
-            <Text style={s.detailValue}>{item.payment_method === 'cash' ? 'كاش' : item.payment_method === 'instapay' ? 'إنستاباي' : 'محفظة'}</Text>
-          </View>
+
+          {item.notes && <Text style={s.notes}>📝 {item.notes}</Text>}
+
+          {action && (
+            <TouchableOpacity style={[s.actionBtn, { backgroundColor: status.color }]}
+              onPress={() => Alert.alert('تأكيد', `${action.label}؟`, [
+                { text: 'إلغاء', style: 'cancel' },
+                { text: 'تأكيد', onPress: () => updateStatus(item.id, action.status) },
+              ])}>
+              <Text style={s.actionText}>{action.label}</Text>
+            </TouchableOpacity>
+          )}
+
+          {item.customer?.phone && (item.status === 'assigned' || item.status === 'delivering') && (
+            <TouchableOpacity style={s.callBtn} onPress={() => Linking.openURL(`tel:${item.customer.phone}`)}>
+              <Text style={s.callBtnText}>📞 اتصل بالعميل</Text>
+            </TouchableOpacity>
+          )}
         </View>
-
-        {item.notes && <Text style={s.notes}>📝 {item.notes}</Text>}
-
-        {action && (
-          <TouchableOpacity style={[s.actionBtn, { backgroundColor: status.color }]}
-            onPress={() => Alert.alert('تأكيد', `${action.label}؟`, [
-              { text: 'إلغاء', style: 'cancel' },
-              { text: 'تأكيد', onPress: () => updateStatus(item.id, action.status) },
-            ])}>
-            <Text style={s.actionText}>{action.label}</Text>
-          </TouchableOpacity>
-        )}
-
-        {item.customer?.phone && (item.status === 'assigned' || item.status === 'delivering') && (
-          <TouchableOpacity style={s.callBtn} onPress={() => Linking.openURL(`tel:${item.customer.phone}`)}>
-            <Text style={s.callBtnText}>📞 اتصل بالعميل</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      </Animated.View>
     )
   }
 
   return (
     <View style={s.container}>
-      <View style={s.header}>
+      <Animated.View entering={FadeInDown.duration(500)} style={s.header}>
         <View>
           <Text style={s.title}>الطلبات</Text>
           <Text style={s.subtitle}>{activeOrders.length} نشط · {completedOrders.length} مكتمل</Text>
@@ -164,17 +168,17 @@ export default function DriverOrdersScreen() {
         <View style={s.avatar}>
           <Text style={s.avatarText}>{profile?.name?.[0] ?? '؟'}</Text>
         </View>
-      </View>
+      </Animated.View>
 
-      <View style={s.filterRow}>
+      <Animated.View entering={FadeInDown.duration(500).delay(100)} style={s.filterRow}>
         {([['active', 'النشطة'], ['completed', 'المكتملة'], ['all', 'الكل']] as [Filter, string][]).map(([key, label]) => (
           <TouchableOpacity key={key} style={[s.filterBtn, filter === key && s.filterActive]} onPress={() => setFilter(key)}>
             <Text style={[s.filterText, filter === key && s.filterTextActive]}>{label}</Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </Animated.View>
 
-      <View style={s.statsRow}>
+      <Animated.View entering={FadeInDown.duration(500).delay(200)} style={s.statsRow}>
         <View style={s.statCard}>
           <Text style={s.statValue}>{activeOrders.length}</Text>
           <Text style={s.statLabel}>نشط</Text>
@@ -187,17 +191,19 @@ export default function DriverOrdersScreen() {
           <Text style={s.statValue}>{completedOrders.length}</Text>
           <Text style={s.statLabel}>مكتمل</Text>
         </View>
-      </View>
+      </Animated.View>
 
       {loading ? (
-        <View style={s.emptyCard}>
-          <Text style={s.emptyText}>جاري التحميل...</Text>
-        </View>
+        <Animated.View entering={FadeInDown.duration(400).delay(300)} style={{ gap: 12 }}>
+          <SkeletonOrderCard />
+          <SkeletonOrderCard />
+          <SkeletonOrderCard />
+        </Animated.View>
       ) : filteredOrders.length === 0 ? (
-        <View style={s.emptyCard}>
+        <Animated.View entering={FadeInDown.duration(500).delay(300)} style={s.emptyCard}>
           <Text style={s.emptyIcon}>📋</Text>
           <Text style={s.emptyText}>{filter === 'completed' ? 'لا توجد طلبات مكتملة' : 'لا توجد طلبات نشطة'}</Text>
-        </View>
+        </Animated.View>
       ) : (
         <FlatList
           data={filteredOrders}

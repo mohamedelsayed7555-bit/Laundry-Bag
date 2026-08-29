@@ -43,12 +43,12 @@ export default function DataTable<T extends Record<string, any>>({
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-surface-border/60">
+            <tr className="bg-navy-900/[0.04] border-b-2 border-navy-900/10">
               {columns.map((col) => (
                 <th
                   key={col.key}
                   className={cn(
-                    'px-5 py-3.5 text-[11px] font-semibold text-gray-400 text-right uppercase tracking-wider',
+                    'px-5 py-4 text-xs font-bold text-navy-900/70 text-right tracking-wide',
                     col.className
                   )}
                 >

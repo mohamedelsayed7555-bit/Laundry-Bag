@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "scheme": "cleano-driver",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "bundleIdentifier": "com.cleano.driver",
       "supportsTablet": false

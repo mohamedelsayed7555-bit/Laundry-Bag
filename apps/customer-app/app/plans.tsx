@@ -29,6 +29,7 @@ type Subscription = {
   end_date: string
   auto_renew: boolean
   total_paid: number
+  plan_name?: string
 }
 
 const durations = [
@@ -55,7 +56,8 @@ export default function PlansScreen() {
   const { profile } = useAuth()
   const router = useRouter()
   const [plans, setPlans] = useState<Plan[]>([])
-  const [activeSub, setActiveSub] = useState<(Subscription & { plan_name?: string }) | null>(null)
+  const [activeSub, setActiveSub] = useState<Subscription | null>(null)
+  const [pendingSub, setPendingSub] = useState<Subscription | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedDuration, setSelectedDuration] = useState('monthly')
   const [subscribing, setSubscribing] = useState(false)
@@ -77,10 +79,15 @@ export default function PlansScreen() {
         .from('subscriptions')
         .select('*, plans(name)')
         .eq('user_id', profile.id)
-        .eq('status', 'active')
-        .single()
+        .in('status', ['active', 'pending'])
+        .order('created_at', { ascending: false })
       if (subData) {
-        setActiveSub({ ...subData, plan_name: (subData as any).plans?.name } as any)
+        const active = subData.find((s: any) => s.status === 'active')
+        const pending = subData.find((s: any) => s.status === 'pending')
+        if (active) setActiveSub({ ...active, plan_name: (active as any).plans?.name } as any)
+        else setActiveSub(null)
+        if (pending) setPendingSub({ ...pending, plan_name: (pending as any).plans?.name } as any)
+        else setPendingSub(null)
       }
     }
     setLoading(false)
@@ -89,10 +96,11 @@ export default function PlansScreen() {
   async function handleSubscribe(plan: Plan) {
     if (!profile) return
     if (activeSub) {
-      Alert.alert('تنبيه', 'لديك اشتراك نشط بالفعل. هل تريد الترقية؟', [
-        { text: 'إلغاء', style: 'cancel' },
-        { text: 'ترقية', onPress: () => doSubscribe(plan) },
-      ])
+      Alert.alert('تنبيه', 'لديك اشتراك نشط بالفعل')
+      return
+    }
+    if (pendingSub) {
+      Alert.alert('تنبيه', 'لديك طلب اشتراك قيد المراجعة بالفعل')
       return
     }
     doSubscribe(plan)
@@ -104,40 +112,30 @@ export default function PlansScreen() {
 
     Alert.alert(
       `اشتراك ${plan.name}`,
-      `المدة: ${dur.label}\nالسعر: ${price} ج.م\n${plan.items_per_month} قطعة/شهر`,
+      `المدة: ${dur.label}\nالسعر: ${price} ج.م\n${plan.items_per_month} قطعة/شهر\n\nسيتم مراجعة طلبك وتفعيله من الإدارة بعد الدفع`,
       [
         { text: 'إلغاء', style: 'cancel' },
         {
-          text: 'تأكيد الاشتراك',
+          text: 'إرسال طلب اشتراك',
           onPress: async () => {
             setSubscribing(true)
-            const now = new Date()
-            const months = selectedDuration === 'monthly' ? 1 : selectedDuration === 'quarterly' ? 3 : selectedDuration === 'biannual' ? 6 : 12
-            const endDate = new Date(now)
-            endDate.setMonth(endDate.getMonth() + months)
-
-            if (activeSub) {
-              await supabase.from('subscriptions').update({ status: 'cancelled', cancelled_at: now.toISOString() }).eq('id', activeSub.id)
-            }
 
             const { error } = await supabase.from('subscriptions').insert({
               user_id: profile!.id,
               plan_id: plan.id,
               duration: selectedDuration,
-              status: 'active',
+              status: 'pending',
               items_used: 0,
               items_limit: plan.items_per_month,
-              start_date: now.toISOString().split('T')[0],
-              end_date: endDate.toISOString().split('T')[0],
               auto_renew: true,
               payment_method: 'cash',
               total_paid: price,
             })
             setSubscribing(false)
             if (error) {
-              Alert.alert('خطأ', 'حدث خطأ أثناء الاشتراك')
+              Alert.alert('خطأ', 'حدث خطأ أثناء إرسال الطلب')
             } else {
-              Alert.alert('تم', 'تم الاشتراك بنجاح! 🎉', [{ text: 'حسناً', onPress: () => loadData() }])
+              Alert.alert('تم', 'تم إرسال طلب الاشتراك! سيتم تفعيله بعد مراجعة الإدارة والدفع 📋', [{ text: 'حسناً', onPress: () => loadData() }])
             }
           },
         },
@@ -165,6 +163,15 @@ export default function PlansScreen() {
         <Text style={s.title}>الباقات</Text>
         <View style={{ width: 60 }} />
       </View>
+
+      {/* Pending Subscription */}
+      {pendingSub && (
+        <View style={s.pendingSubCard}>
+          <Text style={s.pendingSubBadge}>⏳ طلب اشتراك قيد المراجعة</Text>
+          <Text style={s.pendingSubName}>{pendingSub.plan_name}</Text>
+          <Text style={s.pendingSubHint}>سيتم تفعيل اشتراكك بعد مراجعة الإدارة وتأكيد الدفع</Text>
+        </View>
+      )}
 
       {/* Active Subscription */}
       {activeSub && (
@@ -257,6 +264,15 @@ const s = StyleSheet.create({
   backText: { color: colors.primary, fontSize: 16, fontWeight: '600' },
   title: { fontSize: 20, fontWeight: 'bold', color: '#fff' },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: '#fff', marginBottom: 12, marginTop: 8 },
+
+  // Pending subscription
+  pendingSubCard: {
+    backgroundColor: '#f59e0b15', borderRadius: 20, padding: 20, marginBottom: 16,
+    borderWidth: 1.5, borderColor: '#f59e0b40',
+  },
+  pendingSubBadge: { color: '#f59e0b', fontSize: 14, fontWeight: '700', marginBottom: 8 },
+  pendingSubName: { fontSize: 18, fontWeight: 'bold', color: '#fff', marginBottom: 8 },
+  pendingSubHint: { fontSize: 12, color: colors.navy[300] },
 
   // Active subscription
   activeSubCard: {

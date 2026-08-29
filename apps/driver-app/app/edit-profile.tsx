@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, KeyboardAvoidingView, Platform, ScrollView, Animated } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../src/contexts/AuthContext'
 import { supabase } from '../src/lib/supabase'
@@ -11,10 +11,19 @@ export default function EditProfileScreen() {
   const [name, setName] = useState(profile?.name ?? '')
   const [phone, setPhone] = useState(profile?.phone ?? '')
   const [saving, setSaving] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  function clearError(field: string) {
+    setErrors(prev => { const n = { ...prev }; delete n[field]; return n })
+  }
 
   async function handleSave() {
-    if (!name.trim()) { Alert.alert('خطأ', 'أدخل الاسم'); return }
-    if (!phone.trim()) { Alert.alert('خطأ', 'أدخل رقم التليفون'); return }
+    const e: Record<string, string> = {}
+    if (!name.trim()) e.name = 'الاسم مطلوب'
+    if (!phone.trim()) e.phone = 'رقم التليفون مطلوب'
+    else if (!/^01[0-9]{9}$/.test(phone.trim())) e.phone = 'رقم تليفون غير صحيح'
+    setErrors(e)
+    if (Object.keys(e).length > 0) return
     if (!profile) return
     setSaving(true)
     const { error } = await supabase.from('users').update({
@@ -49,10 +58,12 @@ export default function EditProfileScreen() {
 
         <View style={s.form}>
           <Text style={s.label}>الاسم</Text>
-          <TextInput style={s.input} value={name} onChangeText={setName} placeholder="الاسم الكامل" placeholderTextColor={colors.navy[400]} textAlign="right" />
+          <TextInput style={[s.input, errors.name ? s.inputError : null]} value={name} onChangeText={v => { setName(v); clearError('name') }} placeholder="الاسم الكامل" placeholderTextColor={colors.navy[400]} textAlign="right" />
+          {errors.name ? <Text style={s.errorText}>{errors.name}</Text> : null}
 
           <Text style={s.label}>رقم التليفون</Text>
-          <TextInput style={s.input} value={phone} onChangeText={setPhone} placeholder="01xxxxxxxxx" placeholderTextColor={colors.navy[400]} keyboardType="phone-pad" textAlign="left" />
+          <TextInput style={[s.input, errors.phone ? s.inputError : null]} value={phone} onChangeText={v => { setPhone(v); clearError('phone') }} placeholder="01xxxxxxxxx" placeholderTextColor={colors.navy[400]} keyboardType="phone-pad" textAlign="left" />
+          {errors.phone ? <Text style={s.errorText}>{errors.phone}</Text> : null}
 
           <Text style={s.label}>البريد الإلكتروني</Text>
           <View style={[s.input, s.disabledInput]}>
@@ -85,6 +96,8 @@ const s = StyleSheet.create({
   },
   disabledInput: { backgroundColor: colors.navy[700], justifyContent: 'center' },
   disabledText: { fontSize: 16, color: colors.navy[400] },
+  inputError: { borderColor: '#ef4444', backgroundColor: '#ef444410' },
+  errorText: { fontSize: 12, color: '#ef4444', textAlign: 'right', marginTop: 4, fontWeight: '500' },
   saveBtn: { backgroundColor: colors.primary, borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 8 },
   saveBtnText: { color: '#fff', fontSize: 18, fontWeight: '700' },
 })

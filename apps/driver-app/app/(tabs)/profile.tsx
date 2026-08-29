@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Switch } from 'react-native'
+import Animated, { FadeInDown } from 'react-native-reanimated'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { supabase } from '../../src/lib/supabase'
@@ -44,15 +45,15 @@ export default function DriverProfileScreen() {
   const handleSignOut = () => {
     Alert.alert('تسجيل الخروج', 'هل أنت متأكد؟', [
       { text: 'إلغاء', style: 'cancel' },
-      { text: 'خروج', style: 'destructive', onPress: signOut },
+      { text: 'خروج', style: 'destructive', onPress: async () => { await signOut(); router.replace('/') } },
     ])
   }
 
   return (
     <View style={s.container}>
-      <Text style={s.title}>حسابي</Text>
+      <Animated.Text entering={FadeInDown.duration(500)} style={s.title}>حسابي</Animated.Text>
 
-      <View style={s.card}>
+      <Animated.View entering={FadeInDown.duration(500).delay(100)} style={s.card}>
         <View style={s.avatar}>
           <Text style={s.avatarText}>{profile?.name?.[0] ?? '؟'}</Text>
         </View>
@@ -61,9 +62,9 @@ export default function DriverProfileScreen() {
         <View style={s.roleBadge}>
           <Text style={s.roleText}>سائق</Text>
         </View>
-      </View>
+      </Animated.View>
 
-      <View style={s.onlineCard}>
+      <Animated.View entering={FadeInDown.duration(500).delay(200)} style={s.onlineCard}>
         <View style={s.onlineRow}>
           <View style={s.onlineInfo}>
             <View style={[s.statusDot, { backgroundColor: isOnline ? colors.success : colors.danger }]} />
@@ -78,9 +79,9 @@ export default function DriverProfileScreen() {
           />
         </View>
         <Text style={s.onlineHint}>{isOnline ? 'ستصلك طلبات جديدة' : 'لن تصلك طلبات جديدة'}</Text>
-      </View>
+      </Animated.View>
 
-      <View style={s.statsRow}>
+      <Animated.View entering={FadeInDown.duration(500).delay(300)} style={s.statsRow}>
         <View style={s.statCard}>
           <Text style={s.statValue}>{stats.total}</Text>
           <Text style={s.statLabel}>إجمالي الطلبات</Text>
@@ -93,17 +94,18 @@ export default function DriverProfileScreen() {
           <Text style={s.statValue}>{stats.earnings.toFixed(0)}</Text>
           <Text style={s.statLabel}>ج.م</Text>
         </View>
-      </View>
+      </Animated.View>
 
-      <View style={s.menuSection}>
+      <Animated.View entering={FadeInDown.duration(500).delay(400)} style={s.menuSection}>
         <TouchableOpacity style={s.menuItem} onPress={() => router.push('/edit-profile')}>
           <Text style={s.menuIcon}>✏️</Text>
           <Text style={s.menuText}>تعديل البيانات</Text>
           <Text style={s.menuArrow}>←</Text>
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
       {profile?.vehicle_type && (
+        <Animated.View entering={FadeInDown.duration(500).delay(500)}>
         <View style={s.infoCard}>
           <View style={s.infoRow}>
             <Text style={s.infoLabel}>المركبة</Text>
@@ -116,11 +118,14 @@ export default function DriverProfileScreen() {
             </View>
           )}
         </View>
+        </Animated.View>
       )}
 
+      <Animated.View entering={FadeInDown.duration(500).delay(600)}>
       <TouchableOpacity style={s.logoutBtn} onPress={handleSignOut}>
         <Text style={s.logoutText}>تسجيل الخروج</Text>
       </TouchableOpacity>
+      </Animated.View>
     </View>
   )
 }

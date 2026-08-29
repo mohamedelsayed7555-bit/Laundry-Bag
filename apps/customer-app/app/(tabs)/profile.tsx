@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Image } from 'react-native'
+import Animated, { FadeInDown } from 'react-native-reanimated'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { supabase } from '../../src/lib/supabase'
@@ -24,15 +25,15 @@ export default function ProfileScreen() {
   const handleSignOut = () => {
     Alert.alert('تسجيل الخروج', 'هل أنت متأكد؟', [
       { text: 'إلغاء', style: 'cancel' },
-      { text: 'خروج', style: 'destructive', onPress: signOut },
+      { text: 'خروج', style: 'destructive', onPress: async () => { await signOut(); router.replace('/') } },
     ])
   }
 
   return (
     <View style={s.container}>
-      <Text style={s.title}>حسابي</Text>
+      <Animated.Text entering={FadeInDown.duration(500)} style={s.title}>حسابي</Animated.Text>
 
-      <View style={s.card}>
+      <Animated.View entering={FadeInDown.duration(500).delay(100)} style={s.card}>
         {profile?.avatar_url ? (
           <Image source={{ uri: profile.avatar_url }} style={s.avatarImg} />
         ) : (
@@ -47,9 +48,9 @@ export default function ProfileScreen() {
             <Text style={s.codeText}>{profile.customer_code}</Text>
           </View>
         )}
-      </View>
+      </Animated.View>
 
-      <View style={s.statsRow}>
+      <Animated.View entering={FadeInDown.duration(500).delay(200)} style={s.statsRow}>
         <View style={s.statCard}>
           <Text style={s.statValue}>{profile?.tier ?? 'bronze'}</Text>
           <Text style={s.statLabel}>المستوى</Text>
@@ -58,9 +59,9 @@ export default function ProfileScreen() {
           <Text style={s.statValue}>{profile?.points ?? 0}</Text>
           <Text style={s.statLabel}>النقاط</Text>
         </View>
-      </View>
+      </Animated.View>
 
-      <View style={s.menuSection}>
+      <Animated.View entering={FadeInDown.duration(500).delay(300)} style={s.menuSection}>
         <TouchableOpacity style={s.menuItem} onPress={() => router.push('/edit-profile')}>
           <Text style={s.menuIcon}>✏️</Text>
           <Text style={s.menuText}>تعديل البيانات</Text>
@@ -82,11 +83,13 @@ export default function ProfileScreen() {
             <Text style={s.menuArrow}>←</Text>
           )}
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
+      <Animated.View entering={FadeInDown.duration(500).delay(400)}>
       <TouchableOpacity style={s.logoutBtn} onPress={handleSignOut}>
         <Text style={s.logoutText}>تسجيل الخروج</Text>
       </TouchableOpacity>
+      </Animated.View>
     </View>
   )
 }

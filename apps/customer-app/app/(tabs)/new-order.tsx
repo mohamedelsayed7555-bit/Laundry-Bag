@@ -133,12 +133,14 @@ export default function NewOrderScreen() {
       service_type: cart[0].service_type,
       items: cart,
       items_count: totalItems,
+      subtotal: totalPrice,
       total: orderTotal,
       payment_method: useSubscription ? 'subscription' : paymentMethod,
       notes: notes || null,
       status: 'pending',
       payment_status: useSubscription ? 'paid' : 'pending',
       address_id: selectedAddress?.id || null,
+      delivery_location: selectedAddress ? { lat: selectedAddress.lat, lng: selectedAddress.lng, label: selectedAddress.label } : {},
     })
 
     // Update subscription items_used
@@ -267,16 +269,21 @@ export default function NewOrderScreen() {
         </>
       )}
 
-      <Text style={s.sectionTitle}>طريقة الدفع</Text>
-      <View style={s.grid}>
-        {paymentMethods.map(pm => (
-          <TouchableOpacity key={pm.key} onPress={() => setPaymentMethod(pm.key)}
-            style={[s.optionCard, paymentMethod === pm.key && s.optionSelected]}>
-            <Text style={s.optionIcon}>{pm.icon}</Text>
-            <Text style={[s.optionLabel, paymentMethod === pm.key && s.optionLabelSelected]}>{pm.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      {/* Payment - hidden if subscription covers it */}
+      {!(activeSub && subRemaining !== null && subRemaining >= totalItems && totalItems > 0) && (
+        <>
+          <Text style={s.sectionTitle}>طريقة الدفع</Text>
+          <View style={s.grid}>
+            {paymentMethods.map(pm => (
+              <TouchableOpacity key={pm.key} onPress={() => setPaymentMethod(pm.key)}
+                style={[s.optionCard, paymentMethod === pm.key && s.optionSelected]}>
+                <Text style={s.optionIcon}>{pm.icon}</Text>
+                <Text style={[s.optionLabel, paymentMethod === pm.key && s.optionLabelSelected]}>{pm.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </>
+      )}
 
       {paymentMethod === 'instapay' && paymentSettings.instapay ? (
         <View style={s.paymentInfoCard}>

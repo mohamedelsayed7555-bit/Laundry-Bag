@@ -1,6 +1,7 @@
 import { Slot } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { I18nManager } from 'react-native'
+import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext'
 import { useNotifications } from '../src/hooks/useNotifications'
 
@@ -15,10 +16,12 @@ function NotificationSetup() {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <NotificationSetup />
-      <StatusBar style="dark" />
-      <Slot />
-    </AuthProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AuthProvider>
+        <NotificationSetup />
+        <StatusBar style="dark" />
+        <Slot />
+      </AuthProvider>
+    </GestureHandlerRootView>
   )
 }

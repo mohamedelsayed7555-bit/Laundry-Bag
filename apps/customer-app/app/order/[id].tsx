@@ -145,6 +145,9 @@ export default function OrderDetailsScreen() {
           <Text style={s.sectionTitle}>السائق</Text>
           <DetailRow label="الاسم" value={order.driver.name} />
           {order.driver.phone && <DetailRow label="التليفون" value={order.driver.phone} />}
+          <TouchableOpacity style={s.chatBtn} onPress={() => router.push(`/chat/${order.id}`)}>
+            <Text style={s.chatBtnText}>💬 محادثة مع السائق</Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -292,6 +295,12 @@ const s = StyleSheet.create({
   cancelRateText: { color: colors.navy[200], fontSize: 14, fontWeight: '600' },
   submitRateBtn: { flex: 2, backgroundColor: colors.accent, borderRadius: 12, padding: 12, alignItems: 'center' },
   submitRateText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+
+  chatBtn: {
+    backgroundColor: colors.primary + '15', borderRadius: 12, padding: 12, alignItems: 'center', marginTop: 12,
+    borderWidth: 1, borderColor: colors.primary + '30',
+  },
+  chatBtnText: { color: colors.primary, fontSize: 14, fontWeight: '700' },
 
   cancelBtn: {
     borderWidth: 1.5, borderColor: colors.danger, borderRadius: 16,

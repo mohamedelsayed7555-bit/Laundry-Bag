@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Alert, Modal, ActivityIndicator, Platform } from 'react-native'
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Alert, Modal, ActivityIndicator, Platform, ScrollView } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../src/contexts/AuthContext'
 import { supabase } from '../src/lib/supabase'
@@ -70,8 +70,13 @@ export default function AddressesScreen() {
     setLocatingMe(false)
   }
 
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+
   async function handleSave() {
-    if (!form.label.trim()) { Alert.alert('خطأ', 'أدخل اسم العنوان'); return }
+    const e: Record<string, string> = {}
+    if (!form.label.trim()) e.label = 'اسم العنوان مطلوب'
+    setFormErrors(e)
+    if (Object.keys(e).length > 0) return
     if (!profile) return
 
     const payload = {
@@ -172,7 +177,7 @@ export default function AddressesScreen() {
 
       <Modal visible={showModal} animationType="slide" transparent>
         <View style={s.modalOverlay}>
-          <View style={s.modalContent}>
+          <ScrollView style={s.modalContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <Text style={s.modalTitle}>{editing ? 'تعديل العنوان' : 'إضافة عنوان'}</Text>
 
             {/* Map */}
@@ -194,7 +199,7 @@ export default function AddressesScreen() {
               </TouchableOpacity>
             </View>
 
-            <FormField label="اسم العنوان *" value={form.label} onChange={v => setForm(f => ({ ...f, label: v }))} placeholder="مثال: البيت، الشغل" />
+            <FormField label="اسم العنوان *" value={form.label} onChange={v => { setForm(f => ({ ...f, label: v })); setFormErrors(p => { const n = {...p}; delete n.label; return n }) }} placeholder="مثال: البيت، الشغل" error={formErrors.label} />
             <FormField label="المبنى" value={form.building} onChange={v => setForm(f => ({ ...f, building: v }))} placeholder="رقم أو اسم المبنى" />
             <View style={s.row}>
               <View style={{ flex: 1 }}><FormField label="الطابق" value={form.floor} onChange={v => setForm(f => ({ ...f, floor: v }))} placeholder="3" /></View>
@@ -211,18 +216,19 @@ export default function AddressesScreen() {
                 <Text style={s.modalSaveText}>حفظ</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </ScrollView>
         </View>
       </Modal>
     </View>
   )
 }
 
-function FormField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder: string }) {
+function FormField({ label, value, onChange, placeholder, error }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; error?: string }) {
   return (
     <View style={{ marginBottom: 12 }}>
       <Text style={s.fieldLabel}>{label}</Text>
-      <TextInput style={s.fieldInput} value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={colors.navy[400]} textAlign="right" />
+      <TextInput style={[s.fieldInput, error ? s.fieldInputError : null]} value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={colors.navy[400]} textAlign="right" />
+      {error ? <Text style={s.fieldError}>{error}</Text> : null}
     </View>
   )
 }
@@ -253,7 +259,9 @@ const s = StyleSheet.create({
   modalTitle: { fontSize: 18, fontWeight: '700', color: '#fff', marginBottom: 16, textAlign: 'center' },
   row: { flexDirection: 'row', gap: 12 },
   fieldLabel: { fontSize: 12, color: colors.navy[200], marginBottom: 4, textAlign: 'right' },
-  fieldInput: { backgroundColor: colors.navy[700], borderRadius: 10, padding: 12, color: '#fff', fontSize: 14 },
+  fieldInput: { backgroundColor: colors.navy[700], borderRadius: 10, padding: 12, color: '#fff', fontSize: 14, borderWidth: 1.5, borderColor: 'transparent' },
+  fieldInputError: { borderColor: '#ef4444', backgroundColor: '#ef444410' },
+  fieldError: { fontSize: 11, color: '#ef4444', textAlign: 'right', marginTop: 3, fontWeight: '500' },
   modalActions: { flexDirection: 'row', gap: 12, marginTop: 20 },
   modalCancel: { flex: 1, borderWidth: 1, borderColor: colors.navy[500], borderRadius: 12, padding: 14, alignItems: 'center' },
   modalCancelText: { color: colors.navy[200], fontWeight: '600' },

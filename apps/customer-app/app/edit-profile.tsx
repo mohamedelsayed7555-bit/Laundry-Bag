@@ -22,6 +22,11 @@ export default function EditProfileScreen() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [savingPassword, setSavingPassword] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  function clearError(field: string) {
+    setErrors(prev => { const n = { ...prev }; delete n[field]; return n })
+  }
 
   async function pickImage() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
@@ -74,8 +79,12 @@ export default function EditProfileScreen() {
   }
 
   async function handleSave() {
-    if (!name.trim()) { Alert.alert('خطأ', 'أدخل الاسم'); return }
-    if (!phone.trim()) { Alert.alert('خطأ', 'أدخل رقم التليفون'); return }
+    const e: Record<string, string> = {}
+    if (!name.trim()) e.name = 'الاسم مطلوب'
+    if (!phone.trim()) e.phone = 'رقم التليفون مطلوب'
+    else if (!/^01[0-9]{9}$/.test(phone.trim())) e.phone = 'رقم تليفون غير صحيح'
+    setErrors(e)
+    if (Object.keys(e).length > 0) return
     if (!profile) return
     setSaving(true)
     const { error } = await supabase.from('users').update({
@@ -178,10 +187,12 @@ export default function EditProfileScreen() {
         <Text style={s.sectionTitle}>البيانات الشخصية</Text>
 
         <Text style={s.label}>الاسم</Text>
-        <TextInput style={s.input} value={name} onChangeText={setName} placeholder="الاسم الكامل" placeholderTextColor={colors.navy[400]} textAlign="right" />
+        <TextInput style={[s.input, errors.name ? s.inputError : null]} value={name} onChangeText={v => { setName(v); clearError('name') }} placeholder="الاسم الكامل" placeholderTextColor={colors.navy[400]} textAlign="right" />
+        {errors.name ? <Text style={s.errorText}>{errors.name}</Text> : null}
 
         <Text style={s.label}>رقم التليفون</Text>
-        <TextInput style={s.input} value={phone} onChangeText={setPhone} placeholder="01xxxxxxxxx" placeholderTextColor={colors.navy[400]} keyboardType="phone-pad" textAlign="left" />
+        <TextInput style={[s.input, errors.phone ? s.inputError : null]} value={phone} onChangeText={v => { setPhone(v); clearError('phone') }} placeholder="01xxxxxxxxx" placeholderTextColor={colors.navy[400]} keyboardType="phone-pad" textAlign="left" />
+        {errors.phone ? <Text style={s.errorText}>{errors.phone}</Text> : null}
 
         <Text style={s.label}>البريد الإلكتروني</Text>
         <View style={[s.input, s.disabledInput]}>
@@ -300,6 +311,8 @@ const s = StyleSheet.create({
   },
   disabledInput: { backgroundColor: colors.navy[700], justifyContent: 'center', opacity: 0.6 },
   disabledText: { fontSize: 16, color: colors.navy[400] },
+  inputError: { borderColor: '#ef4444', backgroundColor: '#ef444410' },
+  errorText: { fontSize: 12, color: '#ef4444', textAlign: 'right', marginTop: 4, fontWeight: '500' },
   saveBtn: {
     backgroundColor: colors.primary, borderRadius: 14, padding: 16,
     alignItems: 'center', marginTop: 16,
@@ -311,7 +324,6 @@ const s = StyleSheet.create({
   strengthRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8, marginBottom: 4 },
   strengthBar: { flex: 1, height: 4, borderRadius: 2 },
   strengthText: { fontSize: 11, fontWeight: '600', marginRight: 8, minWidth: 40 },
-  errorText: { fontSize: 11, color: colors.danger, marginTop: 4 },
   matchText: { fontSize: 11, color: colors.success, marginTop: 4 },
   passwordBtn: {
     backgroundColor: colors.accent, borderRadius: 14, padding: 14,

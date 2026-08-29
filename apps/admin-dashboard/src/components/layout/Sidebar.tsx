@@ -51,6 +51,7 @@ function useNavGroups() {
       items: [
         { label: t.sidebar.prices, href: '/prices', icon: Tag },
         { label: t.sidebar.plans, href: '/plans', icon: Crown },
+        { label: 'الاشتراكات', href: '/subscriptions', icon: Crown },
         { label: t.sidebar.finance, href: '/finance', icon: DollarSign },
         { label: t.sidebar.inventory, href: '/inventory', icon: Package },
       ],

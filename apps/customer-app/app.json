@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "scheme": "cleano",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "bundleIdentifier": "com.cleano.customer",
       "supportsTablet": false
@@ -20,7 +20,12 @@
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.RECORD_AUDIO"
-      ]
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDummyKeyForBuild"
+        }
+      }
     },
     "plugins": [
       "expo-router",
