@@ -97,6 +97,7 @@ export default function AddressesScreen() {
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High })
       const coord = { latitude: loc.coords.latitude, longitude: loc.coords.longitude }
       setPin(coord)
+      if (!form.label.trim()) setForm(f => ({ ...f, label: 'موقعي الحالي' }))
       webviewRef.current?.injectJavaScript(`window.setCenter(${coord.latitude}, ${coord.longitude}); true;`)
     } catch {
       Alert.alert('خطأ', 'لم نتمكن من تحديد موقعك')
@@ -220,7 +221,7 @@ export default function AddressesScreen() {
 
       <Modal visible={showModal} animationType="slide" transparent>
         <View style={s.modalOverlay}>
-          <ScrollView style={s.modalContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <ScrollView style={s.modalContent} contentContainerStyle={{ paddingBottom: 40 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <Text style={s.modalTitle}>{editing ? 'تعديل العنوان' : 'إضافة عنوان'}</Text>
 
             <Text style={s.fieldLabel}>حدد الموقع على الخريطة</Text>
@@ -314,7 +315,7 @@ const s = StyleSheet.create({
   modalSave: { flex: 2, backgroundColor: colors.primary, borderRadius: 12, padding: 14, alignItems: 'center' },
   modalSaveText: { color: '#fff', fontWeight: '700' },
 
-  mapContainer: { height: 200, borderRadius: 16, overflow: 'hidden', marginBottom: 16, position: 'relative' },
+  mapContainer: { height: 160, borderRadius: 16, overflow: 'hidden', marginBottom: 16, position: 'relative' },
   map: { flex: 1 },
   myLocBtn: {
     position: 'absolute', bottom: 10, left: 10,

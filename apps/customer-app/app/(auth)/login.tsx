@@ -3,6 +3,7 @@ import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, Alert,
   KeyboardAvoidingView, Platform, ScrollView, Image, Animated,
 } from 'react-native'
+import { useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { colors } from '../../src/theme'
 
@@ -16,6 +17,7 @@ export default function LoginScreen() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [serverError, setServerError] = useState('')
   const { signInWithPassword, signUp, signInWithBiometric, biometricEnabled, biometricAvailable } = useAuth()
+  const router = useRouter()
   const [bioLoading, setBioLoading] = useState(false)
 
   function clearError(field: string) {
@@ -45,6 +47,7 @@ export default function LoginScreen() {
     const { error } = await signInWithPassword(email, password)
     setLoading(false)
     if (error) setServerError(error)
+    else router.replace('/(tabs)/home')
   }
 
   const handleSignUp = async () => {
@@ -160,6 +163,7 @@ export default function LoginScreen() {
                 const { error } = await signInWithBiometric()
                 setBioLoading(false)
                 if (error) setServerError(error)
+                else router.replace('/(tabs)/home')
               }}
               disabled={bioLoading}
             >
