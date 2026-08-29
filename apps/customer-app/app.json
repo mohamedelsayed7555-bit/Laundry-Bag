@@ -30,6 +30,7 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
+      "expo-local-authentication",
       "expo-location",
       "expo-image-picker"
     ],
