@@ -11,7 +11,7 @@ interface StatCardProps {
   change?: string
   changeType?: 'up' | 'down' | 'neutral'
   icon: LucideIcon
-  color: 'green' | 'blue' | 'purple' | 'orange' | 'red' | 'cyan'
+  color: 'green' | 'blue' | 'purple' | 'orange' | 'red' | 'cyan' | 'yellow'
   index?: number
 }
 
@@ -51,6 +51,12 @@ const colorMap = {
     icon: 'text-cyan-500',
     gradient: 'from-cyan-500/10 to-cyan-500/5',
     accent: 'bg-cyan-500',
+  },
+  yellow: {
+    bg: 'bg-amber-50',
+    icon: 'text-amber-500',
+    gradient: 'from-amber-500/10 to-amber-500/5',
+    accent: 'bg-amber-500',
   },
 }
 
