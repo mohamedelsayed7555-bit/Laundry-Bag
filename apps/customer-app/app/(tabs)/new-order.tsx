@@ -43,12 +43,16 @@ export default function NewOrderScreen() {
   const [cart, setCart] = useState<OrderItem[]>([])
   const [activeSub, setActiveSub] = useState<any>(null)
   const [paymentSettings, setPaymentSettings] = useState<{ instapay: string; wallet: string }>({ instapay: '', wallet: '' })
+  const [deliveryFee, setDeliveryFee] = useState(0)
 
   useEffect(() => {
     supabase.from('prices').select('*').eq('is_active', true).then(({ data }) => {
       setPrices(data ?? [])
       const types = [...new Set((data ?? []).map((p: any) => p.item_type))]
       setItemTypes(types as string[])
+    })
+    supabase.from('settings').select('key, value').eq('key', 'delivery_fee').single().then(({ data }) => {
+      if (data) setDeliveryFee(Number(data.value) || 0)
     })
     supabase.from('settings').select('key, value').in('key', ['instapay_number', 'wallet_number']).then(({ data }) => {
       const inst = data?.find(s => s.key === 'instapay_number')
@@ -125,7 +129,8 @@ export default function NewOrderScreen() {
     }
 
     const useSubscription = activeSub && subRemaining !== null && subRemaining >= totalItems
-    const orderTotal = useSubscription ? 0 : totalPrice
+    const fee = useSubscription ? 0 : deliveryFee
+    const orderTotal = useSubscription ? 0 : totalPrice + fee
 
     setSaving(true)
     const { error } = await supabase.from('orders').insert({
@@ -134,6 +139,7 @@ export default function NewOrderScreen() {
       items: cart,
       items_count: totalItems,
       subtotal: totalPrice,
+      delivery_fee: fee,
       total: orderTotal,
       payment_method: useSubscription ? 'cash' : paymentMethod,
       notes: notes || null,
@@ -308,14 +314,20 @@ export default function NewOrderScreen() {
         multiline numberOfLines={3} textAlignVertical="top" textAlign="right" />
 
       <View style={s.totalCard}>
-        <Text style={s.totalLabel}>الإجمالي</Text>
         {activeSub && subRemaining !== null && subRemaining >= totalItems && totalItems > 0 ? (
-          <View style={{ alignItems: 'flex-start' }}>
-            <Text style={[s.totalValue, { color: colors.success }]}>مجاناً (باقة)</Text>
-            <Text style={{ fontSize: 11, color: colors.navy[400], textDecorationLine: 'line-through' }}>{totalPrice.toFixed(2)} ج.م</Text>
-          </View>
+          <>
+            <View style={s.totalRow}><Text style={s.totalLabel}>الإجمالي</Text><Text style={[s.totalValue, { color: colors.success }]}>مجاناً (باقة)</Text></View>
+            <Text style={{ fontSize: 11, color: colors.navy[400], textDecorationLine: 'line-through', textAlign: 'left' }}>{totalPrice.toFixed(2)} ج.م</Text>
+          </>
         ) : (
-          <Text style={s.totalValue}>{totalPrice.toFixed(2)} ج.م</Text>
+          <>
+            <View style={s.totalRow}><Text style={s.breakdownLabel}>المجموع</Text><Text style={s.breakdownValue}>{totalPrice.toFixed(2)} ج.م</Text></View>
+            {deliveryFee > 0 && <View style={s.totalRow}><Text style={s.breakdownLabel}>رسوم التوصيل</Text><Text style={s.breakdownValue}>{deliveryFee.toFixed(2)} ج.م</Text></View>}
+            <View style={[s.totalRow, { borderTopWidth: 1, borderTopColor: colors.navy[700], paddingTop: 8, marginTop: 4 }]}>
+              <Text style={s.totalLabel}>الإجمالي</Text>
+              <Text style={s.totalValue}>{(totalPrice + deliveryFee).toFixed(2)} ج.م</Text>
+            </View>
+          </>
         )}
       </View>
 
@@ -371,8 +383,11 @@ const s = StyleSheet.create({
     backgroundColor: colors.navy[800], borderRadius: 16, padding: 20, marginTop: 24,
     borderWidth: 1, borderColor: colors.navy[700],
   },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   totalLabel: { fontSize: 16, color: colors.navy[200] },
   totalValue: { fontSize: 24, fontWeight: 'bold', color: colors.primary },
+  breakdownLabel: { fontSize: 13, color: colors.navy[400] },
+  breakdownValue: { fontSize: 13, color: colors.navy[200] },
   submitBtn: {
     backgroundColor: colors.primary, borderRadius: 16, padding: 18, alignItems: 'center', marginTop: 20,
     shadowColor: colors.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 8,

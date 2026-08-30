@@ -103,6 +103,7 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [activeFeature, setActiveFeature] = useState(0)
   const router = useRouter()
   const brandRef = useRef<HTMLDivElement>(null)
@@ -333,16 +334,25 @@ export default function AdminLoginPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-navy-300 mb-2">Password <span className="text-red-400">*</span></label>
-              <input
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                minLength={6}
-                className="w-full p-3.5 bg-navy-800/40 border border-navy-600/40 rounded-xl text-white placeholder-navy-500 focus:outline-none focus:ring-2 focus:ring-primary-500/40 focus:border-primary-500/40 transition-all"
-                dir="ltr"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  minLength={6}
+                  className="w-full p-3.5 pr-12 bg-navy-800/40 border border-navy-600/40 rounded-xl text-white placeholder-navy-500 focus:outline-none focus:ring-2 focus:ring-primary-500/40 focus:border-primary-500/40 transition-all"
+                  dir="ltr"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-navy-400 hover:text-white transition-colors text-lg"
+                >
+                  {showPassword ? '🙈' : '👁️'}
+                </button>
+              </div>
             </div>
             <button
               type="submit"

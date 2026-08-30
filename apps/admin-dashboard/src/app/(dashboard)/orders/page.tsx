@@ -39,12 +39,18 @@ export default function OrdersPage() {
   const [drivers, setDrivers] = useState<any[]>([])
   const [customers, setCustomers] = useState<any[]>([])
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ customer_id: '', service_type: 'wash', items_count: 1, notes: '', total: 0 })
+  const [form, setForm] = useState({ customer_id: '', service_type: 'wash', items_count: 1, notes: '', total: 0, order_type: 'delivery' as 'delivery' | 'walkin', walkin_name: '', walkin_phone: '' })
+  const [messages, setMessages] = useState<any[]>([])
+  const [msgsLoading, setMsgsLoading] = useState(false)
+  const [deliveryFeeSetting, setDeliveryFeeSetting] = useState(0)
   const { toast } = useToast()
 
   useEffect(() => {
     loadOrders()
     loadDriversCustomers()
+    supabase.from('settings').select('value').eq('key', 'delivery_fee').single().then(({ data }) => {
+      if (data) setDeliveryFeeSetting(Number(data.value) || 0)
+    })
     const ch = supabase.channel('orders-rt')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => loadOrders())
       .subscribe()
@@ -71,6 +77,8 @@ export default function OrdersPage() {
   async function assignDriver(orderId: string, driverId: string) {
     await supabase.from('orders').update({ driver_id: driverId, status: 'assigned' }).eq('id', orderId)
     await supabase.from('order_status_history').insert({ order_id: orderId, status: 'assigned', changed_by: driverId })
+    const driverInfo = drivers.find(d => d.id === driverId)
+    setDetail((prev: any) => prev?.id === orderId ? { ...prev, driver_id: driverId, status: 'assigned', driver: driverInfo ?? prev.driver } : prev)
     loadOrders()
     toast('تم تعيين السائق')
   }
@@ -85,6 +93,21 @@ export default function OrdersPage() {
     toast(`تم تحديث الحالة إلى: ${ORDER_STATUS_LABELS[next as OrderStatus]}`)
   }
 
+  async function loadMessages(orderId: string) {
+    setMsgsLoading(true)
+    const { data } = await supabase.from('messages')
+      .select('*, sender:users!messages_sender_id_fkey(name, role)')
+      .eq('order_id', orderId)
+      .order('created_at', { ascending: true })
+    setMessages(data ?? [])
+    setMsgsLoading(false)
+  }
+
+  function openDetail(order: any) {
+    setDetail(order)
+    loadMessages(order.id)
+  }
+
   async function cancelOrder(id: string) {
     await supabase.from('orders').update({ status: 'cancelled' }).eq('id', id)
     loadOrders()
@@ -95,16 +118,35 @@ export default function OrdersPage() {
   async function handleAddOrder(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
-    const orderNum = `CLN-${Date.now().toString(36).toUpperCase()}`
     const total = form.total || 0
+    const isWalkin = form.order_type === 'walkin'
+
+    let customerId = form.customer_id
+
+    if (isWalkin) {
+      const { data: existing } = await supabase.from('users').select('id').eq('phone', form.walkin_phone).eq('role', 'customer').single()
+      if (existing) {
+        customerId = existing.id
+      } else {
+        const { data: newId, error: rpcErr } = await supabase.rpc('create_walkin_customer', { p_name: form.walkin_name, p_phone: form.walkin_phone })
+        if (rpcErr || !newId) { setSaving(false); toast('خطأ في إنشاء العميل', 'error'); return }
+        customerId = newId
+      }
+    }
+
     const { error } = await supabase.from('orders').insert({
-      order_number: orderNum, customer_id: form.customer_id, service_type: form.service_type,
-      items_count: form.items_count, notes: form.notes || null, status: 'pending', payment_status: 'pending', payment_method: 'cash',
-      subtotal: total, total, delivery_location: {},
+      customer_id: customerId, service_type: form.service_type,
+      items_count: form.items_count, notes: isWalkin ? `[من المحل] ${form.walkin_name} - ${form.walkin_phone}${form.notes ? '\n' + form.notes : ''}` : (form.notes || null),
+      status: isWalkin ? 'processing' : 'pending',
+      payment_status: 'pending', payment_method: 'cash',
+      subtotal: total, delivery_fee: isWalkin ? 0 : deliveryFeeSetting, total: isWalkin ? total : total + deliveryFeeSetting, delivery_location: {},
     })
     setSaving(false)
-    if (!error) { setShowAdd(false); setForm({ customer_id: '', service_type: 'wash', items_count: 1, notes: '', total: 0 }); loadOrders(); toast('تم إضافة الطلب') }
-    else { console.error('Order insert error:', error); toast('حدث خطأ', 'error') }
+    if (!error) {
+      setShowAdd(false)
+      setForm({ customer_id: '', service_type: 'wash', items_count: 1, notes: '', total: 0, order_type: 'delivery', walkin_name: '', walkin_phone: '' })
+      loadOrders(); toast(isWalkin ? 'تم إضافة طلب من المحل' : 'تم إضافة الطلب')
+    } else { console.error('Order insert error:', error); toast('حدث خطأ', 'error') }
   }
 
   const allStatuses = ['all', 'pending', 'assigned', 'picked_up', 'processing', 'ready', 'delivering', 'delivered', 'cancelled']
@@ -129,7 +171,7 @@ export default function OrdersPage() {
     { key: 'status', label: 'الحالة', render: (item: any) => <Badge variant={statusVariant[item.status] ?? 'neutral'}>{ORDER_STATUS_LABELS[item.status as OrderStatus] ?? item.status}</Badge> },
     { key: 'actions', label: '', render: (item: any) => (
       <Tooltip content="عرض التفاصيل">
-        <button onClick={() => setDetail(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors">
+        <button onClick={() => openDetail(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors">
           <Eye size={15} className="text-gray-400 hover:text-gray-600" />
         </button>
       </Tooltip>
@@ -202,11 +244,11 @@ export default function OrdersPage() {
               </div>
             )}
 
-            {!detail.driver_id && detail.status === 'pending' && (
+            {['pending', 'assigned'].includes(detail.status) && (
               <div>
-                <p className="text-xs font-medium text-gray-500 mb-1.5">تعيين سائق</p>
-                <select onChange={e => { if (e.target.value) assignDriver(detail.id, e.target.value) }} className={inputClass}>
-                  <option value="">اختر سائق...</option>
+                <p className="text-xs font-medium text-gray-500 mb-1.5">{detail.driver_id ? 'تغيير السائق' : 'تعيين سائق'}</p>
+                <select value={detail.driver_id ?? ''} onChange={e => { if (e.target.value && e.target.value !== detail.driver_id) assignDriver(detail.id, e.target.value) }} className={inputClass}>
+                  {!detail.driver_id && <option value="">اختر سائق...</option>}
                   {drivers.map(d => <option key={d.id} value={d.id}>{d.name} — {d.phone}</option>)}
                 </select>
               </div>
@@ -214,10 +256,31 @@ export default function OrdersPage() {
 
             {detail.driver && (
               <div className="bg-blue-50/50 rounded-xl p-3 border border-blue-100">
-                <p className="text-[10px] text-blue-600 mb-0.5">السائق</p>
+                <p className="text-[10px] text-blue-600 mb-0.5">السائق الحالي</p>
                 <p className="text-sm font-semibold text-blue-800">{detail.driver.name} — {detail.driver.phone}</p>
               </div>
             )}
+
+            <div className="bg-surface-muted/30 rounded-xl p-3 border border-navy-100">
+              <p className="text-[10px] text-gray-400 mb-2 font-medium">المحادثة</p>
+              {msgsLoading ? (
+                <p className="text-xs text-gray-400 text-center py-4">جاري التحميل...</p>
+              ) : messages.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-4">لا توجد رسائل</p>
+              ) : (
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {messages.map(msg => (
+                    <div key={msg.id} className={`flex flex-col ${msg.sender?.role === 'driver' ? 'items-start' : 'items-end'}`}>
+                      <p className="text-[10px] text-gray-400 mb-0.5">{msg.sender?.name} — {msg.sender?.role === 'driver' ? 'سائق' : 'عميل'}</p>
+                      <div className={`px-3 py-2 rounded-xl max-w-[80%] text-sm ${msg.sender?.role === 'driver' ? 'bg-blue-50 text-blue-800' : 'bg-green-50 text-green-800'}`}>
+                        {msg.body}
+                      </div>
+                      <p className="text-[9px] text-gray-300 mt-0.5">{new Date(msg.created_at).toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <div className="flex gap-2 pt-2">
               {statusFlow[detail.status] && (
@@ -240,12 +303,38 @@ export default function OrdersPage() {
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="طلب جديد">
         <form onSubmit={handleAddOrder} className="space-y-4">
           <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">نوع الطلب</label>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setForm({ ...form, order_type: 'delivery' })}
+                className={`flex-1 p-2.5 rounded-xl text-sm font-semibold transition-all ${form.order_type === 'delivery' ? 'bg-primary-500 text-white' : 'bg-navy-50 text-gray-500 hover:bg-navy-100'}`}>
+                توصيل
+              </button>
+              <button type="button" onClick={() => setForm({ ...form, order_type: 'walkin' })}
+                className={`flex-1 p-2.5 rounded-xl text-sm font-semibold transition-all ${form.order_type === 'walkin' ? 'bg-accent text-white' : 'bg-navy-50 text-gray-500 hover:bg-navy-100'}`}>
+                من المحل
+              </button>
+            </div>
+          </div>
+          {form.order_type === 'delivery' ? (
+          <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">العميل <span className="text-red-400">*</span></label>
             <select value={form.customer_id} onChange={e => setForm({ ...form, customer_id: e.target.value })} required className={inputClass}>
               <option value="">اختر عميل...</option>
               {customers.map(c => <option key={c.id} value={c.id}>{c.name} ({c.customer_code})</option>)}
             </select>
           </div>
+          ) : (
+          <>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">اسم العميل <span className="text-red-400">*</span></label>
+              <input type="text" value={form.walkin_name} onChange={e => setForm({ ...form, walkin_name: e.target.value })} required className={inputClass} placeholder="اسم العميل" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">رقم الموبايل <span className="text-red-400">*</span></label>
+              <input type="tel" value={form.walkin_phone} onChange={e => setForm({ ...form, walkin_phone: e.target.value })} required className={inputClass} placeholder="01xxxxxxxxx" dir="ltr" />
+            </div>
+          </>
+          )}
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">الخدمة <span className="text-red-400">*</span></label>
             <select value={form.service_type} onChange={e => setForm({ ...form, service_type: e.target.value })} required className={inputClass}>

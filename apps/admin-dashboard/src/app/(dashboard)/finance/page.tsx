@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import StatCard from '@/components/ui/StatCard'
 import DataTable from '@/components/ui/DataTable'
 import Badge from '@/components/ui/Badge'
-import { DollarSign, TrendingUp, TrendingDown, CreditCard, Calendar, RotateCcw, Crown } from 'lucide-react'
+import { DollarSign, TrendingUp, TrendingDown, CreditCard, Calendar, RotateCcw, Crown, Truck } from 'lucide-react'
 import Tooltip from '@/components/ui/Tooltip'
 import PermissionGate from '@/components/ui/PermissionGate'
 import { motion } from 'framer-motion'
@@ -18,7 +18,7 @@ type DatePreset = 'all' | 'today' | 'week' | 'month' | 'custom'
 type SourceFilter = 'all' | 'orders' | 'subscriptions'
 
 export default function FinancePage() {
-  const [stats, setStats] = useState({ revenue: 0, paid: 0, unpaid: 0, ordersCount: 0, subsRevenue: 0, subsCount: 0 })
+  const [stats, setStats] = useState({ revenue: 0, paid: 0, unpaid: 0, ordersCount: 0, subsRevenue: 0, subsCount: 0, deliveryFees: 0 })
   const [rows, setRows] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [payFilter, setPayFilter] = useState('all')
@@ -74,6 +74,7 @@ export default function FinancePage() {
     const orderRevenue = allOrders.reduce((s, o) => s + (o.total ?? 0), 0)
     const paid = allOrders.filter(o => o.payment_status === 'confirmed').reduce((s, o) => s + (o.total ?? 0), 0)
     const subsRevenue = allSubs.reduce((s: number, sub: any) => s + (sub.plan?.price ?? 0), 0)
+    const deliveryFees = allOrders.reduce((s, o) => s + (o.delivery_fee ?? 0), 0)
 
     setStats({
       revenue: orderRevenue + subsRevenue,
@@ -82,6 +83,7 @@ export default function FinancePage() {
       ordersCount: allOrders.length,
       subsRevenue,
       subsCount: allSubs.length,
+      deliveryFees,
     })
 
     // Merge into unified rows
@@ -220,10 +222,11 @@ export default function FinancePage() {
         )}
       </motion.div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <StatCard label="إجمالي الإيرادات" value={`${stats.revenue.toLocaleString()} ج.م`} icon={DollarSign} color="green" />
         <StatCard label="المدفوع (طلبات)" value={`${stats.paid.toLocaleString()} ج.م`} icon={TrendingUp} color="blue" />
         <StatCard label="غير مدفوع" value={`${stats.unpaid.toLocaleString()} ج.م`} icon={TrendingDown} color="orange" />
+        <StatCard label="رسوم التوصيل" value={`${stats.deliveryFees.toLocaleString()} ج.م`} icon={Truck} color="purple" />
         <StatCard label="إيرادات الاشتراكات" value={`${stats.subsRevenue.toLocaleString()} ج.م`} icon={Crown} color="yellow" />
         <StatCard label="عدد الطلبات" value={stats.ordersCount} icon={CreditCard} color="purple" />
       </div>

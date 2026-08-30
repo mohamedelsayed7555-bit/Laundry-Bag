@@ -13,6 +13,7 @@ export default function LoginScreen() {
   const { signInWithPassword, signInWithBiometric, biometricEnabled } = useAuth()
   const router = useRouter()
   const [bioLoading, setBioLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   function clearError(field: string) {
     setErrors(prev => { const n = { ...prev }; delete n[field]; return n })
@@ -70,15 +71,20 @@ export default function LoginScreen() {
           {errors.email ? <Text style={s.errorText}>{errors.email}</Text> : null}
 
           <Text style={s.label}>كلمة المرور</Text>
-          <TextInput
-            style={[s.input, errors.password ? s.inputError : null]}
-            placeholder="••••••••"
-            placeholderTextColor={colors.navy[300]}
-            value={password}
-            onChangeText={v => { setPassword(v); clearError('password') }}
-            secureTextEntry
-            textAlign="left"
-          />
+          <View style={s.passwordContainer}>
+            <TextInput
+              style={[s.passwordInput, errors.password ? s.inputError : null]}
+              placeholder="••••••••"
+              placeholderTextColor={colors.navy[300]}
+              value={password}
+              onChangeText={v => { setPassword(v); clearError('password') }}
+              secureTextEntry={!showPassword}
+              textAlign="left"
+            />
+            <TouchableOpacity style={s.eyeBtn} onPress={() => setShowPassword(!showPassword)}>
+              <Text style={s.eyeIcon}>{showPassword ? '🙈' : '👁️'}</Text>
+            </TouchableOpacity>
+          </View>
           {errors.password ? <Text style={s.errorText}>{errors.password}</Text> : null}
 
           <TouchableOpacity style={[s.button, loading && s.buttonDisabled]} onPress={handleLogin} disabled={loading}>
@@ -127,6 +133,16 @@ const s = StyleSheet.create({
     borderWidth: 1.5, borderColor: colors.navy[500], borderRadius: 14,
     padding: 16, fontSize: 18, backgroundColor: colors.navy[800], color: '#fff',
   },
+  passwordContainer: {
+    flexDirection: 'row', alignItems: 'center',
+    borderWidth: 1.5, borderColor: colors.navy[500], borderRadius: 14,
+    backgroundColor: colors.navy[800],
+  },
+  passwordInput: {
+    flex: 1, padding: 16, fontSize: 18, color: '#fff',
+  },
+  eyeBtn: { paddingHorizontal: 14 },
+  eyeIcon: { fontSize: 20 },
   inputError: {
     borderColor: '#ef4444', backgroundColor: '#ef444410',
   },

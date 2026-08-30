@@ -78,8 +78,8 @@ export default function Sidebar({ collapsed, onToggleCollapse }: { collapsed?: b
   const toggleCollapse = onToggleCollapse ?? (() => setInternalCollapsed(c => !c))
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
     router.push('/login')
+    await supabase.auth.signOut()
   }
 
   const sidebarWidth = isCollapsed ? 'w-[72px]' : 'w-[260px]'

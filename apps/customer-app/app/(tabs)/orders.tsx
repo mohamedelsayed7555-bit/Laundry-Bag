@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl } from 'react-native'
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Linking } from 'react-native'
 import { useRouter } from 'expo-router'
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated'
 import { useAuth } from '../../src/contexts/AuthContext'
@@ -34,7 +34,7 @@ export default function OrdersScreen() {
     if (!profile) return
     const { data } = await supabase
       .from('orders')
-      .select('*, driver:users!orders_driver_id_fkey(name)')
+      .select('*, driver:users!orders_driver_id_fkey(name, phone)')
       .eq('customer_id', profile.id)
       .order('created_at', { ascending: false })
     setOrders(data ?? [])
@@ -79,14 +79,29 @@ export default function OrdersScreen() {
                 <Text style={s.detailValue}>{item.driver.name}</Text>
               </View>
             )}
+            {item.driver?.phone && (
+              <View style={s.detailRow}>
+                <Text style={s.detailLabel}>موبايل السائق</Text>
+                <TouchableOpacity onPress={() => Linking.openURL(`tel:${item.driver.phone}`)}>
+                  <Text style={[s.detailValue, { color: colors.primary, textDecorationLine: 'underline' }]}>📞 {item.driver.phone}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
 
           <Text style={s.date}>{new Date(item.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}</Text>
 
           {item.driver_id && !['delivered', 'cancelled'].includes(item.status) && (
-            <TouchableOpacity style={s.msgBtn} onPress={() => router.push(`/chat/${item.id}`)}>
-              <Text style={s.msgBtnText}>💬 رسالة السائق</Text>
-            </TouchableOpacity>
+            <View style={s.contactRow}>
+              <TouchableOpacity style={s.msgBtn} onPress={() => router.push(`/chat/${item.id}`)}>
+                <Text style={s.msgBtnText}>💬 رسالة</Text>
+              </TouchableOpacity>
+              {item.driver?.phone && (
+                <TouchableOpacity style={s.callBtn} onPress={() => Linking.openURL(`tel:${item.driver.phone}`)}>
+                  <Text style={s.callBtnText}>📞 اتصال</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           )}
         </TouchableOpacity>
       </Animated.View>
@@ -146,6 +161,9 @@ const s = StyleSheet.create({
   emptyIcon: { fontSize: 40, marginBottom: 12 },
   emptyText: { fontSize: 15, color: colors.navy[300] },
   emptySubText: { fontSize: 12, color: colors.navy[400], marginTop: 8 },
-  msgBtn: { borderWidth: 1, borderColor: colors.primary, borderRadius: 12, padding: 10, alignItems: 'center', marginTop: 12 },
+  contactRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  msgBtn: { flex: 1, borderWidth: 1, borderColor: colors.primary, borderRadius: 12, padding: 10, alignItems: 'center' },
   msgBtnText: { fontSize: 13, color: colors.primary, fontWeight: '600' },
+  callBtn: { flex: 1, borderWidth: 1, borderColor: colors.accent, borderRadius: 12, padding: 10, alignItems: 'center' },
+  callBtnText: { fontSize: 13, color: colors.accent, fontWeight: '600' },
 })

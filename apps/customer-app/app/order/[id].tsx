@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, Linking } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { supabase } from '../../src/lib/supabase'
@@ -133,7 +133,8 @@ export default function OrderDetailsScreen() {
         <Text style={s.sectionTitle}>تفاصيل الطلب</Text>
         <DetailRow label="الخدمة" value={serviceLabel[order.service_type] ?? order.service_type} />
         <DetailRow label="عدد القطع" value={String(order.items_count)} />
-        <DetailRow label="المبلغ" value={`${order.total?.toFixed(2)} ج.م`} highlight />
+        {order.delivery_fee > 0 && <DetailRow label="رسوم التوصيل" value={`${Number(order.delivery_fee).toFixed(2)} ج.م`} />}
+        <DetailRow label="الإجمالي" value={`${order.total?.toFixed(2)} ج.م`} highlight />
         <DetailRow label="طريقة الدفع" value={order.payment_method === 'cash' ? 'كاش' : order.payment_method === 'instapay' ? 'إنستاباي' : 'محفظة'} />
         <DetailRow label="حالة الدفع" value={order.payment_status === 'confirmed' ? 'مؤكد' : order.payment_status === 'refunded' ? 'مسترد' : 'معلق'} />
         <DetailRow label="التاريخ" value={new Date(order.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })} />
@@ -144,7 +145,14 @@ export default function OrderDetailsScreen() {
         <View style={s.detailsCard}>
           <Text style={s.sectionTitle}>السائق</Text>
           <DetailRow label="الاسم" value={order.driver.name} />
-          {order.driver.phone && <DetailRow label="التليفون" value={order.driver.phone} />}
+          {order.driver.phone && (
+            <View style={s.detailRow}>
+              <Text style={s.detailLabel}>التليفون</Text>
+              <TouchableOpacity onPress={() => Linking.openURL(`tel:${order.driver.phone}`)}>
+                <Text style={[s.detailValue, { color: colors.primary, textDecorationLine: 'underline' }]}>📞 {order.driver.phone}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
           <TouchableOpacity style={s.chatBtn} onPress={() => router.push(`/chat/${order.id}`)}>
             <Text style={s.chatBtnText}>💬 محادثة مع السائق</Text>
           </TouchableOpacity>
