@@ -59,7 +59,7 @@ export default function OrdersPage() {
 
   async function loadOrders() {
     const { data } = await supabase.from('orders')
-      .select('*, customer:users!orders_customer_id_fkey(name, phone, customer_code), driver:users!orders_driver_id_fkey(name, phone)')
+      .select('*, customer:users!orders_customer_id_fkey(name, phone, customer_code), driver:users!orders_driver_id_fkey(name, phone), subscription:subscriptions(items_used, items_limit)')
       .order('created_at', { ascending: false })
     setOrders(data ?? [])
     setLoading(false)
@@ -164,8 +164,20 @@ export default function OrdersPage() {
         <p className="text-[10px] text-gray-400">{item.customer?.customer_code}</p>
       </div>
     )},
+    { key: 'type', label: 'النوع', render: (item: any) => {
+      if (item.notes?.includes('[من المحل]')) return <Badge variant="warning">من المحل</Badge>
+      if (item.subscription_id) return <Badge variant="info">باقة</Badge>
+      return <Badge variant="neutral">عادي</Badge>
+    }},
     { key: 'service_type', label: 'الخدمة', render: (item: any) => <span className="text-gray-600 text-xs">{SERVICE_TYPE_LABELS[item.service_type as ServiceType] ?? item.service_type}</span> },
-    { key: 'items_count', label: 'القطع', render: (item: any) => <span className="text-gray-600">{item.items_count}</span> },
+    { key: 'items_count', label: 'القطع', render: (item: any) => (
+      <div>
+        <span className="text-gray-600">{item.items_count}</span>
+        {item.subscription && (
+          <p className="text-[10px] text-primary-500 font-medium">{item.subscription.items_used} من {item.subscription.items_limit}</p>
+        )}
+      </div>
+    )},
     { key: 'total', label: 'المبلغ', render: (item: any) => <span className="font-semibold text-gray-800">{item.total ? `${item.total.toFixed(2)} ج.م` : '—'}</span> },
     { key: 'driver', label: 'السائق', render: (item: any) => item.driver?.name ?? <span className="text-gray-300">—</span> },
     { key: 'status', label: 'الحالة', render: (item: any) => <Badge variant={statusVariant[item.status] ?? 'neutral'}>{ORDER_STATUS_LABELS[item.status as OrderStatus] ?? item.status}</Badge> },
@@ -244,7 +256,7 @@ export default function OrdersPage() {
               </div>
             )}
 
-            {['pending', 'assigned'].includes(detail.status) && (
+            {['pending', 'assigned'].includes(detail.status) && !detail.notes?.includes('[من المحل]') && (
               <div>
                 <p className="text-xs font-medium text-gray-500 mb-1.5">{detail.driver_id ? 'تغيير السائق' : 'تعيين سائق'}</p>
                 <select value={detail.driver_id ?? ''} onChange={e => { if (e.target.value && e.target.value !== detail.driver_id) assignDriver(detail.id, e.target.value) }} className={inputClass}>

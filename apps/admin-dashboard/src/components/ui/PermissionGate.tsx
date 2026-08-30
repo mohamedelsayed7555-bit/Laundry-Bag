@@ -1,6 +1,8 @@
 'use client'
 
 import { useAuth } from '@/lib/auth-context'
+import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
 import { ShieldX } from 'lucide-react'
 
 interface PermissionGateProps {
@@ -9,9 +11,16 @@ interface PermissionGateProps {
 }
 
 export default function PermissionGate({ permission, children }: PermissionGateProps) {
-  const { hasPermission, loading } = useAuth()
+  const { user, hasPermission, loading } = useAuth()
+  const router = useRouter()
 
-  if (loading) {
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace('/login')
+    }
+  }, [loading, user, router])
+
+  if (loading || !user) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-7 h-7 border-[3px] border-primary-500 border-t-transparent rounded-full animate-spin" />
