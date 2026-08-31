@@ -1,12 +1,14 @@
 import { useEffect, useState, useCallback } from 'react'
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert, Linking } from 'react-native'
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Linking } from 'react-native'
 import { useRouter } from 'expo-router'
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { supabase } from '../../src/lib/supabase'
 import { useRealtimeDriverOrders } from '../../src/hooks/useRealtimeOrders'
+import { useDriverLocation } from '../../src/hooks/useDriverLocation'
 import { colors } from '../../src/theme'
 import { SkeletonOrderCard } from '../../src/components/Skeleton'
+import { useCustomAlert } from '../../src/components/CustomAlert'
 
 const statusConfig: Record<string, { label: string; color: string; icon: string }> = {
   assigned: { label: 'بانتظار الاستلام', color: '#3b82f6', icon: '📋' },
@@ -34,6 +36,7 @@ type Filter = 'active' | 'completed' | 'all'
 export default function DriverOrdersScreen() {
   const { profile } = useAuth()
   const router = useRouter()
+  const { showAlert, AlertComponent } = useCustomAlert()
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -43,10 +46,11 @@ export default function DriverOrdersScreen() {
     if (!profile) return
     const { data } = await supabase
       .from('orders')
-      .select('*, customer:users!orders_customer_id_fkey(name, phone, customer_code), address:addresses(label, building, floor, apartment, landmark, lat, lng)')
+      .select('id, order_number, status, service_type, items_count, total, notes, created_at, customer:users!orders_customer_id_fkey(name, phone, customer_code), address:addresses(label, building, floor, apartment, landmark, lat, lng)')
       .eq('driver_id', profile.id)
       .not('status', 'in', '("cancelled","refunded")')
       .order('created_at', { ascending: false })
+      .limit(50)
     setOrders(data ?? [])
     setLoading(false)
     setRefreshing(false)
@@ -54,31 +58,52 @@ export default function DriverOrdersScreen() {
 
   useEffect(() => { loadOrders() }, [loadOrders])
   useRealtimeDriverOrders(profile?.id, loadOrders)
+  const hasActive = orders.some(o => o.status !== 'delivered')
+  useDriverLocation(profile?.id, hasActive)
 
   const onRefresh = () => { setRefreshing(true); loadOrders() }
 
   async function updateStatus(orderId: string, newStatus: string) {
     const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId)
     if (error) {
-      Alert.alert('خطأ', 'حدث خطأ أثناء تحديث الحالة')
+      showAlert({ title: 'خطأ', message: 'حدث خطأ أثناء تحديث الحالة', type: 'error' })
     } else {
       await supabase.from('order_status_history').insert({
         order_id: orderId, status: newStatus, changed_by: profile?.id,
       })
-      loadOrders()
+      if (newStatus === 'delivered') {
+        showAlert({ title: 'تم التسليم', message: 'تم تسليم الطلب للعميل بنجاح', type: 'success', buttons: [
+          { text: 'حسناً', onPress: () => loadOrders() },
+        ] })
+      } else {
+        const statusMsg = statusConfig[newStatus]?.label ?? newStatus
+        showAlert({ title: 'تم', message: `تم تحديث الحالة: ${statusMsg}`, type: 'success' })
+        loadOrders()
+      }
     }
   }
 
   function openNavigation(addr: any) {
     if (!addr?.lat || !addr?.lng) {
-      Alert.alert('خطأ', 'لا يوجد موقع محدد لهذا العنوان')
+      showAlert({ title: 'خطأ', message: 'لا يوجد موقع محدد لهذا العنوان', type: 'error' })
       return
     }
     const url = `https://www.google.com/maps/dir/?api=1&destination=${addr.lat},${addr.lng}`
     Linking.openURL(url)
   }
 
-  const activeOrders = orders.filter(o => !['delivered'].includes(o.status))
+  const statusPriority: Record<string, number> = {
+    assigned: 0,
+    ready: 1,
+    delivering: 2,
+    picked_up: 3,
+    processing: 4,
+    delivered: 5,
+  }
+
+  const activeOrders = orders
+    .filter(o => !['delivered'].includes(o.status))
+    .sort((a, b) => (statusPriority[a.status] ?? 9) - (statusPriority[b.status] ?? 9))
   const completedOrders = orders.filter(o => o.status === 'delivered')
 
   const filteredOrders = filter === 'active' ? activeOrders : filter === 'completed' ? completedOrders : orders
@@ -152,10 +177,10 @@ export default function DriverOrdersScreen() {
 
           {action && (
             <TouchableOpacity style={[s.actionBtn, { backgroundColor: status.color }]}
-              onPress={() => Alert.alert('تأكيد', `${action.label}؟`, [
+              onPress={() => showAlert({ title: 'تأكيد', message: `${action.label}؟`, type: 'confirm', buttons: [
                 { text: 'إلغاء', style: 'cancel' },
                 { text: 'تأكيد', onPress: () => updateStatus(item.id, action.status) },
-              ])}>
+              ] })}>
               <Text style={s.actionText}>{action.label}</Text>
             </TouchableOpacity>
           )}
@@ -176,6 +201,7 @@ export default function DriverOrdersScreen() {
   }
 
   return (
+    <>
     <View style={s.container}>
       <Animated.View entering={FadeInDown.duration(500)} style={s.header}>
         <View>
@@ -232,6 +258,8 @@ export default function DriverOrdersScreen() {
         />
       )}
     </View>
+    {AlertComponent}
+    </>
   )
 }
 

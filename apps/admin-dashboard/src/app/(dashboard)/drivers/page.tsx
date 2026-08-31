@@ -26,7 +26,7 @@ export default function DriversPage() {
   useEffect(() => { loadDrivers() }, [])
 
   async function loadDrivers() {
-    const { data } = await supabase.from('users').select('*').eq('role', 'driver').order('created_at', { ascending: false })
+    const { data } = await supabase.from('users').select('id, name, phone, email, vehicle_type, vehicle_number, is_active, created_at').eq('role', 'driver').order('created_at', { ascending: false })
     setDrivers(data ?? [])
     setLoading(false)
   }

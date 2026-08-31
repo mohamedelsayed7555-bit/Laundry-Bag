@@ -34,9 +34,10 @@ export default function OrdersScreen() {
     if (!profile) return
     const { data } = await supabase
       .from('orders')
-      .select('*, driver:users!orders_driver_id_fkey(name, phone)')
+      .select('id, order_number, status, service_type, items_count, total, delivery_fee, notes, payment_status, subscription_id, created_at, driver:users!orders_driver_id_fkey(name, phone)')
       .eq('customer_id', profile.id)
       .order('created_at', { ascending: false })
+      .limit(50)
     setOrders(data ?? [])
     setLoading(false)
     setRefreshing(false)

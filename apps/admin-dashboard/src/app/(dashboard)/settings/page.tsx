@@ -51,7 +51,7 @@ export default function SettingsPage() {
   }, [])
 
   async function loadSettings() {
-    const { data } = await supabase.from('settings').select('*').order('key')
+    const { data } = await supabase.from('settings').select('id, key, value, description').order('key')
     setSettings(data ?? [])
     const vals: Record<string, string> = {}
     data?.forEach(s => { vals[s.id] = typeof s.value === 'object' ? JSON.stringify(s.value) : String(s.value) })
@@ -69,7 +69,7 @@ export default function SettingsPage() {
     setUserId(user.id)
     setUserEmail(user.email ?? '')
     setNewEmail(user.email ?? '')
-    const { data } = await supabase.from('users').select('*').eq('id', user.id).single()
+    const { data } = await supabase.from('users').select('id, name, phone, email, role, avatar_url').eq('id', user.id).single()
     if (data) {
       setProfile(data)
       setName(data.name || '')
@@ -80,14 +80,14 @@ export default function SettingsPage() {
 
   async function handleSaveAll() {
     setSaving(true)
-    const updates = settings.map(s => supabase.from('settings').update({ value: editValues[s.id] ?? s.value }).eq('id', s.id))
-    await Promise.all(updates)
+    const upsertData = settings.map(s => ({ id: s.id, key: s.key, value: editValues[s.id] ?? s.value, description: s.description }))
     const nameExists = settings.find(s => s.key === 'org_name')
     const phoneExists = settings.find(s => s.key === 'org_phone')
-    if (nameExists) await supabase.from('settings').update({ value: orgName }).eq('id', nameExists.id)
-    else await supabase.from('settings').upsert({ key: 'org_name', value: orgName, description: 'اسم المؤسسة' })
-    if (phoneExists) await supabase.from('settings').update({ value: orgPhone }).eq('id', phoneExists.id)
-    else await supabase.from('settings').upsert({ key: 'org_phone', value: orgPhone, description: 'رقم هاتف المؤسسة' })
+    if (nameExists) upsertData.push({ id: nameExists.id, key: 'org_name', value: orgName, description: nameExists.description })
+    if (phoneExists) upsertData.push({ id: phoneExists.id, key: 'org_phone', value: orgPhone, description: phoneExists.description })
+    await supabase.from('settings').upsert(upsertData)
+    if (!nameExists) await supabase.from('settings').upsert({ key: 'org_name', value: orgName, description: 'اسم المؤسسة' })
+    if (!phoneExists) await supabase.from('settings').upsert({ key: 'org_phone', value: orgPhone, description: 'رقم هاتف المؤسسة' })
     setSaving(false)
     loadSettings()
     toast('تم حفظ الإعدادات بنجاح')

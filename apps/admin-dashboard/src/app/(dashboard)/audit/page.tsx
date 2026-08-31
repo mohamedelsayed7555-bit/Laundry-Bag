@@ -96,22 +96,13 @@ export default function AuditPage() {
   async function loadLogs() {
     const { data, error } = await supabase
       .from('audit_logs')
-      .select('*')
+      .select('id, user_id, action, entity_type, entity_id, details, created_at, actor:users!audit_logs_user_id_fkey(name, role)')
       .order('created_at', { ascending: false })
       .limit(limit)
 
     if (error) { console.error('audit_logs error:', error); setLoading(false); return }
 
-    const logs = data ?? []
-    const userIds = [...new Set(logs.map(l => l.user_id).filter(Boolean))]
-    let usersMap: Record<string, { name: string; avatar_url: string | null; role: string }> = {}
-    if (userIds.length > 0) {
-      const orFilter = userIds.map(id => `id.eq.${id}`).join(',')
-      const { data: users, error: usersError } = await supabase.from('users').select('id, name, role').or(orFilter)
-      if (usersError) console.error('users fetch error:', usersError)
-      for (const u of users ?? []) usersMap[u.id] = { name: u.name, avatar_url: null, role: u.role }
-    }
-    setLogs(logs.map(l => ({ ...l, actor: usersMap[l.user_id] || null })))
+    setLogs(data ?? [])
     setLoading(false)
   }
 

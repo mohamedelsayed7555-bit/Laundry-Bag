@@ -24,7 +24,7 @@ export default function Header() {
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (user) {
-        const { data } = await supabase.from('users').select('*').eq('id', user.id).single()
+        const { data } = await supabase.from('users').select('id, name, role, avatar_url').eq('id', user.id).single()
         setProfile(data as User)
       }
     })

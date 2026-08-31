@@ -23,7 +23,7 @@ export default function BranchesPage() {
   useEffect(() => { loadBranches() }, [])
 
   async function loadBranches() {
-    const { data } = await supabase.from('branches').select('*').order('created_at', { ascending: false })
+    const { data } = await supabase.from('branches').select('id, name, address, phone, is_active, created_at').order('created_at', { ascending: false })
     setBranches(data ?? [])
     setLoading(false)
   }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import DataTable from '@/components/ui/DataTable'
@@ -45,6 +45,12 @@ export default function OrdersPage() {
   const [deliveryFeeSetting, setDeliveryFeeSetting] = useState(0)
   const { toast } = useToast()
 
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const debouncedLoadOrders = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => loadOrders(), 2000)
+  }, [])
+
   useEffect(() => {
     loadOrders()
     loadDriversCustomers()
@@ -52,15 +58,16 @@ export default function OrdersPage() {
       if (data) setDeliveryFeeSetting(Number(data.value) || 0)
     })
     const ch = supabase.channel('orders-rt')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => loadOrders())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => debouncedLoadOrders())
       .subscribe()
-    return () => { supabase.removeChannel(ch) }
+    return () => { supabase.removeChannel(ch); if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [])
 
   async function loadOrders() {
     const { data } = await supabase.from('orders')
-      .select('*, customer:users!orders_customer_id_fkey(name, phone, customer_code), driver:users!orders_driver_id_fkey(name, phone), subscription:subscriptions(items_used, items_limit)')
+      .select('id, order_number, status, service_type, items_count, total, delivery_fee, notes, payment_status, payment_method, subscription_id, customer_id, driver_id, created_at, customer:users!orders_customer_id_fkey(name, phone, customer_code), driver:users!orders_driver_id_fkey(name, phone), subscription:subscriptions(items_used, items_limit)')
       .order('created_at', { ascending: false })
+      .limit(200)
     setOrders(data ?? [])
     setLoading(false)
   }
@@ -75,6 +82,8 @@ export default function OrdersPage() {
   }
 
   async function assignDriver(orderId: string, driverId: string) {
+    const order = orders.find(o => o.id === orderId)
+    if (order?.notes?.includes('[من المحل]')) { toast('طلب من المحل لا يحتاج سائق', 'error'); return }
     await supabase.from('orders').update({ driver_id: driverId, status: 'assigned' }).eq('id', orderId)
     await supabase.from('order_status_history').insert({ order_id: orderId, status: 'assigned', changed_by: driverId })
     const driverInfo = drivers.find(d => d.id === driverId)
@@ -150,11 +159,11 @@ export default function OrdersPage() {
   }
 
   const allStatuses = ['all', 'pending', 'assigned', 'picked_up', 'processing', 'ready', 'delivering', 'delivered', 'cancelled']
-  const filtered = orders.filter(o => {
+  const filtered = useMemo(() => orders.filter(o => {
     const matchSearch = !search || o.order_number?.toLowerCase().includes(search.toLowerCase()) || o.customer?.name?.includes(search)
     const matchStatus = statusFilter === 'all' || o.status === statusFilter
     return matchSearch && matchStatus
-  })
+  }), [orders, search, statusFilter])
 
   const columns = [
     { key: 'order_number', label: 'رقم الطلب', render: (item: any) => <span className="font-semibold text-navy-800">{item.order_number}</span> },
@@ -179,7 +188,7 @@ export default function OrdersPage() {
       </div>
     )},
     { key: 'total', label: 'المبلغ', render: (item: any) => <span className="font-semibold text-gray-800">{item.total ? `${item.total.toFixed(2)} ج.م` : '—'}</span> },
-    { key: 'driver', label: 'السائق', render: (item: any) => item.driver?.name ?? <span className="text-gray-300">—</span> },
+    { key: 'driver', label: 'السائق', render: (item: any) => item.notes?.includes('[من المحل]') ? <span className="text-gray-300">—</span> : (item.driver?.name ?? <span className="text-gray-300">—</span>) },
     { key: 'status', label: 'الحالة', render: (item: any) => <Badge variant={statusVariant[item.status] ?? 'neutral'}>{ORDER_STATUS_LABELS[item.status as OrderStatus] ?? item.status}</Badge> },
     { key: 'actions', label: '', render: (item: any) => (
       <Tooltip content="عرض التفاصيل">
@@ -266,7 +275,7 @@ export default function OrdersPage() {
               </div>
             )}
 
-            {detail.driver && (
+            {detail.driver && !detail.notes?.includes('[من المحل]') && (
               <div className="bg-blue-50/50 rounded-xl p-3 border border-blue-100">
                 <p className="text-[10px] text-blue-600 mb-0.5">السائق الحالي</p>
                 <p className="text-sm font-semibold text-blue-800">{detail.driver.name} — {detail.driver.phone}</p>
@@ -322,7 +331,7 @@ export default function OrdersPage() {
                 توصيل
               </button>
               <button type="button" onClick={() => setForm({ ...form, order_type: 'walkin' })}
-                className={`flex-1 p-2.5 rounded-xl text-sm font-semibold transition-all ${form.order_type === 'walkin' ? 'bg-accent text-white' : 'bg-navy-50 text-gray-500 hover:bg-navy-100'}`}>
+                className={`flex-1 p-2.5 rounded-xl text-sm font-semibold transition-all ${form.order_type === 'walkin' ? 'bg-accent-orange text-white' : 'bg-navy-50 text-gray-500 hover:bg-navy-100'}`}>
                 من المحل
               </button>
             </div>

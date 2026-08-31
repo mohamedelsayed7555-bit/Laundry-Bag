@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Alert } from 'react-native'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
+import { useCustomAlert } from '../../src/components/CustomAlert'
 import { supabase } from '../../src/lib/supabase'
 import { colors } from '../../src/theme'
 
@@ -14,9 +15,12 @@ const services = [
 
 const paymentMethods = [
   { key: 'cash', icon: '💵', label: 'كاش' },
+  { key: 'visa', icon: '💳', label: 'فيزا / ماستركارد' },
   { key: 'instapay', icon: '📱', label: 'إنستاباي' },
   { key: 'wallet', icon: '👛', label: 'محفظة' },
 ]
+
+const SUPABASE_URL = 'https://kjqtrmedkvqfofwymoni.supabase.co'
 
 type OrderItem = {
   name: string
@@ -28,6 +32,7 @@ type OrderItem = {
 export default function NewOrderScreen() {
   const { profile } = useAuth()
   const router = useRouter()
+  const { showAlert, AlertComponent } = useCustomAlert()
   const [paymentMethod, setPaymentMethod] = useState('cash')
   const [notes, setNotes] = useState('')
   const [prices, setPrices] = useState<any[]>([])
@@ -44,12 +49,14 @@ export default function NewOrderScreen() {
   const [activeSub, setActiveSub] = useState<any>(null)
   const [paymentSettings, setPaymentSettings] = useState<{ instapay: string; wallet: string }>({ instapay: '', wallet: '' })
   const [deliveryFee, setDeliveryFee] = useState(0)
+  const [dataLoading, setDataLoading] = useState(true)
 
   useEffect(() => {
-    supabase.from('prices').select('*').eq('is_active', true).then(({ data }) => {
+    supabase.from('prices').select('id, item_type, service_type, price').eq('is_active', true).then(({ data }) => {
       setPrices(data ?? [])
       const types = [...new Set((data ?? []).map((p: any) => p.item_type))]
       setItemTypes(types as string[])
+      setDataLoading(false)
     })
     supabase.from('settings').select('key, value').eq('key', 'delivery_fee').single().then(({ data }) => {
       if (data) setDeliveryFee(Number(data.value) || 0)
@@ -63,7 +70,7 @@ export default function NewOrderScreen() {
       })
     })
     if (profile) {
-      supabase.from('addresses').select('*').eq('user_id', profile.id).order('is_default', { ascending: false })
+      supabase.from('addresses').select('id, label, address, lat, lng, is_default').eq('user_id', profile.id).order('is_default', { ascending: false })
         .then(({ data }) => {
           setAddresses(data ?? [])
           const def = data?.find((a: any) => a.is_default) ?? data?.[0]
@@ -76,15 +83,15 @@ export default function NewOrderScreen() {
 
   const subRemaining = activeSub ? activeSub.items_limit - activeSub.items_used : null
 
-  const getPrice = (itemType: string, serviceType: string) => {
+  const getPrice = useCallback((itemType: string, serviceType: string) => {
     const match = prices.find(p => p.item_type === itemType && p.service_type === serviceType)
     return match?.price ?? 0
-  }
+  }, [prices])
 
-  const availableServices = () => {
+  const availableServices = useMemo(() => {
     if (!selectedItemType) return []
     return services.filter(s => prices.some(p => p.item_type === selectedItemType && p.service_type === s.key))
-  }
+  }, [selectedItemType, prices])
 
   const addToCart = () => {
     if (!selectedItemType || !selectedService) return
@@ -110,21 +117,20 @@ export default function NewOrderScreen() {
     setCart(cart.filter((_, i) => i !== index))
   }
 
-  const totalPrice = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
-  const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0)
+  const totalPrice = useMemo(() => cart.reduce((sum, item) => sum + item.price * item.quantity, 0), [cart])
+  const totalItems = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart])
 
   const serviceLabel = (key: string) => services.find(s => s.key === key)?.label ?? key
 
   async function handleSubmit() {
     if (!profile) return
     if (cart.length === 0) {
-      Alert.alert('تنبيه', 'أضف قطعة واحدة على الأقل')
+      showAlert('تنبيه', 'أضف قطعة واحدة على الأقل')
       return
     }
 
-    // Check subscription quota
     if (activeSub && subRemaining !== null && totalItems > subRemaining) {
-      Alert.alert('تنبيه', `رصيد باقتك ${subRemaining} قطعة فقط وأنت محتاج ${totalItems} قطعة.\nيمكنك ترقية باقتك أو تقليل عدد القطع.`)
+      showAlert('تنبيه', `رصيد باقتك ${subRemaining} قطعة فقط وأنت محتاج ${totalItems} قطعة.\nيمكنك ترقية باقتك أو تقليل عدد القطع.`)
       return
     }
 
@@ -133,7 +139,9 @@ export default function NewOrderScreen() {
     const orderTotal = useSubscription ? 0 : totalPrice + fee
 
     setSaving(true)
-    const { error } = await supabase.from('orders').insert({
+    const isOnlinePayment = !useSubscription && (paymentMethod === 'visa' || paymentMethod === 'e_wallet')
+
+    const { data: orderData, error } = await supabase.from('orders').insert({
       customer_id: profile.id,
       service_type: cart[0].service_type,
       items: cart,
@@ -148,9 +156,8 @@ export default function NewOrderScreen() {
       subscription_id: useSubscription ? activeSub.id : null,
       address_id: selectedAddress?.id || null,
       delivery_location: selectedAddress ? { lat: selectedAddress.lat, lng: selectedAddress.lng, label: selectedAddress.label } : {},
-    })
+    }).select('id').single()
 
-    // Update subscription items_used
     if (!error && useSubscription) {
       await supabase
         .from('subscriptions')
@@ -159,20 +166,59 @@ export default function NewOrderScreen() {
       setActiveSub({ ...activeSub, items_used: activeSub.items_used + totalItems })
     }
 
-    setSaving(false)
     if (error) {
-      Alert.alert('خطأ', error.message || 'حدث خطأ أثناء إنشاء الطلب')
-    } else {
-      const msg = useSubscription
-        ? `تم إنشاء طلبك بنجاح!\nتم خصم ${totalItems} قطعة من باقتك (متبقي ${subRemaining! - totalItems})`
-        : 'تم إنشاء طلبك بنجاح! سيتم تعيين سائق قريباً'
-      Alert.alert('تم', msg, [
-        { text: 'حسناً', onPress: () => router.replace('/(tabs)/orders') },
-      ])
+      setSaving(false)
+      showAlert('خطأ', error.message || 'حدث خطأ أثناء إنشاء الطلب')
+      return
     }
+
+    if (isOnlinePayment && orderData) {
+      try {
+        const session = (await supabase.auth.getSession()).data.session
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/paymob-pay`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({
+            order_id: orderData.id,
+            payment_method: paymentMethod === 'visa' ? 'card' : 'wallet',
+          }),
+        })
+        const paymentData = await res.json()
+        setSaving(false)
+        if (paymentData.iframe_url) {
+          router.push({ pathname: '/payment', params: { url: paymentData.iframe_url } })
+        } else if (paymentData.error) {
+          showAlert('خطأ', paymentData.error)
+        }
+      } catch (e) {
+        setSaving(false)
+        showAlert('خطأ', 'حدث خطأ في الاتصال بخدمة الدفع')
+      }
+      return
+    }
+
+    setSaving(false)
+    const msg = useSubscription
+      ? `تم إنشاء طلبك بنجاح!\nتم خصم ${totalItems} قطعة من باقتك (متبقي ${subRemaining! - totalItems})`
+      : 'تم إنشاء طلبك بنجاح! سيتم تعيين سائق قريباً'
+    showAlert('تم', msg, [
+      { text: 'حسناً', onPress: () => router.replace('/(tabs)/orders') },
+    ])
+  }
+
+  if (dataLoading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.navy[900], justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    )
   }
 
   return (
+    <>
     <ScrollView style={s.container} contentContainerStyle={s.content}>
       <Text style={s.title}>طلب جديد</Text>
 
@@ -230,7 +276,7 @@ export default function NewOrderScreen() {
         <>
           <Text style={s.stepLabel}>نوع الخدمة</Text>
           <View style={s.grid}>
-            {availableServices().map(svc => (
+            {availableServices.map(svc => (
               <TouchableOpacity key={svc.key} onPress={() => setSelectedService(svc.key)}
                 style={[s.optionCard, selectedService === svc.key && s.optionSelected]}>
                 <Text style={s.optionIcon}>{svc.icon}</Text>
@@ -335,6 +381,8 @@ export default function NewOrderScreen() {
         <Text style={s.submitText}>{saving ? 'جاري الإرسال...' : 'تأكيد الطلب'}</Text>
       </TouchableOpacity>
     </ScrollView>
+    {AlertComponent}
+    </>
   )
 }
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import StatCard from '@/components/ui/StatCard'
 import DataTable from '@/components/ui/DataTable'
@@ -54,33 +54,36 @@ export default function FinancePage() {
 
     // Load orders
     let oQuery = supabase.from('orders')
-      .select('*, customer:users!orders_customer_id_fkey(name, customer_code)')
+      .select('id, order_number, status, total, delivery_fee, payment_status, payment_method, subscription_id, created_at, customer:users!orders_customer_id_fkey(name, customer_code)')
       .order('created_at', { ascending: false })
+      .limit(500)
     if (from) oQuery = oQuery.gte('created_at', from)
     if (to) oQuery = oQuery.lte('created_at', to)
     const { data: ordersData } = await oQuery
 
     // Load subscriptions
     let sQuery = supabase.from('subscriptions')
-      .select('*, user:users!subscriptions_user_id_fkey(name, customer_code), plan:plans(name, price)')
+      .select('id, status, total_paid, created_at, user:users!subscriptions_user_id_fkey(name, customer_code), plan:plans(name)')
       .order('created_at', { ascending: false })
+      .limit(500)
     if (from) sQuery = sQuery.gte('created_at', from)
     if (to) sQuery = sQuery.lte('created_at', to)
     const { data: subsData } = await sQuery
 
     const allOrders = ordersData ?? []
-    const allSubs = (subsData ?? []).filter((s: any) => s.status !== 'pending')
+    const activeOrders = allOrders.filter((o: any) => !['cancelled', 'refunded'].includes(o.status))
+    const allSubs = (subsData ?? []).filter((s: any) => !['pending', 'cancelled'].includes(s.status))
 
-    const orderRevenue = allOrders.reduce((s, o) => s + (o.total ?? 0), 0)
-    const paid = allOrders.filter(o => o.payment_status === 'confirmed').reduce((s, o) => s + (o.total ?? 0), 0)
-    const subsRevenue = allSubs.reduce((s: number, sub: any) => s + (sub.plan?.price ?? 0), 0)
-    const deliveryFees = allOrders.reduce((s, o) => s + (o.delivery_fee ?? 0), 0)
+    const orderRevenue = activeOrders.reduce((s, o) => s + (o.total ?? 0), 0)
+    const paid = activeOrders.filter(o => o.payment_status === 'confirmed').reduce((s, o) => s + (o.total ?? 0), 0)
+    const subsRevenue = allSubs.reduce((s: number, sub: any) => s + (Number(sub.total_paid) || 0), 0)
+    const deliveryFees = activeOrders.reduce((s, o) => s + (o.delivery_fee ?? 0), 0)
 
     setStats({
       revenue: orderRevenue + subsRevenue,
       paid,
       unpaid: orderRevenue - paid,
-      ordersCount: allOrders.length,
+      ordersCount: activeOrders.length,
       subsRevenue,
       subsCount: allSubs.length,
       deliveryFees,
@@ -99,7 +102,7 @@ export default function FinancePage() {
     const subRows = allSubs.map((s: any) => ({
       ...s,
       _source: 'subscription' as const,
-      _amount: s.plan?.price ?? 0,
+      _amount: Number(s.total_paid) || 0,
       _customerName: s.user?.name ?? '—',
       _customerCode: s.user?.customer_code,
       _date: s.created_at,
@@ -123,9 +126,12 @@ export default function FinancePage() {
     setDateTo('')
   }
 
-  let filtered = rows
-  if (sourceFilter !== 'all') filtered = filtered.filter(r => r._source === (sourceFilter === 'orders' ? 'order' : 'subscription'))
-  if (payFilter !== 'all') filtered = filtered.filter(r => r.payment_status === payFilter)
+  const filtered = useMemo(() => {
+    let result = rows
+    if (sourceFilter !== 'all') result = result.filter(r => r._source === (sourceFilter === 'orders' ? 'order' : 'subscription'))
+    if (payFilter !== 'all') result = result.filter(r => r.payment_status === payFilter)
+    return result
+  }, [rows, sourceFilter, payFilter])
 
   const paymentLabel: Record<string, string> = { cash: 'كاش', instapay: 'إنستاباي', wallet: 'محفظة', subscription: 'اشتراك' }
 

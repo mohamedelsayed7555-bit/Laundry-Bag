@@ -24,7 +24,7 @@ export default function InventoryPage() {
   useEffect(() => { loadItems() }, [])
 
   async function loadItems() {
-    const { data } = await supabase.from('inventory').select('*').order('name')
+    const { data } = await supabase.from('inventory').select('id, name, quantity, min_quantity, unit, category, is_active').order('name')
     setItems(data ?? [])
     setLoading(false)
   }

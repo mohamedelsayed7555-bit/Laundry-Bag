@@ -86,7 +86,7 @@ export default function NotificationDropdown() {
     if (!adminId) return
     const { data } = await supabase
       .from('notifications')
-      .select('*')
+      .select('id, title, body, type, data, read_at, created_at')
       .eq('user_id', adminId)
       .order('created_at', { ascending: false })
       .limit(30)

@@ -29,7 +29,7 @@ export default function PricesPage() {
   useEffect(() => { loadPrices() }, [])
 
   async function loadPrices() {
-    const { data } = await supabase.from('prices').select('*').order('item_type')
+    const { data } = await supabase.from('prices').select('id, item_type, service_type, price, is_active').order('item_type')
     setPrices(data ?? [])
     setLoading(false)
   }

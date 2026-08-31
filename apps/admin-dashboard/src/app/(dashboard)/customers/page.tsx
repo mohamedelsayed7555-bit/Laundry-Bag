@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import DataTable from '@/components/ui/DataTable'
@@ -24,7 +24,7 @@ export default function CustomersPage() {
   useEffect(() => { loadCustomers() }, [])
 
   async function loadCustomers() {
-    const { data } = await supabase.from('users').select('*').eq('role', 'customer').order('created_at', { ascending: false })
+    const { data } = await supabase.from('users').select('id, name, phone, email, customer_code, tier, points, is_active, created_at').eq('role', 'customer').order('created_at', { ascending: false }).limit(500)
     setCustomers(data ?? [])
     setLoading(false)
   }
@@ -63,10 +63,10 @@ export default function CustomersPage() {
     setEditItem(item)
   }
 
-  const filtered = customers.filter(c => {
+  const filtered = useMemo(() => customers.filter(c => {
     if (!search) return true
     return c.name?.includes(search) || c.phone?.includes(search) || c.customer_code?.includes(search)
-  })
+  }), [customers, search])
 
   const tierVariant = (tier: string) => {
     const map: Record<string, 'success' | 'warning' | 'info' | 'purple'> = { bronze: 'warning', silver: 'info', gold: 'success', platinum: 'purple' }

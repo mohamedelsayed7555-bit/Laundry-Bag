@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import StatCard from '@/components/ui/StatCard'
@@ -78,29 +78,38 @@ export default function DashboardPage() {
   const [recentOrders, setRecentOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const debouncedLoad = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => loadDashboard(), 3000)
+  }, [])
+
   useEffect(() => {
     loadDashboard()
     const channel = supabase.channel('dashboard-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => loadDashboard())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => loadDashboard())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => debouncedLoad())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => debouncedLoad())
       .subscribe()
-    return () => { supabase.removeChannel(channel) }
+    return () => { supabase.removeChannel(channel); if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [])
 
   async function loadDashboard() {
-    const [orders, customers, drivers, recent] = await Promise.all([
+    const [orders, customers, drivers, recent, subs] = await Promise.all([
       supabase.from('orders').select('id, total, status', { count: 'exact' }),
       supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'customer'),
       supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'driver'),
       supabase.from('orders').select('*, customer:users!orders_customer_id_fkey(name, customer_code)').order('created_at', { ascending: false }).limit(7),
+      supabase.from('subscriptions').select('total_paid, status').not('status', 'in', '("pending","cancelled")'),
     ])
 
     const allOrders = orders.data ?? []
-    const revenue = allOrders.reduce((sum, o) => sum + (o.total ?? 0), 0)
+    const activeOrders = allOrders.filter(o => !['cancelled', 'refunded'].includes(o.status))
+    const ordersRevenue = activeOrders.reduce((sum, o) => sum + (o.total ?? 0), 0)
+    const subsRevenue = (subs.data ?? []).reduce((sum: number, s: any) => sum + (Number(s.total_paid) || 0), 0)
     const active = allOrders.filter(o => !['delivered', 'cancelled', 'refunded'].includes(o.status)).length
 
     setStats({
-      totalRevenue: revenue,
+      totalRevenue: ordersRevenue + subsRevenue,
       totalOrders: orders.count ?? 0,
       totalCustomers: customers.count ?? 0,
       totalDrivers: drivers.count ?? 0,
