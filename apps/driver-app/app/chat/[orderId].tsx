@@ -28,9 +28,10 @@ export default function ChatScreen() {
 
     const { data } = await supabase
       .from('messages')
-      .select('*')
+      .select('id, sender_id, receiver_id, body, read_at, created_at')
       .eq('order_id', orderId)
       .order('created_at', { ascending: true })
+      .limit(200)
 
     setMessages(data ?? [])
 
@@ -75,12 +76,29 @@ export default function ChatScreen() {
     if (!order?.customer_id) return
 
     setSending(true)
+    const msgBody = text.trim()
     await supabase.from('messages').insert({
       order_id: orderId,
       sender_id: profile.id,
       receiver_id: order.customer_id,
-      body: text.trim(),
+      body: msgBody,
     })
+
+    const { data: customerData } = await supabase.from('users').select('fcm_token').eq('id', order.customer_id).single()
+    if (customerData?.fcm_token) {
+      fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: customerData.fcm_token,
+          title: `رسالة من ${profile.name ?? 'السائق'}`,
+          body: msgBody.length > 100 ? msgBody.slice(0, 100) + '...' : msgBody,
+          sound: 'default',
+          data: { type: 'chat', order_id: orderId },
+        }),
+      }).catch(() => {})
+    }
+
     setText('')
     setSending(false)
   }

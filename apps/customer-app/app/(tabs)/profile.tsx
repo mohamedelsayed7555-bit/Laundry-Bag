@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Image, ScrollView, Switch, TextInput, Modal } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Switch, TextInput, Modal } from 'react-native'
 import Animated, { FadeInDown } from 'react-native-reanimated'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
+import { useCustomAlert } from '../../src/components/CustomAlert'
 import { supabase } from '../../src/lib/supabase'
 import { colors } from '../../src/theme'
 
 export default function ProfileScreen() {
   const { profile, signOut, biometricEnabled, biometricAvailable, toggleBiometric } = useAuth()
+  const { showAlert, AlertComponent } = useCustomAlert()
   const [activeSub, setActiveSub] = useState<any>(null)
   const [showBioModal, setShowBioModal] = useState(false)
   const [bioEmail, setBioEmail] = useState('')
@@ -27,13 +29,14 @@ export default function ProfileScreen() {
   const router = useRouter()
 
   const handleSignOut = () => {
-    Alert.alert('تسجيل الخروج', 'هل أنت متأكد؟', [
+    showAlert({ title: 'تسجيل الخروج', message: 'هل أنت متأكد؟', type: 'confirm', buttons: [
       { text: 'إلغاء', style: 'cancel' },
       { text: 'خروج', style: 'destructive', onPress: async () => { await signOut(); router.replace('/') } },
-    ])
+    ] })
   }
 
   return (
+    <>
     <ScrollView style={s.container} contentContainerStyle={s.contentContainer} showsVerticalScrollIndicator={false}>
       <Animated.Text entering={FadeInDown.duration(500)} style={s.title}>حسابي</Animated.Text>
 
@@ -101,7 +104,7 @@ export default function ProfileScreen() {
                   setShowBioModal(true)
                 } else {
                   await toggleBiometric(false)
-                  Alert.alert('تم', 'تم إلغاء تسجيل الدخول بالبصمة')
+                  showAlert({ title: 'تم', message: 'تم إلغاء تسجيل الدخول بالبصمة', type: 'success' })
                 }
               }}
               trackColor={{ false: colors.navy[600], true: colors.primary + '60' }}
@@ -134,15 +137,15 @@ export default function ProfileScreen() {
                 style={[s.bioModalSave, bioSaving && { opacity: 0.6 }]}
                 disabled={bioSaving}
                 onPress={async () => {
-                  if (!bioEmail || !bioPassword) { Alert.alert('تنبيه', 'أدخل البريد وكلمة المرور'); return }
+                  if (!bioEmail || !bioPassword) { showAlert({ title: 'تنبيه', message: 'أدخل البريد وكلمة المرور', type: 'warning' }); return }
                   setBioSaving(true)
                   const ok = await toggleBiometric(true, bioEmail, bioPassword)
                   setBioSaving(false)
                   if (ok) {
                     setShowBioModal(false)
-                    Alert.alert('تم', 'تم تفعيل تسجيل الدخول بالبصمة بنجاح')
+                    showAlert({ title: 'تم', message: 'تم تفعيل تسجيل الدخول بالبصمة بنجاح', type: 'success' })
                   } else {
-                    Alert.alert('خطأ', 'فشل تفعيل البصمة')
+                    showAlert({ title: 'خطأ', message: 'فشل تفعيل البصمة', type: 'error' })
                   }
                 }}
               >
@@ -153,6 +156,8 @@ export default function ProfileScreen() {
         </View>
       </Modal>
     </ScrollView>
+    {AlertComponent}
+    </>
   )
 }
 

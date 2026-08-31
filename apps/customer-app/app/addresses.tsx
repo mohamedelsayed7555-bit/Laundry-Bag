@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from 'react'
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Alert, Modal, ActivityIndicator, Platform, ScrollView } from 'react-native'
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Modal, ActivityIndicator, Platform, ScrollView } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../src/contexts/AuthContext'
+import { useCustomAlert } from '../src/components/CustomAlert'
 import { supabase } from '../src/lib/supabase'
 import { colors } from '../src/theme'
 import { WebView } from 'react-native-webview'
@@ -46,6 +47,7 @@ function buildPickerMapHTML(lat: number, lng: number) {
 export default function AddressesScreen() {
   const { profile } = useAuth()
   const router = useRouter()
+  const { showAlert, AlertComponent } = useCustomAlert()
   const [addresses, setAddresses] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -59,7 +61,7 @@ export default function AddressesScreen() {
 
   async function loadAddresses() {
     if (!profile) return
-    const { data } = await supabase.from('addresses').select('*').eq('user_id', profile.id).order('is_default', { ascending: false })
+    const { data } = await supabase.from('addresses').select('id, label, address, lat, lng, is_default, user_id').eq('user_id', profile.id).order('is_default', { ascending: false })
     setAddresses(data ?? [])
     setLoading(false)
   }
@@ -90,7 +92,7 @@ export default function AddressesScreen() {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync()
       if (status !== 'granted') {
-        Alert.alert('صلاحية الموقع', 'يرجى السماح بالوصول للموقع من الإعدادات')
+        showAlert({ title: 'صلاحية الموقع', message: 'يرجى السماح بالوصول للموقع من الإعدادات', type: 'warning' })
         setLocatingMe(false)
         return
       }
@@ -100,7 +102,7 @@ export default function AddressesScreen() {
       if (!form.label.trim()) setForm(f => ({ ...f, label: 'موقعي الحالي' }))
       webviewRef.current?.injectJavaScript(`window.setCenter(${coord.latitude}, ${coord.longitude}); true;`)
     } catch {
-      Alert.alert('خطأ', 'لم نتمكن من تحديد موقعك')
+      showAlert({ title: 'خطأ', message: 'لم نتمكن من تحديد موقعك', type: 'error' })
     }
     setLocatingMe(false)
   }
@@ -146,13 +148,13 @@ export default function AddressesScreen() {
   }
 
   async function handleDelete(id: string) {
-    Alert.alert('حذف العنوان', 'هل أنت متأكد؟', [
+    showAlert({ title: 'حذف العنوان', message: 'هل أنت متأكد؟', type: 'confirm', buttons: [
       { text: 'إلغاء', style: 'cancel' },
       { text: 'حذف', style: 'destructive', onPress: async () => {
         await supabase.from('addresses').delete().eq('id', id)
         loadAddresses()
       }},
-    ])
+    ] })
   }
 
   async function setDefault(id: string) {
@@ -163,6 +165,7 @@ export default function AddressesScreen() {
   }
 
   return (
+    <>
     <View style={s.container}>
       <View style={s.headerRow}>
         <TouchableOpacity onPress={() => router.back()}>
@@ -267,6 +270,8 @@ export default function AddressesScreen() {
         </View>
       </Modal>
     </View>
+    {AlertComponent}
+    </>
   )
 }
 

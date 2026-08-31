@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, Alert,
+  View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, Image, Animated,
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
+import { useCustomAlert } from '../../src/components/CustomAlert'
 import { colors } from '../../src/theme'
 
 export default function LoginScreen() {
@@ -19,6 +20,7 @@ export default function LoginScreen() {
   const [serverError, setServerError] = useState('')
   const { signInWithPassword, signUp, signInWithBiometric, biometricEnabled, biometricAvailable } = useAuth()
   const router = useRouter()
+  const { showAlert, AlertComponent } = useCustomAlert()
   const [bioLoading, setBioLoading] = useState(false)
 
   function clearError(field: string) {
@@ -60,13 +62,14 @@ export default function LoginScreen() {
     if (error) {
       setServerError(error)
     } else {
-      Alert.alert('تم', 'تم إنشاء حسابك بنجاح! يمكنك تسجيل الدخول الآن', [
+      showAlert({ title: 'تم', message: 'تم إنشاء حسابك بنجاح! يمكنك تسجيل الدخول الآن', type: 'success', buttons: [
         { text: 'حسناً', onPress: () => { setIsSignUp(false); setErrors({}); setServerError('') } },
-      ])
+      ] })
     }
   }
 
   return (
+    <>
     <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
         <View style={s.logoBox}>
@@ -187,6 +190,8 @@ export default function LoginScreen() {
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
+    {AlertComponent}
+    </>
   )
 }
 

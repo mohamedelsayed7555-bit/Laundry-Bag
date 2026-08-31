@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, Linking } from 'react-native'
+import { useEffect, useState, useRef } from 'react'
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Linking } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import MapView, { Marker } from 'react-native-maps'
 import { useAuth } from '../../src/contexts/AuthContext'
+import { useCustomAlert } from '../../src/components/CustomAlert'
 import { supabase } from '../../src/lib/supabase'
 import { colors } from '../../src/theme'
 import { CANCELLABLE_STATUSES } from '../../src/shared/types'
@@ -27,6 +29,7 @@ export default function OrderDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const { profile } = useAuth()
   const router = useRouter()
+  const { showAlert, AlertComponent } = useCustomAlert()
   const [order, setOrder] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [showRating, setShowRating] = useState(false)
@@ -34,6 +37,8 @@ export default function OrderDetailsScreen() {
   const [ratingDriver, setRatingDriver] = useState(0)
   const [ratingNote, setRatingNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [driverLoc, setDriverLoc] = useState<{ lat: number; lng: number } | null>(null)
+  const mapRef = useRef<MapView>(null)
 
   useEffect(() => {
     loadOrder()
@@ -43,6 +48,27 @@ export default function OrderDetailsScreen() {
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [id])
+
+  useEffect(() => {
+    if (!order?.driver_id || !['assigned', 'picked_up', 'delivering'].includes(order?.status)) {
+      setDriverLoc(null)
+      return
+    }
+    supabase.from('driver_locations').select('lat, lng').eq('driver_id', order.driver_id).single()
+      .then(({ data }) => { if (data) setDriverLoc(data) })
+
+    const ch = supabase
+      .channel(`driver-loc-${order.driver_id}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'driver_locations',
+        filter: `driver_id=eq.${order.driver_id}`,
+      }, (payload: any) => {
+        const loc = payload.new
+        if (loc?.lat && loc?.lng) setDriverLoc({ lat: loc.lat, lng: loc.lng })
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [order?.driver_id, order?.status])
 
   async function loadOrder() {
     const { data } = await supabase
@@ -55,7 +81,7 @@ export default function OrderDetailsScreen() {
   }
 
   async function handleCancel() {
-    Alert.alert('إلغاء الطلب', 'هل أنت متأكد من إلغاء هذا الطلب؟', [
+    showAlert({ title: 'إلغاء الطلب', message: 'هل أنت متأكد من إلغاء هذا الطلب؟', type: 'confirm', buttons: [
       { text: 'لا', style: 'cancel' },
       {
         text: 'نعم، إلغاء', style: 'destructive', onPress: async () => {
@@ -64,15 +90,15 @@ export default function OrderDetailsScreen() {
             cancellation_reason: 'إلغاء بواسطة العميل',
             cancelled_at: new Date().toISOString(),
           }).eq('id', id)
-          if (error) Alert.alert('خطأ', 'حدث خطأ أثناء الإلغاء')
+          if (error) showAlert({ title: 'خطأ', message: 'حدث خطأ أثناء الإلغاء', type: 'error' })
           else loadOrder()
         }
       },
-    ])
+    ] })
   }
 
   async function handleRate() {
-    if (ratingService === 0) { Alert.alert('خطأ', 'اختر تقييم الخدمة'); return }
+    if (ratingService === 0) { showAlert({ title: 'خطأ', message: 'اختر تقييم الخدمة', type: 'error' }); return }
     setSubmitting(true)
     const { error } = await supabase.from('orders').update({
       rating_service: ratingService,
@@ -81,9 +107,24 @@ export default function OrderDetailsScreen() {
       rated_at: new Date().toISOString(),
     }).eq('id', id)
     setSubmitting(false)
-    if (error) Alert.alert('خطأ', 'حدث خطأ')
+    if (error) showAlert({ title: 'خطأ', message: 'حدث خطأ', type: 'error' })
     else { setShowRating(false); loadOrder() }
   }
+
+  function getDistance(lat1: number, lng1: number, lat2: number, lng2: number) {
+    const R = 6371
+    const dLat = (lat2 - lat1) * Math.PI / 180
+    const dLng = (lng2 - lng1) * Math.PI / 180
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  }
+
+  const customerLat = order?.delivery_location?.lat
+  const customerLng = order?.delivery_location?.lng
+  const distanceKm = driverLoc && customerLat && customerLng
+    ? getDistance(driverLoc.lat, driverLoc.lng, customerLat, customerLng)
+    : null
+  const etaMinutes = distanceKm !== null ? Math.max(1, Math.round(distanceKm / 0.5)) : null
 
   if (loading) return <View style={s.container}><Text style={s.loadingText}>جاري التحميل...</Text></View>
   if (!order) return <View style={s.container}><Text style={s.loadingText}>الطلب غير موجود</Text></View>
@@ -93,6 +134,7 @@ export default function OrderDetailsScreen() {
   const canRate = order.status === 'delivered' && !order.rated_at
 
   return (
+    <>
     <ScrollView style={s.container} contentContainerStyle={s.content}>
       <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
         <Text style={s.backText}>→ رجوع</Text>
@@ -129,6 +171,63 @@ export default function OrderDetailsScreen() {
         </View>
       )}
 
+      {driverLoc && ['assigned', 'picked_up', 'delivering'].includes(order.status) && (
+        <View style={s.trackingCard}>
+          <Text style={s.sectionTitle}>تتبع السائق</Text>
+          <View style={s.mapWrapper}>
+            <MapView
+              ref={mapRef}
+              style={s.map}
+              initialRegion={{
+                latitude: driverLoc.lat,
+                longitude: driverLoc.lng,
+                latitudeDelta: 0.03,
+                longitudeDelta: 0.03,
+              }}
+              region={driverLoc ? {
+                latitude: (driverLoc.lat + (customerLat ?? driverLoc.lat)) / 2,
+                longitude: (driverLoc.lng + (customerLng ?? driverLoc.lng)) / 2,
+                latitudeDelta: Math.max(0.015, Math.abs(driverLoc.lat - (customerLat ?? driverLoc.lat)) * 2.5),
+                longitudeDelta: Math.max(0.015, Math.abs(driverLoc.lng - (customerLng ?? driverLoc.lng)) * 2.5),
+              } : undefined}
+              scrollEnabled={false}
+              zoomEnabled={false}
+            >
+              <Marker
+                coordinate={{ latitude: driverLoc.lat, longitude: driverLoc.lng }}
+                title={order.driver?.name ?? 'السائق'}
+                pinColor="#3b82f6"
+              />
+              {customerLat && customerLng && (
+                <Marker
+                  coordinate={{ latitude: customerLat, longitude: customerLng }}
+                  title="موقعك"
+                  pinColor="#10b981"
+                />
+              )}
+            </MapView>
+          </View>
+          <View style={s.etaRow}>
+            {distanceKm !== null && (
+              <View style={s.etaItem}>
+                <Text style={s.etaValue}>{distanceKm < 1 ? `${Math.round(distanceKm * 1000)} م` : `${distanceKm.toFixed(1)} كم`}</Text>
+                <Text style={s.etaLabel}>المسافة</Text>
+              </View>
+            )}
+            {etaMinutes !== null && (
+              <View style={s.etaItem}>
+                <Text style={s.etaValue}>{etaMinutes} د</Text>
+                <Text style={s.etaLabel}>الوقت المتوقع</Text>
+              </View>
+            )}
+            <View style={s.etaItem}>
+              <Text style={s.etaValue}>{statusConfig[order.status]?.icon}</Text>
+              <Text style={s.etaLabel}>{statusConfig[order.status]?.label}</Text>
+            </View>
+          </View>
+        </View>
+      )}
+
       <View style={s.detailsCard}>
         <Text style={s.sectionTitle}>تفاصيل الطلب</Text>
         <DetailRow label="الخدمة" value={serviceLabel[order.service_type] ?? order.service_type} />
@@ -140,6 +239,12 @@ export default function OrderDetailsScreen() {
         <DetailRow label="التاريخ" value={new Date(order.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })} />
         {order.notes && <DetailRow label="ملاحظات" value={order.notes} />}
       </View>
+
+      {['pending', 'assigned'].includes(order.status) && (
+        <TouchableOpacity style={s.editBtn} onPress={() => router.push(`/edit-order/${order.id}`)}>
+          <Text style={s.editBtnText}>✏️ تعديل الطلب</Text>
+        </TouchableOpacity>
+      )}
 
       {order.driver && (
         <View style={s.detailsCard}>
@@ -234,6 +339,8 @@ export default function OrderDetailsScreen() {
         </View>
       )}
     </ScrollView>
+    {AlertComponent}
+    </>
   )
 }
 
@@ -322,4 +429,21 @@ const s = StyleSheet.create({
   },
   noCancelText: { fontSize: 14, fontWeight: '700', color: colors.warning, marginBottom: 6 },
   noCancelSub: { fontSize: 12, color: colors.navy[300], lineHeight: 18 },
+
+  editBtn: {
+    backgroundColor: colors.navy[800], borderRadius: 16, padding: 16, alignItems: 'center', marginBottom: 16,
+    borderWidth: 1.5, borderColor: colors.primary,
+  },
+  editBtnText: { color: colors.primary, fontSize: 15, fontWeight: '700' },
+
+  trackingCard: {
+    backgroundColor: colors.navy[800], borderRadius: 20, padding: 20,
+    borderWidth: 1, borderColor: colors.navy[700], marginBottom: 16, overflow: 'hidden',
+  },
+  mapWrapper: { borderRadius: 14, overflow: 'hidden', height: 200, marginBottom: 14 },
+  map: { flex: 1 },
+  etaRow: { flexDirection: 'row', justifyContent: 'space-around' },
+  etaItem: { alignItems: 'center', gap: 4 },
+  etaValue: { fontSize: 18, fontWeight: '800', color: '#fff' },
+  etaLabel: { fontSize: 11, color: colors.navy[300] },
 })

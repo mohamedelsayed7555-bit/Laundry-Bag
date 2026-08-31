@@ -1,13 +1,15 @@
 import { useState } from 'react'
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, KeyboardAvoidingView, Platform, ScrollView, Animated } from 'react-native'
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Animated } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../src/contexts/AuthContext'
 import { supabase } from '../src/lib/supabase'
 import { colors } from '../src/theme'
+import { useCustomAlert } from '../src/components/CustomAlert'
 
 export default function EditProfileScreen() {
   const { profile, refreshProfile } = useAuth()
   const router = useRouter()
+  const { showAlert, AlertComponent } = useCustomAlert()
   const [name, setName] = useState(profile?.name ?? '')
   const [phone, setPhone] = useState(profile?.phone ?? '')
   const [saving, setSaving] = useState(false)
@@ -32,14 +34,15 @@ export default function EditProfileScreen() {
     }).eq('id', profile.id)
     setSaving(false)
     if (error) {
-      Alert.alert('خطأ', 'حدث خطأ أثناء التحديث')
+      showAlert({ title: 'خطأ', message: 'حدث خطأ أثناء التحديث', type: 'error' })
     } else {
       await refreshProfile()
-      Alert.alert('تم', 'تم تحديث البيانات بنجاح', [{ text: 'حسناً', onPress: () => router.back() }])
+      showAlert({ title: 'تم', message: 'تم تحديث البيانات بنجاح', type: 'success', buttons: [{ text: 'حسناً', onPress: () => router.back() }] })
     }
   }
 
   return (
+    <>
     <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView contentContainerStyle={s.content}>
         <View style={s.headerRow}>
@@ -76,6 +79,8 @@ export default function EditProfileScreen() {
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
+    {AlertComponent}
+    </>
   )
 }
 

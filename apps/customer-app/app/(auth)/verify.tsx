@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react'
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, KeyboardAvoidingView, Platform } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
+import { useCustomAlert } from '../../src/components/CustomAlert'
 import { colors } from '../../src/theme'
 
 const OTP_LENGTH = 6
@@ -13,6 +14,7 @@ export default function VerifyScreen() {
   const inputs = useRef<(TextInput | null)[]>([])
   const { verifyOtp, signInWithOtp } = useAuth()
   const router = useRouter()
+  const { showAlert, AlertComponent } = useCustomAlert()
 
   const handleChange = (text: string, index: number) => {
     const newOtp = [...otp]
@@ -32,7 +34,7 @@ export default function VerifyScreen() {
     const { error } = await verifyOtp(email, token)
     setLoading(false)
     if (error) {
-      Alert.alert('خطأ', 'كود التفعيل غير صحيح')
+      showAlert({ title: 'خطأ', message: 'كود التفعيل غير صحيح', type: 'error' })
       setOtp(Array(OTP_LENGTH).fill(''))
       inputs.current[0]?.focus()
     }
@@ -41,10 +43,11 @@ export default function VerifyScreen() {
   const handleResend = async () => {
     if (!email) return
     const { error } = await signInWithOtp(email)
-    Alert.alert(error ? 'خطأ' : 'تم', error ?? 'تم إرسال كود جديد')
+    showAlert({ title: error ? 'خطأ' : 'تم', message: error ?? 'تم إرسال كود جديد', type: error ? 'error' : 'success' })
   }
 
   return (
+    <>
     <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={s.content}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
@@ -78,6 +81,8 @@ export default function VerifyScreen() {
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
+    {AlertComponent}
+    </>
   )
 }
 

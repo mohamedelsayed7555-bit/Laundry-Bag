@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ScrollView, Image, Platform, ActivityIndicator } from 'react-native'
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Image, Platform, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../src/contexts/AuthContext'
+import { useCustomAlert } from '../src/components/CustomAlert'
 import { supabase } from '../src/lib/supabase'
 import { colors } from '../src/theme'
 import * as ImagePicker from 'expo-image-picker'
@@ -9,6 +10,7 @@ import * as ImagePicker from 'expo-image-picker'
 export default function EditProfileScreen() {
   const { profile, refreshProfile } = useAuth()
   const router = useRouter()
+  const { showAlert, AlertComponent } = useCustomAlert()
   const [name, setName] = useState(profile?.name ?? '')
   const [phone, setPhone] = useState(profile?.phone ?? '')
   const [saving, setSaving] = useState(false)
@@ -31,7 +33,7 @@ export default function EditProfileScreen() {
   async function pickImage() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
     if (status !== 'granted') {
-      Alert.alert('صلاحية', 'يرجى السماح بالوصول للصور من الإعدادات')
+      showAlert({ title: 'صلاحية', message: 'يرجى السماح بالوصول للصور من الإعدادات', type: 'warning' })
       return
     }
 
@@ -60,7 +62,7 @@ export default function EditProfileScreen() {
         .upload(path, arrayBuffer, { upsert: true, contentType: `image/${ext}` })
 
       if (uploadError) {
-        Alert.alert('خطأ', 'فشل رفع الصورة')
+        showAlert({ title: 'خطأ', message: 'فشل رفع الصورة', type: 'error' })
         setUploading(false)
         return
       }
@@ -71,9 +73,9 @@ export default function EditProfileScreen() {
       await supabase.from('users').update({ avatar_url: url }).eq('id', profile!.id)
       setAvatarUrl(url)
       await refreshProfile()
-      Alert.alert('تم', 'تم تحديث الصورة الشخصية')
+      showAlert({ title: 'تم', message: 'تم تحديث الصورة الشخصية', type: 'success' })
     } catch {
-      Alert.alert('خطأ', 'حدث خطأ أثناء رفع الصورة')
+      showAlert({ title: 'خطأ', message: 'حدث خطأ أثناء رفع الصورة', type: 'error' })
     }
     setUploading(false)
   }
@@ -93,44 +95,45 @@ export default function EditProfileScreen() {
     }).eq('id', profile.id)
     setSaving(false)
     if (error) {
-      Alert.alert('خطأ', 'حدث خطأ أثناء التحديث')
+      showAlert({ title: 'خطأ', message: 'حدث خطأ أثناء التحديث', type: 'error' })
     } else {
       await refreshProfile()
-      Alert.alert('تم', 'تم تحديث البيانات بنجاح')
+      showAlert({ title: 'تم', message: 'تم تحديث البيانات بنجاح', type: 'success' })
     }
   }
 
   async function handleChangePassword() {
     if (newPassword.length < 6) {
-      Alert.alert('خطأ', 'كلمة المرور يجب أن تكون 6 أحرف على الأقل')
+      showAlert({ title: 'خطأ', message: 'كلمة المرور يجب أن تكون 6 أحرف على الأقل', type: 'error' })
       return
     }
     if (newPassword !== confirmPassword) {
-      Alert.alert('خطأ', 'كلمة المرور غير متطابقة')
+      showAlert({ title: 'خطأ', message: 'كلمة المرور غير متطابقة', type: 'error' })
       return
     }
     setSavingPassword(true)
     const { error } = await supabase.auth.updateUser({ password: newPassword })
     setSavingPassword(false)
     if (error) {
-      Alert.alert('خطأ', error.message || 'حدث خطأ')
+      showAlert({ title: 'خطأ', message: error.message || 'حدث خطأ', type: 'error' })
     } else {
       setNewPassword('')
       setConfirmPassword('')
       setShowPassword(false)
-      Alert.alert('تم', 'تم تغيير كلمة المرور بنجاح')
+      showAlert({ title: 'تم', message: 'تم تغيير كلمة المرور بنجاح', type: 'success' })
     }
   }
 
   async function handleDeleteAccount() {
-    Alert.alert(
-      'حذف الحساب',
-      'هل أنت متأكد؟ سيتم حذف حسابك نهائياً ولن تتمكن من استرجاعه.',
-      [
+    showAlert({
+      title: 'حذف الحساب',
+      message: 'هل أنت متأكد؟ سيتم حذف حسابك نهائياً ولن تتمكن من استرجاعه.',
+      type: 'confirm',
+      buttons: [
         { text: 'إلغاء', style: 'cancel' },
         {
           text: 'حذف نهائي', style: 'destructive', onPress: () => {
-            Alert.alert('تأكيد أخير', 'هذا الإجراء لا يمكن التراجع عنه!', [
+            showAlert({ title: 'تأكيد أخير', message: 'هذا الإجراء لا يمكن التراجع عنه!', type: 'confirm', buttons: [
               { text: 'تراجع', style: 'cancel' },
               {
                 text: 'احذف حسابي', style: 'destructive', onPress: async () => {
@@ -140,11 +143,11 @@ export default function EditProfileScreen() {
                   router.replace('/')
                 }
               },
-            ])
+            ] })
           }
         },
-      ]
-    )
+      ],
+    })
   }
 
   const passwordStrength = newPassword.length >= 12 ? 4 : newPassword.length >= 8 ? 3 : newPassword.length >= 6 ? 2 : newPassword.length > 0 ? 1 : 0
@@ -152,6 +155,7 @@ export default function EditProfileScreen() {
   const strengthColor = ['', colors.danger, colors.warning, colors.primary, colors.success][passwordStrength]
 
   return (
+    <>
     <ScrollView style={s.container} contentContainerStyle={s.content}>
       <View style={s.headerRow}>
         <TouchableOpacity onPress={() => router.back()}>
@@ -269,6 +273,8 @@ export default function EditProfileScreen() {
 
       <View style={{ height: 40 }} />
     </ScrollView>
+    {AlertComponent}
+    </>
   )
 }
 

@@ -68,6 +68,32 @@ export default function SubscriptionsPage() {
       start_date: now.toISOString().split('T')[0],
       end_date: endDate.toISOString().split('T')[0],
     }).eq('id', sub.id)
+
+    const planName = sub.plans?.name ?? 'الباقة'
+    await supabase.from('notifications').insert({
+      user_id: sub.user_id,
+      title: 'تم تفعيل اشتراكك',
+      body: `تم قبول وتفعيل اشتراكك في باقة ${planName}. يمكنك الآن إنشاء طلباتك.`,
+      type: 'system',
+      data: { subscription_id: sub.id },
+      sent_at: new Date().toISOString(),
+    })
+
+    const { data: userData } = await supabase.from('users').select('fcm_token').eq('id', sub.user_id).single()
+    if (userData?.fcm_token) {
+      fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: userData.fcm_token,
+          title: 'تم تفعيل اشتراكك ✅',
+          body: `تم قبول وتفعيل اشتراكك في باقة ${planName}. يمكنك الآن إنشاء طلباتك.`,
+          sound: 'default',
+          data: { type: 'subscription', subscription_id: sub.id },
+        }),
+      }).catch(() => {})
+    }
+
     loadSubs()
     setDetail(null)
     toast('تم تفعيل الاشتراك بنجاح')

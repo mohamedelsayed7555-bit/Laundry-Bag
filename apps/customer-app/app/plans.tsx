@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../src/contexts/AuthContext'
+import { useCustomAlert } from '../src/components/CustomAlert'
 import { supabase } from '../src/lib/supabase'
 import { colors } from '../src/theme'
 
@@ -55,6 +56,7 @@ const paymentMethods = [
 export default function PlansScreen() {
   const { profile } = useAuth()
   const router = useRouter()
+  const { showAlert, AlertComponent } = useCustomAlert()
   const [plans, setPlans] = useState<Plan[]>([])
   const [activeSub, setActiveSub] = useState<Subscription | null>(null)
   const [pendingSub, setPendingSub] = useState<Subscription | null>(null)
@@ -69,7 +71,7 @@ export default function PlansScreen() {
   async function loadData() {
     const { data: plansData } = await supabase
       .from('plans')
-      .select('*')
+      .select('id, name, items_limit, monthly_price, features, is_active')
       .eq('is_active', true)
       .order('monthly_price', { ascending: true })
     setPlans((plansData ?? []) as Plan[])
@@ -96,11 +98,11 @@ export default function PlansScreen() {
   async function handleSubscribe(plan: Plan) {
     if (!profile) return
     if (activeSub) {
-      Alert.alert('تنبيه', 'لديك اشتراك نشط بالفعل')
+      showAlert({ title: 'تنبيه', message: 'لديك اشتراك نشط بالفعل', type: 'warning' })
       return
     }
     if (pendingSub) {
-      Alert.alert('تنبيه', 'لديك طلب اشتراك قيد المراجعة بالفعل')
+      showAlert({ title: 'تنبيه', message: 'لديك طلب اشتراك قيد المراجعة بالفعل', type: 'warning' })
       return
     }
     doSubscribe(plan)
@@ -110,10 +112,11 @@ export default function PlansScreen() {
     const dur = durations.find(d => d.key === selectedDuration)!
     const price = plan[dur.priceKey]
 
-    Alert.alert(
-      `اشتراك ${plan.name}`,
-      `المدة: ${dur.label}\nالسعر: ${price} ج.م\n${plan.items_per_month} قطعة/شهر\n\nسيتم مراجعة طلبك وتفعيله من الإدارة بعد الدفع`,
-      [
+    showAlert({
+      title: `اشتراك ${plan.name}`,
+      message: `المدة: ${dur.label}\nالسعر: ${price} ج.م\n${plan.items_per_month} قطعة/شهر\n\nسيتم مراجعة طلبك وتفعيله من الإدارة بعد الدفع`,
+      type: 'confirm',
+      buttons: [
         { text: 'إلغاء', style: 'cancel' },
         {
           text: 'إرسال طلب اشتراك',
@@ -133,14 +136,14 @@ export default function PlansScreen() {
             })
             setSubscribing(false)
             if (error) {
-              Alert.alert('خطأ', 'حدث خطأ أثناء إرسال الطلب')
+              showAlert({ title: 'خطأ', message: 'حدث خطأ أثناء إرسال الطلب', type: 'error' })
             } else {
-              Alert.alert('تم', 'تم إرسال طلب الاشتراك! سيتم تفعيله بعد مراجعة الإدارة والدفع 📋', [{ text: 'حسناً', onPress: () => loadData() }])
+              showAlert({ title: 'تم', message: 'تم إرسال طلب الاشتراك! سيتم تفعيله بعد مراجعة الإدارة والدفع', type: 'success', buttons: [{ text: 'حسناً', onPress: () => loadData() }] })
             }
           },
         },
-      ]
-    )
+      ],
+    })
   }
 
   const durationObj = durations.find(d => d.key === selectedDuration)!
@@ -154,6 +157,7 @@ export default function PlansScreen() {
   }
 
   return (
+    <>
     <ScrollView style={s.container} contentContainerStyle={s.content}>
       {/* Header */}
       <View style={s.headerRow}>
@@ -198,23 +202,27 @@ export default function PlansScreen() {
         </View>
       )}
 
-      {/* Duration Selector */}
-      <Text style={s.sectionTitle}>اختر مدة الاشتراك</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.durScroll} contentContainerStyle={s.durRow}>
-        {durations.map(d => (
-          <TouchableOpacity
-            key={d.key}
-            style={[s.durChip, selectedDuration === d.key && s.durChipActive]}
-            onPress={() => setSelectedDuration(d.key)}
-          >
-            <Text style={[s.durLabel, selectedDuration === d.key && s.durLabelActive]}>{d.label}</Text>
-            {d.save && <Text style={s.durSave}>وفّر {d.save}</Text>}
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      {/* Duration Selector - only show if no active subscription */}
+      {!activeSub && (
+        <>
+          <Text style={s.sectionTitle}>اختر مدة الاشتراك</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.durScroll} contentContainerStyle={s.durRow}>
+            {durations.map(d => (
+              <TouchableOpacity
+                key={d.key}
+                style={[s.durChip, selectedDuration === d.key && s.durChipActive]}
+                onPress={() => setSelectedDuration(d.key)}
+              >
+                <Text style={[s.durLabel, selectedDuration === d.key && s.durLabelActive]}>{d.label}</Text>
+                {d.save && <Text style={s.durSave}>وفّر {d.save}</Text>}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </>
+      )}
 
-      {/* Plans */}
-      {plans.map(plan => {
+      {/* Plans - only show if no active subscription */}
+      {!activeSub && plans.map(plan => {
         const price = plan[durationObj.priceKey]
         const tierColor = tierColors[plan.tier] ?? colors.primary
         const isCurrentPlan = activeSub?.plan_id === plan.id
@@ -252,8 +260,16 @@ export default function PlansScreen() {
         )
       })}
 
+      {activeSub && (
+        <View style={{ alignItems: 'center', marginTop: 16 }}>
+          <Text style={{ color: colors.navy[400], fontSize: 13, textAlign: 'center' }}>لديك اشتراك نشط. لتغيير الباقة تواصل مع الإدارة.</Text>
+        </View>
+      )}
+
       <View style={{ height: 40 }} />
     </ScrollView>
+    {AlertComponent}
+    </>
   )
 }
 

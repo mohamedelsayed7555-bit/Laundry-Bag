@@ -107,4 +107,5 @@ export const ROUTE_PERMISSIONS: Record<string, string> = {
   '/reports': 'reports.view',
   '/audit': 'audit.view',
   '/settings': 'settings.view',
+  '/notifications': 'customers.view',
 }

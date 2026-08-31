@@ -73,14 +73,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  async function fetchProfile(session: Session) {
+  async function fetchProfile(session: Session, checkDeactivation = true) {
     const { data } = await supabase
       .from('users')
-      .select('*')
+      .select('id, name, phone, email, role, is_active, avatar_url, vehicle_type, vehicle_number, fcm_token')
       .eq('id', session.user.id)
       .single()
 
-    if (data && data.is_active === false) {
+    if (checkDeactivation && data && data.is_active === false && data.role === 'driver') {
       await supabase.auth.signOut()
       setState(s => ({ ...s, session: null, profile: null, loading: false }))
       return
@@ -136,7 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function refreshProfile() {
     if (state.session) {
-      await fetchProfile(state.session)
+      await fetchProfile(state.session, false)
     }
   }
 
