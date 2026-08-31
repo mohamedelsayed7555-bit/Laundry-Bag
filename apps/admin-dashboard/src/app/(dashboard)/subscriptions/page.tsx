@@ -60,7 +60,7 @@ export default function SubscriptionsPage() {
   const { toast } = useToast()
 
   useEffect(() => {
-    loadSubs()
+    supabase.rpc('expire_subscriptions').then(() => loadSubs())
     loadOptions()
     const ch = supabase.channel('subs-rt')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'subscriptions' }, () => loadSubs())
@@ -109,6 +109,8 @@ export default function SubscriptionsPage() {
     e.preventDefault()
     if (!form.user_id || !form.plan_id) { toast('اختر العميل والباقة', 'error'); return }
     setSaving(true)
+    const { data: existing } = await supabase.from('subscriptions').select('id').eq('user_id', form.user_id).eq('plan_id', form.plan_id).eq('status', 'active').maybeSingle()
+    if (existing) { setSaving(false); toast('العميل عنده اشتراك نشط في نفس الباقة بالفعل', 'error'); return }
     const totalPaid = getPlanPrice(form.plan_id, form.duration)
     const itemsLimit = getPlanItemsLimit(form.plan_id, form.duration)
     const { error } = await supabase.from('subscriptions').insert({
@@ -195,6 +197,10 @@ export default function SubscriptionsPage() {
   }
 
   async function deleteSub(id: string) {
+    const sub = subs.find(s => s.id === id)
+    if (sub?.status === 'active') { toast('لا يمكن حذف اشتراك نشط — قم بإلغائه أولاً', 'error'); return }
+    const { data: linkedOrders } = await supabase.from('orders').select('id').eq('subscription_id', id).not('status', 'in', '("delivered","cancelled","refunded")').limit(1)
+    if (linkedOrders && linkedOrders.length > 0) { toast('لا يمكن الحذف — يوجد طلبات مرتبطة لم تكتمل بعد', 'error'); return }
     if (!confirm('هل أنت متأكد من حذف هذا الاشتراك؟')) return
     const { error } = await supabase.from('subscriptions').delete().eq('id', id)
     if (!error) { loadSubs(); setDetail(null); toast('تم حذف الاشتراك', 'warning') }

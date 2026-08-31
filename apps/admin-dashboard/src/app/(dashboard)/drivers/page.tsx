@@ -14,6 +14,8 @@ import Tooltip from '@/components/ui/Tooltip'
 import PermissionGate from '@/components/ui/PermissionGate'
 import { isValidEgyptianPhone, isValidEmail } from '@/lib/utils'
 
+const PAGE_SIZE = 20
+
 export default function DriversPage() {
   const [drivers, setDrivers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -23,13 +25,23 @@ export default function DriversPage() {
   const [detailItem, setDetailItem] = useState<any>(null)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ name: '', phone: '', email: '', vehicle_type: 'motorcycle', vehicle_number: '' })
+  const [page, setPage] = useState(0)
+  const [totalCount, setTotalCount] = useState(0)
   const { toast } = useToast()
 
-  useEffect(() => { loadDrivers() }, [])
+  useEffect(() => { loadDrivers() }, [page, search])
 
   async function loadDrivers() {
-    const { data } = await supabase.from('users').select('id, name, phone, email, vehicle_type, vehicle_number, is_active, created_at').eq('role', 'driver').order('created_at', { ascending: false })
+    setLoading(true)
+    const from = page * PAGE_SIZE
+    const to = from + PAGE_SIZE - 1
+    let query = supabase.from('users').select('id, name, phone, email, vehicle_type, vehicle_number, is_active, created_at', { count: 'exact' }).eq('role', 'driver')
+    if (search) {
+      query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%`)
+    }
+    const { data, count } = await query.order('created_at', { ascending: false }).range(from, to)
     setDrivers(data ?? [])
+    setTotalCount(count ?? 0)
     setLoading(false)
   }
 
@@ -80,7 +92,7 @@ export default function DriversPage() {
     setEditItem(item)
   }
 
-  const filtered = drivers.filter(d => { if (!search) return true; const s = search.toLowerCase(); return d.name?.toLowerCase().includes(s) || d.phone?.includes(s) })
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE)
   const activeDrivers = drivers.filter(d => d.is_active).length
   const vehicleLabel: Record<string, string> = { motorcycle: 'موتوسيكل', car: 'سيارة', van: 'فان' }
 
@@ -139,7 +151,7 @@ export default function DriversPage() {
       <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Truck className="w-5 h-5 text-orange-500" /> إدارة السائقين</h2>
-          <p className="text-sm text-gray-400 mt-0.5">{drivers.length} سائق</p>
+          <p className="text-sm text-gray-400 mt-0.5">{totalCount} سائق</p>
         </div>
         <button onClick={() => { setForm({ name: '', phone: '', email: '', vehicle_type: 'motorcycle', vehicle_number: '' }); setShowAdd(true) }}
           className="flex items-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:shadow-glow-green transition-all duration-300">
@@ -148,20 +160,30 @@ export default function DriversPage() {
       </motion.div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatCard label="إجمالي السائقين" value={drivers.length} icon={Truck} color="blue" index={0} />
+        <StatCard label="إجمالي السائقين" value={totalCount} icon={Truck} color="blue" index={0} />
         <StatCard label="متاح" value={activeDrivers} icon={CheckCircle} color="green" index={1} />
         <StatCard label="في مهمة" value={0} icon={Clock} color="orange" index={2} />
-        <StatCard label="غير متاح" value={drivers.length - activeDrivers} icon={XCircle} color="red" index={3} />
+        <StatCard label="غير متاح" value={totalCount - activeDrivers} icon={XCircle} color="red" index={3} />
       </div>
 
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className="relative max-w-md">
         <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input type="text" placeholder="بحث بالاسم أو الهاتف..." value={search} onChange={e => setSearch(e.target.value)}
+        <input type="text" placeholder="بحث بالاسم أو الهاتف..." value={search} onChange={e => { setSearch(e.target.value); setPage(0) }}
           className="w-full pr-10 pl-4 py-2.5 bg-white border border-surface-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all" />
       </motion.div>
 
       {loading ? <TableSkeleton rows={5} cols={5} />
-        : <DataTable columns={columns} data={filtered} emptyMessage="لا يوجد سائقين" />}
+        : <DataTable columns={columns} data={drivers} emptyMessage="لا يوجد سائقين" />}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-4">
+          <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
+            className="px-3 py-1.5 text-sm rounded-lg border border-surface-border disabled:opacity-40 hover:bg-surface-muted transition-colors">السابق</button>
+          <span className="text-sm text-gray-500">{page + 1} / {totalPages}</span>
+          <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}
+            className="px-3 py-1.5 text-sm rounded-lg border border-surface-border disabled:opacity-40 hover:bg-surface-muted transition-colors">التالي</button>
+        </div>
+      )}
 
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="سائق جديد">
         <form onSubmit={handleAdd} className="space-y-4">

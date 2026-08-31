@@ -53,42 +53,44 @@ export default function FinancePage() {
   async function load() {
     const { from, to } = getDateRange()
 
-    // Load orders
+    // Stats from server-side aggregation (accurate, no row limit)
+    const { data: serverStats } = await supabase.rpc('get_finance_stats', {
+      date_from: from ?? undefined,
+      date_to: to ?? undefined,
+    })
+    if (serverStats) {
+      const s = serverStats as any
+      setStats({
+        revenue: (Number(s.order_revenue) || 0) + (Number(s.subs_revenue) || 0),
+        paid: Number(s.order_paid) || 0,
+        unpaid: (Number(s.order_revenue) || 0) - (Number(s.order_paid) || 0),
+        ordersCount: Number(s.orders_count) || 0,
+        subsRevenue: Number(s.subs_revenue) || 0,
+        subsCount: Number(s.subs_count) || 0,
+        deliveryFees: Number(s.delivery_fees) || 0,
+      })
+    }
+
+    // Load rows for the table (paginated display)
     let oQuery = supabase.from('orders')
       .select('id, order_number, status, total, delivery_fee, payment_status, payment_method, subscription_id, created_at, customer:users!orders_customer_id_fkey(name, customer_code)')
       .order('created_at', { ascending: false })
-      .limit(500)
+      .limit(200)
     if (from) oQuery = oQuery.gte('created_at', from)
     if (to) oQuery = oQuery.lte('created_at', to)
     const { data: ordersData } = await oQuery
 
-    // Load subscriptions
     let sQuery = supabase.from('subscriptions')
       .select('id, status, total_paid, created_at, user:users!subscriptions_user_id_fkey(name, customer_code), plan:plans(name)')
+      .not('status', 'in', '("pending","cancelled")')
       .order('created_at', { ascending: false })
-      .limit(500)
+      .limit(200)
     if (from) sQuery = sQuery.gte('created_at', from)
     if (to) sQuery = sQuery.lte('created_at', to)
     const { data: subsData } = await sQuery
 
     const allOrders = ordersData ?? []
-    const activeOrders = allOrders.filter((o: any) => !['cancelled', 'refunded'].includes(o.status))
-    const allSubs = (subsData ?? []).filter((s: any) => !['pending', 'cancelled'].includes(s.status))
-
-    const orderRevenue = activeOrders.reduce((s, o) => s + (o.total ?? 0), 0)
-    const paid = activeOrders.filter(o => o.payment_status === 'confirmed').reduce((s, o) => s + (o.total ?? 0), 0)
-    const subsRevenue = allSubs.reduce((s: number, sub: any) => s + (Number(sub.total_paid) || 0), 0)
-    const deliveryFees = activeOrders.reduce((s, o) => s + (o.delivery_fee ?? 0), 0)
-
-    setStats({
-      revenue: orderRevenue + subsRevenue,
-      paid,
-      unpaid: orderRevenue - paid,
-      ordersCount: activeOrders.length,
-      subsRevenue,
-      subsCount: allSubs.length,
-      deliveryFees,
-    })
+    const allSubs = subsData ?? []
 
     // Merge into unified rows
     const orderRows = allOrders.map((o: any) => ({

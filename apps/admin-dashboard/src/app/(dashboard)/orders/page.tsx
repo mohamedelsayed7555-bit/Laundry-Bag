@@ -50,6 +50,7 @@ export default function OrdersPage() {
   const [messages, setMessages] = useState<any[]>([])
   const [msgsLoading, setMsgsLoading] = useState(false)
   const [deliveryFeeSetting, setDeliveryFeeSetting] = useState(0)
+  const [avgPrices, setAvgPrices] = useState<Record<string, number>>({})
   const [page, setPage] = useState(0)
   const [totalCount, setTotalCount] = useState(0)
   const { toast } = useToast()
@@ -66,6 +67,15 @@ export default function OrdersPage() {
     loadDriversCustomers()
     supabase.from('settings').select('value').eq('key', 'delivery_fee').single().then(({ data }) => {
       if (data) setDeliveryFeeSetting(Number(data.value) || 0)
+    })
+    supabase.from('prices').select('service_type, price').eq('is_active', true).then(({ data }) => {
+      if (data) {
+        const grouped: Record<string, number[]> = {}
+        data.forEach((p: any) => { (grouped[p.service_type] ??= []).push(Number(p.price)) })
+        const avgs: Record<string, number> = {}
+        for (const [k, v] of Object.entries(grouped)) { avgs[k] = Math.round(v.reduce((a, b) => a + b, 0) / v.length) }
+        setAvgPrices(avgs)
+      }
     })
     const ch = supabase.channel('orders-rt')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => debouncedLoadOrders())
@@ -140,11 +150,20 @@ export default function OrdersPage() {
   }
 
   async function cancelOrder(id: string) {
+    const order = orders.find(o => o.id === id)
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'cancelled' } : o))
     setDetail(null)
     toast('تم إلغاء الطلب', 'warning')
     const { error } = await supabase.from('orders').update({ status: 'cancelled' }).eq('id', id)
-    if (error) { toast('حدث خطأ — جاري التحديث', 'error'); loadOrders() }
+    if (error) { toast('حدث خطأ — جاري التحديث', 'error'); loadOrders(); return }
+    await supabase.from('order_status_history').insert({ order_id: id, status: 'cancelled' })
+    if (order?.subscription_id && order.items_count) {
+      const { data: sub } = await supabase.from('subscriptions').select('items_used').eq('id', order.subscription_id).single()
+      if (sub) {
+        const newUsed = Math.max(0, (sub.items_used ?? 0) - order.items_count)
+        await supabase.from('subscriptions').update({ items_used: newUsed }).eq('id', order.subscription_id)
+      }
+    }
   }
 
   async function handleAddOrder(e: React.FormEvent) {
@@ -412,18 +431,27 @@ export default function OrdersPage() {
           )}
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">الخدمة <span className="text-red-400">*</span></label>
-            <select value={form.service_type} onChange={e => setForm({ ...form, service_type: e.target.value })} required className={inputClass}>
+            <select value={form.service_type} onChange={e => {
+              const st = e.target.value
+              const avg = avgPrices[st] ?? 0
+              setForm({ ...form, service_type: st, total: avg ? avg * form.items_count : form.total })
+            }} required className={inputClass}>
               <option value="wash">غسيل</option><option value="iron">كوي</option>
               <option value="wash_iron">غسيل وكوي</option><option value="dry_clean">تنظيف جاف</option>
             </select>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">عدد القطع <span className="text-red-400">*</span></label>
-            <input type="number" min={1} value={form.items_count} onChange={e => setForm({ ...form, items_count: +e.target.value })} required className={inputClass} />
+            <input type="number" min={1} value={form.items_count} onChange={e => {
+              const count = +e.target.value || 1
+              const avg = avgPrices[form.service_type] ?? 0
+              setForm({ ...form, items_count: count, total: avg ? avg * count : form.total })
+            }} required className={inputClass} />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">المبلغ (ج.م) <span className="text-red-400">*</span></label>
             <input type="number" min={0} step="0.01" value={form.total} onChange={e => setForm({ ...form, total: e.target.value === '' ? '' as any : +e.target.value })} required className={inputClass} placeholder="0.00" />
+            {avgPrices[form.service_type] && <p className="text-[10px] text-gray-400 mt-1">محسوب تلقائي (متوسط {avgPrices[form.service_type]} ج.م × {form.items_count} قطعة) — يمكنك تعديله</p>}
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">ملاحظات</label>

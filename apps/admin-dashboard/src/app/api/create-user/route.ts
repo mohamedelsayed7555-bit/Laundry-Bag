@@ -39,14 +39,16 @@ export async function POST(request: NextRequest) {
 
   if (authError) {
     console.error('Auth createUser error:', authError.message, authError)
-    const { data: listData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
-    const existingAuth = listData?.users?.find((u: any) => u.email === email)
-    if (existingAuth) {
-      await (supabaseAdmin.auth.admin as any).updateUserById(existingAuth.id, { password, user_metadata: { name, role } })
-      const updates: Record<string, any> = { name, role, email, permissions: permissions || [], is_active: true }
-      if (phone) updates.phone = phone
-      await supabaseAdmin.from('users').upsert({ id: existingAuth.id, ...updates })
-      return NextResponse.json({ success: true, id: existingAuth.id })
+    if (authError.message?.includes('already been registered') || authError.message?.includes('already exists')) {
+      const { data: listData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 50 })
+      const existingAuth = listData?.users?.find((u: any) => u.email === email)
+      if (existingAuth) {
+        await supabaseAdmin.auth.admin.updateUserById(existingAuth.id, { password, user_metadata: { name, role } })
+        const updates: Record<string, any> = { name, role, email, permissions: permissions || [], is_active: true }
+        if (phone) updates.phone = phone
+        await supabaseAdmin.from('users').upsert({ id: existingAuth.id, ...updates })
+        return NextResponse.json({ success: true, id: existingAuth.id })
+      }
     }
     return NextResponse.json({ error: authError.message }, { status: 400 })
   }
