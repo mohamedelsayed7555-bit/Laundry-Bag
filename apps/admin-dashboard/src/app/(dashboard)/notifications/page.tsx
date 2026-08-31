@@ -27,7 +27,7 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true)
   const [recipientCount, setRecipientCount] = useState<number | null>(null)
   const { toast } = useToast()
-  const { profile } = useAuth()
+  const { user: profile } = useAuth()
 
   useEffect(() => { loadHistory() }, [])
   useEffect(() => { loadRecipientCount() }, [target])
@@ -64,7 +64,7 @@ export default function NotificationsPage() {
         .eq('status', 'active')
       const ids = (subUsers ?? []).map(s => s.user_id)
       if (ids.length > 0) {
-        query = query.not('id', 'in', `(${ids.join(',')})`)
+        query = (query as any).not('id', 'in', `(${ids.join(',')})`)
       }
     }
 
@@ -106,7 +106,7 @@ export default function NotificationsPage() {
         .eq('status', 'active')
       const ids = (subUsers ?? []).map(s => s.user_id)
       if (ids.length > 0) {
-        tokenQuery = tokenQuery.not('id', 'in', `(${ids.join(',')})`)
+        tokenQuery = (tokenQuery as any).not('id', 'in', `(${ids.join(',')})`)
       }
     }
 

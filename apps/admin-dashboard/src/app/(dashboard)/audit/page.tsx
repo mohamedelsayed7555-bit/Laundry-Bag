@@ -18,7 +18,7 @@ interface AuditLog {
   entity_id: string | null
   details: any
   created_at: string
-  actor?: { name: string; avatar_url: string | null; role: string } | null
+  actor?: { name: string; avatar_url?: string | null; role: string } | null
 }
 
 const actionConfig: Record<string, { label: string; icon: typeof Plus; variant: 'success' | 'warning' | 'danger' | 'info' | 'purple' | 'neutral' }> = {
@@ -102,7 +102,11 @@ export default function AuditPage() {
 
     if (error) { console.error('audit_logs error:', error); setLoading(false); return }
 
-    setLogs(data ?? [])
+    const normalized = (data ?? []).map((d: any) => ({
+      ...d,
+      actor: Array.isArray(d.actor) ? d.actor[0] ?? null : d.actor,
+    }))
+    setLogs(normalized)
     setLoading(false)
   }
 

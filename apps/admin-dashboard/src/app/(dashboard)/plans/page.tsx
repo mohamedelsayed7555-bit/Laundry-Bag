@@ -61,7 +61,7 @@ export default function PlansPage() {
       supabase.from('plans').select('id, name, items_limit, monthly_price, features, is_active').order('monthly_price'),
       supabase.from('subscriptions').select('*, user:users!subscriptions_user_id_fkey(name), plan:plans!subscriptions_plan_id_fkey(name)').eq('status', 'active'),
     ])
-    setPlans(p.data ?? [])
+    setPlans((p.data ?? []) as any)
     setSubs(s.data ?? [])
     setLoading(false)
   }
