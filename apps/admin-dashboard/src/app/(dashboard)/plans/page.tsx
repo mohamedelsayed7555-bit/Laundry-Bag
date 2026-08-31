@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import Modal from '@/components/ui/Modal'
 import Badge from '@/components/ui/Badge'
 import { Crown, Plus, Edit2, Power, Users, Zap, Star, Gem } from 'lucide-react'
+import { PageSkeleton } from '@/components/ui/Skeleton'
 import { motion } from 'framer-motion'
 import { useToast } from '@/components/ui/Toast'
 import Tooltip from '@/components/ui/Tooltip'
@@ -181,7 +182,7 @@ export default function PlansPage() {
     </form>
   )
 
-  if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>
+  if (loading) return <PageSkeleton stats={0} tableRows={5} tableCols={4} />
 
   return (
     <PermissionGate permission="plans.manage">

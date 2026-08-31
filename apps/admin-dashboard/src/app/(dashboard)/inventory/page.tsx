@@ -6,6 +6,7 @@ import DataTable from '@/components/ui/DataTable'
 import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
 import { Package, Plus, Edit2, AlertTriangle } from 'lucide-react'
+import { TableSkeleton } from '@/components/ui/Skeleton'
 import { motion } from 'framer-motion'
 import StatCard from '@/components/ui/StatCard'
 import { useToast } from '@/components/ui/Toast'
@@ -129,7 +130,7 @@ export default function InventoryPage() {
         <StatCard label="متوفر" value={items.length - lowStock.length} icon={Package} color="green" />
       </div>
 
-      {loading ? <div className="flex items-center justify-center h-32"><div className="w-6 h-6 border-3 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>
+      {loading ? <TableSkeleton rows={4} cols={5} />
         : <DataTable columns={columns} data={items} emptyMessage="لا توجد أصناف في المخزون" />}
 
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="صنف جديد">

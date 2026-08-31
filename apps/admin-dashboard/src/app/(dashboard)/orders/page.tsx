@@ -13,6 +13,7 @@ import {
   Eye,
   ArrowRight,
 } from 'lucide-react'
+import { PageSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import Tooltip from '@/components/ui/Tooltip'
 import PermissionGate from '@/components/ui/PermissionGate'
@@ -234,9 +235,7 @@ export default function OrdersPage() {
       </motion.div>
 
       {loading ? (
-        <div className="flex items-center justify-center h-40">
-          <div className="w-7 h-7 border-[3px] border-primary-500 border-t-transparent rounded-full animate-spin" />
-        </div>
+        <PageSkeleton stats={0} tableRows={6} tableCols={6} />
       ) : (
         <DataTable columns={columns} data={filtered} emptyMessage="لا توجد طلبات" />
       )}

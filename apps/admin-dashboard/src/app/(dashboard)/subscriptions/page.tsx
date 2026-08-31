@@ -7,6 +7,7 @@ import DataTable from '@/components/ui/DataTable'
 import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
 import { Crown, Eye, Check, X } from 'lucide-react'
+import { TableSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import PermissionGate from '@/components/ui/PermissionGate'
 
@@ -174,9 +175,7 @@ export default function SubscriptionsPage() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center h-40">
-          <div className="w-7 h-7 border-[3px] border-primary-500 border-t-transparent rounded-full animate-spin" />
-        </div>
+        <TableSkeleton rows={5} cols={6} />
       ) : (
         <DataTable columns={columns} data={filtered} emptyMessage="لا توجد اشتراكات" />
       )}

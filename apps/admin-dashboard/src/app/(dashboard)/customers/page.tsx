@@ -7,6 +7,7 @@ import DataTable from '@/components/ui/DataTable'
 import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
 import { Search, Plus, Edit2, Power, Users } from 'lucide-react'
+import { TableSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import Tooltip from '@/components/ui/Tooltip'
 import PermissionGate from '@/components/ui/PermissionGate'
@@ -141,7 +142,7 @@ export default function CustomersPage() {
           className="w-full pr-10 pl-4 py-2.5 bg-white border border-surface-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all" />
       </motion.div>
 
-      {loading ? <div className="flex items-center justify-center h-32"><div className="w-7 h-7 border-[3px] border-primary-500 border-t-transparent rounded-full animate-spin" /></div>
+      {loading ? <TableSkeleton rows={5} cols={5} />
         : <DataTable columns={columns} data={filtered} emptyMessage="لا يوجد عملاء مسجلين" />}
 
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="عميل جديد">

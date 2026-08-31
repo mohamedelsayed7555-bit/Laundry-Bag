@@ -6,6 +6,7 @@ import StatCard from '@/components/ui/StatCard'
 import DataTable from '@/components/ui/DataTable'
 import Badge from '@/components/ui/Badge'
 import { DollarSign, TrendingUp, TrendingDown, CreditCard, Calendar, RotateCcw, Crown, Truck } from 'lucide-react'
+import { PageSkeleton } from '@/components/ui/Skeleton'
 import Tooltip from '@/components/ui/Tooltip'
 import PermissionGate from '@/components/ui/PermissionGate'
 import { motion } from 'framer-motion'
@@ -191,7 +192,7 @@ export default function FinancePage() {
 
   const inputClass = 'px-3 py-2 bg-white border border-surface-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 transition-all'
 
-  if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>
+  if (loading) return <PageSkeleton stats={4} tableRows={5} tableCols={5} />
 
   return (
     <PermissionGate permission="finance.view">
