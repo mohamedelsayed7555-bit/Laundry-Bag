@@ -87,8 +87,7 @@ export default function Sidebar({ collapsed, onToggleCollapse }: { collapsed?: b
   const sidebarWidth = isCollapsed ? 'w-[72px]' : 'w-[260px]'
 
   return (
-    <motion.aside
-      layout
+    <aside
       className={cn(
         'fixed right-0 top-0 h-screen flex flex-col z-50 transition-all duration-300',
         sidebarWidth
@@ -185,11 +184,9 @@ export default function Sidebar({ collapsed, onToggleCollapse }: { collapsed?: b
                     )}
                   >
                     {isActive && (
-                      <motion.div
-                        layoutId="sidebar-active"
+                      <div
                         className="absolute inset-0 rounded-xl bg-gradient-to-l from-primary-500/20 to-accent-purple/10 border border-primary-500/20"
                         style={{ boxShadow: '0 0 20px -5px rgba(0, 175, 95, 0.15)' }}
-                        transition={{ type: 'spring', duration: 0.25, bounce: 0.1 }}
                       />
                     )}
                     <span className={cn(
@@ -248,6 +245,6 @@ export default function Sidebar({ collapsed, onToggleCollapse }: { collapsed?: b
           </button>
         )}
       </div>
-    </motion.aside>
+    </aside>
   )
 }

@@ -11,6 +11,7 @@ import { TableSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import Tooltip from '@/components/ui/Tooltip'
 import PermissionGate from '@/components/ui/PermissionGate'
+import { isValidEgyptianPhone, isValidEmail } from '@/lib/utils'
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<any[]>([])
@@ -20,18 +21,27 @@ export default function CustomersPage() {
   const [editItem, setEditItem] = useState<any>(null)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ name: '', phone: '', email: '', tier: 'bronze' })
+  const [page, setPage] = useState(0)
+  const [totalCount, setTotalCount] = useState(0)
   const { toast } = useToast()
+  const PAGE_SIZE = 20
 
-  useEffect(() => { loadCustomers() }, [])
+  useEffect(() => { loadCustomers() }, [page])
 
   async function loadCustomers() {
-    const { data } = await supabase.from('users').select('id, name, phone, email, customer_code, tier, points, is_active, created_at').eq('role', 'customer').order('created_at', { ascending: false }).limit(500)
+    const { data, count } = await supabase.from('users')
+      .select('id, name, phone, email, customer_code, tier, points, is_active, created_at', { count: 'exact' })
+      .eq('role', 'customer').order('created_at', { ascending: false })
+      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
     setCustomers(data ?? [])
+    setTotalCount(count ?? 0)
     setLoading(false)
   }
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
+    if (form.phone && !isValidEgyptianPhone(form.phone)) { toast('رقم الموبايل غير صحيح — يجب أن يبدأ بـ 01 ويكون 11 رقم', 'error'); return }
+    if (form.email && !isValidEmail(form.email)) { toast('صيغة البريد الإلكتروني غير صحيحة', 'error'); return }
     setSaving(true)
     const res = await fetch('/api/users', {
       method: 'POST',
@@ -46,7 +56,17 @@ export default function CustomersPage() {
 
   async function handleEdit(e: React.FormEvent) {
     e.preventDefault()
+    if (form.phone && !isValidEgyptianPhone(form.phone)) { toast('رقم الموبايل غير صحيح — يجب أن يبدأ بـ 01 ويكون 11 رقم', 'error'); return }
+    if (form.email && !isValidEmail(form.email)) { toast('صيغة البريد الإلكتروني غير صحيحة', 'error'); return }
     setSaving(true)
+    if (form.phone) {
+      const { data: dup } = await supabase.from('users').select('id').eq('phone', form.phone).neq('id', editItem.id).maybeSingle()
+      if (dup) { setSaving(false); toast('رقم الموبايل مستخدم بالفعل', 'error'); return }
+    }
+    if (form.email) {
+      const { data: dup } = await supabase.from('users').select('id').eq('email', form.email).neq('id', editItem.id).maybeSingle()
+      if (dup) { setSaving(false); toast('البريد الإلكتروني مستخدم بالفعل', 'error'); return }
+    }
     const { error } = await supabase.from('users').update({ name: form.name, phone: form.phone, email: form.email, tier: form.tier }).eq('id', editItem.id)
     setSaving(false)
     if (!error) { setEditItem(null); loadCustomers(); toast('تم تعديل بيانات العميل') }
@@ -54,9 +74,10 @@ export default function CustomersPage() {
   }
 
   async function toggleActive(id: string, current: boolean) {
-    await supabase.from('users').update({ is_active: !current }).eq('id', id)
-    loadCustomers()
+    setCustomers(prev => prev.map(c => c.id === id ? { ...c, is_active: !current } : c))
     toast(current ? 'تم تعطيل العميل' : 'تم تفعيل العميل')
+    const { error } = await supabase.from('users').update({ is_active: !current }).eq('id', id)
+    if (error) { toast('حدث خطأ — جاري التحديث', 'error'); loadCustomers() }
   }
 
   function openEdit(item: any) {
@@ -66,7 +87,8 @@ export default function CustomersPage() {
 
   const filtered = useMemo(() => customers.filter(c => {
     if (!search) return true
-    return c.name?.includes(search) || c.phone?.includes(search) || c.customer_code?.includes(search)
+    const s = search.toLowerCase()
+    return c.name?.toLowerCase().includes(s) || c.phone?.includes(s) || c.customer_code?.toLowerCase().includes(s)
   }), [customers, search])
 
   const tierVariant = (tier: string) => {
@@ -128,7 +150,7 @@ export default function CustomersPage() {
       <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Users className="w-5 h-5 text-accent-purple" /> إدارة العملاء</h2>
-          <p className="text-sm text-gray-400 mt-0.5">{customers.length} عميل</p>
+          <p className="text-sm text-gray-400 mt-0.5">{totalCount} عميل</p>
         </div>
         <button onClick={() => { setForm({ name: '', phone: '', email: '', tier: 'bronze' }); setShowAdd(true) }}
           className="flex items-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:shadow-glow-green transition-all duration-300">
@@ -143,7 +165,28 @@ export default function CustomersPage() {
       </motion.div>
 
       {loading ? <TableSkeleton rows={5} cols={5} />
-        : <DataTable columns={columns} data={filtered} emptyMessage="لا يوجد عملاء مسجلين" />}
+        : <>
+          <DataTable columns={columns} data={filtered} emptyMessage="لا يوجد عملاء مسجلين" pageSize={PAGE_SIZE} />
+          {(() => { const tp = Math.ceil(totalCount / PAGE_SIZE); return tp > 1 ? (
+            <div className="flex items-center justify-between mt-3">
+              <span className="text-xs text-gray-400">صفحة {page + 1} من {tp}</span>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setPage(p => p - 1)} disabled={page === 0}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-muted disabled:opacity-30 disabled:cursor-not-allowed">
+                  <span className="text-gray-600 text-sm">›</span>
+                </button>
+                {Array.from({ length: Math.min(tp, 5) }, (_, i) => {
+                  const pn = tp <= 5 ? i : page < 3 ? i : page > tp - 4 ? tp - 5 + i : page - 2 + i
+                  return <button key={pn} onClick={() => setPage(pn)} className={`w-8 h-8 rounded-lg text-xs font-medium transition-all ${page === pn ? 'bg-navy-900 text-white shadow-premium-md' : 'text-gray-500 hover:bg-surface-muted'}`}>{pn + 1}</button>
+                })}
+                <button onClick={() => setPage(p => p + 1)} disabled={page >= tp - 1}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-muted disabled:opacity-30 disabled:cursor-not-allowed">
+                  <span className="text-gray-600 text-sm">‹</span>
+                </button>
+              </div>
+            </div>
+          ) : null })()}
+        </>}
 
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="عميل جديد">
         <form onSubmit={handleAdd} className="space-y-4">

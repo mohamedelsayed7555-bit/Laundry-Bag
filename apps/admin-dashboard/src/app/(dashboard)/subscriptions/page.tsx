@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase'
 import DataTable from '@/components/ui/DataTable'
 import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
-import { Crown, Eye, Check, X } from 'lucide-react'
+import { Crown, Eye, Check, X, Plus, Edit2, Trash2 } from 'lucide-react'
 import { TableSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import PermissionGate from '@/components/ui/PermissionGate'
@@ -34,15 +34,34 @@ const durationLabels: Record<string, string> = {
   annual: 'سنوي',
 }
 
+const emptyForm = {
+  user_id: '',
+  plan_id: '',
+  duration: 'monthly',
+  status: 'pending',
+  items_used: 0,
+  items_limit: 0,
+  payment_method: 'cash',
+  total_paid: 0,
+  auto_renew: false,
+}
+
 export default function SubscriptionsPage() {
   const [subs, setSubs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('all')
   const [detail, setDetail] = useState<any>(null)
+  const [showAdd, setShowAdd] = useState(false)
+  const [editSub, setEditSub] = useState<any>(null)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState(emptyForm)
+  const [customers, setCustomers] = useState<any[]>([])
+  const [plans, setPlans] = useState<any[]>([])
   const { toast } = useToast()
 
   useEffect(() => {
     loadSubs()
+    loadOptions()
     const ch = supabase.channel('subs-rt')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'subscriptions' }, () => loadSubs())
       .subscribe()
@@ -56,6 +75,130 @@ export default function SubscriptionsPage() {
       .order('created_at', { ascending: false })
     setSubs(data ?? [])
     setLoading(false)
+  }
+
+  async function loadOptions() {
+    const [c, p] = await Promise.all([
+      supabase.from('users').select('id, name, phone').eq('role', 'customer').eq('is_active', true).order('name'),
+      supabase.from('plans').select('id, name, items_per_month, monthly_price, quarterly_price, biannual_price, annual_price').eq('is_active', true).order('monthly_price'),
+    ])
+    setCustomers(c.data ?? [])
+    setPlans(p.data ?? [])
+  }
+
+  function getPlanPrice(planId: string, duration: string): number {
+    const plan = plans.find(p => p.id === planId)
+    if (!plan) return 0
+    const priceMap: Record<string, number> = {
+      monthly: plan.monthly_price,
+      quarterly: plan.quarterly_price ?? plan.monthly_price * 3,
+      biannual: plan.biannual_price ?? plan.monthly_price * 6,
+      annual: plan.annual_price ?? plan.monthly_price * 12,
+    }
+    return priceMap[duration] ?? 0
+  }
+
+  function getPlanItemsLimit(planId: string, duration: string): number {
+    const plan = plans.find(p => p.id === planId)
+    if (!plan) return 0
+    const months = duration === 'monthly' ? 1 : duration === 'quarterly' ? 3 : duration === 'biannual' ? 6 : 12
+    return plan.items_per_month * months
+  }
+
+  async function handleAdd(e: React.FormEvent) {
+    e.preventDefault()
+    if (!form.user_id || !form.plan_id) { toast('اختر العميل والباقة', 'error'); return }
+    setSaving(true)
+    const totalPaid = getPlanPrice(form.plan_id, form.duration)
+    const itemsLimit = getPlanItemsLimit(form.plan_id, form.duration)
+    const { error } = await supabase.from('subscriptions').insert({
+      user_id: form.user_id,
+      plan_id: form.plan_id,
+      duration: form.duration,
+      status: form.status,
+      items_used: 0,
+      items_limit: itemsLimit,
+      payment_method: form.payment_method,
+      total_paid: totalPaid,
+      auto_renew: form.auto_renew,
+    })
+    setSaving(false)
+    if (!error) {
+      const planName = plans.find(p => p.id === form.plan_id)?.name ?? 'الباقة'
+      const durationText = durationLabels[form.duration] ?? form.duration
+      const notifTitle = form.status === 'active' ? 'تم تفعيل اشتراكك' : 'تم إنشاء اشتراك جديد'
+      const notifBody = form.status === 'active'
+        ? `تم تفعيل اشتراكك في باقة ${planName} (${durationText}). يمكنك الآن إنشاء طلباتك.`
+        : `تم إنشاء اشتراك في باقة ${planName} (${durationText}). في انتظار التفعيل.`
+
+      await supabase.from('notifications').insert({
+        user_id: form.user_id,
+        title: notifTitle,
+        body: notifBody,
+        type: 'system',
+        data: { plan_id: form.plan_id },
+        sent_at: new Date().toISOString(),
+      })
+
+      const { data: userData } = await supabase.from('users').select('fcm_token').eq('id', form.user_id).single()
+      if (userData?.fcm_token) {
+        fetch('https://exp.host/--/api/v2/push/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: userData.fcm_token,
+            title: notifTitle,
+            body: notifBody,
+            sound: 'default',
+            data: { type: 'subscription' },
+          }),
+        }).catch(() => {})
+      }
+
+      setShowAdd(false); setForm(emptyForm); loadSubs(); toast('تم إضافة الاشتراك بنجاح')
+    } else { toast('حدث خطأ: ' + error.message, 'error') }
+  }
+
+  async function handleEdit(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+    const totalPaid = getPlanPrice(form.plan_id, form.duration)
+    const itemsLimit = getPlanItemsLimit(form.plan_id, form.duration)
+    const { error } = await supabase.from('subscriptions').update({
+      plan_id: form.plan_id,
+      duration: form.duration,
+      status: form.status,
+      items_used: form.items_used,
+      items_limit: itemsLimit,
+      payment_method: form.payment_method,
+      total_paid: totalPaid,
+      auto_renew: form.auto_renew,
+    }).eq('id', editSub.id)
+    setSaving(false)
+    if (!error) { setEditSub(null); loadSubs(); toast('تم تعديل الاشتراك') }
+    else { toast('حدث خطأ: ' + error.message, 'error') }
+  }
+
+  function openEdit(sub: any) {
+    setForm({
+      user_id: sub.user_id,
+      plan_id: sub.plan_id,
+      duration: sub.duration,
+      status: sub.status,
+      items_used: sub.items_used ?? 0,
+      items_limit: sub.items_limit ?? 0,
+      payment_method: sub.payment_method ?? 'cash',
+      total_paid: sub.total_paid ?? 0,
+      auto_renew: sub.auto_renew ?? false,
+    })
+    setEditSub(sub)
+  }
+
+  async function deleteSub(id: string) {
+    if (!confirm('هل أنت متأكد من حذف هذا الاشتراك؟')) return
+    const { error } = await supabase.from('subscriptions').delete().eq('id', id)
+    if (!error) { loadSubs(); setDetail(null); toast('تم حذف الاشتراك', 'warning') }
+    else { toast('حدث خطأ أثناء الحذف', 'error') }
   }
 
   async function activateSub(sub: any) {
@@ -142,12 +285,91 @@ export default function SubscriptionsPage() {
             </button>
           </>
         )}
-        <button onClick={() => setDetail(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors">
+        <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-blue-50 rounded-lg transition-colors" title="تعديل">
+          <Edit2 size={15} className="text-blue-500" />
+        </button>
+        <button onClick={() => setDetail(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors" title="عرض">
           <Eye size={15} className="text-gray-400 hover:text-gray-600" />
         </button>
       </div>
     )},
   ]
+
+  const selectClass = 'w-full p-3 border border-surface-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all'
+  const inputClass = selectClass
+
+  const formFields = (
+    <>
+      {!editSub && (
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1.5">العميل <span className="text-red-400">*</span></label>
+          <select value={form.user_id} onChange={e => setForm({ ...form, user_id: e.target.value })} required className={selectClass}>
+            <option value="">اختر العميل...</option>
+            {customers.map(c => <option key={c.id} value={c.id}>{c.name} — {c.phone}</option>)}
+          </select>
+        </div>
+      )}
+      <div>
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">الباقة <span className="text-red-400">*</span></label>
+        <select value={form.plan_id} onChange={e => {
+          const newPlanId = e.target.value
+          setForm({ ...form, plan_id: newPlanId, total_paid: getPlanPrice(newPlanId, form.duration), items_limit: getPlanItemsLimit(newPlanId, form.duration) })
+        }} required className={selectClass}>
+          <option value="">اختر الباقة...</option>
+          {plans.map(p => <option key={p.id} value={p.id}>{p.name} — {p.monthly_price} ج.م/شهر</option>)}
+        </select>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1.5">المدة</label>
+          <select value={form.duration} onChange={e => {
+            const newDuration = e.target.value
+            setForm({ ...form, duration: newDuration, total_paid: getPlanPrice(form.plan_id, newDuration), items_limit: getPlanItemsLimit(form.plan_id, newDuration) })
+          }} className={selectClass}>
+            <option value="monthly">شهري</option>
+            <option value="quarterly">ربع سنوي</option>
+            <option value="biannual">نصف سنوي</option>
+            <option value="annual">سنوي</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1.5">الحالة</label>
+          <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className={selectClass}>
+            <option value="pending">في الانتظار</option>
+            <option value="active">نشط</option>
+            <option value="cancelled">ملغي</option>
+            <option value="paused">متوقف</option>
+          </select>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1.5">طريقة الدفع</label>
+          <select value={form.payment_method} onChange={e => setForm({ ...form, payment_method: e.target.value })} className={selectClass}>
+            <option value="cash">كاش</option>
+            <option value="visa">فيزا</option>
+            <option value="instapay">انستاباي</option>
+            <option value="e_wallet">محفظة</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1.5">المبلغ المدفوع</label>
+          <input type="number" min={0} value={form.total_paid} onChange={e => setForm({ ...form, total_paid: +e.target.value })} className={inputClass} />
+        </div>
+      </div>
+      {editSub && (
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1.5">القطع المستخدمة</label>
+          <input type="number" min={0} value={form.items_used} onChange={e => setForm({ ...form, items_used: +e.target.value })} className={inputClass} />
+        </div>
+      )}
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" checked={form.auto_renew} onChange={e => setForm({ ...form, auto_renew: e.target.checked })}
+          className="w-4 h-4 rounded border-gray-300 text-primary-500 focus:ring-primary-500/20" />
+        <span className="text-sm text-gray-600">تجديد تلقائي</span>
+      </label>
+    </>
+  )
 
   return (
     <PermissionGate permission="plans.manage">
@@ -162,6 +384,10 @@ export default function SubscriptionsPage() {
             {pendingCount > 0 && <span className="text-amber-500 font-semibold mr-2">• {pendingCount} في الانتظار</span>}
           </p>
         </div>
+        <button onClick={() => { setForm(emptyForm); setShowAdd(true) }}
+          className="flex items-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:shadow-glow-green transition-all duration-300">
+          <Plus size={16} /> اشتراك جديد
+        </button>
       </motion.div>
 
       <div className="flex gap-1.5 overflow-x-auto pb-1">
@@ -180,6 +406,33 @@ export default function SubscriptionsPage() {
         <DataTable columns={columns} data={filtered} emptyMessage="لا توجد اشتراكات" />
       )}
 
+      {/* Add Modal */}
+      <Modal open={showAdd} onClose={() => setShowAdd(false)} title="اشتراك جديد">
+        <form onSubmit={handleAdd} className="space-y-4">
+          {formFields}
+          <button type="submit" disabled={saving} className="w-full bg-gradient-to-l from-primary-500 to-primary-600 text-white p-3 rounded-xl font-semibold hover:shadow-glow-green disabled:opacity-50 transition-all">
+            {saving ? 'جاري الحفظ...' : 'إضافة الاشتراك'}
+          </button>
+        </form>
+      </Modal>
+
+      {/* Edit Modal */}
+      <Modal open={!!editSub} onClose={() => setEditSub(null)} title="تعديل الاشتراك">
+        <form onSubmit={handleEdit} className="space-y-4">
+          {editSub && (
+            <div className="bg-surface-muted/50 rounded-xl p-3 mb-2">
+              <p className="text-xs text-gray-400">العميل</p>
+              <p className="text-sm font-semibold text-gray-800">{editSub.user?.name ?? '—'}</p>
+            </div>
+          )}
+          {formFields}
+          <button type="submit" disabled={saving} className="w-full bg-gradient-to-l from-primary-500 to-primary-600 text-white p-3 rounded-xl font-semibold hover:shadow-glow-green disabled:opacity-50 transition-all">
+            {saving ? 'جاري الحفظ...' : 'حفظ التعديلات'}
+          </button>
+        </form>
+      </Modal>
+
+      {/* Detail Modal */}
       <Modal open={!!detail} onClose={() => setDetail(null)} title="تفاصيل الاشتراك">
         {detail && (
           <div className="space-y-4">
@@ -201,7 +454,6 @@ export default function SubscriptionsPage() {
               ))}
             </div>
 
-            {/* Items Progress */}
             {detail.status === 'active' && (
               <div className="bg-surface-muted/50 rounded-xl p-4">
                 <div className="flex justify-between items-center mb-2">
@@ -234,6 +486,10 @@ export default function SubscriptionsPage() {
                   إلغاء الاشتراك
                 </button>
               )}
+              <button onClick={() => deleteSub(detail.id)}
+                className="px-4 py-3 border border-red-200 text-red-500 rounded-xl text-sm font-medium hover:bg-red-50 transition-colors flex items-center gap-1">
+                <Trash2 size={14} /> حذف
+              </button>
             </div>
           </div>
         )}

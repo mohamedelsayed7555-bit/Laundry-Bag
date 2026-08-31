@@ -7,8 +7,10 @@ import Badge from '@/components/ui/Badge'
 import {
   ScrollText, ShoppingBag, Users, Crown, Settings, Search,
   ArrowRightLeft, UserPlus, UserMinus, Truck, Plus, Edit2, Trash2, Power, Filter,
+  ChevronRight, ChevronLeft,
 } from 'lucide-react'
 import PermissionGate from '@/components/ui/PermissionGate'
+import { TableSkeleton } from '@/components/ui/Skeleton'
 
 interface AuditLog {
   id: string
@@ -82,6 +84,8 @@ function buildDescription(log: AuditLog): string {
   }
 }
 
+const PAGE_SIZE = 20
+
 export default function AuditPage() {
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [loading, setLoading] = useState(true)
@@ -89,16 +93,24 @@ export default function AuditPage() {
   const [entityFilter, setEntityFilter] = useState('all')
   const [actionFilter, setActionFilter] = useState('all')
   const [roleFilter, setRoleFilter] = useState('all')
-  const [limit, setLimit] = useState(50)
+  const [page, setPage] = useState(0)
+  const [totalCount, setTotalCount] = useState(0)
 
-  useEffect(() => { loadLogs() }, [limit])
+  useEffect(() => { loadLogs() }, [page, entityFilter, actionFilter])
 
   async function loadLogs() {
-    const { data, error } = await supabase
+    setLoading(true)
+    let query = supabase
       .from('audit_logs')
-      .select('id, user_id, action, entity_type, entity_id, details, created_at, actor:users!audit_logs_user_id_fkey(name, role)')
+      .select('id, user_id, action, entity_type, entity_id, details, created_at, actor:users!audit_logs_user_id_fkey(name, role)', { count: 'exact' })
       .order('created_at', { ascending: false })
-      .limit(limit)
+
+    if (entityFilter !== 'all') query = query.eq('entity_type', entityFilter)
+    if (actionFilter !== 'all') query = query.eq('action', actionFilter)
+
+    query = query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
+
+    const { data, error, count } = await query
 
     if (error) { console.error('audit_logs error:', error); setLoading(false); return }
 
@@ -107,12 +119,11 @@ export default function AuditPage() {
       actor: Array.isArray(d.actor) ? d.actor[0] ?? null : d.actor,
     }))
     setLogs(normalized)
+    setTotalCount(count ?? 0)
     setLoading(false)
   }
 
   const filtered = logs.filter(log => {
-    if (entityFilter !== 'all' && log.entity_type !== entityFilter) return false
-    if (actionFilter !== 'all' && log.action !== actionFilter) return false
     if (roleFilter !== 'all' && (log.actor?.role || '') !== roleFilter) return false
     if (search) {
       const s = search.toLowerCase()
@@ -123,8 +134,7 @@ export default function AuditPage() {
     return true
   })
 
-  const uniqueActions = [...new Set(logs.map(l => l.action))]
-  const uniqueEntities = [...new Set(logs.map(l => l.entity_type))]
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE)
 
   return (
     <PermissionGate permission="audit.view">
@@ -136,7 +146,7 @@ export default function AuditPage() {
           </h2>
           <p className="text-sm text-gray-400 mt-0.5">تتبع جميع العمليات التي تتم على النظام</p>
         </div>
-        <div className="text-sm text-gray-400">{filtered.length} سجل</div>
+        <div className="text-sm text-gray-400">{totalCount} سجل</div>
       </motion.div>
 
       {/* Filters */}
@@ -146,15 +156,22 @@ export default function AuditPage() {
           <input type="text" placeholder="بحث بالاسم أو العملية..." value={search} onChange={e => setSearch(e.target.value)}
             className="w-full pr-10 pl-4 py-2.5 bg-white border border-surface-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all" />
         </div>
-        <select value={entityFilter} onChange={e => setEntityFilter(e.target.value)}
+        <select value={entityFilter} onChange={e => { setEntityFilter(e.target.value); setPage(0) }}
           className="px-3 py-2.5 bg-white border border-surface-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 transition-all">
           <option value="all">كل الأقسام</option>
-          {uniqueEntities.map(e => <option key={e} value={e}>{entityConfig[e]?.label || e}</option>)}
+          <option value="order">طلب</option>
+          <option value="user">مستخدم</option>
+          <option value="plan">باقة</option>
         </select>
-        <select value={actionFilter} onChange={e => setActionFilter(e.target.value)}
+        <select value={actionFilter} onChange={e => { setActionFilter(e.target.value); setPage(0) }}
           className="px-3 py-2.5 bg-white border border-surface-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 transition-all">
           <option value="all">كل العمليات</option>
-          {uniqueActions.map(a => <option key={a} value={a}>{actionConfig[a]?.label || a}</option>)}
+          <option value="create">إنشاء</option>
+          <option value="update">تعديل</option>
+          <option value="delete">حذف</option>
+          <option value="status_change">تغيير حالة</option>
+          <option value="assign_driver">تعيين سائق</option>
+          <option value="toggle_active">تفعيل/إلغاء</option>
         </select>
         <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)}
           className="px-3 py-2.5 bg-white border border-surface-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 transition-all">
@@ -169,9 +186,7 @@ export default function AuditPage() {
 
       {/* Timeline */}
       {loading ? (
-        <div className="flex items-center justify-center h-40">
-          <div className="w-7 h-7 border-[3px] border-primary-500 border-t-transparent rounded-full animate-spin" />
-        </div>
+        <TableSkeleton rows={6} cols={4} />
       ) : filtered.length === 0 ? (
         <div className="bg-white rounded-2xl shadow-premium border border-surface-border/60 p-12 text-center">
           <div className="w-16 h-16 rounded-2xl bg-surface-muted flex items-center justify-center mx-auto mb-4">
@@ -197,7 +212,6 @@ export default function AuditPage() {
                   transition={{ delay: Math.min(i * 0.02, 0.5) }}
                   className="flex items-start gap-4 px-5 py-4 hover:bg-surface-muted/30 transition-colors"
                 >
-                  {/* Avatar */}
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-400 to-accent-purple/80 flex items-center justify-center text-white font-bold text-sm flex-shrink-0 mt-0.5 overflow-hidden">
                     {log.actor?.avatar_url ? (
                       <img src={log.actor.avatar_url} alt="" className="w-full h-full object-cover" />
@@ -206,7 +220,6 @@ export default function AuditPage() {
                     )}
                   </div>
 
-                  {/* Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1.5">
                       <span className="font-bold text-sm text-gray-800">{log.actor?.name ?? 'نظام'}</span>
@@ -242,12 +255,53 @@ export default function AuditPage() {
             })}
           </div>
 
-          {logs.length >= limit && (
-            <div className="px-5 py-3 border-t border-surface-border/40 text-center">
-              <button onClick={() => setLimit(l => l + 50)}
-                className="text-sm text-primary-500 font-medium hover:text-primary-600 transition-colors">
-                تحميل المزيد...
-              </button>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-5 py-3 border-t border-surface-border/40">
+              <span className="text-xs text-gray-400">
+                صفحة {page + 1} من {totalPages}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage(p => p - 1)}
+                  disabled={page === 0}
+                  className="p-2 rounded-lg hover:bg-surface-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronRight size={16} className="text-gray-600" />
+                </button>
+                {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                  let pageNum: number
+                  if (totalPages <= 5) {
+                    pageNum = i
+                  } else if (page < 3) {
+                    pageNum = i
+                  } else if (page > totalPages - 4) {
+                    pageNum = totalPages - 5 + i
+                  } else {
+                    pageNum = page - 2 + i
+                  }
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setPage(pageNum)}
+                      className={`w-8 h-8 rounded-lg text-xs font-medium transition-all ${
+                        page === pageNum
+                          ? 'bg-navy-900 text-white shadow-premium-md'
+                          : 'text-gray-500 hover:bg-surface-muted'
+                      }`}
+                    >
+                      {pageNum + 1}
+                    </button>
+                  )
+                })}
+                <button
+                  onClick={() => setPage(p => p + 1)}
+                  disabled={page >= totalPages - 1}
+                  className="p-2 rounded-lg hover:bg-surface-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft size={16} className="text-gray-600" />
+                </button>
+              </div>
             </div>
           )}
         </div>

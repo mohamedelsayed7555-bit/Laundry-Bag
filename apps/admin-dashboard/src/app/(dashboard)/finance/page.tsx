@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import StatCard from '@/components/ui/StatCard'
 import DataTable from '@/components/ui/DataTable'
 import Badge from '@/components/ui/Badge'
-import { DollarSign, TrendingUp, TrendingDown, CreditCard, Calendar, RotateCcw, Crown, Truck } from 'lucide-react'
+import { DollarSign, TrendingUp, TrendingDown, CreditCard, Calendar, RotateCcw, Crown, Truck, Download } from 'lucide-react'
 import { PageSkeleton } from '@/components/ui/Skeleton'
 import Tooltip from '@/components/ui/Tooltip'
 import PermissionGate from '@/components/ui/PermissionGate'
@@ -136,16 +136,33 @@ export default function FinancePage() {
 
   const paymentLabel: Record<string, string> = { cash: 'كاش', instapay: 'إنستاباي', wallet: 'محفظة', subscription: 'اشتراك' }
 
-  async function markPaid(id: string) {
-    const { error } = await supabase.from('orders').update({ payment_status: 'confirmed' }).eq('id', id)
-    if (error) { toast('حدث خطأ: ' + error.message, 'error'); return }
-    setRows(prev => prev.map(r => r.id === id ? { ...r, payment_status: 'confirmed' } : r))
-    toast('تم تأكيد الدفع بنجاح')
-    setStats(prev => {
-      const row = rows.find(r => r.id === id)
-      const amount = row?._amount ?? 0
-      return { ...prev, paid: prev.paid + amount, unpaid: prev.unpaid - amount }
+  function exportExcel() {
+    import('xlsx').then(XLSX => {
+      const exportData = filtered.map(r => ({
+        'النوع': r._source === 'order' ? 'طلب' : 'اشتراك',
+        'المرجع': r._source === 'order' ? r.order_number : r.plan?.name ?? '—',
+        'العميل': r._customerName,
+        'المبلغ': r._amount?.toFixed(2),
+        'طريقة الدفع': paymentLabel[r.payment_method] ?? r.payment_method,
+        'حالة الدفع': r.payment_status === 'confirmed' ? 'مدفوع' : r.payment_status === 'refunded' ? 'مسترد' : 'غير مدفوع',
+        'التاريخ': new Date(r._date).toLocaleDateString('ar-EG'),
+      }))
+      const ws = XLSX.utils.json_to_sheet(exportData)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'المالية')
+      XLSX.writeFile(wb, `تقرير-مالي-${new Date().toISOString().split('T')[0]}.xlsx`)
+      toast('تم تصدير التقرير بنجاح')
     })
+  }
+
+  async function markPaid(id: string) {
+    const row = rows.find(r => r.id === id)
+    const amount = row?._amount ?? 0
+    setRows(prev => prev.map(r => r.id === id ? { ...r, payment_status: 'confirmed' } : r))
+    setStats(prev => ({ ...prev, paid: prev.paid + amount, unpaid: prev.unpaid - amount }))
+    toast('تم تأكيد الدفع بنجاح')
+    const { error } = await supabase.from('orders').update({ payment_status: 'confirmed' }).eq('id', id)
+    if (error) { toast('حدث خطأ — جاري التحديث', 'error'); load() }
   }
 
   const columns = [
@@ -202,11 +219,16 @@ export default function FinancePage() {
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><DollarSign className="w-5 h-5 text-emerald-500" /> المالية</h2>
           <p className="text-sm text-gray-400 mt-0.5">ملخص الإيرادات والمدفوعات</p>
         </div>
-        {(preset !== 'all' || payFilter !== 'all' || sourceFilter !== 'all') && (
-          <button onClick={resetFilters} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-500 transition-colors">
-            <RotateCcw size={14} /> إعادة تعيين
+        <div className="flex items-center gap-3">
+          {(preset !== 'all' || payFilter !== 'all' || sourceFilter !== 'all') && (
+            <button onClick={resetFilters} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-500 transition-colors">
+              <RotateCcw size={14} /> إعادة تعيين
+            </button>
+          )}
+          <button onClick={exportExcel} className="flex items-center gap-1.5 bg-emerald-50 text-emerald-600 px-3 py-2 rounded-xl text-xs font-medium hover:bg-emerald-100 transition-colors">
+            <Download size={14} /> تصدير Excel
           </button>
-        )}
+        </div>
       </motion.div>
 
       {/* Date filters */}

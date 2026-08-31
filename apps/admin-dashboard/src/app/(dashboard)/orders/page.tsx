@@ -17,6 +17,7 @@ import { PageSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import Tooltip from '@/components/ui/Tooltip'
 import PermissionGate from '@/components/ui/PermissionGate'
+import { isValidEgyptianPhone } from '@/lib/utils'
 import { ORDER_STATUS_LABELS, SERVICE_TYPE_LABELS } from '@cleano/shared-types'
 import type { OrderStatus, ServiceType } from '@cleano/shared-types'
 
@@ -30,6 +31,11 @@ const statusFlow: Record<string, string> = {
   processing: 'ready', ready: 'delivering', delivering: 'delivered',
 }
 
+const walkinStatusFlow: Record<string, string> = {
+  pending: 'processing', assigned: 'processing', picked_up: 'processing',
+  processing: 'ready', ready: 'delivered',
+}
+
 export default function OrdersPage() {
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -40,11 +46,14 @@ export default function OrdersPage() {
   const [drivers, setDrivers] = useState<any[]>([])
   const [customers, setCustomers] = useState<any[]>([])
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ customer_id: '', service_type: 'wash', items_count: 1, notes: '', total: 0, order_type: 'delivery' as 'delivery' | 'walkin', walkin_name: '', walkin_phone: '' })
+  const [form, setForm] = useState({ customer_id: '', service_type: 'wash', items_count: 1, notes: '', total: '' as any, order_type: 'delivery' as 'delivery' | 'walkin', walkin_name: '', walkin_phone: '' })
   const [messages, setMessages] = useState<any[]>([])
   const [msgsLoading, setMsgsLoading] = useState(false)
   const [deliveryFeeSetting, setDeliveryFeeSetting] = useState(0)
+  const [page, setPage] = useState(0)
+  const [totalCount, setTotalCount] = useState(0)
   const { toast } = useToast()
+  const PAGE_SIZE = 20
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const debouncedLoadOrders = useCallback(() => {
@@ -64,12 +73,20 @@ export default function OrdersPage() {
     return () => { supabase.removeChannel(ch); if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [])
 
+  useEffect(() => { loadOrders() }, [page, statusFilter])
+
   async function loadOrders() {
-    const { data } = await supabase.from('orders')
-      .select('id, order_number, status, service_type, items_count, total, delivery_fee, notes, payment_status, payment_method, subscription_id, customer_id, driver_id, created_at, customer:users!orders_customer_id_fkey(name, phone, customer_code), driver:users!orders_driver_id_fkey(name, phone), subscription:subscriptions(items_used, items_limit)')
+    let query = supabase.from('orders')
+      .select('id, order_number, status, service_type, items_count, total, delivery_fee, notes, payment_status, payment_method, subscription_id, customer_id, driver_id, created_at, customer:users!orders_customer_id_fkey(name, phone, customer_code), driver:users!orders_driver_id_fkey(name, phone), subscription:subscriptions(items_used, items_limit)', { count: 'exact' })
       .order('created_at', { ascending: false })
-      .limit(200)
+
+    if (statusFilter !== 'all') query = query.eq('status', statusFilter)
+
+    query = query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
+
+    const { data, count } = await query
     setOrders(data ?? [])
+    setTotalCount(count ?? 0)
     setLoading(false)
   }
 
@@ -85,22 +102,26 @@ export default function OrdersPage() {
   async function assignDriver(orderId: string, driverId: string) {
     const order = orders.find(o => o.id === orderId)
     if (order?.notes?.includes('[من المحل]')) { toast('طلب من المحل لا يحتاج سائق', 'error'); return }
-    await supabase.from('orders').update({ driver_id: driverId, status: 'assigned' }).eq('id', orderId)
-    await supabase.from('order_status_history').insert({ order_id: orderId, status: 'assigned', changed_by: driverId })
     const driverInfo = drivers.find(d => d.id === driverId)
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, driver_id: driverId, status: 'assigned', driver: driverInfo } : o))
     setDetail((prev: any) => prev?.id === orderId ? { ...prev, driver_id: driverId, status: 'assigned', driver: driverInfo ?? prev.driver } : prev)
-    loadOrders()
     toast('تم تعيين السائق')
+    const { error } = await supabase.from('orders').update({ driver_id: driverId, status: 'assigned' }).eq('id', orderId)
+    if (error) { toast('حدث خطأ — جاري التحديث', 'error'); loadOrders(); return }
+    await supabase.from('order_status_history').insert({ order_id: orderId, status: 'assigned', changed_by: driverId })
   }
 
   async function advanceStatus(order: any) {
-    const next = statusFlow[order.status]
+    const isWalkin = order.notes?.includes('[من المحل]')
+    const flow = isWalkin ? walkinStatusFlow : statusFlow
+    const next = flow[order.status]
     if (!next) return
-    await supabase.from('orders').update({ status: next }).eq('id', order.id)
-    await supabase.from('order_status_history').insert({ order_id: order.id, status: next })
-    loadOrders()
+    setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: next } : o))
     setDetail((prev: any) => prev ? { ...prev, status: next } : null)
     toast(`تم تحديث الحالة إلى: ${ORDER_STATUS_LABELS[next as OrderStatus]}`)
+    const { error } = await supabase.from('orders').update({ status: next }).eq('id', order.id)
+    if (error) { toast('حدث خطأ — جاري التحديث', 'error'); loadOrders(); return }
+    await supabase.from('order_status_history').insert({ order_id: order.id, status: next })
   }
 
   async function loadMessages(orderId: string) {
@@ -119,17 +140,19 @@ export default function OrdersPage() {
   }
 
   async function cancelOrder(id: string) {
-    await supabase.from('orders').update({ status: 'cancelled' }).eq('id', id)
-    loadOrders()
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'cancelled' } : o))
     setDetail(null)
     toast('تم إلغاء الطلب', 'warning')
+    const { error } = await supabase.from('orders').update({ status: 'cancelled' }).eq('id', id)
+    if (error) { toast('حدث خطأ — جاري التحديث', 'error'); loadOrders() }
   }
 
   async function handleAddOrder(e: React.FormEvent) {
     e.preventDefault()
+    const isWalkin = form.order_type === 'walkin'
+    if (isWalkin && !isValidEgyptianPhone(form.walkin_phone)) { toast('رقم الموبايل غير صحيح — يجب أن يبدأ بـ 01 ويكون 11 رقم', 'error'); return }
     setSaving(true)
     const total = form.total || 0
-    const isWalkin = form.order_type === 'walkin'
 
     let customerId = form.customer_id
 
@@ -160,11 +183,12 @@ export default function OrdersPage() {
   }
 
   const allStatuses = ['all', 'pending', 'assigned', 'picked_up', 'processing', 'ready', 'delivering', 'delivered', 'cancelled']
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE)
   const filtered = useMemo(() => orders.filter(o => {
-    const matchSearch = !search || o.order_number?.toLowerCase().includes(search.toLowerCase()) || o.customer?.name?.includes(search)
-    const matchStatus = statusFilter === 'all' || o.status === statusFilter
-    return matchSearch && matchStatus
-  }), [orders, search, statusFilter])
+    if (!search) return true
+    const s = search.toLowerCase()
+    return o.order_number?.toLowerCase().includes(s) || o.customer?.name?.toLowerCase().includes(s)
+  }), [orders, search])
 
   const columns = [
     { key: 'order_number', label: 'رقم الطلب', render: (item: any) => <span className="font-semibold text-navy-800">{item.order_number}</span> },
@@ -210,7 +234,7 @@ export default function OrdersPage() {
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
             <ClipboardList className="w-5 h-5 text-primary-500" /> إدارة الطلبات
           </h2>
-          <p className="text-sm text-gray-400 mt-0.5">{orders.length} طلب</p>
+          <p className="text-sm text-gray-400 mt-0.5">{totalCount} طلب</p>
         </div>
         <button onClick={() => setShowAdd(true)}
           className="flex items-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:shadow-glow-green transition-all duration-300">
@@ -226,7 +250,7 @@ export default function OrdersPage() {
         </div>
         <div className="flex gap-1.5 overflow-x-auto pb-1">
           {allStatuses.map(s => (
-            <button key={s} onClick={() => setStatusFilter(s)}
+            <button key={s} onClick={() => { setStatusFilter(s); setPage(0) }}
               className={`px-3 py-2 rounded-lg text-[11px] font-medium transition-all whitespace-nowrap ${statusFilter === s ? 'bg-navy-900 text-white shadow-premium-md' : 'bg-white text-gray-500 hover:bg-surface-muted border border-surface-border/60'}`}>
               {s === 'all' ? 'الكل' : ORDER_STATUS_LABELS[s as OrderStatus] ?? s}
             </button>
@@ -237,7 +261,33 @@ export default function OrdersPage() {
       {loading ? (
         <PageSkeleton stats={0} tableRows={6} tableCols={6} />
       ) : (
-        <DataTable columns={columns} data={filtered} emptyMessage="لا توجد طلبات" />
+        <>
+          <DataTable columns={columns} data={filtered} emptyMessage="لا توجد طلبات" pageSize={PAGE_SIZE} />
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-3">
+              <span className="text-xs text-gray-400">صفحة {page + 1} من {totalPages}</span>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setPage(p => p - 1)} disabled={page === 0}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                  <span className="text-gray-600 text-sm">›</span>
+                </button>
+                {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                  const pageNum = totalPages <= 5 ? i : page < 3 ? i : page > totalPages - 4 ? totalPages - 5 + i : page - 2 + i
+                  return (
+                    <button key={pageNum} onClick={() => setPage(pageNum)}
+                      className={`w-8 h-8 rounded-lg text-xs font-medium transition-all ${page === pageNum ? 'bg-navy-900 text-white shadow-premium-md' : 'text-gray-500 hover:bg-surface-muted'}`}>
+                      {pageNum + 1}
+                    </button>
+                  )
+                })}
+                <button onClick={() => setPage(p => p + 1)} disabled={page >= totalPages - 1}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                  <span className="text-gray-600 text-sm">‹</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       <Modal open={!!detail} onClose={() => setDetail(null)} title={`تفاصيل الطلب ${detail?.order_number ?? ''}`}>
@@ -303,12 +353,17 @@ export default function OrdersPage() {
             </div>
 
             <div className="flex gap-2 pt-2">
-              {statusFlow[detail.status] && (
-                <button onClick={() => advanceStatus(detail)}
-                  className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white p-3 rounded-xl font-semibold text-sm hover:shadow-glow-green transition-all">
-                  <ArrowRight size={16} /> {ORDER_STATUS_LABELS[statusFlow[detail.status] as OrderStatus]}
-                </button>
-              )}
+              {(() => {
+                const isWalkin = detail.notes?.includes('[من المحل]')
+                const flow = isWalkin ? walkinStatusFlow : statusFlow
+                const next = flow[detail.status]
+                return next ? (
+                  <button onClick={() => advanceStatus(detail)}
+                    className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white p-3 rounded-xl font-semibold text-sm hover:shadow-glow-green transition-all">
+                    <ArrowRight size={16} /> {ORDER_STATUS_LABELS[next as OrderStatus]}
+                  </button>
+                ) : null
+              })()}
               {!['delivered', 'cancelled', 'refunded'].includes(detail.status) && (
                 <button onClick={() => cancelOrder(detail.id)}
                   className="px-4 py-3 border border-red-200 text-red-500 rounded-xl text-sm font-medium hover:bg-red-50 transition-colors">
@@ -368,7 +423,7 @@ export default function OrdersPage() {
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">المبلغ (ج.م) <span className="text-red-400">*</span></label>
-            <input type="number" min={0} step="0.01" value={form.total} onChange={e => setForm({ ...form, total: +e.target.value })} required className={inputClass} />
+            <input type="number" min={0} step="0.01" value={form.total} onChange={e => setForm({ ...form, total: e.target.value === '' ? '' as any : +e.target.value })} required className={inputClass} placeholder="0.00" />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">ملاحظات</label>

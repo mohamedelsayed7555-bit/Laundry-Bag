@@ -289,9 +289,9 @@ export default function AdminLoginPage() {
 
       {/* Right side — Login form */}
       <div className="flex-1 flex items-center justify-center bg-navy-950 relative overflow-hidden min-h-screen lg:min-h-0">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-navy-900/50 via-navy-950 to-navy-950" />
-        <div className="absolute top-1/4 -right-20 w-72 h-72 bg-primary-500/[0.06] rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 -left-20 w-72 h-72 bg-accent-purple/[0.06] rounded-full blur-3xl" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-navy-900/50 via-navy-950 to-navy-950 pointer-events-none" />
+        <div className="absolute top-1/4 -right-20 w-72 h-72 bg-primary-500/[0.06] rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-1/4 -left-20 w-72 h-72 bg-accent-purple/[0.06] rounded-full blur-3xl pointer-events-none" />
 
         {/* Mobile branding (shown on small screens) */}
         <div className="lg:hidden absolute top-0 left-0 right-0 h-32 flex items-center justify-center"

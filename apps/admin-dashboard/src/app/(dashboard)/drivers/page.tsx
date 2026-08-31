@@ -12,6 +12,7 @@ import { TableSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import Tooltip from '@/components/ui/Tooltip'
 import PermissionGate from '@/components/ui/PermissionGate'
+import { isValidEgyptianPhone, isValidEmail } from '@/lib/utils'
 
 export default function DriversPage() {
   const [drivers, setDrivers] = useState<any[]>([])
@@ -34,6 +35,8 @@ export default function DriversPage() {
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
+    if (form.phone && !isValidEgyptianPhone(form.phone)) { toast('رقم الموبايل غير صحيح — يجب أن يبدأ بـ 01 ويكون 11 رقم', 'error'); return }
+    if (form.email && !isValidEmail(form.email)) { toast('صيغة البريد الإلكتروني غير صحيحة', 'error'); return }
     setSaving(true)
     const res = await fetch('/api/users', {
       method: 'POST',
@@ -48,18 +51,28 @@ export default function DriversPage() {
 
   async function handleEdit(e: React.FormEvent) {
     e.preventDefault()
+    if (form.phone && !isValidEgyptianPhone(form.phone)) { toast('رقم الموبايل غير صحيح — يجب أن يبدأ بـ 01 ويكون 11 رقم', 'error'); return }
+    if (form.email && !isValidEmail(form.email)) { toast('صيغة البريد الإلكتروني غير صحيحة', 'error'); return }
     setSaving(true)
-    await supabase.from('users').update({ name: form.name, phone: form.phone, email: form.email, vehicle_type: form.vehicle_type, vehicle_number: form.vehicle_number }).eq('id', editItem.id)
+    if (form.phone) {
+      const { data: dup } = await supabase.from('users').select('id').eq('phone', form.phone).neq('id', editItem.id).maybeSingle()
+      if (dup) { setSaving(false); toast('رقم الموبايل مستخدم بالفعل', 'error'); return }
+    }
+    if (form.email) {
+      const { data: dup } = await supabase.from('users').select('id').eq('email', form.email).neq('id', editItem.id).maybeSingle()
+      if (dup) { setSaving(false); toast('البريد الإلكتروني مستخدم بالفعل', 'error'); return }
+    }
+    const { error } = await supabase.from('users').update({ name: form.name, phone: form.phone, email: form.email, vehicle_type: form.vehicle_type, vehicle_number: form.vehicle_number }).eq('id', editItem.id)
     setSaving(false)
-    setEditItem(null)
-    loadDrivers()
-    toast('تم تعديل بيانات السائق')
+    if (!error) { setEditItem(null); loadDrivers(); toast('تم تعديل بيانات السائق') }
+    else { toast('حدث خطأ أثناء التعديل', 'error') }
   }
 
   async function toggleActive(id: string, current: boolean) {
-    await supabase.from('users').update({ is_active: !current }).eq('id', id)
-    loadDrivers()
+    setDrivers(prev => prev.map(d => d.id === id ? { ...d, is_active: !current } : d))
     toast(current ? 'تم تعطيل السائق' : 'تم تفعيل السائق')
+    const { error } = await supabase.from('users').update({ is_active: !current }).eq('id', id)
+    if (error) { toast('حدث خطأ — جاري التحديث', 'error'); loadDrivers() }
   }
 
   function openEdit(item: any) {
@@ -67,7 +80,7 @@ export default function DriversPage() {
     setEditItem(item)
   }
 
-  const filtered = drivers.filter(d => !search || d.name?.includes(search) || d.phone?.includes(search))
+  const filtered = drivers.filter(d => { if (!search) return true; const s = search.toLowerCase(); return d.name?.toLowerCase().includes(s) || d.phone?.includes(s) })
   const activeDrivers = drivers.filter(d => d.is_active).length
   const vehicleLabel: Record<string, string> = { motorcycle: 'موتوسيكل', car: 'سيارة', van: 'فان' }
 

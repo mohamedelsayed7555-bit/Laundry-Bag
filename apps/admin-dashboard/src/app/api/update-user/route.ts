@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { rateLimit } from '@/lib/rate-limit'
+import { requireAdmin } from '@/lib/api-auth'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -7,6 +9,10 @@ const supabaseAdmin = createClient(
 )
 
 export async function POST(request: NextRequest) {
+  const limited = rateLimit(request)
+  if (limited) return limited
+  const auth = await requireAdmin(request)
+  if (auth instanceof NextResponse) return auth
   const body = await request.json()
   const { userId, email, password } = body
 
