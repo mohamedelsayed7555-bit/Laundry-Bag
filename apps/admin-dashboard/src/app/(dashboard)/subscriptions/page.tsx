@@ -51,7 +51,7 @@ export default function SubscriptionsPage() {
   async function loadSubs() {
     const { data } = await supabase
       .from('subscriptions')
-      .select('*, user:users!subscriptions_user_id_fkey(name, phone, customer_code), plans(name)')
+      .select('*, user:users!subscriptions_user_id_fkey(name, phone, customer_code), plans:plans!subscriptions_plan_id_fkey(name)')
       .order('created_at', { ascending: false })
     setSubs(data ?? [])
     setLoading(false)

@@ -58,7 +58,7 @@ export default function PlansPage() {
 
   async function loadData() {
     const [p, s] = await Promise.all([
-      supabase.from('plans').select('id, name, items_limit, monthly_price, features, is_active').order('monthly_price'),
+      supabase.from('plans').select('id, name, description, tier, items_per_month, includes_all_services, monthly_price, quarterly_price, biannual_price, annual_price, is_active').order('monthly_price'),
       supabase.from('subscriptions').select('*, user:users!subscriptions_user_id_fkey(name), plan:plans!subscriptions_plan_id_fkey(name)').eq('status', 'active'),
     ])
     setPlans((p.data ?? []) as any)
