@@ -175,6 +175,7 @@ export default function Sidebar({ collapsed, onToggleCollapse }: { collapsed?: b
                   <Link
                     key={item.href}
                     href={item.href}
+                    prefetch={true}
                     className={cn(
                       'group relative flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-200',
                       isCollapsed ? 'justify-center p-2.5' : 'px-3 py-2.5',
@@ -188,7 +189,7 @@ export default function Sidebar({ collapsed, onToggleCollapse }: { collapsed?: b
                         layoutId="sidebar-active"
                         className="absolute inset-0 rounded-xl bg-gradient-to-l from-primary-500/20 to-accent-purple/10 border border-primary-500/20"
                         style={{ boxShadow: '0 0 20px -5px rgba(0, 175, 95, 0.15)' }}
-                        transition={{ type: 'spring', duration: 0.4, bounce: 0.15 }}
+                        transition={{ type: 'spring', duration: 0.25, bounce: 0.1 }}
                       />
                     )}
                     <span className={cn(
