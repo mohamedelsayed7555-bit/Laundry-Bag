@@ -3,6 +3,8 @@ import { Alert, Platform } from 'react-native'
 import { supabase } from '../lib/supabase'
 import * as SecureStore from 'expo-secure-store'
 import * as LocalAuthentication from 'expo-local-authentication'
+import * as Notifications from 'expo-notifications'
+import * as Device from 'expo-device'
 import type { Session } from '@supabase/supabase-js'
 import type { User } from '../shared/types'
 
@@ -94,6 +96,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profile: data as User | null,
       loading: false,
     }))
+
+    if (data) registerPushToken(data.id)
+  }
+
+  async function registerPushToken(userId: string) {
+    try {
+      if (!Device.isDevice) return
+      const { status: existing } = await Notifications.getPermissionsAsync()
+      let finalStatus = existing
+      if (existing !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync()
+        finalStatus = status
+      }
+      if (finalStatus !== 'granted') return
+      const tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId: '178256af-c74c-4880-9722-8d30ba1e3e8b',
+      })
+      const token = tokenData.data
+      await supabase.from('users').update({ fcm_token: token }).eq('id', userId)
+    } catch {}
   }
 
   async function signInWithOtp(email: string) {

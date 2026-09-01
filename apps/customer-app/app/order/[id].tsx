@@ -258,15 +258,16 @@ export default function OrderDetailsScreen() {
       {order.driver && (
         <View style={s.detailsCard}>
           <Text style={s.sectionTitle}>السائق</Text>
-          <DetailRow label="الاسم" value={order.driver.name} />
-          {order.driver.phone && (
-            <View style={s.detailRow}>
-              <Text style={s.detailLabel}>التليفون</Text>
-              <TouchableOpacity onPress={() => Linking.openURL(`tel:${order.driver.phone}`)}>
-                <Text style={[s.detailValue, { color: colors.primary, textDecorationLine: 'underline' }]}>📞 {order.driver.phone}</Text>
-              </TouchableOpacity>
+          <View style={s.driverInfoRow}>
+            <View style={s.driverInfoLeft}>
+              <Text style={s.driverInfoName}>{order.driver.name}</Text>
+              {order.driver.phone && (
+                <TouchableOpacity onPress={() => Linking.openURL(`tel:${order.driver.phone}`)}>
+                  <Text style={s.driverInfoPhone}>{order.driver.phone} 📞</Text>
+                </TouchableOpacity>
+              )}
             </View>
-          )}
+          </View>
           <TouchableOpacity style={s.chatBtn} onPress={() => router.push(`/chat/${order.id}`)}>
             <Text style={s.chatBtnText}>💬 محادثة مع السائق</Text>
           </TouchableOpacity>
@@ -400,6 +401,11 @@ const s = StyleSheet.create({
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.navy[700] },
   detailLabel: { fontSize: 13, color: colors.navy[300] },
   detailValue: { fontSize: 13, color: '#fff', fontWeight: '500', maxWidth: '60%', textAlign: 'left' },
+
+  driverInfoRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.navy[700] },
+  driverInfoLeft: { flex: 1, gap: 4 },
+  driverInfoName: { fontSize: 15, color: '#fff', fontWeight: '700' },
+  driverInfoPhone: { fontSize: 14, color: colors.primary, fontWeight: '500' },
 
   rateBtn: {
     backgroundColor: colors.accent, borderRadius: 16, padding: 16, alignItems: 'center', marginBottom: 16,

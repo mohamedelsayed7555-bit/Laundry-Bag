@@ -246,11 +246,11 @@ const s = StyleSheet.create({
   menuSection: { gap: 8, marginBottom: 24 },
   menuItem: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: colors.navy[800],
-    borderRadius: 16, padding: 14, borderWidth: 1, borderColor: colors.navy[700],
+    borderRadius: 16, padding: 14, borderWidth: 1, borderColor: colors.navy[700], gap: 12,
   },
   menuIconWrap: {
     width: 40, height: 40, borderRadius: 12, backgroundColor: colors.navy[700],
-    justifyContent: 'center', alignItems: 'center', marginLeft: 12,
+    justifyContent: 'center', alignItems: 'center',
   },
   menuText: { flex: 1, fontSize: 15, color: '#fff', fontWeight: '600' },
   menuBadge: {
@@ -259,7 +259,7 @@ const s = StyleSheet.create({
   menuBadgeText: { fontSize: 11, color: colors.primary, fontWeight: '700' },
 
   logoutBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12,
     backgroundColor: colors.dangerGlow, borderWidth: 1, borderColor: colors.danger + '30',
     borderRadius: 16, padding: 16,
   },

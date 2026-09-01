@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Lin
 import { useRouter } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated'
-import { Phone, MessageCircle, Navigation } from 'lucide-react-native'
+import { Phone, MessageCircle, Navigation, MapPin } from 'lucide-react-native'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { supabase } from '../../src/lib/supabase'
 import { useRealtimeDriverOrders } from '../../src/hooks/useRealtimeOrders'
@@ -63,7 +63,7 @@ export default function DriverOrdersScreen() {
     if (!profile) return
     const { data } = await supabase
       .from('orders')
-      .select('id, order_number, status, service_type, items_count, total, notes, payment_method, payment_status, created_at, customer:users!orders_customer_id_fkey(name, phone, customer_code), address:addresses(label, building, floor, apartment, landmark, lat, lng)')
+      .select('id, order_number, status, service_type, items_count, total, notes, payment_method, payment_status, delivery_location, created_at, customer:users!orders_customer_id_fkey(name, phone, customer_code), address:addresses(label, building, floor, apartment, landmark, lat, lng)')
       .eq('driver_id', profile.id)
       .not('status', 'in', '("cancelled","refunded")')
       .order('created_at', { ascending: false })
@@ -226,6 +226,12 @@ export default function DriverOrdersScreen() {
           )}
 
           <View style={s.contactRow}>
+            {(addr?.lat || item.delivery_location?.lat) && (
+              <TouchableOpacity style={s.mapBtn} onPress={() => openNavigation(addr || item.delivery_location)} activeOpacity={0.7}>
+                <MapPin size={16} color="#f59e0b" />
+                <Text style={s.mapBtnText}>الخريطة</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity style={s.msgBtn} onPress={() => router.push(`/chat/${item.id}`)} activeOpacity={0.7}>
               <MessageCircle size={16} color={colors.primary} />
               <Text style={s.msgBtnText}>رسالة</Text>
@@ -400,6 +406,12 @@ const s = StyleSheet.create({
     backgroundColor: colors.accentGlow,
   },
   callBtnText: { fontSize: 13, color: colors.accent, fontWeight: '700' },
+  mapBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    borderWidth: 1.5, borderColor: '#f59e0b40', borderRadius: 14, padding: 11,
+    backgroundColor: '#f59e0b10',
+  },
+  mapBtnText: { fontSize: 13, color: '#f59e0b', fontWeight: '700' },
 
   emptyCard: {
     backgroundColor: colors.navy[800], borderRadius: 22, padding: 40,

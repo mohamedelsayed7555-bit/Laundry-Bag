@@ -61,10 +61,18 @@ export default function MapScreen() {
     if (!profile) return
     const { data } = await supabase
       .from('orders')
-      .select('id, order_number, status, total, customer:users!orders_customer_id_fkey(name, phone), address:addresses(label, building, floor, apartment, landmark, lat, lng)')
+      .select('id, order_number, status, total, delivery_location, customer:users!orders_customer_id_fkey(name, phone), address:addresses(label, building, floor, apartment, landmark, lat, lng)')
       .eq('driver_id', profile.id)
       .in('status', ['assigned', 'picked_up', 'ready', 'delivering'])
-    setOrders((data ?? []).filter((o: any) => o.address?.lat && o.address?.lng))
+    const mapped = (data ?? []).map((o: any) => {
+      if (o.address?.lat && o.address?.lng) return o
+      const dl = o.delivery_location
+      if (dl?.lat && dl?.lng) {
+        return { ...o, address: { lat: dl.lat, lng: dl.lng, label: dl.address || dl.label || 'موقع التوصيل', building: null, floor: null, apartment: null, landmark: null } }
+      }
+      return null
+    }).filter(Boolean)
+    setOrders(mapped)
   }, [profile])
 
   useEffect(() => { load() }, [load])

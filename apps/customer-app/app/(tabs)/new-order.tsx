@@ -126,6 +126,10 @@ export default function NewOrderScreen() {
 
   async function handleSubmit() {
     if (!profile) return
+    if (!selectedAddress) {
+      showAlert({ title: 'تنبيه', message: 'ادخل موقعك — اختر عنوان من عناوينك أو أضف عنوان جديد', type: 'warning' })
+      return
+    }
     if (cart.length === 0) {
       showAlert({ title: 'تنبيه', message: 'أضف قطعة واحدة على الأقل', type: 'warning' })
       return

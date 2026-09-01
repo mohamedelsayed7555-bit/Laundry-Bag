@@ -259,17 +259,17 @@ const s = StyleSheet.create({
   menuSection: { gap: 10, marginBottom: 20 },
   menuItem: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: colors.navy[800],
-    borderRadius: 16, padding: 16, borderWidth: 1, borderColor: colors.navy[700],
+    borderRadius: 16, padding: 16, borderWidth: 1, borderColor: colors.navy[700], gap: 12,
   },
   menuIconWrap: {
     width: 36, height: 36, borderRadius: 12,
-    justifyContent: 'center', alignItems: 'center', marginLeft: 12,
+    justifyContent: 'center', alignItems: 'center',
   },
   menuText: { flex: 1, fontSize: 15, color: '#fff', fontWeight: '600' },
   menuSubText: { fontSize: 11, color: colors.navy[300], marginTop: 2 },
 
   logoutBtn: {
-    flexDirection: 'row', alignItems: 'center',
+    flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: colors.dangerGlow, borderWidth: 1.5, borderColor: colors.danger + '40',
     borderRadius: 16, padding: 16,
   },

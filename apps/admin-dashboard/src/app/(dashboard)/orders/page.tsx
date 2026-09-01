@@ -314,7 +314,7 @@ export default function OrdersPage() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               {[
-                { label: 'العميل', value: detail.customer?.name },
+                { label: 'العميل', value: <div><p>{detail.customer?.name}</p>{detail.customer?.phone && <p className="text-[11px] text-gray-400 font-normal mt-0.5" dir="ltr">{detail.customer.phone}</p>}</div> },
                 { label: 'الحالة', value: <Badge variant={statusVariant[detail.status]}>{ORDER_STATUS_LABELS[detail.status as OrderStatus]}</Badge> },
                 { label: 'المبلغ', value: `${detail.total?.toFixed(2) ?? '—'} ج.م` },
                 { label: 'القطع', value: `${detail.items_count} قطعة` },

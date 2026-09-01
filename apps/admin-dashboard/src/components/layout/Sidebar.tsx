@@ -22,6 +22,7 @@ import {
   ChevronLeft,
   Sparkles,
   Bell,
+  Star,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
@@ -61,6 +62,7 @@ function useNavGroups() {
       label: t.sidebar.analytics,
       items: [
         { label: t.sidebar.reports, href: '/reports', icon: BarChart3 },
+        { label: 'التقييمات', href: '/ratings', icon: Star },
         { label: t.sidebar.auditLog, href: '/audit', icon: ScrollText },
         { label: 'الإشعارات', href: '/notifications', icon: Bell },
         { label: t.sidebar.settings, href: '/settings', icon: Settings },
