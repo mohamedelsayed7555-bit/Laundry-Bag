@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native'
 import { useRouter } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated'
@@ -41,7 +41,7 @@ export default function HomeScreen() {
       .limit(3)
       .then(({ data }) => { setRecentOrders(data ?? []); setLoading(false) })
 
-    supabase.from('subscriptions').select('*, plans(name, items_limit)')
+    supabase.from('subscriptions').select('*, plans(name, items_per_month)')
       .eq('user_id', profile.id).eq('status', 'active').single()
       .then(({ data }) => setActiveSub(data))
   }, [profile])
@@ -61,8 +61,14 @@ export default function HomeScreen() {
           <Text style={s.greetSmall}>{greeting()} 👋</Text>
           <Text style={s.greetName}>{profile?.name ?? ''}</Text>
         </View>
-        <TouchableOpacity style={s.avatar} onPress={() => router.push('/(tabs)/profile')}>
-          <Text style={s.avatarText}>{profile?.name?.[0] ?? '؟'}</Text>
+        <TouchableOpacity onPress={() => router.push('/(tabs)/profile')}>
+          {profile?.avatar_url ? (
+            <Image source={{ uri: profile.avatar_url }} style={s.avatarImg} />
+          ) : (
+            <View style={s.avatar}>
+              <Text style={s.avatarText}>{profile?.name?.[0] ?? '؟'}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </Animated.View>
 
@@ -95,7 +101,7 @@ export default function HomeScreen() {
             <View style={{ flex: 1 }}>
               <Text style={s.subBannerTitle}>باقة {activeSub.plans?.name}</Text>
               <Text style={s.subBannerSub}>
-                متبقي {(activeSub.plans?.items_limit ?? 0) - (activeSub.items_used ?? 0)} قطعة
+                متبقي {(activeSub.plans?.items_per_month ?? 0) - (activeSub.items_used ?? 0)} قطعة
               </Text>
             </View>
             <Text style={s.subBannerArrow}>←</Text>
@@ -201,6 +207,10 @@ const s = StyleSheet.create({
     borderWidth: 2, borderColor: colors.accentLight,
   },
   avatarText: { fontSize: 20, color: '#fff', fontWeight: 'bold' },
+  avatarImg: {
+    width: 48, height: 48, borderRadius: 24,
+    borderWidth: 2, borderColor: colors.accentLight,
+  },
 
   heroCard: {
     flexDirection: 'row', borderRadius: 24,

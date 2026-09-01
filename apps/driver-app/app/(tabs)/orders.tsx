@@ -33,6 +33,21 @@ const serviceLabel: Record<string, string> = {
   wash: 'غسيل', iron: 'كي', wash_iron: 'غسيل وكي', dry_clean: 'تنظيف جاف',
 }
 
+const paymentMethodLabel: Record<string, { label: string; icon: string }> = {
+  cash: { label: 'كاش', icon: '💵' },
+  visa: { label: 'فيزا', icon: '💳' },
+  e_wallet: { label: 'محفظة', icon: '📱' },
+  instapay: { label: 'إنستاباي', icon: '🏦' },
+}
+
+const paymentStatusLabel: Record<string, { label: string; color: string }> = {
+  pending: { label: 'معلق', color: '#f59e0b' },
+  confirmed: { label: 'مؤكد', color: '#10b981' },
+  paid: { label: 'مدفوع', color: '#10b981' },
+  failed: { label: 'فشل', color: '#ef4444' },
+  refunded: { label: 'مسترد', color: '#8b5cf6' },
+}
+
 type Filter = 'active' | 'completed' | 'all'
 
 export default function DriverOrdersScreen() {
@@ -48,7 +63,7 @@ export default function DriverOrdersScreen() {
     if (!profile) return
     const { data } = await supabase
       .from('orders')
-      .select('id, order_number, status, service_type, items_count, total, notes, created_at, customer:users!orders_customer_id_fkey(name, phone, customer_code), address:addresses(label, building, floor, apartment, landmark, lat, lng)')
+      .select('id, order_number, status, service_type, items_count, total, notes, payment_method, payment_status, created_at, customer:users!orders_customer_id_fkey(name, phone, customer_code), address:addresses(label, building, floor, apartment, landmark, lat, lng)')
       .eq('driver_id', profile.id)
       .not('status', 'in', '("cancelled","refunded")')
       .order('created_at', { ascending: false })
@@ -167,6 +182,24 @@ export default function DriverOrdersScreen() {
             </View>
             <View style={[s.detailChip, { backgroundColor: colors.primaryGlow, borderColor: colors.primary + '30' }]}>
               <Text style={[s.detailChipLabel, { color: colors.primary }]}>{item.total?.toFixed(2)} ج.م</Text>
+            </View>
+          </View>
+
+          {/* Payment Info */}
+          <View style={s.paymentRow}>
+            <View style={s.paymentItem}>
+              <Text style={s.paymentLabel}>الدفع</Text>
+              <Text style={s.paymentValue}>
+                {paymentMethodLabel[item.payment_method]?.icon ?? '💰'} {paymentMethodLabel[item.payment_method]?.label ?? item.payment_method}
+              </Text>
+            </View>
+            <View style={s.paymentItem}>
+              <Text style={s.paymentLabel}>الحالة</Text>
+              <View style={[s.paymentStatusBadge, { backgroundColor: (paymentStatusLabel[item.payment_status]?.color ?? '#999') + '20' }]}>
+                <Text style={[s.paymentStatusText, { color: paymentStatusLabel[item.payment_status]?.color ?? '#999' }]}>
+                  {paymentStatusLabel[item.payment_status]?.label ?? item.payment_status}
+                </Text>
+              </View>
             </View>
           </View>
 
@@ -337,6 +370,16 @@ const s = StyleSheet.create({
     borderRadius: 10, borderWidth: 1, borderColor: colors.navy[600],
   },
   detailChipLabel: { fontSize: 12, color: colors.navy[100], fontWeight: '600' },
+
+  paymentRow: {
+    flexDirection: 'row', gap: 12, marginTop: 8, marginBottom: 4,
+    backgroundColor: colors.navy[700] + '40', borderRadius: 12, padding: 12,
+  },
+  paymentItem: { flex: 1, gap: 4 },
+  paymentLabel: { fontSize: 10, color: colors.navy[400], fontWeight: '600' },
+  paymentValue: { fontSize: 13, color: '#fff', fontWeight: '700' },
+  paymentStatusBadge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8 },
+  paymentStatusText: { fontSize: 12, fontWeight: '700' },
 
   notes: { fontSize: 12, color: colors.navy[200], marginTop: 4, marginBottom: 4 },
 

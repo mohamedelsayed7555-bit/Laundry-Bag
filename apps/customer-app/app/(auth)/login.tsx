@@ -39,7 +39,7 @@ export default function LoginScreen() {
     if (!email.trim()) e.email = 'البريد الإلكتروني مطلوب'
     else if (!email.includes('@') || !email.includes('.')) e.email = 'بريد إلكتروني غير صحيح'
     if (!password) e.password = 'كلمة المرور مطلوبة'
-    else if (password.length < 6) e.password = 'كلمة المرور 6 أحرف على الأقل'
+    else if (password.length < 6) e.password = 'كلمة المرور لازم 6 أحرف على الأقل (حروف إنجليزي وأرقام)'
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -158,6 +158,9 @@ export default function LoginScreen() {
               </TouchableOpacity>
             </View>
             {errors.password ? <Text style={s.errorText}>{errors.password}</Text> : null}
+            {isSignUp && !errors.password && (
+              <Text style={s.hintText}>6 أحرف على الأقل - حروف إنجليزي وأرقام</Text>
+            )}
           </View>
 
           <TouchableOpacity
@@ -274,6 +277,9 @@ const s = StyleSheet.create({
   },
   errorText: {
     fontSize: 11, color: colors.danger, textAlign: 'right', marginTop: 4, fontWeight: '600',
+  },
+  hintText: {
+    fontSize: 11, color: colors.navy[400], textAlign: 'right', marginTop: 4,
   },
   serverErrorBox: {
     backgroundColor: colors.dangerGlow, borderWidth: 1, borderColor: '#ef444440',

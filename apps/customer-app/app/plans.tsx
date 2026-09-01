@@ -71,7 +71,7 @@ export default function PlansScreen() {
   async function loadData() {
     const { data: plansData } = await supabase
       .from('plans')
-      .select('id, name, items_limit, monthly_price, features, is_active')
+      .select('id, name, description, tier, items_per_month, includes_all_services, monthly_price, quarterly_price, biannual_price, annual_price, is_active')
       .eq('is_active', true)
       .order('monthly_price', { ascending: true })
     setPlans((plansData ?? []) as Plan[])
