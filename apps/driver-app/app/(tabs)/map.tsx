@@ -164,7 +164,7 @@ export default function MapScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.navy[900] },
   header: { paddingHorizontal: 20, paddingTop: 56, paddingBottom: 12, backgroundColor: colors.navy[900] },
-  title: { fontSize: 22, fontWeight: 'bold', color: '#fff' },
+  title: { fontSize: 24, fontWeight: '800', color: '#fff' },
   subtitle: { fontSize: 13, color: colors.navy[300], marginTop: 2 },
 
   mapContainer: { flex: 1, borderRadius: 20, overflow: 'hidden', margin: 12 },

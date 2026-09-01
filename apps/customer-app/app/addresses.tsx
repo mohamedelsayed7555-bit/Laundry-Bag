@@ -61,7 +61,7 @@ export default function AddressesScreen() {
 
   async function loadAddresses() {
     if (!profile) return
-    const { data } = await supabase.from('addresses').select('id, label, address, lat, lng, is_default, user_id').eq('user_id', profile.id).order('is_default', { ascending: false })
+    const { data } = await supabase.from('addresses').select('id, label, lat, lng, building, floor, apartment, landmark, notes, is_default, user_id').eq('user_id', profile.id).order('is_default', { ascending: false })
     setAddresses(data ?? [])
     setLoading(false)
   }
@@ -138,10 +138,13 @@ export default function AddressesScreen() {
       is_default: addresses.length === 0,
     }
 
-    if (editing) {
-      await supabase.from('addresses').update(payload).eq('id', editing.id)
-    } else {
-      await supabase.from('addresses').insert(payload)
+    const { error } = editing
+      ? await supabase.from('addresses').update(payload).eq('id', editing.id)
+      : await supabase.from('addresses').insert(payload)
+
+    if (error) {
+      showAlert({ title: 'خطأ', message: error.message || 'حدث خطأ أثناء حفظ العنوان', type: 'error' })
+      return
     }
     setShowModal(false)
     loadAddresses()

@@ -103,7 +103,7 @@ export default function MessagesScreen() {
         <FlatList
           data={conversations}
           keyExtractor={i => i.order_id}
-          contentContainerStyle={{ gap: 8, paddingBottom: 20 }}
+          contentContainerStyle={{ gap: 8, paddingBottom: 100 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={colors.primary} />}
           renderItem={({ item }) => (
             <TouchableOpacity
@@ -144,8 +144,8 @@ function timeAgo(dateStr: string): string {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.navy[900], padding: 20, paddingTop: 60 },
-  title: { fontSize: 22, fontWeight: 'bold', color: '#fff', marginBottom: 20 },
+  container: { flex: 1, backgroundColor: colors.navy[900], padding: 20, paddingTop: 56 },
+  title: { fontSize: 24, fontWeight: '800', color: '#fff', marginBottom: 20 },
   emptyCard: {
     backgroundColor: colors.navy[800], borderRadius: 20, padding: 40,
     alignItems: 'center', borderWidth: 1, borderColor: colors.navy[700],

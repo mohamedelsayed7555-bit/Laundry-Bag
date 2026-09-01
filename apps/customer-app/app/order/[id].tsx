@@ -172,8 +172,15 @@ export default function OrderDetailsScreen() {
       )}
 
       {driverLoc && ['assigned', 'picked_up', 'delivering'].includes(order.status) && (
-        <View style={s.trackingCard}>
-          <Text style={s.sectionTitle}>تتبع السائق</Text>
+        <TouchableOpacity
+          style={s.trackingCard}
+          activeOpacity={0.8}
+          onPress={() => router.push(`/tracking/${order.id}`)}
+        >
+          <View style={s.trackingHeader}>
+            <Text style={s.sectionTitle}>تتبع السائق</Text>
+            <Text style={s.expandHint}>اضغط للتكبير ←</Text>
+          </View>
           <View style={s.mapWrapper}>
             <MapView
               ref={mapRef}
@@ -192,6 +199,8 @@ export default function OrderDetailsScreen() {
               } : undefined}
               scrollEnabled={false}
               zoomEnabled={false}
+              pitchEnabled={false}
+              rotateEnabled={false}
             >
               <Marker
                 coordinate={{ latitude: driverLoc.lat, longitude: driverLoc.lng }}
@@ -216,7 +225,7 @@ export default function OrderDetailsScreen() {
             )}
             {etaMinutes !== null && (
               <View style={s.etaItem}>
-                <Text style={s.etaValue}>{etaMinutes} د</Text>
+                <Text style={[s.etaValue, { color: colors.primary }]}>{etaMinutes} د</Text>
                 <Text style={s.etaLabel}>الوقت المتوقع</Text>
               </View>
             )}
@@ -225,7 +234,7 @@ export default function OrderDetailsScreen() {
               <Text style={s.etaLabel}>{statusConfig[order.status]?.label}</Text>
             </View>
           </View>
-        </View>
+        </TouchableOpacity>
       )}
 
       <View style={s.detailsCard}>
@@ -234,8 +243,8 @@ export default function OrderDetailsScreen() {
         <DetailRow label="عدد القطع" value={String(order.items_count)} />
         {order.delivery_fee > 0 && <DetailRow label="رسوم التوصيل" value={`${Number(order.delivery_fee).toFixed(2)} ج.م`} />}
         <DetailRow label="الإجمالي" value={`${order.total?.toFixed(2)} ج.م`} highlight />
-        <DetailRow label="طريقة الدفع" value={order.payment_method === 'cash' ? 'كاش' : order.payment_method === 'instapay' ? 'إنستاباي' : 'محفظة'} />
-        <DetailRow label="حالة الدفع" value={order.payment_status === 'confirmed' ? 'مؤكد' : order.payment_status === 'refunded' ? 'مسترد' : 'معلق'} />
+        <DetailRow label="طريقة الدفع" value={{ cash: 'كاش', visa: 'فيزا', e_wallet: 'محفظة إلكترونية', instapay: 'إنستاباي', wallet: 'محفظة' }[order.payment_method] ?? order.payment_method} />
+        <DetailRow label="حالة الدفع" value={{ confirmed: 'مؤكد', refunded: 'مسترد', failed: 'فشل', pending: 'معلق' }[order.payment_status] ?? 'معلق'} />
         <DetailRow label="التاريخ" value={new Date(order.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })} />
         {order.notes && <DetailRow label="ملاحظات" value={order.notes} />}
       </View>
@@ -438,9 +447,11 @@ const s = StyleSheet.create({
 
   trackingCard: {
     backgroundColor: colors.navy[800], borderRadius: 20, padding: 20,
-    borderWidth: 1, borderColor: colors.navy[700], marginBottom: 16, overflow: 'hidden',
+    borderWidth: 1, borderColor: colors.primary + '30', marginBottom: 16, overflow: 'hidden',
   },
-  mapWrapper: { borderRadius: 14, overflow: 'hidden', height: 200, marginBottom: 14 },
+  trackingHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  expandHint: { fontSize: 12, color: colors.primary, fontWeight: '600' },
+  mapWrapper: { borderRadius: 14, overflow: 'hidden', height: 240, marginBottom: 14 },
   map: { flex: 1 },
   etaRow: { flexDirection: 'row', justifyContent: 'space-around' },
   etaItem: { alignItems: 'center', gap: 4 },

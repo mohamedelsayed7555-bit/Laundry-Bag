@@ -16,6 +16,7 @@
     "@supabase/supabase-js": "^2.45.0",
     "expo": "~52.0.0",
     "expo-device": "~7.0.3",
+    "expo-linear-gradient": "~14.0.2",
     "expo-linking": "~7.0.5",
     "expo-local-authentication": "~15.0.2",
     "expo-location": "~18.0.0",

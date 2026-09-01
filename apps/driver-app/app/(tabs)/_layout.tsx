@@ -1,4 +1,5 @@
 import { Tabs } from 'expo-router'
+import { Platform } from 'react-native'
 import { ClipboardList, MapPin, MessageCircle, User } from 'lucide-react-native'
 import { colors } from '../../src/theme'
 
@@ -8,16 +9,28 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.navy[300],
+        tabBarInactiveTintColor: colors.navy[400],
         tabBarStyle: {
+          position: 'absolute',
+          bottom: Platform.OS === 'ios' ? 24 : 16,
+          left: 16,
+          right: 16,
           backgroundColor: colors.navy[800],
-          borderTopColor: colors.navy[700],
-          borderTopWidth: 1,
-          height: 85,
-          paddingTop: 8,
-          paddingBottom: 24,
+          borderRadius: 24,
+          height: 64,
+          borderTopWidth: 0,
+          borderWidth: 1,
+          borderColor: colors.navy[600],
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.3,
+          shadowRadius: 24,
+          elevation: 16,
+          paddingBottom: 0,
+          paddingTop: 6,
         },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '600', marginTop: 2 },
+        tabBarItemStyle: { paddingTop: 4 },
       }}
     >
       <Tabs.Screen name="orders" options={{ title: 'الطلبات', tabBarIcon: ({ color, size }) => <ClipboardList size={size} color={color} /> }} />

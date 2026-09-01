@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, ScrollView, Image, Animated,
+  KeyboardAvoidingView, Platform, ScrollView, Image,
 } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { useCustomAlert } from '../../src/components/CustomAlert'
@@ -72,11 +73,19 @@ export default function LoginScreen() {
     <>
     <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
-        <View style={s.logoBox}>
-          <Image source={require('../../assets/logo.jpg')} style={s.logoImage} resizeMode="contain" />
-          <Text style={s.logoText}>Laundry Bag</Text>
+        {/* Logo Section */}
+        <View style={s.logoSection}>
+          <View style={s.logoGlowWrap}>
+            <View style={s.logoGlow} />
+            <Image source={require('../../assets/logo.jpg')} style={s.logoImage} resizeMode="contain" />
+          </View>
+          <Text style={s.brandName}>Laundry Bag</Text>
           <Text style={s.tagline}>غسيلك في شنطة</Text>
-          <Text style={s.taglineSub}>خدمة غسيل وكي الملابس{'\n'}توصيل سريع وذكي</Text>
+          <View style={s.divider}>
+            <View style={s.dividerLine} />
+            <Text style={s.dividerText}>خدمة غسيل وكي احترافية</Text>
+            <View style={s.dividerLine} />
+          </View>
         </View>
 
         {/* Tabs */}
@@ -98,69 +107,75 @@ export default function LoginScreen() {
         <View style={s.form}>
           {isSignUp && (
             <>
-              <Text style={s.label}>الاسم الكامل</Text>
-              <TextInput
-                style={[s.input, errors.name ? s.inputError : null]}
+              <InputField
+                label="الاسم الكامل"
+                icon="👤"
                 placeholder="محمد أحمد"
-                placeholderTextColor={colors.navy[300]}
                 value={name}
                 onChangeText={v => { setName(v); clearError('name') }}
+                error={errors.name}
                 textAlign="right"
               />
-              {errors.name ? <Text style={s.errorText}>{errors.name}</Text> : null}
-
-              <Text style={s.label}>رقم التليفون</Text>
-              <TextInput
-                style={[s.input, errors.phone ? s.inputError : null]}
+              <InputField
+                label="رقم التليفون"
+                icon="📱"
                 placeholder="01xxxxxxxxx"
-                placeholderTextColor={colors.navy[300]}
                 value={phone}
                 onChangeText={v => { setPhone(v); clearError('phone') }}
+                error={errors.phone}
                 keyboardType="phone-pad"
                 textAlign="left"
               />
-              {errors.phone ? <Text style={s.errorText}>{errors.phone}</Text> : null}
             </>
           )}
 
-          <Text style={s.label}>البريد الإلكتروني</Text>
-          <TextInput
-            style={[s.input, errors.email ? s.inputError : null]}
+          <InputField
+            label="البريد الإلكتروني"
+            icon="✉️"
             placeholder="example@email.com"
-            placeholderTextColor={colors.navy[300]}
             value={email}
             onChangeText={v => { setEmail(v); clearError('email') }}
+            error={errors.email}
             keyboardType="email-address"
             autoCapitalize="none"
             textAlign="left"
           />
-          {errors.email ? <Text style={s.errorText}>{errors.email}</Text> : null}
 
-          <Text style={s.label}>كلمة المرور</Text>
-          <View style={s.passwordContainer}>
-            <TextInput
-              style={[s.passwordInput, errors.password ? s.inputError : null]}
-              placeholder="••••••••"
-              placeholderTextColor={colors.navy[300]}
-              value={password}
-              onChangeText={v => { setPassword(v); clearError('password') }}
-              secureTextEntry={!showPassword}
-              textAlign="left"
-            />
-            <TouchableOpacity style={s.eyeBtn} onPress={() => setShowPassword(!showPassword)}>
-              <Text style={s.eyeIcon}>{showPassword ? '🙈' : '👁️'}</Text>
-            </TouchableOpacity>
+          <View>
+            <Text style={s.label}>🔒  كلمة المرور</Text>
+            <View style={[s.inputWrap, errors.password ? s.inputError : null]}>
+              <TextInput
+                style={s.passwordInput}
+                placeholder="••••••••"
+                placeholderTextColor={colors.navy[400]}
+                value={password}
+                onChangeText={v => { setPassword(v); clearError('password') }}
+                secureTextEntry={!showPassword}
+                textAlign="left"
+              />
+              <TouchableOpacity style={s.eyeBtn} onPress={() => setShowPassword(!showPassword)}>
+                <Text style={s.eyeIcon}>{showPassword ? '🙈' : '👁️'}</Text>
+              </TouchableOpacity>
+            </View>
+            {errors.password ? <Text style={s.errorText}>{errors.password}</Text> : null}
           </View>
-          {errors.password ? <Text style={s.errorText}>{errors.password}</Text> : null}
 
           <TouchableOpacity
             style={[s.button, loading && s.buttonDisabled]}
             onPress={isSignUp ? handleSignUp : handleLogin}
             disabled={loading}
+            activeOpacity={0.8}
           >
-            <Text style={s.buttonText}>
-              {loading ? 'جاري التحميل...' : isSignUp ? 'إنشاء حساب' : 'تسجيل دخول'}
-            </Text>
+            <LinearGradient
+              colors={[colors.primary, colors.primaryDark]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={s.buttonGradient}
+            >
+              <Text style={s.buttonText}>
+                {loading ? 'جاري التحميل...' : isSignUp ? 'إنشاء حساب' : 'تسجيل دخول'}
+              </Text>
+            </LinearGradient>
           </TouchableOpacity>
 
           {!isSignUp && biometricEnabled && (
@@ -175,6 +190,7 @@ export default function LoginScreen() {
                 else router.replace('/(tabs)/home')
               }}
               disabled={bioLoading}
+              activeOpacity={0.7}
             >
               <Text style={s.bioButtonText}>
                 {bioLoading ? 'جاري التحقق...' : '🔐 تسجيل دخول بالبصمة'}
@@ -195,67 +211,94 @@ export default function LoginScreen() {
   )
 }
 
+function InputField({ label, icon, error, ...inputProps }: any) {
+  return (
+    <View>
+      <Text style={s.label}>{icon}  {label}</Text>
+      <View style={[s.inputWrap, error ? s.inputError : null]}>
+        <TextInput
+          style={s.input}
+          placeholderTextColor={colors.navy[400]}
+          {...inputProps}
+        />
+      </View>
+      {error ? <Text style={s.errorText}>{error}</Text> : null}
+    </View>
+  )
+}
+
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.navy[900] },
   content: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40 },
-  logoBox: { alignItems: 'center', marginBottom: 36 },
-  logoImage: { width: 120, height: 120, marginBottom: 16 },
-  logoText: { fontSize: 36, fontWeight: '800', color: '#fff', letterSpacing: 2 },
-  tagline: { fontSize: 16, color: colors.gray[300], marginTop: 8 },
-  taglineSub: { fontSize: 13, color: colors.navy[300], marginTop: 4, textAlign: 'center', lineHeight: 20 },
+
+  logoSection: { alignItems: 'center', marginBottom: 32 },
+  logoGlowWrap: { position: 'relative', marginBottom: 16 },
+  logoGlow: {
+    position: 'absolute', top: -10, left: -10, right: -10, bottom: -10,
+    borderRadius: 70, backgroundColor: colors.primaryGlow,
+  },
+  logoImage: { width: 110, height: 110, borderRadius: 55, borderWidth: 3, borderColor: colors.primary },
+  brandName: {
+    fontSize: 32, fontWeight: '800', color: '#fff', letterSpacing: 1.5,
+  },
+  tagline: { fontSize: 16, color: colors.primary, marginTop: 4, fontWeight: '600' },
+  divider: { flexDirection: 'row', alignItems: 'center', marginTop: 16, gap: 12, width: '100%' },
+  dividerLine: { flex: 1, height: 1, backgroundColor: colors.navy[600] },
+  dividerText: { fontSize: 12, color: colors.navy[300] },
 
   tabs: {
-    flexDirection: 'row', backgroundColor: colors.navy[800], borderRadius: 14,
-    padding: 4, marginBottom: 24,
+    flexDirection: 'row', backgroundColor: colors.navy[800], borderRadius: 16,
+    padding: 4, marginBottom: 24, borderWidth: 1, borderColor: colors.navy[700],
   },
-  tab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 12 },
+  tab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 14 },
   tabActive: { backgroundColor: colors.primary },
-  tabText: { fontSize: 15, fontWeight: '600', color: colors.navy[300] },
+  tabText: { fontSize: 15, fontWeight: '600', color: colors.navy[400] },
   tabTextActive: { color: '#fff' },
 
-  form: { gap: 12 },
-  label: { fontSize: 14, fontWeight: '600', color: colors.navy[100], textAlign: 'right' },
-  input: {
-    borderWidth: 1.5, borderColor: colors.navy[500], borderRadius: 14,
-    padding: 16, fontSize: 18, backgroundColor: colors.navy[800], color: '#fff',
+  form: { gap: 16 },
+  label: { fontSize: 13, fontWeight: '600', color: colors.navy[100], textAlign: 'right', marginBottom: 6 },
+  inputWrap: {
+    borderWidth: 1.5, borderColor: colors.navy[600], borderRadius: 14,
+    backgroundColor: colors.navy[800], overflow: 'hidden',
   },
-  passwordContainer: {
-    flexDirection: 'row', alignItems: 'center',
-    borderWidth: 1.5, borderColor: colors.navy[500], borderRadius: 14,
-    backgroundColor: colors.navy[800],
+  input: {
+    padding: 16, fontSize: 16, color: '#fff',
   },
   passwordInput: {
-    flex: 1, padding: 16, fontSize: 18, color: '#fff',
+    flex: 1, padding: 16, fontSize: 16, color: '#fff',
   },
-  eyeBtn: { paddingHorizontal: 14 },
+  eyeBtn: { paddingHorizontal: 16, justifyContent: 'center' },
   eyeIcon: { fontSize: 20 },
   inputError: {
-    borderColor: '#ef4444', backgroundColor: '#ef444410',
+    borderColor: colors.danger, backgroundColor: colors.dangerGlow,
   },
   errorText: {
-    fontSize: 12, color: '#ef4444', textAlign: 'right', marginTop: 4, fontWeight: '500',
+    fontSize: 11, color: colors.danger, textAlign: 'right', marginTop: 4, fontWeight: '600',
   },
   serverErrorBox: {
-    backgroundColor: '#ef444415', borderWidth: 1, borderColor: '#ef444440',
-    borderRadius: 12, padding: 12, marginBottom: 16,
+    backgroundColor: colors.dangerGlow, borderWidth: 1, borderColor: '#ef444440',
+    borderRadius: 14, padding: 14, marginBottom: 8,
   },
   serverErrorText: {
-    color: '#ef4444', fontSize: 13, textAlign: 'center', fontWeight: '600',
+    color: colors.danger, fontSize: 13, textAlign: 'center', fontWeight: '600',
   },
   button: {
-    backgroundColor: colors.primary, borderRadius: 14, padding: 16, alignItems: 'center',
-    marginTop: 8, shadowColor: colors.primary, shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3, shadowRadius: 12, elevation: 8,
+    borderRadius: 16, overflow: 'hidden', marginTop: 4,
+    shadowColor: colors.primary, shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35, shadowRadius: 14, elevation: 10,
+  },
+  buttonGradient: {
+    padding: 16, alignItems: 'center',
   },
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: '#fff', fontSize: 18, fontWeight: '700' },
   switchText: {
-    color: colors.accent, fontSize: 14, textAlign: 'center', marginTop: 8,
-    textDecorationLine: 'underline',
+    color: colors.accent, fontSize: 14, textAlign: 'center', marginTop: 4,
+    fontWeight: '600',
   },
   bioButton: {
-    borderWidth: 1.5, borderColor: colors.primary, borderRadius: 14, padding: 16,
-    alignItems: 'center', marginTop: 8,
+    borderWidth: 1.5, borderColor: colors.primary, borderRadius: 16, padding: 16,
+    alignItems: 'center', backgroundColor: colors.primaryGlow,
   },
   bioButtonText: { color: colors.primary, fontSize: 16, fontWeight: '700' },
 })

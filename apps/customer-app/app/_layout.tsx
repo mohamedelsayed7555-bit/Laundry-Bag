@@ -51,7 +51,7 @@ export default function RootLayout() {
       <ErrorBoundary>
         <AuthProvider>
           <NotificationSetup />
-          <StatusBar style="dark" />
+          <StatusBar style="light" />
           <Slot />
         </AuthProvider>
       </ErrorBoundary>

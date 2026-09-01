@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { useCustomAlert } from '../../src/components/CustomAlert'
@@ -16,8 +17,8 @@ const services = [
 const paymentMethods = [
   { key: 'cash', icon: '💵', label: 'كاش' },
   { key: 'visa', icon: '💳', label: 'فيزا / ماستركارد' },
-  { key: 'instapay', icon: '📱', label: 'إنستاباي' },
-  { key: 'wallet', icon: '👛', label: 'محفظة' },
+  { key: 'e_wallet', icon: '📱', label: 'محفظة إلكترونية' },
+  { key: 'instapay', icon: '🏦', label: 'إنستاباي' },
 ]
 
 const SUPABASE_URL = 'https://kjqtrmedkvqfofwymoni.supabase.co'
@@ -47,6 +48,7 @@ export default function NewOrderScreen() {
 
   const [cart, setCart] = useState<OrderItem[]>([])
   const [activeSub, setActiveSub] = useState<any>(null)
+  const [walletPhone, setWalletPhone] = useState('')
   const [paymentSettings, setPaymentSettings] = useState<{ instapay: string; wallet: string }>({ instapay: '', wallet: '' })
   const [deliveryFee, setDeliveryFee] = useState(0)
   const [dataLoading, setDataLoading] = useState(true)
@@ -125,12 +127,12 @@ export default function NewOrderScreen() {
   async function handleSubmit() {
     if (!profile) return
     if (cart.length === 0) {
-      showAlert('تنبيه', 'أضف قطعة واحدة على الأقل')
+      showAlert({ title: 'تنبيه', message: 'أضف قطعة واحدة على الأقل', type: 'warning' })
       return
     }
 
     if (activeSub && subRemaining !== null && totalItems > subRemaining) {
-      showAlert('تنبيه', `رصيد باقتك ${subRemaining} قطعة فقط وأنت محتاج ${totalItems} قطعة.\nيمكنك ترقية باقتك أو تقليل عدد القطع.`)
+      showAlert({ title: 'تنبيه', message: `رصيد باقتك ${subRemaining} قطعة فقط وأنت محتاج ${totalItems} قطعة.\nيمكنك ترقية باقتك أو تقليل عدد القطع.`, type: 'warning' })
       return
     }
 
@@ -140,6 +142,12 @@ export default function NewOrderScreen() {
 
     setSaving(true)
     const isOnlinePayment = !useSubscription && (paymentMethod === 'visa' || paymentMethod === 'e_wallet')
+
+    if (isOnlinePayment && paymentMethod === 'e_wallet' && !walletPhone.match(/^01[0-9]{9}$/)) {
+      setSaving(false)
+      showAlert({ title: 'تنبيه', message: 'أدخل رقم موبايل المحفظة بشكل صحيح (01xxxxxxxxx)', type: 'warning' })
+      return
+    }
 
     const { data: orderData, error } = await supabase.from('orders').insert({
       customer_id: profile.id,
@@ -168,7 +176,7 @@ export default function NewOrderScreen() {
 
     if (error) {
       setSaving(false)
-      showAlert('خطأ', error.message || 'حدث خطأ أثناء إنشاء الطلب')
+      showAlert({ title: 'خطأ', message: error.message || 'حدث خطأ أثناء إنشاء الطلب', type: 'error' })
       return
     }
 
@@ -184,6 +192,7 @@ export default function NewOrderScreen() {
           body: JSON.stringify({
             order_id: orderData.id,
             payment_method: paymentMethod === 'visa' ? 'card' : 'wallet',
+            ...(paymentMethod === 'e_wallet' ? { wallet_phone: walletPhone } : {}),
           }),
         })
         const paymentData = await res.json()
@@ -191,11 +200,11 @@ export default function NewOrderScreen() {
         if (paymentData.iframe_url) {
           router.push({ pathname: '/payment', params: { url: paymentData.iframe_url } })
         } else if (paymentData.error) {
-          showAlert('خطأ', paymentData.error)
+          showAlert({ title: 'خطأ', message: paymentData.error, type: 'error' })
         }
       } catch (e) {
         setSaving(false)
-        showAlert('خطأ', 'حدث خطأ في الاتصال بخدمة الدفع')
+        showAlert({ title: 'خطأ', message: 'حدث خطأ في الاتصال بخدمة الدفع', type: 'error' })
       }
       return
     }
@@ -204,9 +213,9 @@ export default function NewOrderScreen() {
     const msg = useSubscription
       ? `تم إنشاء طلبك بنجاح!\nتم خصم ${totalItems} قطعة من باقتك (متبقي ${subRemaining! - totalItems})`
       : 'تم إنشاء طلبك بنجاح! سيتم تعيين سائق قريباً'
-    showAlert('تم', msg, [
+    showAlert({ title: 'تم', message: msg, type: 'success', buttons: [
       { text: 'حسناً', onPress: () => router.replace('/(tabs)/orders') },
-    ])
+    ] })
   }
 
   if (dataLoading) {
@@ -338,18 +347,27 @@ export default function NewOrderScreen() {
         </>
       )}
 
+      {paymentMethod === 'e_wallet' && (
+        <View style={s.paymentInfoCard}>
+          <Text style={s.paymentInfoTitle}>📱 رقم موبايل المحفظة</Text>
+          <TextInput
+            style={s.walletPhoneInput}
+            value={walletPhone}
+            onChangeText={setWalletPhone}
+            placeholder="01xxxxxxxxx"
+            placeholderTextColor={colors.navy[400]}
+            keyboardType="phone-pad"
+            maxLength={11}
+            textAlign="left"
+          />
+          <Text style={s.paymentInfoHint}>أدخل رقم موبايل المحفظة (فودافون كاش / أورانج كاش / إلخ) وهيجيلك إشعار للموافقة على الدفع</Text>
+        </View>
+      )}
+
       {paymentMethod === 'instapay' && paymentSettings.instapay ? (
         <View style={s.paymentInfoCard}>
-          <Text style={s.paymentInfoTitle}>📱 حوّل على رقم الإنستاباي</Text>
+          <Text style={s.paymentInfoTitle}>🏦 حوّل على رقم الإنستاباي</Text>
           <Text style={s.paymentInfoNumber} selectable>{paymentSettings.instapay}</Text>
-          <Text style={s.paymentInfoHint}>حوّل المبلغ وأرسل صورة الإيصال للسائق في المحادثة</Text>
-        </View>
-      ) : null}
-
-      {paymentMethod === 'wallet' && paymentSettings.wallet ? (
-        <View style={s.paymentInfoCard}>
-          <Text style={s.paymentInfoTitle}>👛 حوّل على رقم المحفظة</Text>
-          <Text style={s.paymentInfoNumber} selectable>{paymentSettings.wallet}</Text>
           <Text style={s.paymentInfoHint}>حوّل المبلغ وأرسل صورة الإيصال للسائق في المحادثة</Text>
         </View>
       ) : null}
@@ -377,8 +395,10 @@ export default function NewOrderScreen() {
         )}
       </View>
 
-      <TouchableOpacity style={[s.submitBtn, (saving || cart.length === 0) && s.submitDisabled]} onPress={handleSubmit} disabled={saving || cart.length === 0}>
-        <Text style={s.submitText}>{saving ? 'جاري الإرسال...' : 'تأكيد الطلب'}</Text>
+      <TouchableOpacity style={[s.submitBtn, (saving || cart.length === 0) && s.submitDisabled]} onPress={handleSubmit} disabled={saving || cart.length === 0} activeOpacity={0.8}>
+        <LinearGradient colors={[colors.primary, colors.primaryDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.submitGradient}>
+          <Text style={s.submitText}>{saving ? 'جاري الإرسال...' : 'تأكيد الطلب'}</Text>
+        </LinearGradient>
       </TouchableOpacity>
     </ScrollView>
     {AlertComponent}
@@ -388,8 +408,8 @@ export default function NewOrderScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.navy[900] },
-  content: { padding: 20, paddingTop: 60, paddingBottom: 40 },
-  title: { fontSize: 24, fontWeight: 'bold', color: '#fff', marginBottom: 24 },
+  content: { padding: 20, paddingTop: 56, paddingBottom: 120 },
+  title: { fontSize: 24, fontWeight: '800', color: '#fff', marginBottom: 24 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: '#fff', marginBottom: 12, marginTop: 20 },
   stepLabel: { fontSize: 13, fontWeight: '600', color: colors.navy[200], marginBottom: 8, marginTop: 12 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
@@ -427,7 +447,6 @@ const s = StyleSheet.create({
     color: '#fff', fontSize: 14, borderWidth: 1, borderColor: colors.navy[700], minHeight: 80,
   },
   totalCard: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     backgroundColor: colors.navy[800], borderRadius: 16, padding: 20, marginTop: 24,
     borderWidth: 1, borderColor: colors.navy[700],
   },
@@ -437,9 +456,10 @@ const s = StyleSheet.create({
   breakdownLabel: { fontSize: 13, color: colors.navy[400] },
   breakdownValue: { fontSize: 13, color: colors.navy[200] },
   submitBtn: {
-    backgroundColor: colors.primary, borderRadius: 16, padding: 18, alignItems: 'center', marginTop: 20,
-    shadowColor: colors.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 8,
+    borderRadius: 16, overflow: 'hidden', marginTop: 20,
+    shadowColor: colors.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 14, elevation: 10,
   },
+  submitGradient: { padding: 18, alignItems: 'center' },
   submitDisabled: { opacity: 0.6 },
   submitText: { fontSize: 18, fontWeight: '700', color: '#fff' },
   addAddressBtn: {
@@ -464,7 +484,12 @@ const s = StyleSheet.create({
   },
   paymentInfoTitle: { fontSize: 14, fontWeight: '700', color: '#fff', marginBottom: 8 },
   paymentInfoNumber: { fontSize: 22, fontWeight: 'bold', color: colors.accent, textAlign: 'center', marginBottom: 8, letterSpacing: 2 },
-  paymentInfoHint: { fontSize: 11, color: colors.navy[300], textAlign: 'center' },
+  paymentInfoHint: { fontSize: 11, color: colors.navy[300], textAlign: 'center', marginTop: 8 },
+  walletPhoneInput: {
+    backgroundColor: colors.navy[700], borderRadius: 12, padding: 14,
+    color: '#fff', fontSize: 18, fontWeight: '600', letterSpacing: 1,
+    borderWidth: 1, borderColor: colors.navy[600], textAlign: 'center',
+  },
 
   // Subscription banner
   subBanner: {

@@ -1,7 +1,9 @@
 import { useEffect, useState, useCallback } from 'react'
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Linking } from 'react-native'
 import { useRouter } from 'expo-router'
+import { LinearGradient } from 'expo-linear-gradient'
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated'
+import { Phone, MessageCircle, Navigation } from 'lucide-react-native'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { supabase } from '../../src/lib/supabase'
 import { useRealtimeDriverOrders } from '../../src/hooks/useRealtimeOrders'
@@ -93,29 +95,24 @@ export default function DriverOrdersScreen() {
   }
 
   const statusPriority: Record<string, number> = {
-    assigned: 0,
-    ready: 1,
-    delivering: 2,
-    picked_up: 3,
-    processing: 4,
-    delivered: 5,
+    assigned: 0, ready: 1, delivering: 2, picked_up: 3, processing: 4, delivered: 5,
   }
 
   const activeOrders = orders
     .filter(o => !['delivered'].includes(o.status))
     .sort((a, b) => (statusPriority[a.status] ?? 9) - (statusPriority[b.status] ?? 9))
   const completedOrders = orders.filter(o => o.status === 'delivered')
-
   const filteredOrders = filter === 'active' ? activeOrders : filter === 'completed' ? completedOrders : orders
 
   const renderOrder = ({ item, index }: { item: any; index: number }) => {
     const status = statusConfig[item.status] ?? { label: item.status, color: '#999', icon: '❓' }
     const action = nextAction[item.status]
     const addr = item.address
+    const isActive = item.status !== 'delivered'
 
     return (
       <Animated.View entering={FadeInRight.duration(400).delay(index * 80)}>
-        <View style={s.orderCard}>
+        <View style={[s.orderCard, isActive && { borderColor: status.color + '40' }]}>
           <View style={s.orderHeader}>
             <Text style={s.orderNumber}>{item.order_number}</Text>
             <View style={[s.statusBadge, { backgroundColor: status.color + '20' }]}>
@@ -124,14 +121,20 @@ export default function DriverOrdersScreen() {
             </View>
           </View>
 
+          <View style={s.divider} />
+
           <View style={s.customerInfo}>
-            <Text style={s.customerName}>👤 {item.customer?.name}</Text>
-            {item.customer?.phone ? (
-              <TouchableOpacity onPress={() => Linking.openURL(`tel:${item.customer.phone}`)}>
-                <Text style={s.customerPhoneLink}>📞 {item.customer.phone}</Text>
+            <View style={s.customerAvatar}>
+              <Text style={s.customerAvatarText}>{item.customer?.name?.[0] ?? '؟'}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.customerName}>{item.customer?.name}</Text>
+              {item.customer?.phone && <Text style={s.customerPhone}>{item.customer.phone}</Text>}
+            </View>
+            {item.customer?.phone && (
+              <TouchableOpacity style={s.quickCallBtn} onPress={() => Linking.openURL(`tel:${item.customer.phone}`)}>
+                <Phone size={16} color={colors.primary} />
               </TouchableOpacity>
-            ) : (
-              <Text style={s.customerPhone}>📞 —</Text>
             )}
           </View>
 
@@ -140,7 +143,8 @@ export default function DriverOrdersScreen() {
               <View style={s.addressHeader}>
                 <Text style={s.addressLabel}>📍 {addr?.label || item.delivery_location?.label || 'موقع العميل'}</Text>
                 <TouchableOpacity style={s.navBtn} onPress={() => openNavigation(addr || item.delivery_location)}>
-                  <Text style={s.navBtnText}>🧭 اتجاهات</Text>
+                  <Navigation size={14} color={colors.primary} />
+                  <Text style={s.navBtnText}>اتجاهات</Text>
                 </TouchableOpacity>
               </View>
               {addr && (
@@ -155,43 +159,48 @@ export default function DriverOrdersScreen() {
           )}
 
           <View style={s.orderDetails}>
-            <View style={s.detailRow}>
-              <Text style={s.detailLabel}>الخدمة</Text>
-              <Text style={s.detailValue}>{serviceLabel[item.service_type] ?? item.service_type}</Text>
+            <View style={s.detailChip}>
+              <Text style={s.detailChipLabel}>{serviceLabel[item.service_type] ?? item.service_type}</Text>
             </View>
-            <View style={s.detailRow}>
-              <Text style={s.detailLabel}>القطع</Text>
-              <Text style={s.detailValue}>{item.items_count}</Text>
+            <View style={s.detailChip}>
+              <Text style={s.detailChipLabel}>{item.items_count} قطعة</Text>
             </View>
-            <View style={s.detailRow}>
-              <Text style={s.detailLabel}>المبلغ</Text>
-              <Text style={[s.detailValue, { color: colors.primary, fontWeight: '700' }]}>{item.total?.toFixed(2)} ج.م</Text>
-            </View>
-            <View style={s.detailRow}>
-              <Text style={s.detailLabel}>الدفع</Text>
-              <Text style={s.detailValue}>{item.payment_method === 'cash' ? 'كاش' : item.payment_method === 'instapay' ? 'إنستاباي' : 'محفظة'}</Text>
+            <View style={[s.detailChip, { backgroundColor: colors.primaryGlow, borderColor: colors.primary + '30' }]}>
+              <Text style={[s.detailChipLabel, { color: colors.primary }]}>{item.total?.toFixed(2)} ج.م</Text>
             </View>
           </View>
 
           {item.notes && <Text style={s.notes}>📝 {item.notes}</Text>}
 
           {action && (
-            <TouchableOpacity style={[s.actionBtn, { backgroundColor: status.color }]}
+            <TouchableOpacity
+              style={s.actionBtnWrap}
               onPress={() => showAlert({ title: 'تأكيد', message: `${action.label}؟`, type: 'confirm', buttons: [
                 { text: 'إلغاء', style: 'cancel' },
                 { text: 'تأكيد', onPress: () => updateStatus(item.id, action.status) },
-              ] })}>
-              <Text style={s.actionText}>{action.label}</Text>
+              ] })}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={[status.color, status.color + 'cc']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={s.actionBtn}
+              >
+                <Text style={s.actionText}>{action.label}</Text>
+              </LinearGradient>
             </TouchableOpacity>
           )}
 
           <View style={s.contactRow}>
-            <TouchableOpacity style={s.msgBtn} onPress={() => router.push(`/chat/${item.id}`)}>
-              <Text style={s.msgBtnText}>💬 رسالة</Text>
+            <TouchableOpacity style={s.msgBtn} onPress={() => router.push(`/chat/${item.id}`)} activeOpacity={0.7}>
+              <MessageCircle size={16} color={colors.primary} />
+              <Text style={s.msgBtnText}>رسالة</Text>
             </TouchableOpacity>
             {item.customer?.phone && (
-              <TouchableOpacity style={s.callBtn} onPress={() => Linking.openURL(`tel:${item.customer.phone}`)}>
-                <Text style={s.callBtnText}>📞 اتصال</Text>
+              <TouchableOpacity style={s.callBtn} onPress={() => Linking.openURL(`tel:${item.customer.phone}`)} activeOpacity={0.7}>
+                <Phone size={16} color={colors.accent} />
+                <Text style={s.callBtnText}>اتصال</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -208,8 +217,8 @@ export default function DriverOrdersScreen() {
           <Text style={s.title}>الطلبات</Text>
           <Text style={s.subtitle}>{activeOrders.length} نشط · {completedOrders.length} مكتمل</Text>
         </View>
-        <View style={s.avatar}>
-          <Text style={s.avatarText}>{profile?.name?.[0] ?? '؟'}</Text>
+        <View style={s.headerAvatar}>
+          <Text style={s.headerAvatarText}>{profile?.name?.[0] ?? '؟'}</Text>
         </View>
       </Animated.View>
 
@@ -222,18 +231,16 @@ export default function DriverOrdersScreen() {
       </Animated.View>
 
       <Animated.View entering={FadeInDown.duration(500).delay(200)} style={s.statsRow}>
-        <View style={s.statCard}>
-          <Text style={s.statValue}>{activeOrders.length}</Text>
-          <Text style={s.statLabel}>نشط</Text>
-        </View>
-        <View style={s.statCard}>
-          <Text style={s.statValue}>{orders.filter(o => o.status === 'delivering').length}</Text>
-          <Text style={s.statLabel}>قيد التوصيل</Text>
-        </View>
-        <View style={s.statCard}>
-          <Text style={s.statValue}>{completedOrders.length}</Text>
-          <Text style={s.statLabel}>مكتمل</Text>
-        </View>
+        {[
+          { value: activeOrders.length, label: 'نشط', color: colors.primary },
+          { value: orders.filter(o => o.status === 'delivering').length, label: 'قيد التوصيل', color: colors.warning },
+          { value: completedOrders.length, label: 'مكتمل', color: colors.success },
+        ].map((stat, i) => (
+          <View key={i} style={s.statCard}>
+            <Text style={[s.statValue, { color: stat.color }]}>{stat.value}</Text>
+            <Text style={s.statLabel}>{stat.label}</Text>
+          </View>
+        ))}
       </Animated.View>
 
       {loading ? (
@@ -252,7 +259,7 @@ export default function DriverOrdersScreen() {
           data={filteredOrders}
           renderItem={renderOrder}
           keyExtractor={item => item.id}
-          contentContainerStyle={{ gap: 12, paddingBottom: 20 }}
+          contentContainerStyle={{ gap: 14, paddingBottom: 100 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
           showsVerticalScrollIndicator={false}
         />
@@ -264,69 +271,95 @@ export default function DriverOrdersScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.navy[900], padding: 20, paddingTop: 60 },
+  container: { flex: 1, backgroundColor: colors.navy[900], padding: 20, paddingTop: 56 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  title: { fontSize: 22, fontWeight: '700', color: '#fff' },
+  title: { fontSize: 24, fontWeight: '800', color: '#fff' },
   subtitle: { fontSize: 13, color: colors.navy[300], marginTop: 2 },
-  avatar: {
+  headerAvatar: {
     width: 44, height: 44, borderRadius: 22,
-    backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center',
+    backgroundColor: colors.accent, justifyContent: 'center', alignItems: 'center',
   },
-  avatarText: { fontSize: 18, color: '#fff', fontWeight: 'bold' },
+  headerAvatarText: { fontSize: 18, color: '#fff', fontWeight: '800' },
 
   filterRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  filterBtn: { flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center', backgroundColor: colors.navy[800], borderWidth: 1, borderColor: colors.navy[700] },
+  filterBtn: { flex: 1, paddingVertical: 10, borderRadius: 14, alignItems: 'center', backgroundColor: colors.navy[800], borderWidth: 1, borderColor: colors.navy[700] },
   filterActive: { backgroundColor: colors.primary + '20', borderColor: colors.primary },
   filterText: { fontSize: 13, color: colors.navy[300], fontWeight: '600' },
   filterTextActive: { color: colors.primary },
 
   statsRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
   statCard: {
-    flex: 1, backgroundColor: colors.navy[800], borderRadius: 16, padding: 16,
+    flex: 1, backgroundColor: colors.navy[800], borderRadius: 18, padding: 16,
     alignItems: 'center', borderWidth: 1, borderColor: colors.navy[700],
   },
-  statValue: { fontSize: 22, fontWeight: 'bold', color: '#fff' },
+  statValue: { fontSize: 24, fontWeight: '800' },
   statLabel: { fontSize: 11, color: colors.navy[300], marginTop: 4 },
+
   orderCard: {
-    backgroundColor: colors.navy[800], borderRadius: 20, padding: 20,
+    backgroundColor: colors.navy[800], borderRadius: 22, padding: 20,
     borderWidth: 1, borderColor: colors.navy[700],
   },
-  orderHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  orderNumber: { fontSize: 16, fontWeight: '700', color: '#fff' },
-  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  statusText: { fontSize: 11, fontWeight: '600' },
+  orderHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  orderNumber: { fontSize: 16, fontWeight: '800', color: '#fff' },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
+  statusText: { fontSize: 11, fontWeight: '700' },
+
+  divider: { height: 1, backgroundColor: colors.navy[700], marginVertical: 14 },
+
   customerInfo: {
-    backgroundColor: colors.navy[700] + '60', borderRadius: 12, padding: 12, marginBottom: 12,
-    flexDirection: 'row', justifyContent: 'space-between',
+    flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 10,
   },
-  customerName: { fontSize: 13, color: '#fff', fontWeight: '600' },
-  customerPhone: { fontSize: 13, color: colors.navy[200] },
+  customerAvatar: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: colors.accent + '25', justifyContent: 'center', alignItems: 'center',
+  },
+  customerAvatarText: { fontSize: 16, fontWeight: '700', color: colors.accent },
+  customerName: { fontSize: 14, color: '#fff', fontWeight: '700' },
+  customerPhone: { fontSize: 12, color: colors.navy[300], marginTop: 2 },
+  quickCallBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: colors.primaryGlow, justifyContent: 'center', alignItems: 'center',
+  },
 
   addressBox: {
-    backgroundColor: colors.navy[700] + '40', borderRadius: 12, padding: 12, marginBottom: 12,
+    backgroundColor: colors.navy[700] + '40', borderRadius: 14, padding: 14, marginBottom: 12,
     borderWidth: 1, borderColor: colors.navy[600],
   },
   addressHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
   addressLabel: { fontSize: 13, color: '#fff', fontWeight: '600' },
-  navBtn: { backgroundColor: colors.primary + '20', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  navBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primaryGlow, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 10 },
   navBtnText: { fontSize: 11, color: colors.primary, fontWeight: '700' },
   addressDetail: { fontSize: 11, color: colors.navy[200], marginTop: 2 },
 
-  orderDetails: { gap: 6, marginBottom: 8 },
-  detailRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  detailLabel: { fontSize: 12, color: colors.navy[300] },
-  detailValue: { fontSize: 12, color: '#fff', fontWeight: '500' },
-  notes: { fontSize: 12, color: colors.navy[200], marginTop: 8, marginBottom: 4 },
-  actionBtn: { borderRadius: 14, padding: 14, alignItems: 'center', marginTop: 12 },
-  actionText: { fontSize: 15, fontWeight: '700', color: '#fff' },
-  contactRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
-  msgBtn: { flex: 1, borderWidth: 1, borderColor: colors.primary, borderRadius: 12, padding: 10, alignItems: 'center' },
-  msgBtnText: { fontSize: 13, color: colors.primary, fontWeight: '600' },
-  callBtn: { flex: 1, borderWidth: 1, borderColor: colors.accent, borderRadius: 12, padding: 10, alignItems: 'center' },
-  callBtnText: { fontSize: 13, color: colors.accent, fontWeight: '600' },
-  customerPhoneLink: { fontSize: 13, color: colors.primary, fontWeight: '600', textDecorationLine: 'underline' },
+  orderDetails: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
+  detailChip: {
+    backgroundColor: colors.navy[700], paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: 10, borderWidth: 1, borderColor: colors.navy[600],
+  },
+  detailChipLabel: { fontSize: 12, color: colors.navy[100], fontWeight: '600' },
+
+  notes: { fontSize: 12, color: colors.navy[200], marginTop: 4, marginBottom: 4 },
+
+  actionBtnWrap: { borderRadius: 16, overflow: 'hidden', marginTop: 12 },
+  actionBtn: { padding: 14, alignItems: 'center', borderRadius: 16 },
+  actionText: { fontSize: 15, fontWeight: '800', color: '#fff' },
+
+  contactRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
+  msgBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    borderWidth: 1.5, borderColor: colors.primary + '40', borderRadius: 14, padding: 11,
+    backgroundColor: colors.primaryGlow,
+  },
+  msgBtnText: { fontSize: 13, color: colors.primary, fontWeight: '700' },
+  callBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    borderWidth: 1.5, borderColor: colors.accent + '40', borderRadius: 14, padding: 11,
+    backgroundColor: colors.accentGlow,
+  },
+  callBtnText: { fontSize: 13, color: colors.accent, fontWeight: '700' },
+
   emptyCard: {
-    backgroundColor: colors.navy[800], borderRadius: 20, padding: 40,
+    backgroundColor: colors.navy[800], borderRadius: 22, padding: 40,
     alignItems: 'center', borderWidth: 1, borderColor: colors.navy[700],
   },
   emptyIcon: { fontSize: 40, marginBottom: 12 },

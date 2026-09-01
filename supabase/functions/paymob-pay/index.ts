@@ -26,7 +26,7 @@ Deno.serve(async (req: Request) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Unauthorized");
 
-    const { order_id, payment_method } = await req.json();
+    const { order_id, payment_method, wallet_phone } = await req.json();
     if (!order_id) throw new Error("order_id required");
 
     const { data: order } = await supabase
@@ -100,18 +100,43 @@ Deno.serve(async (req: Request) => {
       .update({ paymob_order_id: String(paymobOrder.id) })
       .eq("id", order_id);
 
-    const result: Record<string, string> = { payment_key: paymentKey };
-
     if (isWallet) {
-      result.type = "wallet";
-    } else {
-      result.type = "card";
-      result.iframe_url = `https://accept.paymob.com/api/acceptance/iframes/${IFRAME_ID}?payment_token=${paymentKey}`;
-    }
+      // Step 4 (wallet): Call wallet pay endpoint
+      const phoneNumber = wallet_phone || profile?.phone || "01000000000";
+      const walletPayRes = await fetch("https://accept.paymob.com/api/acceptance/payments/pay", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: { identifier: phoneNumber, subtype: "WALLET" },
+          payment_token: paymentKey,
+        }),
+      });
+      const walletPayData = await walletPayRes.json();
 
-    return new Response(JSON.stringify(result), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+      if (walletPayData.redirect_url) {
+        return new Response(JSON.stringify({
+          type: "wallet",
+          iframe_url: walletPayData.redirect_url,
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } else {
+        return new Response(JSON.stringify({
+          error: walletPayData.message || "فشل في بدء الدفع بالمحفظة",
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    } else {
+      // Card: return iframe URL
+      return new Response(JSON.stringify({
+        type: "card",
+        iframe_url: `https://accept.paymob.com/api/acceptance/iframes/${IFRAME_ID}?payment_token=${paymentKey}`,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
   } catch (error) {
     return new Response(JSON.stringify({ error: (error as Error).message }), {
       status: 400,

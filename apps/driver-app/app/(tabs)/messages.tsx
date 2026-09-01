@@ -99,12 +99,13 @@ export default function MessagesScreen() {
         <FlatList
           data={conversations}
           keyExtractor={i => i.order_id}
-          contentContainerStyle={{ gap: 8, paddingBottom: 20 }}
+          contentContainerStyle={{ gap: 10, paddingBottom: 100 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={colors.primary} />}
           renderItem={({ item }) => (
             <TouchableOpacity
               style={[s.convoCard, item.unread > 0 && s.convoUnread]}
               onPress={() => router.push(`/chat/${item.order_id}`)}
+              activeOpacity={0.7}
             >
               <View style={s.avatar}>
                 <Text style={s.avatarText}>{item.other_name[0] ?? '?'}</Text>
@@ -140,10 +141,10 @@ function timeAgo(dateStr: string): string {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.navy[900], padding: 20, paddingTop: 60 },
-  title: { fontSize: 22, fontWeight: 'bold', color: '#fff', marginBottom: 20 },
+  container: { flex: 1, backgroundColor: colors.navy[900], padding: 20, paddingTop: 56 },
+  title: { fontSize: 24, fontWeight: '800', color: '#fff', marginBottom: 20 },
   emptyCard: {
-    backgroundColor: colors.navy[800], borderRadius: 20, padding: 40,
+    backgroundColor: colors.navy[800], borderRadius: 22, padding: 40,
     alignItems: 'center', borderWidth: 1, borderColor: colors.navy[700],
   },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
@@ -151,9 +152,9 @@ const s = StyleSheet.create({
   emptySubText: { fontSize: 12, color: colors.navy[400], marginTop: 8 },
   convoCard: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: colors.navy[800],
-    borderRadius: 16, padding: 14, borderWidth: 1, borderColor: colors.navy[700],
+    borderRadius: 18, padding: 16, borderWidth: 1, borderColor: colors.navy[700],
   },
-  convoUnread: { backgroundColor: colors.navy[700], borderColor: colors.primary + '40' },
+  convoUnread: { backgroundColor: colors.navy[700], borderColor: colors.accent + '40' },
   avatar: {
     width: 48, height: 48, borderRadius: 24, backgroundColor: colors.accent + '25',
     justifyContent: 'center', alignItems: 'center', marginLeft: 12,
@@ -166,7 +167,7 @@ const s = StyleSheet.create({
   convoOrderId: { fontSize: 10, color: colors.navy[400], marginTop: 1 },
   convoLastMsg: { fontSize: 13, color: colors.navy[300], marginTop: 2 },
   badge: {
-    backgroundColor: colors.primary, borderRadius: 10, minWidth: 20, height: 20,
+    backgroundColor: colors.accent, borderRadius: 10, minWidth: 20, height: 20,
     justifyContent: 'center', alignItems: 'center', paddingHorizontal: 6, marginRight: 4,
   },
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
