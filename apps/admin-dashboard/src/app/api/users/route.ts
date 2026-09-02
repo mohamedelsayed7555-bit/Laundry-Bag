@@ -54,5 +54,5 @@ export async function POST(request: NextRequest) {
 
   await supabaseAdmin.from('users').update(updates).eq('id', authData.user.id)
 
-  return NextResponse.json({ success: true, id: authData.user.id })
+  return NextResponse.json({ success: true, id: authData.user.id, password })
 }

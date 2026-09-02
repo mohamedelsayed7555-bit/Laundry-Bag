@@ -7,7 +7,7 @@ import DataTable from '@/components/ui/DataTable'
 import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
 import StatCard from '@/components/ui/StatCard'
-import { Search, Plus, Edit2, Power, Eye, Truck, CheckCircle, Clock, XCircle } from 'lucide-react'
+import { Search, Plus, Edit2, Power, Eye, Truck, CheckCircle, Clock, XCircle, Copy } from 'lucide-react'
 import { TableSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import Tooltip from '@/components/ui/Tooltip'
@@ -27,6 +27,7 @@ export default function DriversPage() {
   const [form, setForm] = useState({ name: '', phone: '', email: '', vehicle_type: 'motorcycle', vehicle_number: '' })
   const [page, setPage] = useState(0)
   const [totalCount, setTotalCount] = useState(0)
+  const [newCredentials, setNewCredentials] = useState<{ email: string; password: string } | null>(null)
   const { toast } = useToast()
 
   useEffect(() => { loadDrivers() }, [page, search])
@@ -57,7 +58,7 @@ export default function DriversPage() {
     })
     const result = await res.json()
     setSaving(false)
-    if (result.success) { setShowAdd(false); setForm({ name: '', phone: '', email: '', vehicle_type: 'motorcycle', vehicle_number: '' }); loadDrivers(); toast('تم إضافة السائق بنجاح') }
+    if (result.success) { const creds = { email: form.email || `${Date.now()}@cleano.temp`, password: result.password }; setShowAdd(false); setForm({ name: '', phone: '', email: '', vehicle_type: 'motorcycle', vehicle_number: '' }); setNewCredentials(creds); loadDrivers(); toast('تم إضافة السائق بنجاح') }
     else { toast(result.error ?? 'حدث خطأ أثناء الإضافة', 'error') }
   }
 
@@ -223,6 +224,31 @@ export default function DriversPage() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal open={!!newCredentials} onClose={() => setNewCredentials(null)} title="بيانات دخول السائق">
+        {newCredentials && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-500">احفظ البيانات دي وابعتها للسائق عشان يقدر يسجل دخول</p>
+            <div className="bg-surface-muted/50 rounded-xl p-4 space-y-3">
+              <div>
+                <p className="text-[10px] text-gray-400 mb-0.5">البريد الإلكتروني</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-gray-800 flex-1" dir="ltr">{newCredentials.email}</p>
+                  <button onClick={() => { navigator.clipboard.writeText(newCredentials.email); toast('تم النسخ') }} className="text-gray-400 hover:text-primary-500 transition-colors"><Copy size={14} /></button>
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] text-gray-400 mb-0.5">كلمة المرور</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-gray-800 flex-1 font-mono" dir="ltr">{newCredentials.password}</p>
+                  <button onClick={() => { navigator.clipboard.writeText(newCredentials.password); toast('تم النسخ') }} className="text-gray-400 hover:text-primary-500 transition-colors"><Copy size={14} /></button>
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-red-400">⚠️ الباسورد ده مش هيظهر تاني — انسخه دلوقتي</p>
           </div>
         )}
       </Modal>
