@@ -44,9 +44,9 @@ export default function RatingsPage() {
       .order('rated_at', { ascending: false })
 
     if (filter === 'with_notes') {
-      query = query.not('rating_note', 'is', null).neq('rating_note', '')
+      query = query.not('rating_note', 'is', null).neq('rating_note', '') as any
     } else if (filter === 'low') {
-      query = query.lte('rating_service', 2)
+      query = query.lte('rating_service', 2) as any
     }
 
     const { data, count } = await query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
