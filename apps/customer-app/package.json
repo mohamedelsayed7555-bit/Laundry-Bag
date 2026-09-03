@@ -12,9 +12,12 @@
   },
   "dependencies": {
     "@gorhom/bottom-sheet": "^5.2.14",
+    "@react-native-async-storage/async-storage": "^3.1.1",
+    "@react-native-community/datetimepicker": "^9.2.0",
     "@react-navigation/native": "^7.0.0",
     "@supabase/supabase-js": "^2.45.0",
     "expo": "~52.0.0",
+    "expo-av": "~15.0.2",
     "expo-device": "~7.0.3",
     "expo-image-picker": "~16.0.0",
     "expo-linear-gradient": "~14.0.2",

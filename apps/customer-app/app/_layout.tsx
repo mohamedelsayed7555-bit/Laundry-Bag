@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar'
 import { I18nManager, View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext'
+import { CartProvider } from '../src/contexts/CartContext'
 import { useNotifications } from '../src/hooks/useNotifications'
 import { colors } from '../src/theme'
 
@@ -50,9 +51,11 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ErrorBoundary>
         <AuthProvider>
-          <NotificationSetup />
-          <StatusBar style="light" />
-          <Slot />
+          <CartProvider>
+            <NotificationSetup />
+            <StatusBar style="light" />
+            <Slot />
+          </CartProvider>
         </AuthProvider>
       </ErrorBoundary>
     </GestureHandlerRootView>

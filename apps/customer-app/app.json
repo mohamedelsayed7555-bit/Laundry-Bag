@@ -32,7 +32,22 @@
       "expo-secure-store",
       "expo-local-authentication",
       "expo-location",
-      "expo-image-picker"
+      "expo-image-picker",
+      [
+        "expo-notifications",
+        {
+          "sounds": [
+            "./assets/sounds/order-update.wav",
+            "./assets/sounds/order-placed.wav"
+          ]
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": false
+        }
+      ]
     ],
     "extra": {
       "router": {

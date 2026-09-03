@@ -26,16 +26,37 @@ Deno.serve(async (req: Request) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Unauthorized");
 
-    const { order_id, payment_method, wallet_phone } = await req.json();
-    if (!order_id) throw new Error("order_id required");
+    const { order_id, subscription_id, payment_method, wallet_phone } = await req.json();
+    if (!order_id && !subscription_id) throw new Error("order_id or subscription_id required");
 
-    const { data: order } = await supabase
-      .from("orders")
-      .select("id, order_number, total, customer_id")
-      .eq("id", order_id)
-      .single();
+    let payAmount: number;
+    let merchantOrderId: string;
+    let entityType: "order" | "subscription";
+    let entityId: string;
 
-    if (!order || order.customer_id !== user.id) throw new Error("Order not found");
+    if (subscription_id) {
+      entityType = "subscription";
+      entityId = subscription_id;
+      const { data: sub } = await supabase
+        .from("subscriptions")
+        .select("id, user_id, total_paid, plan_id, plans(name)")
+        .eq("id", subscription_id)
+        .single();
+      if (!sub || sub.user_id !== user.id) throw new Error("Subscription not found");
+      payAmount = sub.total_paid || 0;
+      merchantOrderId = `SUB-${subscription_id.slice(0, 8)}-${Date.now()}`;
+    } else {
+      entityType = "order";
+      entityId = order_id;
+      const { data: order } = await supabase
+        .from("orders")
+        .select("id, order_number, total, customer_id")
+        .eq("id", order_id)
+        .single();
+      if (!order || order.customer_id !== user.id) throw new Error("Order not found");
+      payAmount = order.total;
+      merchantOrderId = `${order.order_number || order.id}-${Date.now()}`;
+    }
 
     const { data: profile } = await supabase
       .from("users")
@@ -49,10 +70,13 @@ Deno.serve(async (req: Request) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ api_key: PAYMOB_API_KEY }),
     });
-    const { token: authToken } = await authRes.json();
+    const authData = await authRes.json();
+    const authToken = authData.token;
+    console.log("Paymob auth success:", !!authToken);
+    if (!authToken) throw new Error("Paymob auth failed: " + JSON.stringify(authData));
 
     // Step 2: Order Registration
-    const amountCents = Math.round(order.total * 100);
+    const amountCents = Math.round(payAmount * 100);
     const orderRes = await fetch("https://accept.paymob.com/api/ecommerce/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -61,11 +85,13 @@ Deno.serve(async (req: Request) => {
         delivery_needed: false,
         amount_cents: amountCents,
         currency: "EGP",
-        merchant_order_id: order.order_number || order.id,
+        merchant_order_id: merchantOrderId,
         items: [],
       }),
     });
     const paymobOrder = await orderRes.json();
+    console.log("Paymob order response:", JSON.stringify(paymobOrder));
+    if (!paymobOrder.id) throw new Error("Paymob order creation failed: " + JSON.stringify(paymobOrder));
 
     // Step 3: Payment Key
     const isWallet = payment_method === "wallet";
@@ -95,10 +121,17 @@ Deno.serve(async (req: Request) => {
     const { token: paymentKey } = await paymentKeyRes.json();
 
     // Save paymob order id
-    await supabase
-      .from("orders")
-      .update({ paymob_order_id: String(paymobOrder.id) })
-      .eq("id", order_id);
+    if (entityType === "order") {
+      await supabase
+        .from("orders")
+        .update({ paymob_order_id: String(paymobOrder.id) })
+        .eq("id", entityId);
+    } else {
+      await supabase
+        .from("subscriptions")
+        .update({ paymob_order_id: String(paymobOrder.id) })
+        .eq("id", entityId);
+    }
 
     if (isWallet) {
       // Step 4 (wallet): Call wallet pay endpoint

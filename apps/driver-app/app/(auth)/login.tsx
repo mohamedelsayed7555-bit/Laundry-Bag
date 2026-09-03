@@ -23,8 +23,12 @@ export default function LoginScreen() {
 
   function validate(): boolean {
     const e: Record<string, string> = {}
-    if (!email.trim()) e.email = 'البريد الإلكتروني مطلوب'
-    else if (!email.includes('@') || !email.includes('.')) e.email = 'بريد إلكتروني غير صحيح'
+    if (!email.trim()) e.email = 'البريد الإلكتروني أو رقم التليفون مطلوب'
+    else {
+      const isPhone = /^01[0-9]{9}$/.test(email.trim())
+      const isEmail = email.includes('@') && email.includes('.')
+      if (!isPhone && !isEmail) e.email = 'ادخل بريد إلكتروني صحيح أو رقم تليفون (01xxxxxxxxx)'
+    }
     if (!password) e.password = 'كلمة المرور مطلوبة'
     setErrors(e)
     return Object.keys(e).length === 0
@@ -62,15 +66,14 @@ export default function LoginScreen() {
         ) : null}
 
         <View style={s.form}>
-          <Text style={s.label}>✉️  البريد الإلكتروني</Text>
+          <Text style={s.label}>👤  البريد الإلكتروني أو رقم التليفون</Text>
           <View style={[s.inputWrap, errors.email ? s.inputError : null]}>
             <TextInput
               style={s.input}
-              placeholder="example@email.com"
+              placeholder="example@email.com أو 01xxxxxxxxx"
               placeholderTextColor={colors.navy[400]}
               value={email}
               onChangeText={v => { setEmail(v); clearError('email') }}
-              keyboardType="email-address"
               autoCapitalize="none"
               textAlign="left"
             />

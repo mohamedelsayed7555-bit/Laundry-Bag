@@ -82,10 +82,21 @@ export default function DriversPage() {
   }
 
   async function toggleActive(id: string, current: boolean) {
+    if (current) {
+      const activeCount = drivers.filter(d => d.is_active && d.id !== id).length
+      if (activeCount === 0) {
+        toast('تحذير: هذا آخر سائق نشط — الطلبات لن يتم تعيينها تلقائياً', 'error')
+      }
+    }
     setDrivers(prev => prev.map(d => d.id === id ? { ...d, is_active: !current } : d))
-    toast(current ? 'تم تعطيل السائق' : 'تم تفعيل السائق')
     const { error } = await supabase.from('users').update({ is_active: !current }).eq('id', id)
-    if (error) { toast('حدث خطأ — جاري التحديث', 'error'); loadDrivers() }
+    if (error) { toast('حدث خطأ — جاري التحديث', 'error'); loadDrivers(); return }
+    if (current) {
+      const { data: count } = await supabase.rpc('redistribute_driver_orders', { p_driver_id: id })
+      toast(count && count > 0 ? `تم تعطيل السائق وتوزيع ${count} طلب` : 'تم تعطيل السائق')
+    } else {
+      toast('تم تفعيل السائق')
+    }
   }
 
   function openEdit(item: any) {

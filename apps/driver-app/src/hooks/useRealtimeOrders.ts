@@ -27,7 +27,7 @@ export function useRealtimeDriverOrders(driverId: string | undefined, onUpdate: 
         },
         (payload) => {
           if (payload.new.driver_id === driverId && payload.old.driver_id !== driverId) {
-            sendLocalNotification('طلب جديد!', `تم تعيين طلب جديد رقم ${payload.new.order_number} لك`)
+            sendLocalNotification('طلب جديد!', `تم تعيين طلب جديد رقم ${payload.new.order_number} لك`, 'new-order')
             onUpdate()
           }
         }

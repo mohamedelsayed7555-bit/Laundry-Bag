@@ -62,7 +62,7 @@ export default function OrdersScreen() {
     if (!profile) return
     const { data } = await supabase
       .from('orders')
-      .select('id, order_number, status, service_type, items_count, total, delivery_fee, notes, payment_status, subscription_id, created_at, driver:users!orders_driver_id_fkey(name, phone)')
+      .select('id, order_number, status, service_type, items_count, total, delivery_fee, cancellation_fee, notes, payment_status, subscription_id, created_at, driver:users!orders_driver_id_fkey(name, phone)')
       .eq('customer_id', profile.id)
       .order('created_at', { ascending: false })
       .limit(50)
@@ -119,6 +119,13 @@ export default function OrdersScreen() {
               <Text style={[s.detailValue, { color: colors.primary, fontWeight: '800' }]}>{item.total?.toFixed(2)} ج.م</Text>
             </View>
           </View>
+
+          {/* Cancellation fee */}
+          {item.status === 'cancelled' && item.cancellation_fee > 0 && (
+            <View style={s.cancelFeeRow}>
+              <Text style={s.cancelFeeText}>💰 رسوم إلغاء: {Number(item.cancellation_fee).toFixed(2)} ج.م</Text>
+            </View>
+          )}
 
           {/* Driver info & actions */}
           {item.driver?.name && (
@@ -226,6 +233,12 @@ const s = StyleSheet.create({
     width: 38, height: 38, borderRadius: 12, backgroundColor: colors.navy[700],
     justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.navy[600],
   },
+
+  cancelFeeRow: {
+    marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.navy[700],
+    backgroundColor: '#ef444415', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8,
+  },
+  cancelFeeText: { fontSize: 12, color: '#ef4444', fontWeight: '600', textAlign: 'center' },
 
   emptyCard: {
     backgroundColor: colors.navy[800], borderRadius: 24, padding: 40,

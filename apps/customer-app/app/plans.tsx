@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Linking } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../src/contexts/AuthContext'
 import { useCustomAlert } from '../src/components/CustomAlert'
@@ -33,11 +33,11 @@ type Subscription = {
   plan_name?: string
 }
 
-const durations = [
-  { key: 'monthly', label: 'شهري', priceKey: 'monthly_price' as const },
-  { key: 'quarterly', label: 'ربع سنوي', priceKey: 'quarterly_price' as const, save: '10%' },
-  { key: 'biannual', label: 'نصف سنوي', priceKey: 'biannual_price' as const, save: '15%' },
-  { key: 'annual', label: 'سنوي', priceKey: 'annual_price' as const, save: '20%' },
+const durationsMeta = [
+  { key: 'monthly', label: 'شهري', months: 1 },
+  { key: 'quarterly', label: 'ربع سنوي', months: 3 },
+  { key: 'biannual', label: 'نصف سنوي', months: 6 },
+  { key: 'annual', label: 'سنوي', months: 12 },
 ]
 
 const tierColors: Record<string, string> = {
@@ -48,9 +48,10 @@ const tierColors: Record<string, string> = {
 }
 
 const paymentMethods = [
-  { key: 'cash', label: 'كاش 💵' },
-  { key: 'instapay', label: 'إنستاباي 📱' },
-  { key: 'wallet', label: 'محفظة 👛' },
+  { key: 'cash', icon: '💵', label: 'كاش' },
+  { key: 'visa', icon: '💳', label: 'فيزا / ماستركارد' },
+  { key: 'wallet', icon: '📱', label: 'محفظة إلكترونية' },
+  { key: 'instapay', icon: '🏦', label: 'إنستاباي' },
 ]
 
 export default function PlansScreen() {
@@ -63,12 +64,33 @@ export default function PlansScreen() {
   const [loading, setLoading] = useState(true)
   const [selectedDuration, setSelectedDuration] = useState('monthly')
   const [subscribing, setSubscribing] = useState(false)
+  const [discountRates, setDiscountRates] = useState({ quarterly: 10, biannual: 15, annual: 20 })
+  const [autoRenew, setAutoRenew] = useState(true)
+  const [selectedPayment, setSelectedPayment] = useState('cash')
 
   useEffect(() => {
     loadData()
   }, [profile])
 
+  function calcPrice(monthlyPrice: number, durationKey: string) {
+    const dur = durationsMeta.find(d => d.key === durationKey)!
+    if (durationKey === 'monthly') return monthlyPrice
+    const rate = discountRates[durationKey as keyof typeof discountRates] ?? 0
+    return Math.round(monthlyPrice * dur.months * (1 - rate / 100))
+  }
+
   async function loadData() {
+    const { data: settingsData } = await supabase.from('settings').select('key, value').in('key', ['discount_quarterly', 'discount_biannual', 'discount_annual'])
+    if (settingsData) {
+      const rates = { ...discountRates }
+      settingsData.forEach(s => {
+        if (s.key === 'discount_quarterly') rates.quarterly = Number(s.value) || 10
+        if (s.key === 'discount_biannual') rates.biannual = Number(s.value) || 15
+        if (s.key === 'discount_annual') rates.annual = Number(s.value) || 20
+      })
+      setDiscountRates(rates)
+    }
+
     const { data: plansData } = await supabase
       .from('plans')
       .select('id, name, description, tier, items_per_month, includes_all_services, monthly_price, quarterly_price, biannual_price, annual_price, is_active')
@@ -109,12 +131,12 @@ export default function PlansScreen() {
   }
 
   async function doSubscribe(plan: Plan) {
-    const dur = durations.find(d => d.key === selectedDuration)!
-    const price = plan[dur.priceKey]
+    const dur = durationsMeta.find(d => d.key === selectedDuration)!
+    const price = calcPrice(plan.monthly_price, selectedDuration)
 
     showAlert({
       title: `اشتراك ${plan.name}`,
-      message: `المدة: ${dur.label}\nالسعر: ${price} ج.م\n${plan.items_per_month} قطعة/شهر\n\nسيتم مراجعة طلبك وتفعيله من الإدارة بعد الدفع`,
+      message: `المدة: ${dur.label}\nالسعر: ${price} ج.م\n${plan.items_per_month} قطعة/شهر\nطريقة الدفع: ${paymentMethods.find(p => p.key === selectedPayment)?.label}\nتجديد تلقائي: ${autoRenew ? 'نعم' : 'لا'}\n\nسيتم مراجعة طلبك وتفعيله من الإدارة بعد الدفع`,
       type: 'confirm',
       buttons: [
         { text: 'إلغاء', style: 'cancel' },
@@ -123,21 +145,41 @@ export default function PlansScreen() {
           onPress: async () => {
             setSubscribing(true)
 
-            const { error } = await supabase.from('subscriptions').insert({
+            const { data: newSub, error } = await supabase.from('subscriptions').insert({
               user_id: profile!.id,
               plan_id: plan.id,
               duration: selectedDuration,
               status: 'pending',
               items_used: 0,
               items_limit: plan.items_per_month,
-              auto_renew: true,
-              payment_method: 'cash',
+              auto_renew: autoRenew,
+              payment_method: selectedPayment,
               total_paid: price,
-            })
-            setSubscribing(false)
+            }).select('id').single()
+
             if (error) {
+              setSubscribing(false)
               showAlert({ title: 'خطأ', message: 'حدث خطأ أثناء إرسال الطلب', type: 'error' })
+              return
+            }
+
+            if (selectedPayment === 'visa' || selectedPayment === 'wallet') {
+              const { data: payData, error: payError } = await supabase.functions.invoke('paymob-pay', {
+                body: {
+                  subscription_id: newSub.id,
+                  payment_method: selectedPayment === 'visa' ? 'card' : 'wallet',
+                  wallet_phone: profile!.phone,
+                },
+              })
+              setSubscribing(false)
+              if (payError || payData?.error) {
+                showAlert({ title: 'خطأ', message: payData?.error || 'فشل في بدء الدفع', type: 'error' })
+              } else if (payData?.iframe_url) {
+                Linking.openURL(payData.iframe_url)
+                showAlert({ title: 'الدفع', message: 'تم فتح صفحة الدفع. بعد الدفع الناجح سيتم تفعيل اشتراكك تلقائياً', type: 'info', buttons: [{ text: 'حسناً', onPress: () => loadData() }] })
+              }
             } else {
+              setSubscribing(false)
               showAlert({ title: 'تم', message: 'تم إرسال طلب الاشتراك! سيتم تفعيله بعد مراجعة الإدارة والدفع', type: 'success', buttons: [{ text: 'حسناً', onPress: () => loadData() }] })
             }
           },
@@ -146,7 +188,7 @@ export default function PlansScreen() {
     })
   }
 
-  const durationObj = durations.find(d => d.key === selectedDuration)!
+  const durationObj = durationsMeta.find(d => d.key === selectedDuration)!
 
   if (loading) {
     return (
@@ -195,10 +237,19 @@ export default function PlansScreen() {
             <Text style={s.subDetailLabel}>ينتهي في</Text>
             <Text style={s.subDetailValue}>{activeSub.end_date}</Text>
           </View>
-          <View style={s.subDetailRow}>
+          <TouchableOpacity style={s.subDetailRow} onPress={async () => {
+            const newVal = !activeSub.auto_renew
+            await supabase.from('subscriptions').update({ auto_renew: newVal }).eq('id', activeSub.id)
+            setActiveSub({ ...activeSub, auto_renew: newVal })
+          }}>
             <Text style={s.subDetailLabel}>تجديد تلقائي</Text>
-            <Text style={s.subDetailValue}>{activeSub.auto_renew ? 'نعم' : 'لا'}</Text>
-          </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={s.subDetailValue}>{activeSub.auto_renew ? 'مفعّل' : 'متوقف'}</Text>
+              <View style={[s.toggleTrackSmall, activeSub.auto_renew && s.toggleTrackActive]}>
+                <View style={[s.toggleThumbSmall, activeSub.auto_renew && s.toggleThumbActiveSmall]} />
+              </View>
+            </View>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -207,23 +258,61 @@ export default function PlansScreen() {
         <>
           <Text style={s.sectionTitle}>اختر مدة الاشتراك</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.durScroll} contentContainerStyle={s.durRow}>
-            {durations.map(d => (
-              <TouchableOpacity
-                key={d.key}
-                style={[s.durChip, selectedDuration === d.key && s.durChipActive]}
-                onPress={() => setSelectedDuration(d.key)}
-              >
-                <Text style={[s.durLabel, selectedDuration === d.key && s.durLabelActive]}>{d.label}</Text>
-                {d.save && <Text style={s.durSave}>وفّر {d.save}</Text>}
-              </TouchableOpacity>
-            ))}
+            {durationsMeta.map(d => {
+              const rate = d.key !== 'monthly' ? discountRates[d.key as keyof typeof discountRates] : 0
+              return (
+                <TouchableOpacity
+                  key={d.key}
+                  style={[s.durChip, selectedDuration === d.key && s.durChipActive]}
+                  onPress={() => setSelectedDuration(d.key)}
+                >
+                  <Text style={[s.durLabel, selectedDuration === d.key && s.durLabelActive]}>{d.label}</Text>
+                  {rate > 0 && <Text style={s.durSave}>وفّر {rate}%</Text>}
+                </TouchableOpacity>
+              )
+            })}
           </ScrollView>
         </>
       )}
 
+      {/* Payment method selector */}
+      {!activeSub && (
+        <>
+          <Text style={s.sectionTitle}>طريقة الدفع</Text>
+          <View style={s.paymentList}>
+            {paymentMethods.map(p => (
+              <TouchableOpacity
+                key={p.key}
+                style={[s.paymentCard, selectedPayment === p.key && s.paymentCardActive]}
+                onPress={() => setSelectedPayment(p.key)}
+              >
+                <Text style={s.paymentIcon}>{p.icon}</Text>
+                <Text style={[s.paymentLabel, selectedPayment === p.key && s.paymentLabelActive]}>{p.label}</Text>
+                {selectedPayment === p.key && (
+                  <View style={s.paymentCheck}><Text style={s.paymentCheckText}>✓</Text></View>
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </>
+      )}
+
+      {/* Auto-renew toggle */}
+      {!activeSub && (
+        <TouchableOpacity style={s.autoRenewRow} onPress={() => setAutoRenew(!autoRenew)} activeOpacity={0.7}>
+          <View style={s.autoRenewInfo}>
+            <Text style={s.autoRenewLabel}>تجديد تلقائي</Text>
+            <Text style={s.autoRenewHint}>الباقة تتجدد تلقائي لما تخلص</Text>
+          </View>
+          <View style={[s.toggleTrack, autoRenew && s.toggleTrackActive]}>
+            <View style={[s.toggleThumb, autoRenew && s.toggleThumbActive]} />
+          </View>
+        </TouchableOpacity>
+      )}
+
       {/* Plans - only show if no active subscription */}
       {!activeSub && plans.map(plan => {
-        const price = plan[durationObj.priceKey]
+        const price = calcPrice(plan.monthly_price, selectedDuration)
         const tierColor = tierColors[plan.tier] ?? colors.primary
         const isCurrentPlan = activeSub?.plan_id === plan.id
 
@@ -342,4 +431,45 @@ const s = StyleSheet.create({
   },
   subscribeBtnDisabled: { backgroundColor: colors.navy[600] },
   subscribeBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+
+  paymentList: { gap: 10, marginBottom: 16 },
+  paymentCard: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.navy[800],
+    borderRadius: 14, padding: 16, borderWidth: 1.5, borderColor: colors.navy[700], gap: 12,
+  },
+  paymentCardActive: { borderColor: colors.primary, backgroundColor: colors.primary + '10' },
+  paymentIcon: { fontSize: 24 },
+  paymentLabel: { fontSize: 14, fontWeight: '600', color: colors.navy[200], flex: 1 },
+  paymentLabelActive: { color: '#fff' },
+  paymentCheck: {
+    width: 24, height: 24, borderRadius: 12, backgroundColor: colors.primary,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  paymentCheckText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+
+  autoRenewRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: colors.navy[800], borderRadius: 16, padding: 16, marginBottom: 20,
+    borderWidth: 1, borderColor: colors.navy[700],
+  },
+  autoRenewInfo: { flex: 1 },
+  autoRenewLabel: { fontSize: 14, fontWeight: '700', color: '#fff' },
+  autoRenewHint: { fontSize: 11, color: colors.navy[300], marginTop: 2 },
+  toggleTrack: {
+    width: 48, height: 28, borderRadius: 14, backgroundColor: colors.navy[600],
+    justifyContent: 'center', padding: 2,
+  },
+  toggleTrackActive: { backgroundColor: colors.primary },
+  toggleThumb: {
+    width: 24, height: 24, borderRadius: 12, backgroundColor: '#fff',
+  },
+  toggleThumbActive: { alignSelf: 'flex-end' },
+  toggleTrackSmall: {
+    width: 36, height: 20, borderRadius: 10, backgroundColor: colors.navy[600],
+    justifyContent: 'center', padding: 2,
+  },
+  toggleThumbSmall: {
+    width: 16, height: 16, borderRadius: 8, backgroundColor: '#fff',
+  },
+  toggleThumbActiveSmall: { alignSelf: 'flex-end' },
 })

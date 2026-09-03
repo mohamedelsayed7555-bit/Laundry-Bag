@@ -87,7 +87,7 @@ export default function OrdersPage() {
 
   async function loadOrders() {
     let query = supabase.from('orders')
-      .select('id, order_number, status, service_type, items_count, total, delivery_fee, notes, payment_status, payment_method, subscription_id, customer_id, driver_id, created_at, customer:users!orders_customer_id_fkey(name, phone, customer_code), driver:users!orders_driver_id_fkey(name, phone), subscription:subscriptions(items_used, items_limit)', { count: 'exact' })
+      .select('id, order_number, status, service_type, items_count, total, delivery_fee, cancellation_fee, cancellation_reason, notes, payment_status, payment_method, subscription_id, customer_id, driver_id, created_at, is_scheduled, scheduled_at, cancelled_at, customer:users!orders_customer_id_fkey(name, phone, customer_code), driver:users!orders_driver_id_fkey(name, phone), subscription:subscriptions(items_used, items_limit)', { count: 'exact' })
       .order('created_at', { ascending: false })
 
     if (statusFilter !== 'all') query = query.eq('status', statusFilter)
@@ -132,6 +132,17 @@ export default function OrdersPage() {
     const { error } = await supabase.from('orders').update({ status: next }).eq('id', order.id)
     if (error) { toast('حدث خطأ — جاري التحديث', 'error'); loadOrders(); return }
     await supabase.from('order_status_history').insert({ order_id: order.id, status: next })
+    if (next === 'ready') {
+      const lat = order.delivery_location?.lat
+      const lng = order.delivery_location?.lng
+      const { data: driverId } = await supabase.rpc('assign_delivery_driver', { p_order_id: order.id, p_lat: lat ? Number(lat) : null, p_lng: lng ? Number(lng) : null })
+      if (driverId) {
+        toast('تم تعيين سائق التوصيل تلقائياً')
+      } else {
+        toast('لا يوجد سائق متاح للتوصيل — يمكنك التعيين يدوياً', 'error')
+      }
+      loadOrders()
+    }
   }
 
   async function loadMessages(orderId: string) {
@@ -233,6 +244,9 @@ export default function OrdersPage() {
     )},
     { key: 'total', label: 'المبلغ', render: (item: any) => <span className="font-semibold text-gray-800">{item.total ? `${item.total.toFixed(2)} ج.م` : '—'}</span> },
     { key: 'driver', label: 'السائق', render: (item: any) => item.notes?.includes('[من المحل]') ? <span className="text-gray-300">—</span> : (item.driver?.name ?? <span className="text-gray-300">—</span>) },
+    { key: 'scheduled', label: 'الموعد', render: (item: any) => item.is_scheduled && item.scheduled_at ? (
+      <span className="text-xs text-amber-500 font-medium">🕐 {new Date(item.scheduled_at).toLocaleDateString('ar-EG')} {new Date(item.scheduled_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</span>
+    ) : <span className="text-gray-300 text-xs">فوري</span> },
     { key: 'status', label: 'الحالة', render: (item: any) => <Badge variant={statusVariant[item.status] ?? 'neutral'}>{ORDER_STATUS_LABELS[item.status as OrderStatus] ?? item.status}</Badge> },
     { key: 'actions', label: '', render: (item: any) => (
       <Tooltip content="عرض التفاصيل">
@@ -330,6 +344,19 @@ export default function OrdersPage() {
               <div className="bg-amber-50/50 rounded-xl p-3 border border-amber-100">
                 <p className="text-[10px] text-amber-600 mb-0.5">ملاحظات</p>
                 <p className="text-sm text-amber-800">{detail.notes}</p>
+              </div>
+            )}
+
+            {detail.status === 'cancelled' && (
+              <div className="bg-red-50/50 rounded-xl p-3 border border-red-100">
+                <p className="text-[10px] text-red-600 mb-0.5">الإلغاء</p>
+                <p className="text-sm text-red-800">{detail.cancellation_reason ?? 'بدون سبب'}</p>
+                {detail.cancellation_fee > 0 && (
+                  <p className="text-sm font-semibold text-red-700 mt-1">💰 رسوم إلغاء: {Number(detail.cancellation_fee).toFixed(2)} ج.م</p>
+                )}
+                {detail.cancelled_at && (
+                  <p className="text-[10px] text-red-400 mt-1">{new Date(detail.cancelled_at).toLocaleString('ar-EG')}</p>
+                )}
               </div>
             )}
 

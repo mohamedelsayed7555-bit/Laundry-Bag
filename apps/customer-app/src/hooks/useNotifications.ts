@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Platform, Alert } from 'react-native'
 import * as Notifications from 'expo-notifications'
 import * as Device from 'expo-device'
+import { Audio } from 'expo-av'
 import { supabase } from '../lib/supabase'
 
 Notifications.setNotificationHandler({
@@ -57,9 +58,23 @@ async function registerForPushNotifications(): Promise<string | null> {
   if (finalStatus !== 'granted') return null
 
   if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('order-updates', {
+      name: 'تحديثات الطلبات',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 300, 150, 300],
+      lightColor: '#00af5f',
+      sound: 'order_update.wav',
+    })
+    await Notifications.setNotificationChannelAsync('order-placed', {
+      name: 'تأكيد الطلب',
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 200, 100, 200],
+      lightColor: '#00af5f',
+      sound: 'order_placed.wav',
+    })
     await Notifications.setNotificationChannelAsync('default', {
       name: 'CLEANO',
-      importance: Notifications.AndroidImportance.MAX,
+      importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#00af5f',
     })
@@ -69,9 +84,27 @@ async function registerForPushNotifications(): Promise<string | null> {
   return tokenData.data
 }
 
-export async function sendLocalNotification(title: string, body: string) {
+export async function sendLocalNotification(title: string, body: string, channelId = 'order-updates') {
   await Notifications.scheduleNotificationAsync({
-    content: { title, body, sound: 'default' },
+    content: { title, body, sound: true },
     trigger: null,
+    ...(Platform.OS === 'android' ? { channelId } : {}),
   })
+}
+
+const soundFiles: Record<string, any> = {
+  'order-update': require('../../../assets/sounds/order-update.wav'),
+  'order-placed': require('../../../assets/sounds/order-placed.wav'),
+}
+
+export async function playNotificationSound(type: 'order-update' | 'order-placed' = 'order-update') {
+  try {
+    const { sound } = await Audio.Sound.createAsync(soundFiles[type])
+    await sound.playAsync()
+    sound.setOnPlaybackStatusUpdate((status) => {
+      if ('didJustFinish' in status && status.didJustFinish) {
+        sound.unloadAsync()
+      }
+    })
+  } catch {}
 }

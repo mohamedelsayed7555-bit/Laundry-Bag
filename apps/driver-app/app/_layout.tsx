@@ -5,6 +5,7 @@ import { I18nManager, View, Text, TouchableOpacity, StyleSheet } from 'react-nat
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext'
 import { useNotifications } from '../src/hooks/useNotifications'
+import NewOrderAlert from '../src/components/NewOrderAlert'
 import { colors } from '../src/theme'
 
 I18nManager.allowRTL(true)
@@ -51,6 +52,7 @@ export default function RootLayout() {
       <ErrorBoundary>
         <AuthProvider>
           <NotificationSetup />
+          <NewOrderAlert />
           <StatusBar style="light" />
           <Slot />
         </AuthProvider>

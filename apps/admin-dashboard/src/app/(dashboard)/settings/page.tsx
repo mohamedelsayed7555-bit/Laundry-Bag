@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Settings, Save, Plus, Trash2, UserCircle, Mail, Lock, Camera, Eye, EyeOff, Check, Users } from 'lucide-react'
+import { Settings, Save, Plus, Trash2, UserCircle, Mail, Lock, Camera, Eye, EyeOff, Check, Users, CreditCard } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Modal from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/Toast'
@@ -11,6 +11,7 @@ import PermissionGate from '@/components/ui/PermissionGate'
 
 const tabs = [
   { key: 'general', label: 'عام', icon: Settings },
+  { key: 'subscriptions', label: 'الاشتراكات', icon: CreditCard },
   { key: 'users', label: 'المستخدمين', icon: Users },
   { key: 'profile', label: 'الملف الشخصي', icon: UserCircle },
   { key: 'security', label: 'الأمان', icon: Lock },
@@ -26,6 +27,8 @@ export default function SettingsPage() {
   const [editValues, setEditValues] = useState<Record<string, string>>({})
   const [showAdd, setShowAdd] = useState(false)
   const [newSetting, setNewSetting] = useState({ key: '', value: '', description: '' })
+  const [discounts, setDiscounts] = useState({ quarterly: '10', biannual: '15', annual: '20' })
+  const [savingDiscounts, setSavingDiscounts] = useState(false)
   const { toast } = useToast()
 
   // Profile states
@@ -60,6 +63,14 @@ export default function SettingsPage() {
     const phoneS = data?.find(s => s.key === 'org_phone')
     if (nameS) setOrgName(String(nameS.value))
     if (phoneS) setOrgPhone(String(phoneS.value))
+    const dq = data?.find(s => s.key === 'discount_quarterly')
+    const db = data?.find(s => s.key === 'discount_biannual')
+    const da = data?.find(s => s.key === 'discount_annual')
+    setDiscounts({
+      quarterly: dq ? String(dq.value) : '10',
+      biannual: db ? String(db.value) : '15',
+      annual: da ? String(da.value) : '20',
+    })
     setLoading(false)
   }
 
@@ -100,6 +111,26 @@ export default function SettingsPage() {
     setNewSetting({ key: '', value: '', description: '' })
     loadSettings()
     toast('تم إضافة الإعداد')
+  }
+
+  async function handleSaveDiscounts() {
+    setSavingDiscounts(true)
+    const entries = [
+      { key: 'discount_quarterly', value: discounts.quarterly, description: 'نسبة خصم ربع سنوي %' },
+      { key: 'discount_biannual', value: discounts.biannual, description: 'نسبة خصم نصف سنوي %' },
+      { key: 'discount_annual', value: discounts.annual, description: 'نسبة خصم سنوي %' },
+    ]
+    for (const entry of entries) {
+      const existing = settings.find(s => s.key === entry.key)
+      if (existing) {
+        await supabase.from('settings').update({ value: entry.value }).eq('id', existing.id)
+      } else {
+        await supabase.from('settings').upsert(entry)
+      }
+    }
+    setSavingDiscounts(false)
+    loadSettings()
+    toast('تم حفظ نسب الخصم')
   }
 
   async function deleteSetting(id: string) {
@@ -231,6 +262,61 @@ export default function SettingsPage() {
               {settings.filter(s => s.key !== 'org_name' && s.key !== 'org_phone').length === 0 && (
                 <p className="text-sm text-gray-400 text-center py-4">لا توجد إعدادات إضافية</p>
               )}
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Subscriptions Tab */}
+      {activeTab === 'subscriptions' && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 max-w-3xl">
+          <div className={sectionClass + ' p-6'}>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-purple-50 rounded-xl"><CreditCard size={20} className="text-purple-600" /></div>
+              <div>
+                <h3 className="font-semibold text-gray-800">نسب خصم فترات الاشتراك</h3>
+                <p className="text-xs text-gray-400 mt-0.5">النسبة بتتطبق على السعر الشهري لحساب سعر الفترة</p>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div className="flex items-center gap-4 p-4 bg-surface-muted/50 rounded-xl">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-700">شهري</p>
+                  <p className="text-xs text-gray-400">السعر الأساسي بدون خصم</p>
+                </div>
+                <div className="w-24 text-center">
+                  <span className="text-sm text-gray-500 font-medium">0%</span>
+                </div>
+              </div>
+              {[
+                { key: 'quarterly' as const, label: 'ربع سنوي', hint: '3 شهور', months: 3 },
+                { key: 'biannual' as const, label: 'نصف سنوي', hint: '6 شهور', months: 6 },
+                { key: 'annual' as const, label: 'سنوي', hint: '12 شهر', months: 12 },
+              ].map(d => (
+                <div key={d.key} className="flex items-center gap-4 p-4 bg-surface-muted/50 rounded-xl">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-700">{d.label}</p>
+                    <p className="text-xs text-gray-400">{d.hint} — مثال: باقة 200 ج.م/شهر = {Math.round(200 * d.months * (1 - Number(discounts[d.key]) / 100))} ج.م</p>
+                  </div>
+                  <div className="relative w-24">
+                    <input
+                      type="number"
+                      min="0"
+                      max="50"
+                      value={discounts[d.key]}
+                      onChange={e => setDiscounts({ ...discounts, [d.key]: e.target.value })}
+                      className="w-full p-2 pr-8 border border-gray-200 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                    />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">%</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end mt-6">
+              <button onClick={handleSaveDiscounts} disabled={savingDiscounts}
+                className="flex items-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:shadow-glow-green disabled:opacity-50 transition-all">
+                <Save size={14} /> {savingDiscounts ? 'جاري الحفظ...' : 'حفظ نسب الخصم'}
+              </button>
             </div>
           </div>
         </motion.div>

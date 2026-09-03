@@ -35,9 +35,16 @@ export default function LoginScreen() {
       if (!name.trim()) e.name = 'الاسم مطلوب'
       if (!phone.trim()) e.phone = 'رقم التليفون مطلوب'
       else if (!/^01[0-9]{9}$/.test(phone.trim())) e.phone = 'رقم تليفون غير صحيح'
+      if (!email.trim()) e.email = 'البريد الإلكتروني مطلوب'
+      else if (!email.includes('@') || !email.includes('.')) e.email = 'بريد إلكتروني غير صحيح'
+    } else {
+      if (!email.trim()) e.email = 'البريد الإلكتروني أو رقم التليفون مطلوب'
+      else {
+        const isPhone = /^01[0-9]{9}$/.test(email.trim())
+        const isEmail = email.includes('@') && email.includes('.')
+        if (!isPhone && !isEmail) e.email = 'ادخل بريد إلكتروني صحيح أو رقم تليفون (01xxxxxxxxx)'
+      }
     }
-    if (!email.trim()) e.email = 'البريد الإلكتروني مطلوب'
-    else if (!email.includes('@') || !email.includes('.')) e.email = 'بريد إلكتروني غير صحيح'
     if (!password) e.password = 'كلمة المرور مطلوبة'
     else if (password.length < 6) e.password = 'كلمة المرور لازم 6 أحرف على الأقل (حروف إنجليزي وأرقام)'
     setErrors(e)
@@ -130,13 +137,13 @@ export default function LoginScreen() {
           )}
 
           <InputField
-            label="البريد الإلكتروني"
-            icon="✉️"
-            placeholder="example@email.com"
+            label={isSignUp ? "البريد الإلكتروني" : "البريد الإلكتروني أو رقم التليفون"}
+            icon={isSignUp ? "✉️" : "👤"}
+            placeholder={isSignUp ? "example@email.com" : "example@email.com أو 01xxxxxxxxx"}
             value={email}
             onChangeText={v => { setEmail(v); clearError('email') }}
             error={errors.email}
-            keyboardType="email-address"
+            keyboardType={isSignUp ? "email-address" : "default"}
             autoCapitalize="none"
             textAlign="left"
           />

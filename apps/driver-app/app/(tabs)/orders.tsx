@@ -63,7 +63,7 @@ export default function DriverOrdersScreen() {
     if (!profile) return
     const { data } = await supabase
       .from('orders')
-      .select('id, order_number, status, service_type, items_count, total, notes, payment_method, payment_status, delivery_location, created_at, customer:users!orders_customer_id_fkey(name, phone, customer_code), address:addresses(label, building, floor, apartment, landmark, lat, lng)')
+      .select('id, order_number, status, service_type, items_count, total, notes, payment_method, payment_status, delivery_location, created_at, is_scheduled, scheduled_at, customer:users!orders_customer_id_fkey(name, phone, customer_code), address:addresses(label, building, floor, apartment, landmark, lat, lng)')
       .eq('driver_id', profile.id)
       .not('status', 'in', '("cancelled","refunded")')
       .order('created_at', { ascending: false })
@@ -135,6 +135,12 @@ export default function DriverOrdersScreen() {
               <Text style={[s.statusText, { color: status.color }]}>{status.label}</Text>
             </View>
           </View>
+
+          {item.is_scheduled && item.scheduled_at && (
+            <View style={s.scheduleBadge}>
+              <Text style={s.scheduleBadgeText}>🕐 موعد: {new Date(item.scheduled_at).toLocaleDateString('ar-EG')} - {new Date(item.scheduled_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</Text>
+            </View>
+          )}
 
           <View style={s.divider} />
 
@@ -387,6 +393,11 @@ const s = StyleSheet.create({
   paymentStatusBadge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8 },
   paymentStatusText: { fontSize: 12, fontWeight: '700' },
 
+  scheduleBadge: {
+    backgroundColor: '#f59e0b15', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6, marginTop: 8,
+    borderWidth: 1, borderColor: '#f59e0b30',
+  },
+  scheduleBadgeText: { fontSize: 12, color: '#f59e0b', fontWeight: '600' },
   notes: { fontSize: 12, color: colors.navy[200], marginTop: 4, marginBottom: 4 },
 
   actionBtnWrap: { borderRadius: 16, overflow: 'hidden', marginTop: 12 },

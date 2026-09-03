@@ -138,8 +138,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null }
   }
 
-  async function signInWithPassword(email: string, password: string) {
-    const { error, data } = await supabase.auth.signInWithPassword({ email, password })
+  async function signInWithPassword(identifier: string, password: string) {
+    const isPhone = /^01[0-9]{9}$/.test(identifier.trim())
+    let loginEmail = identifier
+    if (isPhone) {
+      const { data: user } = await supabase.from('users').select('email').eq('phone', identifier.trim()).single()
+      if (!user?.email) return { error: 'رقم التليفون غير مسجل' }
+      loginEmail = user.email
+    }
+    const { error, data } = await supabase.auth.signInWithPassword({ email: loginEmail, password })
     if (error) return { error: error.message }
 
     if (data.user) {

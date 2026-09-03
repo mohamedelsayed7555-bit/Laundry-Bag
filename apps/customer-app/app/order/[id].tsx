@@ -81,17 +81,44 @@ export default function OrderDetailsScreen() {
   }
 
   async function handleCancel() {
-    showAlert({ title: 'إلغاء الطلب', message: 'هل أنت متأكد من إلغاء هذا الطلب؟', type: 'confirm', buttons: [
-      { text: 'لا', style: 'cancel' },
+    const driverArrived = ['picked_up'].includes(order.status)
+    const fee = driverArrived ? Number(order.delivery_fee ?? 0) : 0
+
+    const message = driverArrived
+      ? `السائق استلم الطلب بالفعل.\n\nفي حالة الإلغاء هتدفع رسوم التوصيل فقط:\n💰 ${fee.toFixed(2)} ج.م\n\nهل تريد الإلغاء؟`
+      : 'هل أنت متأكد من إلغاء هذا الطلب؟\n\nالإلغاء مجاني قبل استلام السائق.'
+
+    showAlert({ title: 'إلغاء الطلب', message, type: 'confirm', buttons: [
+      { text: 'لا، رجوع', style: 'cancel' },
       {
-        text: 'نعم، إلغاء', style: 'destructive', onPress: async () => {
+        text: driverArrived ? `إلغاء ودفع ${fee.toFixed(2)} ج.م` : 'نعم، إلغاء',
+        style: 'destructive',
+        onPress: async () => {
           const { error } = await supabase.from('orders').update({
             status: 'cancelled',
-            cancellation_reason: 'إلغاء بواسطة العميل',
+            cancellation_reason: driverArrived ? 'إلغاء بعد الاستلام — رسوم توصيل' : 'إلغاء بواسطة العميل',
+            cancellation_fee: fee,
             cancelled_at: new Date().toISOString(),
           }).eq('id', id)
-          if (error) showAlert({ title: 'خطأ', message: 'حدث خطأ أثناء الإلغاء', type: 'error' })
-          else loadOrder()
+          if (error) {
+            showAlert({ title: 'خطأ', message: 'حدث خطأ أثناء الإلغاء', type: 'error' })
+          } else {
+            if (driverArrived) {
+              showAlert({
+                title: 'تم الإلغاء',
+                message: `تم إلغاء الطلب.\nرسوم التوصيل: ${fee.toFixed(2)} ج.م`,
+                type: 'warning',
+                buttons: [{ text: 'حسناً', onPress: () => loadOrder() }],
+              })
+            } else {
+              showAlert({
+                title: 'تم الإلغاء',
+                message: 'تم إلغاء طلبك بنجاح بدون أي رسوم.',
+                type: 'success',
+                buttons: [{ text: 'حسناً', onPress: () => loadOrder() }],
+              })
+            }
+          }
         }
       },
     ] })
@@ -245,6 +272,9 @@ export default function OrderDetailsScreen() {
         <DetailRow label="الإجمالي" value={`${order.total?.toFixed(2)} ج.م`} highlight />
         <DetailRow label="طريقة الدفع" value={{ cash: 'كاش', visa: 'فيزا', e_wallet: 'محفظة إلكترونية', instapay: 'إنستاباي', wallet: 'محفظة' }[order.payment_method] ?? order.payment_method} />
         <DetailRow label="حالة الدفع" value={{ confirmed: 'مؤكد', refunded: 'مسترد', failed: 'فشل', pending: 'معلق' }[order.payment_status] ?? 'معلق'} />
+        {order.status === 'cancelled' && order.cancellation_fee > 0 && (
+          <DetailRow label="رسوم الإلغاء" value={`${Number(order.cancellation_fee).toFixed(2)} ج.م`} highlight />
+        )}
         <DetailRow label="التاريخ" value={new Date(order.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })} />
         {order.notes && <DetailRow label="ملاحظات" value={order.notes} />}
       </View>
@@ -345,7 +375,7 @@ export default function OrderDetailsScreen() {
       {!canCancel && order.status !== 'cancelled' && order.status !== 'delivered' && (
         <View style={s.noCancelCard}>
           <Text style={s.noCancelText}>⚠️ لا يمكن إلغاء الطلب في حالة "{status.label}"</Text>
-          <Text style={s.noCancelSub}>يمكن الإلغاء فقط قبل بدء المعالجة. تواصل مع السائق عبر المحادثة لأي استفسار.</Text>
+          <Text style={s.noCancelSub}>يمكن الإلغاء فقط قبل بدء المعالجة. بعد استلام السائق يتم خصم رسوم التوصيل فقط. تواصل مع الدعم لأي مساعدة.</Text>
         </View>
       )}
     </ScrollView>

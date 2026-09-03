@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { sendLocalNotification } from './useNotifications'
+import { sendLocalNotification, playNotificationSound } from './useNotifications'
 
 const statusMessages: Record<string, string> = {
   assigned: 'تم تعيين سائق لطلبك',
@@ -31,7 +31,8 @@ export function useRealtimeOrders(userId: string | undefined, onUpdate: () => vo
           const orderNumber = payload.new.order_number as string
           const message = statusMessages[newStatus]
           if (message) {
-            sendLocalNotification(`طلب ${orderNumber}`, message)
+            sendLocalNotification(`طلب ${orderNumber}`, message, 'order-updates')
+            playNotificationSound('order-update')
           }
           onUpdate()
         }
