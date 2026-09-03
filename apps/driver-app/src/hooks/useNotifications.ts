@@ -88,8 +88,8 @@ export async function sendLocalNotification(title: string, body: string, channel
 }
 
 const soundFiles: Record<string, any> = {
-  'new-order': require('../../../assets/sounds/new-order.wav'),
-  'order-update': require('../../../assets/sounds/order-update.wav'),
+  'new-order': require('../../assets/sounds/new-order.wav'),
+  'order-update': require('../../assets/sounds/order-update.wav'),
 }
 
 export async function playNotificationSound(type: 'new-order' | 'order-update' = 'new-order') {
