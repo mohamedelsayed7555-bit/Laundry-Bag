@@ -31,7 +31,8 @@
       "expo-secure-store",
       "expo-local-authentication",
       "expo-location",
-      "expo-image-picker"
+      "expo-image-picker",
+      "@react-native-community/datetimepicker"
     ],
     "extra": {
       "router": {
