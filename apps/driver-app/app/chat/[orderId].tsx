@@ -13,6 +13,8 @@ type Message = {
   read_at: string | null
 }
 
+const closedStatuses = ['delivered', 'cancelled']
+
 export default function ChatScreen() {
   const { orderId } = useLocalSearchParams<{ orderId: string }>()
   const { profile } = useAuth()
@@ -21,19 +23,30 @@ export default function ChatScreen() {
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const [otherName, setOtherName] = useState('العميل')
+  const [orderStatus, setOrderStatus] = useState<string | null>(null)
   const flatListRef = useRef<FlatList>(null)
+
+  const chatClosed = orderStatus !== null && closedStatuses.includes(orderStatus)
 
   const load = useCallback(async () => {
     if (!profile || !orderId) return
 
-    const { data } = await supabase
-      .from('messages')
-      .select('id, sender_id, receiver_id, body, read_at, created_at')
-      .eq('order_id', orderId)
-      .order('created_at', { ascending: true })
-      .limit(200)
+    const [{ data }, { data: orderData }] = await Promise.all([
+      supabase
+        .from('messages')
+        .select('id, sender_id, receiver_id, body, read_at, created_at')
+        .eq('order_id', orderId)
+        .order('created_at', { ascending: true })
+        .limit(200),
+      supabase
+        .from('orders')
+        .select('status')
+        .eq('id', orderId)
+        .single(),
+    ])
 
     setMessages(data ?? [])
+    if (orderData) setOrderStatus(orderData.status)
 
     const unread = (data ?? []).filter(m => m.receiver_id === profile.id && !m.read_at)
     if (unread.length > 0) {
@@ -69,8 +82,20 @@ export default function ChatScreen() {
     return () => { supabase.removeChannel(channel) }
   }, [profile, orderId])
 
+  useEffect(() => {
+    if (!orderId) return
+    const channel = supabase
+      .channel(`driver-order-status-${orderId}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` }, (payload) => {
+        const newStatus = (payload.new as any).status
+        if (newStatus) setOrderStatus(newStatus)
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [orderId])
+
   async function handleSend() {
-    if (!text.trim() || !profile || !orderId) return
+    if (!text.trim() || !profile || !orderId || chatClosed) return
 
     const { data: order } = await supabase.from('orders').select('customer_id').eq('id', orderId).single()
     if (!order?.customer_id) return
@@ -115,6 +140,13 @@ export default function ChatScreen() {
           <Text style={s.headerName}>{otherName}</Text>
           <Text style={s.headerSub}>طلب #{orderId?.slice(0, 8)}</Text>
         </View>
+        {chatClosed && (
+          <View style={s.closedBadge}>
+            <Text style={s.closedBadgeText}>
+              {orderStatus === 'delivered' ? '✅ مكتمل' : '❌ ملغي'}
+            </Text>
+          </View>
+        )}
       </View>
 
       <FlatList
@@ -139,21 +171,33 @@ export default function ChatScreen() {
         }
       />
 
-      <View style={s.inputRow}>
-        <TouchableOpacity style={[s.sendBtn, (!text.trim() || sending) && { opacity: 0.5 }]} onPress={handleSend} disabled={!text.trim() || sending}>
-          <Text style={s.sendText}>إرسال</Text>
-        </TouchableOpacity>
-        <TextInput
-          style={s.input}
-          value={text}
-          onChangeText={setText}
-          placeholder="اكتب رسالة..."
-          placeholderTextColor={colors.navy[400]}
-          textAlign="right"
-          multiline
-          maxLength={500}
-        />
-      </View>
+      {chatClosed && (
+        <View style={s.closedBanner}>
+          <Text style={s.closedBannerText}>
+            {orderStatus === 'delivered'
+              ? '🔒 تم إغلاق المحادثة — الطلب مكتمل'
+              : '🔒 تم إغلاق المحادثة — الطلب ملغي'}
+          </Text>
+        </View>
+      )}
+
+      {!chatClosed && (
+        <View style={s.inputRow}>
+          <TouchableOpacity style={[s.sendBtn, (!text.trim() || sending) && { opacity: 0.5 }]} onPress={handleSend} disabled={!text.trim() || sending}>
+            <Text style={s.sendText}>إرسال</Text>
+          </TouchableOpacity>
+          <TextInput
+            style={s.input}
+            value={text}
+            onChangeText={setText}
+            placeholder="اكتب رسالة..."
+            placeholderTextColor={colors.navy[400]}
+            textAlign="right"
+            multiline
+            maxLength={500}
+          />
+        </View>
+      )}
     </KeyboardAvoidingView>
   )
 }
@@ -169,6 +213,10 @@ const s = StyleSheet.create({
   headerInfo: { flex: 1 },
   headerName: { fontSize: 16, fontWeight: '700', color: '#fff' },
   headerSub: { fontSize: 11, color: colors.navy[300], marginTop: 1 },
+  closedBadge: {
+    backgroundColor: colors.navy[700], borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4,
+  },
+  closedBadgeText: { fontSize: 11, color: colors.navy[200], fontWeight: '600' },
   msgList: { padding: 16, paddingBottom: 8, flexGrow: 1 },
   bubble: { maxWidth: '78%', borderRadius: 18, padding: 12, marginBottom: 8 },
   bubbleMe: { alignSelf: 'flex-end', backgroundColor: colors.primary, borderBottomLeftRadius: 4 },
@@ -180,6 +228,11 @@ const s = StyleSheet.create({
   bubbleTimeMe: { color: 'rgba(255,255,255,0.6)', textAlign: 'left' },
   emptyChat: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 100 },
   emptyChatText: { color: colors.navy[400], fontSize: 15 },
+  closedBanner: {
+    backgroundColor: colors.navy[800], borderTopWidth: 1, borderTopColor: colors.navy[700],
+    padding: 16, alignItems: 'center',
+  },
+  closedBannerText: { color: colors.navy[300], fontSize: 13, fontWeight: '600' },
   inputRow: {
     flexDirection: 'row', alignItems: 'flex-end', gap: 8,
     backgroundColor: colors.navy[800], padding: 12, paddingBottom: Platform.OS === 'ios' ? 28 : 12,

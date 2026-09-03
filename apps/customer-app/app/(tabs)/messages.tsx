@@ -2,8 +2,9 @@ import { useEffect, useState, useCallback } from 'react'
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
+import { useTheme } from '../../src/contexts/ThemeContext'
+import { useLanguage } from '../../src/contexts/LanguageContext'
 import { supabase } from '../../src/lib/supabase'
-import { colors } from '../../src/theme'
 
 type Conversation = {
   order_id: string
@@ -16,6 +17,8 @@ type Conversation = {
 
 export default function MessagesScreen() {
   const { profile } = useAuth()
+  const { colors } = useTheme()
+  const { t } = useLanguage()
   const router = useRouter()
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [loading, setLoading] = useState(true)
@@ -64,7 +67,7 @@ export default function MessagesScreen() {
       convos.push({
         order_id: orderId,
         other_id: otherId,
-        other_name: userMap.get(otherId) ?? 'سائق',
+        other_name: userMap.get(otherId) ?? 'Driver',
         last_message: last.body,
         last_time: last.created_at,
         unread,
@@ -88,16 +91,15 @@ export default function MessagesScreen() {
   }, [profile, load])
 
   return (
-    <View style={s.container}>
-      <Text style={s.title}>المحادثات</Text>
+    <View style={[s.container, { backgroundColor: colors.navy[900] }]}>
+      <Text style={[s.title, { color: colors.text }]}>{t('messages')}</Text>
 
       {loading ? (
-        <Text style={s.emptyText}>جاري التحميل...</Text>
+        <Text style={[s.emptyText, { color: colors.navy[300] }]}>{t('loading')}</Text>
       ) : conversations.length === 0 ? (
-        <View style={s.emptyCard}>
+        <View style={[s.emptyCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
           <Text style={s.emptyIcon}>💬</Text>
-          <Text style={s.emptyText}>لا توجد محادثات</Text>
-          <Text style={s.emptySubText}>ستظهر هنا محادثاتك مع السائقين</Text>
+          <Text style={[s.emptyText, { color: colors.navy[300] }]}>{t('noMessages')}</Text>
         </View>
       ) : (
         <FlatList
@@ -107,22 +109,21 @@ export default function MessagesScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={colors.primary} />}
           renderItem={({ item }) => (
             <TouchableOpacity
-              style={[s.convoCard, item.unread > 0 && s.convoUnread]}
+              style={[s.convoCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, item.unread > 0 && { backgroundColor: colors.navy[700], borderColor: colors.primary + '40' }]}
               onPress={() => router.push(`/chat/${item.order_id}`)}
             >
-              <View style={s.avatar}>
-                <Text style={s.avatarText}>{item.other_name[0] ?? '?'}</Text>
+              <View style={[s.avatar, { backgroundColor: colors.primary + '25' }]}>
+                <Text style={[s.avatarText, { color: colors.primary }]}>{item.other_name[0] ?? '?'}</Text>
               </View>
               <View style={s.convoContent}>
                 <View style={s.convoHeader}>
-                  <Text style={[s.convoName, item.unread > 0 && { color: '#fff' }]}>{item.other_name}</Text>
-                  <Text style={s.convoTime}>{timeAgo(item.last_time)}</Text>
+                  <Text style={[s.convoName, { color: colors.navy[100] }, item.unread > 0 && { color: colors.text }]}>{item.other_name}</Text>
+                  <Text style={[s.convoTime, { color: colors.navy[400] }]}>{timeAgo(item.last_time)}</Text>
                 </View>
-                <Text style={s.convoOrderId} numberOfLines={1}>طلب #{item.order_id.slice(0, 8)}</Text>
-                <Text style={[s.convoLastMsg, item.unread > 0 && { color: colors.navy[100] }]} numberOfLines={1}>{item.last_message}</Text>
+                <Text style={[s.convoLastMsg, { color: colors.navy[300] }, item.unread > 0 && { color: colors.navy[100] }]} numberOfLines={1}>{item.last_message}</Text>
               </View>
               {item.unread > 0 && (
-                <View style={s.badge}><Text style={s.badgeText}>{item.unread}</Text></View>
+                <View style={[s.badge, { backgroundColor: colors.primary }]}><Text style={s.badgeText}>{item.unread}</Text></View>
               )}
             </TouchableOpacity>
           )}
@@ -135,42 +136,39 @@ export default function MessagesScreen() {
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime()
   const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'الآن'
-  if (mins < 60) return `${mins} د`
+  if (mins < 1) return 'now'
+  if (mins < 60) return `${mins}m`
   const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours} س`
+  if (hours < 24) return `${hours}h`
   const days = Math.floor(hours / 24)
-  return `${days} ي`
+  return `${days}d`
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.navy[900], padding: 20, paddingTop: 56 },
-  title: { fontSize: 24, fontWeight: '800', color: '#fff', marginBottom: 20 },
+  container: { flex: 1, padding: 20, paddingTop: 56 },
+  title: { fontSize: 24, fontWeight: '800', marginBottom: 20 },
   emptyCard: {
-    backgroundColor: colors.navy[800], borderRadius: 20, padding: 40,
-    alignItems: 'center', borderWidth: 1, borderColor: colors.navy[700],
+    borderRadius: 20, padding: 40,
+    alignItems: 'center', borderWidth: 1,
   },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
-  emptyText: { fontSize: 15, color: colors.navy[300], textAlign: 'center' },
-  emptySubText: { fontSize: 12, color: colors.navy[400], marginTop: 8 },
+  emptyText: { fontSize: 15, textAlign: 'center' },
   convoCard: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.navy[800],
-    borderRadius: 16, padding: 14, borderWidth: 1, borderColor: colors.navy[700],
+    flexDirection: 'row', alignItems: 'center',
+    borderRadius: 16, padding: 14, borderWidth: 1,
   },
-  convoUnread: { backgroundColor: colors.navy[700], borderColor: colors.primary + '40' },
   avatar: {
-    width: 48, height: 48, borderRadius: 24, backgroundColor: colors.primary + '25',
+    width: 48, height: 48, borderRadius: 24,
     justifyContent: 'center', alignItems: 'center', marginLeft: 12,
   },
-  avatarText: { fontSize: 18, fontWeight: '700', color: colors.primary },
+  avatarText: { fontSize: 18, fontWeight: '700' },
   convoContent: { flex: 1 },
   convoHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  convoName: { fontSize: 15, fontWeight: '700', color: colors.navy[100] },
-  convoTime: { fontSize: 10, color: colors.navy[400] },
-  convoOrderId: { fontSize: 10, color: colors.navy[400], marginTop: 1 },
-  convoLastMsg: { fontSize: 13, color: colors.navy[300], marginTop: 2 },
+  convoName: { fontSize: 15, fontWeight: '700' },
+  convoTime: { fontSize: 10 },
+  convoLastMsg: { fontSize: 13, marginTop: 2 },
   badge: {
-    backgroundColor: colors.primary, borderRadius: 10, minWidth: 20, height: 20,
+    borderRadius: 10, minWidth: 20, height: 20,
     justifyContent: 'center', alignItems: 'center', paddingHorizontal: 6, marginRight: 4,
   },
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },

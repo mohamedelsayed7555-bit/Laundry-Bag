@@ -5,6 +5,8 @@ import { I18nManager, View, Text, TouchableOpacity, StyleSheet } from 'react-nat
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext'
 import { CartProvider } from '../src/contexts/CartContext'
+import { ThemeProvider, useTheme } from '../src/contexts/ThemeContext'
+import { LanguageProvider } from '../src/contexts/LanguageContext'
 import { useNotifications } from '../src/hooks/useNotifications'
 import { colors } from '../src/theme'
 
@@ -46,17 +48,26 @@ function NotificationSetup() {
   return null
 }
 
+function ThemedStatusBar() {
+  const { isDark } = useTheme()
+  return <StatusBar style={isDark ? 'light' : 'dark'} />
+}
+
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ErrorBoundary>
-        <AuthProvider>
-          <CartProvider>
-            <NotificationSetup />
-            <StatusBar style="light" />
-            <Slot />
-          </CartProvider>
-        </AuthProvider>
+        <ThemeProvider>
+          <LanguageProvider>
+            <AuthProvider>
+              <CartProvider>
+                <NotificationSetup />
+                <ThemedStatusBar />
+                <Slot />
+              </CartProvider>
+            </AuthProvider>
+          </LanguageProvider>
+        </ThemeProvider>
       </ErrorBoundary>
     </GestureHandlerRootView>
   )

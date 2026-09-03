@@ -1,4 +1,6 @@
-export const colors = {
+import { useColorScheme } from 'react-native'
+
+const darkColors = {
   navy: {
     900: '#0a0e1a',
     800: '#121829',
@@ -33,7 +35,69 @@ export const colors = {
   successGlow: 'rgba(16, 185, 129, 0.15)',
   gold: '#fbbf24',
   goldGlow: 'rgba(251, 191, 36, 0.15)',
+  text: '#ffffff',
+  textSecondary: '#818bba',
+  textMuted: '#5765a3',
+  cardBg: '#121829',
+  gradient: ['#0a0e1a', '#121829'] as [string, string],
+  gradientAccent: ['#00c966', '#00875a'] as [string, string],
+  inputBg: '#1a2138',
+  inputBorder: '#222b48',
+  tabBarBg: 'rgba(18, 24, 41, 0.95)',
 } as const
+
+const lightColors = {
+  navy: {
+    900: '#FAF5F0',
+    800: '#F5EDE4',
+    700: '#E8DDD0',
+    600: '#D6C8B8',
+    500: '#BFA98F',
+    400: '#9E8B76',
+    300: '#7A6A58',
+    200: '#5C4E3F',
+    100: '#3D3228',
+  },
+  primary: '#00c966',
+  primaryLight: '#33d480',
+  primaryDark: '#00a352',
+  primaryGlow: 'rgba(0, 201, 102, 0.12)',
+  accent: '#7c5cfc',
+  accentLight: '#9b80fd',
+  accentGlow: 'rgba(124, 92, 252, 0.10)',
+  white: '#3D3228',
+  gray: {
+    100: '#3D3228',
+    200: '#5C4E3F',
+    300: '#7A6A58',
+    400: '#9E8B76',
+    500: '#BFA98F',
+  },
+  danger: '#dc2626',
+  dangerGlow: 'rgba(220, 38, 38, 0.10)',
+  warning: '#d97706',
+  warningGlow: 'rgba(217, 119, 6, 0.10)',
+  success: '#059669',
+  successGlow: 'rgba(5, 150, 105, 0.10)',
+  gold: '#d97706',
+  goldGlow: 'rgba(217, 119, 6, 0.10)',
+  text: '#3D3228',
+  textSecondary: '#7A6A58',
+  textMuted: '#9E8B76',
+  cardBg: '#F5EDE4',
+  gradient: ['#E8D5C0', '#D4B896'] as [string, string],
+  gradientAccent: ['#00c966', '#00a352'] as [string, string],
+  inputBg: '#F5EDE4',
+  inputBorder: '#D6C8B8',
+  tabBarBg: 'rgba(245, 237, 228, 0.95)',
+} as const
+
+export type AppColors = typeof darkColors
+
+export { darkColors, lightColors }
+
+// Default export for backward compatibility
+export const colors = darkColors
 
 export const spacing = {
   xs: 4,

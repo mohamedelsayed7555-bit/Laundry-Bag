@@ -139,10 +139,10 @@ export default function PricesPage() {
           placeholder="مثال: قميص، بنطلون، بدلة..." className="w-full p-3 border border-surface-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all" />
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1.5">التصنيف</label>
-        <select value={form.category_id} onChange={e => setForm({ ...form, category_id: e.target.value })}
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">التصنيف <span className="text-red-400">*</span></label>
+        <select value={form.category_id} onChange={e => setForm({ ...form, category_id: e.target.value })} required
           className="w-full p-3 border border-surface-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all">
-          <option value="">بدون تصنيف</option>
+          <option value="">اختر التصنيف</option>
           {categories.filter(c => c.is_active).map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
         </select>
       </div>
