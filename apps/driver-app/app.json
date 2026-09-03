@@ -41,12 +41,7 @@
           ]
         }
       ],
-      [
-        "expo-av",
-        {
-          "microphonePermission": false
-        }
-      ]
+      "expo-av"
     ],
     "extra": {
       "router": {
