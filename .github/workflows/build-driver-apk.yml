@@ -6,9 +6,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/driver-app
 
     steps:
       - uses: actions/checkout@v4
@@ -17,7 +14,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: apps/driver-app/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - uses: actions/setup-java@v4
         with:
@@ -36,11 +33,12 @@ jobs:
           echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtqcXRybWVka3ZxZm9md3ltb25pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MjQ5NjIsImV4cCI6MjA5NjMwMDk2Mn0.P9VHNeyCXZhVA1f8P_G1SW_mj3C1iiOYIva0pUFnH6s" >> $GITHUB_ENV
 
       - name: Prebuild Android
+        working-directory: apps/driver-app
         run: npx expo prebuild --platform android --clean
 
       - name: Build APK
+        working-directory: apps/driver-app/android
         run: |
-          cd android
           chmod +x gradlew
           ./gradlew assembleRelease
 
