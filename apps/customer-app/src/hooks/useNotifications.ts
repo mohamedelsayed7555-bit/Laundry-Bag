@@ -63,14 +63,12 @@ async function registerForPushNotifications(): Promise<string | null> {
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 300, 150, 300],
       lightColor: '#00af5f',
-      sound: 'order_update.wav',
     })
     await Notifications.setNotificationChannelAsync('order-placed', {
       name: 'تأكيد الطلب',
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 200, 100, 200],
       lightColor: '#00af5f',
-      sound: 'order_placed.wav',
     })
     await Notifications.setNotificationChannelAsync('default', {
       name: 'CLEANO',

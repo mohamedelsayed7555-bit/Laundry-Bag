@@ -58,14 +58,12 @@ async function registerForPushNotifications(): Promise<string | null> {
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 400, 200, 400, 200, 400],
       lightColor: '#00af5f',
-      sound: 'new_order.wav',
     })
     await Notifications.setNotificationChannelAsync('order-updates', {
       name: 'تحديثات الطلبات',
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#00af5f',
-      sound: 'order_update.wav',
     })
     await Notifications.setNotificationChannelAsync('default', {
       name: 'CLEANO Driver',

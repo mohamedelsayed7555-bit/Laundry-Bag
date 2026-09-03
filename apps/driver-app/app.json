@@ -31,17 +31,7 @@
       "expo-router",
       "expo-secure-store",
       "expo-local-authentication",
-      "expo-location",
-      [
-        "expo-notifications",
-        {
-          "sounds": [
-            "./assets/sounds/new-order.wav",
-            "./assets/sounds/order-update.wav"
-          ]
-        }
-      ],
-      "expo-av"
+      "expo-location"
     ],
     "extra": {
       "router": {
