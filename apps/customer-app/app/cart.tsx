@@ -156,7 +156,7 @@ export default function CartScreen() {
       showAlert({ title: isEn ? 'Out of zone' : 'خارج نطاق التوصيل', message: isEn ? `Address is ${distanceKm} km away — max ${zoneSettings.max_zone_km} km` : `العنوان المختار يبعد ${distanceKm} كم — الحد الأقصى ${zoneSettings.max_zone_km} كم`, type: 'warning' })
       return
     }
-    if (activeSub && subRemaining !== null && totalItems > subRemaining) {
+    if (activeSub && subRemaining !== null && subRemaining > 0 && totalItems > subRemaining) {
       showAlert({ title: isEn ? 'Notice' : 'تنبيه', message: isEn ? `Your plan has ${subRemaining} items left but you need ${totalItems}. Upgrade or reduce items.` : `رصيد باقتك ${subRemaining} قطعة فقط وأنت محتاج ${totalItems} قطعة.\nيمكنك ترقية باقتك أو تقليل عدد القطع.`, type: 'warning' })
       return
     }
@@ -331,20 +331,21 @@ export default function CartScreen() {
             {selectedAddress.landmark && <Text style={{ fontSize: 11, color: colors.navy[400], marginTop: 2 }}>📌 {selectedAddress.landmark}</Text>}
           </View>
         )}
-        {addresses.length === 0 ? (
+        <View style={s.addressList}>
+          {addresses.map(addr => (
+            <TouchableOpacity key={addr.id} onPress={() => setSelectedAddress(addr)}
+              style={[s.addressCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, selectedAddress?.id === addr.id && { borderColor: colors.primary, backgroundColor: colors.primary + '10' }]}>
+              <Text style={[s.addressLabel, { color: colors.text }]}>{selectedAddress?.id === addr.id ? '✅' : '📍'} {addr.label}</Text>
+              {(addr.building || addr.floor || addr.apartment) && (
+                <Text style={[s.addressDetail, { color: colors.navy[300] }]}>{[addr.building && `${isEn ? 'Bldg' : 'مبنى'} ${addr.building}`, addr.floor && `${isEn ? 'Floor' : 'ط'}${addr.floor}`, addr.apartment && `${isEn ? 'Apt' : 'ش'}${addr.apartment}`].filter(Boolean).join(' - ')}</Text>
+              )}
+              {addr.landmark && <Text style={[s.addressLandmark, { color: colors.navy[400] }]}>📌 {addr.landmark}</Text>}
+            </TouchableOpacity>
+          ))}
           <TouchableOpacity style={[s.addAddressBtn, { backgroundColor: colors.cardBg, borderColor: colors.primary }]} onPress={() => router.push('/addresses')}>
-            <Text style={[s.addAddressText, { color: colors.primary }]}>📍 {isEn ? 'Add new address' : 'إضافة عنوان جديد'}</Text>
+            <Text style={[s.addAddressText, { color: colors.primary }]}>+ {isEn ? 'Add new address' : 'إضافة عنوان جديد'}</Text>
           </TouchableOpacity>
-        ) : (
-          <View style={s.addressList}>
-            {addresses.map(addr => (
-              <TouchableOpacity key={addr.id} onPress={() => setSelectedAddress(addr)}
-                style={[s.addressCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, selectedAddress?.id === addr.id && { borderColor: colors.primary, backgroundColor: colors.primary + '10' }]}>
-                <Text style={[s.addressLabel, { color: colors.text }]}>{selectedAddress?.id === addr.id ? '✅' : '📍'} {addr.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
+        </View>
 
         <TouchableOpacity style={s.checkboxRow} onPress={() => setSameAddress(!sameAddress)} activeOpacity={0.7}>
           <View style={[s.checkbox, { borderColor: colors.navy[500] }, sameAddress && { backgroundColor: colors.primary, borderColor: colors.primary }]}>
@@ -356,20 +357,21 @@ export default function CartScreen() {
         {!sameAddress && (
           <>
             <Text style={[s.sectionTitle, { color: colors.text }]}>{isEn ? 'Delivery Address' : 'عنوان التسليم (التوصيل)'}</Text>
-            {addresses.length === 0 ? (
+            <View style={s.addressList}>
+              {addresses.map(addr => (
+                <TouchableOpacity key={addr.id} onPress={() => setDeliveryAddress(addr)}
+                  style={[s.addressCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, deliveryAddress?.id === addr.id && { borderColor: colors.primary, backgroundColor: colors.primary + '10' }]}>
+                  <Text style={[s.addressLabel, { color: colors.text }]}>{deliveryAddress?.id === addr.id ? '✅' : '📍'} {addr.label}</Text>
+                  {(addr.building || addr.floor || addr.apartment) && (
+                    <Text style={[s.addressDetail, { color: colors.navy[300] }]}>{[addr.building && `${isEn ? 'Bldg' : 'مبنى'} ${addr.building}`, addr.floor && `${isEn ? 'Floor' : 'ط'}${addr.floor}`, addr.apartment && `${isEn ? 'Apt' : 'ش'}${addr.apartment}`].filter(Boolean).join(' - ')}</Text>
+                  )}
+                  {addr.landmark && <Text style={[s.addressLandmark, { color: colors.navy[400] }]}>📌 {addr.landmark}</Text>}
+                </TouchableOpacity>
+              ))}
               <TouchableOpacity style={[s.addAddressBtn, { backgroundColor: colors.cardBg, borderColor: colors.primary }]} onPress={() => router.push('/addresses')}>
-                <Text style={[s.addAddressText, { color: colors.primary }]}>📍 {isEn ? 'Add new address' : 'إضافة عنوان جديد'}</Text>
+                <Text style={[s.addAddressText, { color: colors.primary }]}>+ {isEn ? 'Add new address' : 'إضافة عنوان جديد'}</Text>
               </TouchableOpacity>
-            ) : (
-              <View style={s.addressList}>
-                {addresses.map(addr => (
-                  <TouchableOpacity key={addr.id} onPress={() => setDeliveryAddress(addr)}
-                    style={[s.addressCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, deliveryAddress?.id === addr.id && { borderColor: colors.primary, backgroundColor: colors.primary + '10' }]}>
-                    <Text style={[s.addressLabel, { color: colors.text }]}>📍 {addr.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
+            </View>
           </>
         )}
 
@@ -381,6 +383,33 @@ export default function CartScreen() {
             {!outOfZone && deliveryFee > 0 && (
               <Text style={[s.distanceFee, { color: colors.navy[300] }]}>{isEn ? `Delivery fee: ${deliveryFee} EGP` : `رسوم التوصيل: ${deliveryFee} ج.م`}</Text>
             )}
+          </View>
+        )}
+
+        {activeSub && subExhausted && (
+          <View style={[s.subCoverBanner, { backgroundColor: '#f59e0b18', borderColor: '#f59e0b40' }]}>
+            <Text style={s.subCoverIcon}>⚠️</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.subCoverTitle, { color: '#f59e0b' }]}>{isEn ? 'Plan limit reached' : 'رصيد الباقة خلص'}</Text>
+              <Text style={[s.subCoverDetail, { color: colors.navy[300] }]}>
+                {isEn ? 'You have used all items in your plan. This order will be paid normally.' : 'استهلكت كل قطع باقتك. الطلب ده هيتدفع عادي.'}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {useSubscription && activeSub && (
+          <View style={[s.subCoverBanner, { backgroundColor: '#10b98118', borderColor: '#10b98140' }]}>
+            <Text style={s.subCoverIcon}>✅</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.subCoverTitle, { color: '#10b981' }]}>{isEn ? 'Covered by your plan' : 'مغطى من باقتك'}</Text>
+              <Text style={[s.subCoverDetail, { color: colors.navy[300] }]}>
+                {isEn
+                  ? `${totalItems} items will be deducted — ${subRemaining! - totalItems} remaining after this order`
+                  : `سيتم خصم ${totalItems} قطعة — متبقي ${subRemaining! - totalItems} قطعة بعد الطلب`}
+              </Text>
+              <Text style={[s.subCoverPlan, { color: colors.navy[400] }]}>📦 {activeSub.plans?.name ?? (isEn ? 'Subscription' : 'الباقة')}</Text>
+            </View>
           </View>
         )}
 
@@ -547,6 +576,8 @@ const s = StyleSheet.create({
     borderWidth: 1.5,
   },
   addressLabel: { fontSize: 14, fontWeight: '600' },
+  addressDetail: { fontSize: 12, marginTop: 4 },
+  addressLandmark: { fontSize: 11, marginTop: 2 },
   checkboxRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     marginTop: 16, paddingVertical: 8,
@@ -587,6 +618,14 @@ const s = StyleSheet.create({
   },
   distanceText: { fontSize: 13, fontWeight: '600' },
   distanceFee: { fontSize: 12, marginTop: 4 },
+  subCoverBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    borderRadius: 16, padding: 16, borderWidth: 1.5, marginBottom: 4,
+  },
+  subCoverIcon: { fontSize: 28 },
+  subCoverTitle: { fontSize: 15, fontWeight: '700' },
+  subCoverDetail: { fontSize: 12, marginTop: 4, lineHeight: 18 },
+  subCoverPlan: { fontSize: 11, marginTop: 4 },
   scheduleToggle: {
     flexDirection: 'row', gap: 10, marginBottom: 12,
   },
