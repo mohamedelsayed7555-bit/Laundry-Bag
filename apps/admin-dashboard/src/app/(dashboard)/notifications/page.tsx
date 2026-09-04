@@ -49,9 +49,9 @@ export default function NotificationsPage() {
         const ids = (subUsers ?? []).map(s => s.user_id)
         if (ids.length > 0) query = (query as any).not('id', 'in', `(${ids.join(',')})`)
       }
-      const { data, error } = await query.order('name')
+      const { data, error } = await query.not('phone', 'is', null).order('name')
       if (error) { toast('خطأ في تحميل العملاء: ' + error.message, 'error'); setLoadingWa(false); return }
-      setWaCustomers(data ?? [])
+      setWaCustomers((data ?? []).filter(c => c.phone))
       setLoadingWa(false)
       setShowWaList(true)
     } catch (e) {
@@ -60,7 +60,8 @@ export default function NotificationsPage() {
     }
   }
 
-  function getWaLink(phone: string) {
+  function getWaLink(phone: string | null) {
+    if (!phone) return '#'
     let num = phone.replace(/\D/g, '')
     if (num.startsWith('0')) num = '2' + num
     if (!num.startsWith('20')) num = '20' + num
