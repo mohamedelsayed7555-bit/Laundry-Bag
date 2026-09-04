@@ -265,7 +265,7 @@ export default function OrdersPage() {
     { key: 'total', label: 'المبلغ', render: (item: any) => <span className="font-semibold text-gray-800">{item.total ? `${item.total.toFixed(2)} ج.م` : '—'}</span> },
     { key: 'payment', label: 'الدفع', render: (item: any) => {
       const pmLabels: Record<string, string> = { cash: 'كاش', visa: 'فيزا', e_wallet: 'محفظة', instapay: 'إنستاباي' }
-      const psVariant: Record<string, string> = { confirmed: 'success', pending: 'warning', failed: 'error' }
+      const psVariant: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> = { confirmed: 'success', pending: 'warning', failed: 'danger' }
       const psLabels: Record<string, string> = { confirmed: 'مدفوع', pending: 'معلق', failed: 'فشل' }
       return (
         <div className="text-center">
@@ -363,7 +363,7 @@ export default function OrdersPage() {
                 { label: 'الحالة', value: <Badge variant={statusVariant[detail.status]}>{ORDER_STATUS_LABELS[detail.status as OrderStatus]}</Badge> },
                 { label: 'المبلغ', value: `${detail.total?.toFixed(2) ?? '—'} ج.م` },
                 { label: 'الدفع', value: <div>
-                  <Badge variant={detail.payment_status === 'confirmed' ? 'success' : detail.payment_status === 'failed' ? 'error' : 'warning'}>
+                  <Badge variant={detail.payment_status === 'confirmed' ? 'success' : detail.payment_status === 'failed' ? 'danger' : 'warning'}>
                     {detail.payment_status === 'confirmed' ? 'مدفوع' : detail.payment_status === 'failed' ? 'فشل' : 'معلق'}
                   </Badge>
                   <p className="text-[10px] text-gray-400 mt-0.5">
