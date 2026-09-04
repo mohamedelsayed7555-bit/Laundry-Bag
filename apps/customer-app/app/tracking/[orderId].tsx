@@ -1,9 +1,41 @@
 import { useEffect, useState, useRef } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, Linking, Platform } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import MapView, { Marker } from 'react-native-maps'
+import { WebView } from 'react-native-webview'
 import { supabase } from '../../src/lib/supabase'
 import { colors } from '../../src/theme'
+
+function buildFullTrackingMapHTML(driverLat: number, driverLng: number, customerLat?: number, customerLng?: number, driverName?: string) {
+  const centerLat = customerLat ? (driverLat + customerLat) / 2 : driverLat
+  const centerLng = customerLng ? (driverLng + customerLng) / 2 : driverLng
+  const zoom = customerLat ? 14 : 15
+  const customerMarker = customerLat && customerLng
+    ? `var custMarker = L.marker([${customerLat}, ${customerLng}], {
+        icon: L.divIcon({ className: '', html: '<div style="background:#10b981;width:16px;height:16px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4)"></div>', iconSize: [16, 16], iconAnchor: [8, 8] })
+      }).addTo(map).bindPopup('موقعك');`
+    : ''
+  return `<!DOCTYPE html>
+<html><head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
+<style>*{margin:0;padding:0}#map{width:100vw;height:100vh}.leaflet-control-attribution{display:none!important}</style>
+</head><body>
+<div id="map"></div>
+<script>
+  var map = L.map('map').setView([${centerLat}, ${centerLng}], ${zoom});
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19}).addTo(map);
+  var driverMarker = L.marker([${driverLat}, ${driverLng}], {
+    icon: L.divIcon({ className: '', html: '<div style="background:#3b82f6;width:18px;height:18px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.5)"></div>', iconSize: [18, 18], iconAnchor: [9, 9] })
+  }).addTo(map).bindPopup('${driverName ?? 'السائق'}');
+  ${customerMarker}
+  window.updateDriver = function(lat, lng) {
+    driverMarker.setLatLng([lat, lng]);
+    ${customerLat ? `var bounds = L.latLngBounds([[lat, lng], [${customerLat}, ${customerLng}]]); map.fitBounds(bounds, {padding: [40, 40]});` : `map.setView([lat, lng], 15);`}
+  };
+<\/script>
+</body></html>`
+}
 
 const statusLabels: Record<string, string> = {
   assigned: 'في الطريق للاستلام',
@@ -14,7 +46,7 @@ const statusLabels: Record<string, string> = {
 export default function TrackingScreen() {
   const { orderId } = useLocalSearchParams<{ orderId: string }>()
   const router = useRouter()
-  const mapRef = useRef<MapView>(null)
+  const mapWebviewRef = useRef<WebView>(null)
   const [order, setOrder] = useState<any>(null)
   const [driverLoc, setDriverLoc] = useState<{ lat: number; lng: number } | null>(null)
 
@@ -47,6 +79,12 @@ export default function TrackingScreen() {
       .subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [order?.driver_id, order?.status])
+
+  useEffect(() => {
+    if (driverLoc && mapWebviewRef.current) {
+      mapWebviewRef.current.injectJavaScript(`window.updateDriver && window.updateDriver(${driverLoc.lat}, ${driverLoc.lng}); true;`)
+    }
+  }, [driverLoc])
 
   async function loadOrder() {
     const { data } = await supabase
@@ -96,38 +134,15 @@ export default function TrackingScreen() {
       {/* Map */}
       <View style={s.mapContainer}>
         {showMap ? (
-          <MapView
-            ref={mapRef}
+          <WebView
+            ref={mapWebviewRef}
+            source={{ html: buildFullTrackingMapHTML(driverLoc.lat, driverLoc.lng, customerLat, customerLng, order?.driver?.name) }}
             style={s.map}
-            initialRegion={{
-              latitude: driverLoc.lat,
-              longitude: driverLoc.lng,
-              latitudeDelta: 0.03,
-              longitudeDelta: 0.03,
-            }}
-            region={driverLoc ? {
-              latitude: (driverLoc.lat + (customerLat ?? driverLoc.lat)) / 2,
-              longitude: (driverLoc.lng + (customerLng ?? driverLoc.lng)) / 2,
-              latitudeDelta: Math.max(0.02, Math.abs(driverLoc.lat - (customerLat ?? driverLoc.lat)) * 2.5),
-              longitudeDelta: Math.max(0.02, Math.abs(driverLoc.lng - (customerLng ?? driverLoc.lng)) * 2.5),
-            } : undefined}
-            showsUserLocation
-            showsMyLocationButton
-          >
-            <Marker
-              coordinate={{ latitude: driverLoc.lat, longitude: driverLoc.lng }}
-              title={order?.driver?.name ?? 'السائق'}
-              description={statusLabels[order?.status] ?? ''}
-              pinColor="#3b82f6"
-            />
-            {customerLat && customerLng && (
-              <Marker
-                coordinate={{ latitude: customerLat, longitude: customerLng }}
-                title="موقعك"
-                pinColor="#10b981"
-              />
-            )}
-          </MapView>
+            javaScriptEnabled
+            domStorageEnabled
+            startInLoadingState
+            originWhitelist={['*']}
+          />
         ) : (
           <View style={s.noMap}>
             <Text style={s.noMapIcon}>📍</Text>

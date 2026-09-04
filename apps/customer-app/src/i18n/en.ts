@@ -153,6 +153,7 @@ export default {
 
   // New Order
   newOrderTitle: 'New Order',
+  pickupAddress: 'Pickup Address',
   serviceType: 'Service Type',
   items: 'Items',
   addItems: 'Add Items',

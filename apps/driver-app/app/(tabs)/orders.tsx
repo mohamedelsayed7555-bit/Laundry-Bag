@@ -88,6 +88,7 @@ export default function DriverOrdersScreen() {
       await supabase.from('order_status_history').insert({
         order_id: orderId, status: newStatus, changed_by: profile?.id,
       })
+      sendPushToCustomer(orderId, newStatus)
       if (newStatus === 'delivered') {
         showAlert({ title: 'تم التسليم', message: 'تم تسليم الطلب للعميل بنجاح', type: 'success', buttons: [
           { text: 'حسناً', onPress: () => loadOrders() },
@@ -98,6 +99,36 @@ export default function DriverOrdersScreen() {
         loadOrders()
       }
     }
+  }
+
+  async function sendPushToCustomer(orderId: string, newStatus: string) {
+    try {
+      const { data: order } = await supabase.from('orders').select('customer_id, order_number').eq('id', orderId).single()
+      if (!order) return
+      const { data: customer } = await supabase.from('users').select('fcm_token').eq('id', order.customer_id).single()
+      if (!customer?.fcm_token) return
+      const statusMessages: Record<string, string> = {
+        assigned: 'تم تعيين سائق لطلبك',
+        picked_up: 'تم استلام ملابسك من السائق',
+        processing: 'ملابسك قيد المعالجة الآن',
+        ready: 'ملابسك جاهزة للتوصيل!',
+        delivering: 'السائق في طريقه إليك',
+        delivered: 'تم توصيل طلبك بنجاح!',
+      }
+      const message = statusMessages[newStatus]
+      if (!message) return
+      fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: customer.fcm_token,
+          title: `طلب ${order.order_number}`,
+          body: message,
+          sound: 'default',
+          data: { type: 'order_update', order_id: orderId, status: newStatus },
+        }),
+      }).catch(() => {})
+    } catch {}
   }
 
   function openNavigation(addr: any) {

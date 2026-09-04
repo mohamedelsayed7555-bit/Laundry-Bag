@@ -119,6 +119,25 @@ export default function OrdersPage() {
     const { error } = await supabase.from('orders').update({ driver_id: driverId, status: 'assigned' }).eq('id', orderId)
     if (error) { toast('حدث خطأ — جاري التحديث', 'error'); loadOrders(); return }
     await supabase.from('order_status_history').insert({ order_id: orderId, status: 'assigned', changed_by: driverId })
+    sendPushToCustomer(orderId, 'assigned')
+  }
+
+  async function sendPushToCustomer(orderId: string, newStatus: string) {
+    try {
+      const { data: order } = await supabase.from('orders').select('customer_id, order_number').eq('id', orderId).single()
+      if (!order) return
+      const { data: customer } = await supabase.from('users').select('fcm_token').eq('id', order.customer_id).single()
+      if (!customer?.fcm_token) return
+      const msgs: Record<string, string> = {
+        assigned: 'تم تعيين سائق لطلبك', picked_up: 'تم استلام ملابسك', processing: 'ملابسك قيد المعالجة',
+        ready: 'ملابسك جاهزة للتوصيل!', delivering: 'السائق في طريقه إليك', delivered: 'تم توصيل طلبك بنجاح!', cancelled: 'تم إلغاء طلبك',
+      }
+      if (!msgs[newStatus]) return
+      fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: customer.fcm_token, title: `طلب ${order.order_number}`, body: msgs[newStatus], sound: 'default', data: { type: 'order_update', order_id: orderId, status: newStatus } }),
+      }).catch(() => {})
+    } catch {}
   }
 
   async function advanceStatus(order: any) {
@@ -132,6 +151,7 @@ export default function OrdersPage() {
     const { error } = await supabase.from('orders').update({ status: next }).eq('id', order.id)
     if (error) { toast('حدث خطأ — جاري التحديث', 'error'); loadOrders(); return }
     await supabase.from('order_status_history').insert({ order_id: order.id, status: next })
+    sendPushToCustomer(order.id, next)
     if (next === 'ready') {
       const lat = order.delivery_location?.lat
       const lng = order.delivery_location?.lng
@@ -243,6 +263,17 @@ export default function OrdersPage() {
       </div>
     )},
     { key: 'total', label: 'المبلغ', render: (item: any) => <span className="font-semibold text-gray-800">{item.total ? `${item.total.toFixed(2)} ج.م` : '—'}</span> },
+    { key: 'payment', label: 'الدفع', render: (item: any) => {
+      const pmLabels: Record<string, string> = { cash: 'كاش', visa: 'فيزا', e_wallet: 'محفظة', instapay: 'إنستاباي' }
+      const psVariant: Record<string, string> = { confirmed: 'success', pending: 'warning', failed: 'error' }
+      const psLabels: Record<string, string> = { confirmed: 'مدفوع', pending: 'معلق', failed: 'فشل' }
+      return (
+        <div className="text-center">
+          <Badge variant={psVariant[item.payment_status] ?? 'neutral'}>{psLabels[item.payment_status] ?? item.payment_status}</Badge>
+          <p className="text-[10px] text-gray-400 mt-0.5">{pmLabels[item.payment_method] ?? item.payment_method}</p>
+        </div>
+      )
+    }},
     { key: 'driver', label: 'السائق', render: (item: any) => item.notes?.includes('[من المحل]') ? <span className="text-gray-300">—</span> : (item.driver?.name ?? <span className="text-gray-300">—</span>) },
     { key: 'scheduled', label: 'الموعد', render: (item: any) => item.is_scheduled && item.scheduled_at ? (
       <span className="text-xs text-amber-500 font-medium">🕐 {new Date(item.scheduled_at).toLocaleDateString('ar-EG')} {new Date(item.scheduled_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</span>
@@ -331,7 +362,14 @@ export default function OrdersPage() {
                 { label: 'العميل', value: <div><p>{detail.customer?.name}</p>{detail.customer?.phone && <p className="text-[11px] text-gray-400 font-normal mt-0.5" dir="ltr">{detail.customer.phone}</p>}</div> },
                 { label: 'الحالة', value: <Badge variant={statusVariant[detail.status]}>{ORDER_STATUS_LABELS[detail.status as OrderStatus]}</Badge> },
                 { label: 'المبلغ', value: `${detail.total?.toFixed(2) ?? '—'} ج.م` },
-                { label: 'القطع', value: `${detail.items_count} قطعة` },
+                { label: 'الدفع', value: <div>
+                  <Badge variant={detail.payment_status === 'confirmed' ? 'success' : detail.payment_status === 'failed' ? 'error' : 'warning'}>
+                    {detail.payment_status === 'confirmed' ? 'مدفوع' : detail.payment_status === 'failed' ? 'فشل' : 'معلق'}
+                  </Badge>
+                  <p className="text-[10px] text-gray-400 mt-0.5">
+                    {{ cash: 'كاش', visa: 'فيزا', e_wallet: 'محفظة', instapay: 'إنستاباي' }[detail.payment_method] ?? detail.payment_method}
+                  </p>
+                </div> },
               ].map((item, i) => (
                 <div key={i} className="bg-surface-muted/50 rounded-xl p-3">
                   <p className="text-[10px] text-gray-400 mb-0.5">{item.label}</p>
@@ -356,6 +394,29 @@ export default function OrdersPage() {
                 )}
                 {detail.cancelled_at && (
                   <p className="text-[10px] text-red-400 mt-1">{new Date(detail.cancelled_at).toLocaleString('ar-EG')}</p>
+                )}
+              </div>
+            )}
+
+            {detail.payment_status !== 'confirmed' && !['cancelled', 'refunded'].includes(detail.status) && (
+              <div className="flex gap-2">
+                <button onClick={async () => {
+                  await supabase.from('orders').update({ payment_status: 'confirmed' }).eq('id', detail.id)
+                  setDetail({ ...detail, payment_status: 'confirmed' })
+                  setOrders(prev => prev.map(o => o.id === detail.id ? { ...o, payment_status: 'confirmed' } : o))
+                  toast('تم تأكيد الدفع')
+                }} className="flex-1 flex items-center justify-center gap-2 bg-emerald-500 text-white p-2.5 rounded-xl font-semibold text-sm hover:bg-emerald-600 transition-colors">
+                  تأكيد الدفع ✓
+                </button>
+                {detail.payment_status !== 'failed' && (
+                  <button onClick={async () => {
+                    await supabase.from('orders').update({ payment_status: 'failed' }).eq('id', detail.id)
+                    setDetail({ ...detail, payment_status: 'failed' })
+                    setOrders(prev => prev.map(o => o.id === detail.id ? { ...o, payment_status: 'failed' } : o))
+                    toast('تم رفض الدفع')
+                  }} className="px-4 py-2.5 border border-red-200 text-red-500 rounded-xl text-sm font-medium hover:bg-red-50 transition-colors">
+                    رفض
+                  </button>
                 )}
               </div>
             )}

@@ -2,8 +2,8 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
+import { useTheme } from '../../src/contexts/ThemeContext'
 import { supabase } from '../../src/lib/supabase'
-import { colors } from '../../src/theme'
 
 type Message = {
   id: string
@@ -18,6 +18,7 @@ const closedStatuses = ['delivered', 'cancelled']
 export default function ChatScreen() {
   const { orderId } = useLocalSearchParams<{ orderId: string }>()
   const { profile } = useAuth()
+  const { colors } = useTheme()
   const router = useRouter()
   const [messages, setMessages] = useState<Message[]>([])
   const [text, setText] = useState('')
@@ -131,19 +132,19 @@ export default function ChatScreen() {
   const isMe = (msg: Message) => msg.sender_id === profile?.id
 
   return (
-    <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
+    <KeyboardAvoidingView style={[s.container, { backgroundColor: colors.navy[900] }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
       {/* Header */}
-      <View style={s.header}>
+      <View style={[s.header, { backgroundColor: colors.navy[800], borderBottomColor: colors.navy[700] }]}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={s.backText}>→</Text>
+          <Text style={[s.backText, { color: colors.primary }]}>→</Text>
         </TouchableOpacity>
         <View style={s.headerInfo}>
-          <Text style={s.headerName}>{otherName}</Text>
-          <Text style={s.headerSub}>طلب #{orderId?.slice(0, 8)}</Text>
+          <Text style={[s.headerName, { color: colors.text }]}>{otherName}</Text>
+          <Text style={[s.headerSub, { color: colors.navy[300] }]}>طلب #{orderId?.slice(0, 8)}</Text>
         </View>
         {chatClosed && (
-          <View style={s.closedBadge}>
-            <Text style={s.closedBadgeText}>
+          <View style={[s.closedBadge, { backgroundColor: colors.navy[700] }]}>
+            <Text style={[s.closedBadgeText, { color: colors.navy[200] }]}>
               {orderStatus === 'delivered' ? '✅ مكتمل' : '❌ ملغي'}
             </Text>
           </View>
@@ -158,9 +159,9 @@ export default function ChatScreen() {
         contentContainerStyle={s.msgList}
         onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
         renderItem={({ item }) => (
-          <View style={[s.bubble, isMe(item) ? s.bubbleMe : s.bubbleOther]}>
-            <Text style={[s.bubbleText, isMe(item) ? s.bubbleTextMe : s.bubbleTextOther]}>{item.body}</Text>
-            <Text style={[s.bubbleTime, isMe(item) && s.bubbleTimeMe]}>
+          <View style={[s.bubble, isMe(item) ? [s.bubbleMe, { backgroundColor: colors.primary }] : [s.bubbleOther, { backgroundColor: colors.navy[700] }]]}>
+            <Text style={[s.bubbleText, isMe(item) ? s.bubbleTextMe : { color: colors.navy[100] }]}>{item.body}</Text>
+            <Text style={[s.bubbleTime, { color: colors.navy[300] }, isMe(item) && s.bubbleTimeMe]}>
               {new Date(item.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
               {isMe(item) && (item.read_at ? ' ✓✓' : ' ✓')}
             </Text>
@@ -168,15 +169,15 @@ export default function ChatScreen() {
         )}
         ListEmptyComponent={
           <View style={s.emptyChat}>
-            <Text style={s.emptyChatText}>💬 ابدأ المحادثة مع السائق</Text>
+            <Text style={[s.emptyChatText, { color: colors.navy[400] }]}>💬 ابدأ المحادثة مع السائق</Text>
           </View>
         }
       />
 
       {/* Chat Closed Banner */}
       {chatClosed && (
-        <View style={s.closedBanner}>
-          <Text style={s.closedBannerText}>
+        <View style={[s.closedBanner, { backgroundColor: colors.navy[800], borderTopColor: colors.navy[700] }]}>
+          <Text style={[s.closedBannerText, { color: colors.navy[300] }]}>
             {orderStatus === 'delivered'
               ? '🔒 تم إغلاق المحادثة — الطلب مكتمل'
               : '🔒 تم إغلاق المحادثة — الطلب ملغي'}
@@ -186,12 +187,12 @@ export default function ChatScreen() {
 
       {/* Input - only if chat is open */}
       {!chatClosed && (
-        <View style={s.inputRow}>
-          <TouchableOpacity style={[s.sendBtn, (!text.trim() || sending) && { opacity: 0.5 }]} onPress={handleSend} disabled={!text.trim() || sending}>
+        <View style={[s.inputRow, { backgroundColor: colors.navy[800], borderTopColor: colors.navy[700] }]}>
+          <TouchableOpacity style={[s.sendBtn, { backgroundColor: colors.primary }, (!text.trim() || sending) && { opacity: 0.5 }]} onPress={handleSend} disabled={!text.trim() || sending}>
             <Text style={s.sendText}>إرسال</Text>
           </TouchableOpacity>
           <TextInput
-            style={s.input}
+            style={[s.input, { backgroundColor: colors.navy[700], color: colors.text }]}
             value={text}
             onChangeText={setText}
             placeholder="اكتب رسالة..."
@@ -207,45 +208,44 @@ export default function ChatScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.navy[900] },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: colors.navy[800], paddingTop: 56, paddingBottom: 14, paddingHorizontal: 20,
-    borderBottomWidth: 1, borderBottomColor: colors.navy[700],
+    paddingTop: 56, paddingBottom: 14, paddingHorizontal: 20,
+    borderBottomWidth: 1,
   },
-  backText: { fontSize: 22, color: colors.primary, fontWeight: '600' },
+  backText: { fontSize: 22, fontWeight: '600' },
   headerInfo: { flex: 1 },
-  headerName: { fontSize: 16, fontWeight: '700', color: '#fff' },
-  headerSub: { fontSize: 11, color: colors.navy[300], marginTop: 1 },
+  headerName: { fontSize: 16, fontWeight: '700' },
+  headerSub: { fontSize: 11, marginTop: 1 },
   closedBadge: {
-    backgroundColor: colors.navy[700], borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4,
+    borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4,
   },
-  closedBadgeText: { fontSize: 11, color: colors.navy[200], fontWeight: '600' },
+  closedBadgeText: { fontSize: 11, fontWeight: '600' },
   msgList: { padding: 16, paddingBottom: 8, flexGrow: 1 },
   bubble: { maxWidth: '78%', borderRadius: 18, padding: 12, marginBottom: 8 },
-  bubbleMe: { alignSelf: 'flex-end', backgroundColor: colors.primary, borderBottomLeftRadius: 4 },
-  bubbleOther: { alignSelf: 'flex-start', backgroundColor: colors.navy[700], borderBottomRightRadius: 4 },
+  bubbleMe: { alignSelf: 'flex-end', borderBottomLeftRadius: 4 },
+  bubbleOther: { alignSelf: 'flex-start', borderBottomRightRadius: 4 },
   bubbleText: { fontSize: 14, lineHeight: 20 },
   bubbleTextMe: { color: '#fff' },
-  bubbleTextOther: { color: colors.navy[100] },
-  bubbleTime: { fontSize: 9, color: colors.navy[300], marginTop: 4, textAlign: 'left' },
+  bubbleTime: { fontSize: 9, marginTop: 4, textAlign: 'left' },
   bubbleTimeMe: { color: 'rgba(255,255,255,0.6)', textAlign: 'left' },
   emptyChat: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 100 },
-  emptyChatText: { color: colors.navy[400], fontSize: 15 },
+  emptyChatText: { fontSize: 15 },
   closedBanner: {
-    backgroundColor: colors.navy[800], borderTopWidth: 1, borderTopColor: colors.navy[700],
+    borderTopWidth: 1,
     padding: 16, alignItems: 'center',
   },
-  closedBannerText: { color: colors.navy[300], fontSize: 13, fontWeight: '600' },
+  closedBannerText: { fontSize: 13, fontWeight: '600' },
   inputRow: {
     flexDirection: 'row', alignItems: 'flex-end', gap: 8,
-    backgroundColor: colors.navy[800], padding: 12, paddingBottom: Platform.OS === 'ios' ? 28 : 12,
-    borderTopWidth: 1, borderTopColor: colors.navy[700],
+    padding: 12, paddingBottom: Platform.OS === 'ios' ? 28 : 12,
+    borderTopWidth: 1,
   },
   input: {
-    flex: 1, backgroundColor: colors.navy[700], borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10,
-    color: '#fff', fontSize: 14, maxHeight: 100,
+    flex: 1, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10,
+    fontSize: 14, maxHeight: 100,
   },
-  sendBtn: { backgroundColor: colors.primary, borderRadius: 20, paddingHorizontal: 18, paddingVertical: 10 },
+  sendBtn: { borderRadius: 20, paddingHorizontal: 18, paddingVertical: 10 },
   sendText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 })

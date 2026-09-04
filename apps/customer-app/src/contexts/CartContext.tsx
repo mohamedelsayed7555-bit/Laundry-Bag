@@ -1,7 +1,8 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { useAuth } from './AuthContext'
 
-const CART_KEY = 'cleano_cart'
+const CART_PREFIX = 'cleano_cart_'
 
 export type CartItem = {
   name: string
@@ -25,24 +26,42 @@ type CartContextType = {
 const CartContext = createContext<CartContextType | null>(null)
 
 export function CartProvider({ children }: { children: ReactNode }) {
+  const { profile } = useAuth()
   const [cart, setCart] = useState<CartItem[]>([])
   const [loaded, setLoaded] = useState(false)
   const [lastAddedIndex, setLastAddedIndex] = useState<number | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+
+  const cartKey = profile?.id ? `${CART_PREFIX}${profile.id}` : null
 
   useEffect(() => {
-    AsyncStorage.getItem(CART_KEY).then(raw => {
+    if (!cartKey) {
+      if (currentUserId) {
+        setCart([])
+        setLoaded(false)
+        setCurrentUserId(null)
+      }
+      return
+    }
+    if (cartKey === `${CART_PREFIX}${currentUserId}`) return
+
+    setCurrentUserId(profile?.id ?? null)
+    setLoaded(false)
+    AsyncStorage.getItem(cartKey).then(raw => {
       if (raw) {
-        try { setCart(JSON.parse(raw)) } catch {}
+        try { setCart(JSON.parse(raw)) } catch { setCart([]) }
+      } else {
+        setCart([])
       }
       setLoaded(true)
     })
-  }, [])
+  }, [cartKey])
 
   useEffect(() => {
-    if (loaded) {
-      AsyncStorage.setItem(CART_KEY, JSON.stringify(cart))
+    if (loaded && cartKey) {
+      AsyncStorage.setItem(cartKey, JSON.stringify(cart))
     }
-  }, [cart, loaded])
+  }, [cart, loaded, cartKey])
 
   const addItem = useCallback((item: CartItem) => {
     setCart(prev => {
@@ -73,8 +92,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clearCart = useCallback(() => {
     setCart([])
-    AsyncStorage.removeItem(CART_KEY)
-  }, [])
+    if (cartKey) AsyncStorage.removeItem(cartKey)
+  }, [cartKey])
 
   const clearLastAdded = useCallback(() => setLastAddedIndex(null), [])
 

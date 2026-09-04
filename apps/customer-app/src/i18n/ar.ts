@@ -154,6 +154,7 @@ export default {
 
   // New Order
   newOrderTitle: 'طلب جديد',
+  pickupAddress: 'عنوان الاستلام',
   serviceType: 'نوع الخدمة',
   items: 'القطع',
   addItems: 'أضف القطع',

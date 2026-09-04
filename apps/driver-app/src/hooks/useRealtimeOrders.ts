@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { sendLocalNotification } from './useNotifications'
+import { sendLocalNotification, playNotificationSound } from './useNotifications'
 
 export function useRealtimeDriverOrders(driverId: string | undefined, onUpdate: () => void) {
   useEffect(() => {
@@ -16,7 +16,15 @@ export function useRealtimeDriverOrders(driverId: string | undefined, onUpdate: 
           table: 'orders',
           filter: `driver_id=eq.${driverId}`,
         },
-        () => onUpdate()
+        (payload) => {
+          const newStatus = payload.new.status as string
+          const oldStatus = payload.old?.status as string
+          if (newStatus === 'ready' && oldStatus !== 'ready') {
+            sendLocalNotification('طلب جاهز للتوصيل! 🚗', `الطلب رقم ${payload.new.order_number} جاهز — ابدأ التوصيل`, 'new-order')
+            playNotificationSound('new-order')
+          }
+          onUpdate()
+        }
       )
       .on(
         'postgres_changes',

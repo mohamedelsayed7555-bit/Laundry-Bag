@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Platform } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
-import { useRouter } from 'expo-router'
+import { useRouter, useFocusEffect } from 'expo-router'
 import DateTimePicker from '@react-native-community/datetimepicker'
 import { useAuth } from '../src/contexts/AuthContext'
 import { useTheme } from '../src/contexts/ThemeContext'
@@ -51,6 +51,7 @@ export default function CartScreen() {
   const [walletPhone, setWalletPhone] = useState('')
   const [paymentSettings, setPaymentSettings] = useState<{ instapay: string; wallet: string }>({ instapay: '', wallet: '' })
   const [deliveryFee, setDeliveryFee] = useState(0)
+  const [minOrderItems, setMinOrderItems] = useState(0)
   const [zoneSettings, setZoneSettings] = useState({ max_zone_km: 30, price_per_km: 2, base_delivery_km: 5, laundry_lat: 30.0444, laundry_lng: 31.2357 })
   const [distanceKm, setDistanceKm] = useState<number | null>(null)
   const [outOfZone, setOutOfZone] = useState(false)
@@ -58,9 +59,19 @@ export default function CartScreen() {
 
   const isEn = locale === 'en'
 
+  const loadAddresses = useCallback(async () => {
+    if (!profile) return
+    const { data } = await supabase.from('addresses').select('id, label, address, lat, lng, is_default').eq('user_id', profile.id).order('is_default', { ascending: false })
+    if (data) {
+      setAddresses(data)
+      const def = data.find((a: any) => a.is_default) ?? data[0]
+      if (def && !selectedAddress) setSelectedAddress(def)
+    }
+  }, [profile])
+
   useEffect(() => {
     Promise.all([
-      supabase.from('settings').select('key, value').in('key', ['delivery_fee', 'max_zone_km', 'price_per_km', 'base_delivery_km', 'laundry_lat', 'laundry_lng']),
+      supabase.from('settings').select('key, value').in('key', ['delivery_fee', 'max_zone_km', 'price_per_km', 'base_delivery_km', 'laundry_lat', 'laundry_lng', 'min_order_items']),
       supabase.from('settings').select('key, value').in('key', ['instapay_number', 'wallet_number']),
       profile ? supabase.from('addresses').select('id, label, address, lat, lng, is_default').eq('user_id', profile.id).order('is_default', { ascending: false }) : null,
       profile ? supabase.from('subscriptions').select('*, plans(name)').eq('user_id', profile.id).eq('status', 'active').single() : null,
@@ -69,6 +80,7 @@ export default function CartScreen() {
         const s: any = {}
         allSettingsRes.data.forEach((r: any) => { s[r.key] = r.value })
         setDeliveryFee(Number(s.delivery_fee) || 0)
+        setMinOrderItems(Number(s.min_order_items) || 0)
         setZoneSettings({
           max_zone_km: Number(s.max_zone_km) || 30,
           price_per_km: Number(s.price_per_km) || 2,
@@ -94,6 +106,8 @@ export default function CartScreen() {
       setLoading(false)
     })
   }, [profile])
+
+  useFocusEffect(useCallback(() => { loadAddresses() }, [loadAddresses]))
 
   useEffect(() => {
     if (selectedAddress?.lat && selectedAddress?.lng) {
@@ -130,6 +144,10 @@ export default function CartScreen() {
     }
     if (cart.length === 0) {
       showAlert({ title: isEn ? 'Notice' : 'تنبيه', message: isEn ? 'Cart is empty' : 'السلة فارغة', type: 'warning' })
+      return
+    }
+    if (minOrderItems > 0 && totalItems < minOrderItems) {
+      showAlert({ title: isEn ? 'Minimum items' : 'الحد الأدنى', message: isEn ? `Minimum order is ${minOrderItems} items. You have ${totalItems}.` : `الحد الأدنى للطلب ${minOrderItems} قطع. عندك ${totalItems} قطعة فقط.`, type: 'warning' })
       return
     }
     if (outOfZone) {

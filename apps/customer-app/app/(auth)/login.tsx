@@ -275,6 +275,7 @@ const s = StyleSheet.create({
   form: { gap: 16 },
   label: { fontSize: 13, fontWeight: '600', textAlign: 'right', marginBottom: 6 },
   inputWrap: {
+    flexDirection: 'row', alignItems: 'center',
     borderWidth: 1.5, borderRadius: 14,
     overflow: 'hidden',
   },
