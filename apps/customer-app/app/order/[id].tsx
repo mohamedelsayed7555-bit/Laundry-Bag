@@ -4,9 +4,12 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { WebView } from 'react-native-webview'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { useCustomAlert } from '../../src/components/CustomAlert'
+import { ActivityIndicator } from 'react-native'
 import { supabase } from '../../src/lib/supabase'
 import { colors } from '../../src/theme'
 import { CANCELLABLE_STATUSES } from '../../src/shared/types'
+
+const SUPABASE_URL = 'https://kjqtrmedkvqfofwymoni.supabase.co'
 
 function buildTrackingMapHTML(driverLat: number, driverLng: number, customerLat?: number, customerLng?: number) {
   const centerLat = customerLat ? (driverLat + customerLat) / 2 : driverLat
@@ -70,6 +73,7 @@ export default function OrderDetailsScreen() {
   const [ratingNote, setRatingNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [driverLoc, setDriverLoc] = useState<{ lat: number; lng: number } | null>(null)
+  const [retrying, setRetrying] = useState(false)
   const mapWebviewRef = useRef<WebView>(null)
 
   useEffect(() => {
@@ -174,6 +178,34 @@ export default function OrderDetailsScreen() {
     setSubmitting(false)
     if (error) showAlert({ title: 'خطأ', message: 'حدث خطأ', type: 'error' })
     else { setShowRating(false); loadOrder() }
+  }
+
+  async function handleRetryPayment() {
+    setRetrying(true)
+    try {
+      const session = (await supabase.auth.getSession()).data.session
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/paymob-pay`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({
+          order_id: order.id,
+          payment_method: order.payment_method === 'visa' ? 'card' : 'wallet',
+        }),
+      })
+      const data = await res.json()
+      setRetrying(false)
+      if (data.iframe_url) {
+        router.push({ pathname: '/payment', params: { url: data.iframe_url } })
+      } else {
+        showAlert({ title: 'خطأ', message: data.error || 'حدث خطأ في الاتصال بخدمة الدفع', type: 'error' })
+      }
+    } catch {
+      setRetrying(false)
+      showAlert({ title: 'خطأ', message: 'حدث خطأ في الاتصال بخدمة الدفع', type: 'error' })
+    }
   }
 
   function getDistance(lat1: number, lng1: number, lat2: number, lng2: number) {
@@ -294,6 +326,20 @@ export default function OrderDetailsScreen() {
         <DetailRow label="التاريخ" value={new Date(order.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })} />
         {order.notes && <DetailRow label="ملاحظات" value={order.notes} />}
       </View>
+
+      {order.payment_status === 'pending' && ['visa', 'e_wallet'].includes(order.payment_method) && order.status !== 'cancelled' && (
+        <TouchableOpacity
+          style={[s.retryPayBtn, retrying && { opacity: 0.6 }]}
+          onPress={handleRetryPayment}
+          disabled={retrying}
+        >
+          {retrying ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={s.retryPayText}>💳 إعادة الدفع</Text>
+          )}
+        </TouchableOpacity>
+      )}
 
       {['pending', 'assigned'].includes(order.status) && (
         <TouchableOpacity style={s.editBtn} onPress={() => router.push(`/edit-order/${order.id}`)}>
@@ -490,6 +536,11 @@ const s = StyleSheet.create({
   },
   noCancelText: { fontSize: 14, fontWeight: '700', color: colors.warning, marginBottom: 6 },
   noCancelSub: { fontSize: 12, color: colors.navy[300], lineHeight: 18 },
+
+  retryPayBtn: {
+    backgroundColor: '#f59e0b', borderRadius: 16, padding: 16, alignItems: 'center', marginBottom: 12,
+  },
+  retryPayText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 
   editBtn: {
     backgroundColor: colors.navy[800], borderRadius: 16, padding: 16, alignItems: 'center', marginBottom: 16,
