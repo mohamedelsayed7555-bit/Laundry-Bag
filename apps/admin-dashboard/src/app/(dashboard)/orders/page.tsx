@@ -116,13 +116,15 @@ export default function OrdersPage() {
     const order = orders.find(o => o.id === orderId)
     if (order?.notes?.includes('[من المحل]')) { toast('طلب من المحل لا يحتاج سائق', 'error'); return }
     const driverInfo = drivers.find(d => d.id === driverId)
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, driver_id: driverId, status: 'assigned', driver: driverInfo } : o))
-    setDetail((prev: any) => prev?.id === orderId ? { ...prev, driver_id: driverId, status: 'assigned', driver: driverInfo ?? prev.driver } : prev)
+    const keepStatus = ['picked_up', 'processing', 'ready', 'delivering'].includes(order?.status ?? '')
+    const newStatus = keepStatus ? order!.status : 'assigned'
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, driver_id: driverId, status: newStatus, driver: driverInfo } : o))
+    setDetail((prev: any) => prev?.id === orderId ? { ...prev, driver_id: driverId, status: newStatus, driver: driverInfo ?? prev.driver } : prev)
     toast('تم تعيين السائق')
-    const { error } = await supabase.from('orders').update({ driver_id: driverId, status: 'assigned' }).eq('id', orderId)
+    const { error } = await supabase.from('orders').update({ driver_id: driverId, status: newStatus }).eq('id', orderId)
     if (error) { toast('حدث خطأ — جاري التحديث', 'error'); loadOrders(); return }
-    await supabase.from('order_status_history').insert({ order_id: orderId, status: 'assigned', changed_by: driverId })
-    sendPushToCustomer(orderId, 'assigned')
+    await supabase.from('order_status_history').insert({ order_id: orderId, status: newStatus, changed_by: driverId })
+    if (!keepStatus) sendPushToCustomer(orderId, 'assigned')
   }
 
   async function sendPushToCustomer(orderId: string, newStatus: string) {
