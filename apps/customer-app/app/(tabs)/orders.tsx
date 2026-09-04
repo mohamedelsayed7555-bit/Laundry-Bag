@@ -13,12 +13,12 @@ import { Phone, MessageCircle } from 'lucide-react-native'
 const statusFlow = ['pending', 'assigned', 'picked_up', 'processing', 'ready', 'delivering', 'delivered']
 
 const statusColors: Record<string, string> = {
-  pending: '#f59e0b', assigned: '#3b82f6', picked_up: '#8b5cf6', processing: '#06b6d4',
+  scheduled: '#a855f7', pending: '#f59e0b', assigned: '#3b82f6', picked_up: '#8b5cf6', processing: '#06b6d4',
   ready: '#10b981', delivering: '#8b5cf6', delivered: '#10b981', cancelled: '#ef4444',
 }
 
 const statusIcons: Record<string, string> = {
-  pending: '⏳', assigned: '🚗', picked_up: '📦', processing: '🔄',
+  scheduled: '🕐', pending: '⏳', assigned: '🚗', picked_up: '📦', processing: '🔄',
   ready: '✅', delivering: '🛵', delivered: '🎉', cancelled: '❌',
 }
 
@@ -47,6 +47,8 @@ const prog = StyleSheet.create({
   label: { fontSize: 10, fontWeight: '700' },
 })
 
+type TabFilter = 'active' | 'completed'
+
 export default function OrdersScreen() {
   const { profile } = useAuth()
   const { colors } = useTheme()
@@ -54,6 +56,7 @@ export default function OrdersScreen() {
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [tab, setTab] = useState<TabFilter>('active')
 
   const router = useRouter()
   const loadOrders = useCallback(async () => {
@@ -73,6 +76,15 @@ export default function OrdersScreen() {
   useRealtimeOrders(profile?.id, loadOrders)
 
   const onRefresh = () => { setRefreshing(true); loadOrders() }
+
+  const activeStatuses = ['scheduled', 'pending', 'assigned', 'picked_up', 'processing', 'ready', 'delivering']
+  const filteredOrders = orders.filter(o =>
+    tab === 'active'
+      ? activeStatuses.includes(o.status)
+      : ['delivered', 'cancelled'].includes(o.status)
+  )
+  const activeCount = orders.filter(o => activeStatuses.includes(o.status)).length
+  const completedCount = orders.filter(o => ['delivered', 'cancelled'].includes(o.status)).length
 
   const getStatusLabel = (status: string) => {
     const key = `status${status.charAt(0).toUpperCase() + status.slice(1).replace(/_([a-z])/g, (_, c) => c.toUpperCase())}` as any
@@ -165,24 +177,50 @@ export default function OrdersScreen() {
     <View style={[s.container, { backgroundColor: colors.navy[900] }]}>
       <Animated.Text entering={FadeInDown.duration(500)} style={[s.title, { color: colors.text }]}>{t('myOrders')}</Animated.Text>
 
+      {/* Tab Filters */}
+      <View style={[s.tabRow, { backgroundColor: colors.navy[800], borderColor: colors.navy[700] }]}>
+        <TouchableOpacity
+          style={[s.tabBtn, tab === 'active' && { backgroundColor: colors.primary }]}
+          onPress={() => setTab('active')}
+        >
+          <Text style={[s.tabText, { color: tab === 'active' ? '#fff' : colors.navy[300] }]}>
+            جاري العمل {activeCount > 0 ? `(${activeCount})` : ''}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[s.tabBtn, tab === 'completed' && { backgroundColor: colors.primary }]}
+          onPress={() => setTab('completed')}
+        >
+          <Text style={[s.tabText, { color: tab === 'completed' ? '#fff' : colors.navy[300] }]}>
+            مكتملة {completedCount > 0 ? `(${completedCount})` : ''}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {loading ? (
         <View style={{ gap: 12 }}>
           <SkeletonOrderCard />
           <SkeletonOrderCard />
           <SkeletonOrderCard />
         </View>
-      ) : orders.length === 0 ? (
+      ) : filteredOrders.length === 0 ? (
         <Animated.View entering={FadeInDown.duration(500).delay(200)} style={[s.emptyCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
-          <Text style={s.emptyIcon}>📦</Text>
-          <Text style={[s.emptyText, { color: colors.navy[200] }]}>{t('noOrdersYet')}</Text>
-          <Text style={[s.emptySubText, { color: colors.navy[400] }]}>{t('orderFirst')}</Text>
-          <TouchableOpacity style={[s.emptyBtn, { backgroundColor: colors.primary }]} onPress={() => router.push('/(tabs)/new-order')}>
-            <Text style={s.emptyBtnText}>{t('orderNow')}</Text>
-          </TouchableOpacity>
+          <Text style={s.emptyIcon}>{tab === 'active' ? '✅' : '📦'}</Text>
+          <Text style={[s.emptyText, { color: colors.navy[200] }]}>
+            {tab === 'active' ? 'لا توجد طلبات حالية' : 'لا توجد طلبات مكتملة'}
+          </Text>
+          {tab === 'active' && orders.length === 0 && (
+            <>
+              <Text style={[s.emptySubText, { color: colors.navy[400] }]}>{t('orderFirst')}</Text>
+              <TouchableOpacity style={[s.emptyBtn, { backgroundColor: colors.primary }]} onPress={() => router.push('/(tabs)/new-order')}>
+                <Text style={s.emptyBtnText}>{t('orderNow')}</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </Animated.View>
       ) : (
         <FlatList
-          data={orders}
+          data={filteredOrders}
           renderItem={renderOrder}
           keyExtractor={item => item.id}
           contentContainerStyle={{ gap: 12, paddingBottom: 100 }}
@@ -196,7 +234,16 @@ export default function OrdersScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1, padding: 20, paddingTop: 56 },
-  title: { fontSize: 24, fontWeight: '800', marginBottom: 20 },
+  title: { fontSize: 24, fontWeight: '800', marginBottom: 16 },
+  tabRow: {
+    flexDirection: 'row', borderRadius: 14, padding: 4,
+    marginBottom: 16, borderWidth: 1,
+  },
+  tabBtn: {
+    flex: 1, paddingVertical: 10, borderRadius: 11,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  tabText: { fontSize: 13, fontWeight: '700' },
 
   orderCard: {
     borderRadius: 20, padding: 18,

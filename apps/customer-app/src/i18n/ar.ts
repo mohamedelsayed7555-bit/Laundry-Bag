@@ -83,6 +83,7 @@ export default {
   orderNow: 'اطلب الآن',
 
   // Order Status
+  statusScheduled: 'مجدول',
   statusPending: 'في الانتظار',
   statusAssigned: 'تم تعيين سائق',
   statusPickedUp: 'تم الاستلام',

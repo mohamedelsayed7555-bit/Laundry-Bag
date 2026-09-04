@@ -28,6 +28,7 @@ export default function TabsLayout() {
           elevation: 16,
           paddingBottom: 0,
           paddingTop: 6,
+          flexDirection: 'row-reverse',
         },
         tabBarLabelStyle: { fontSize: 10, fontWeight: '600', marginTop: 2 },
         tabBarItemStyle: { paddingTop: 4 },

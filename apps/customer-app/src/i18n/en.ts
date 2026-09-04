@@ -83,6 +83,7 @@ export default {
   orderNow: 'Order Now',
 
   // Order Status
+  statusScheduled: 'Scheduled',
   statusPending: 'Pending',
   statusAssigned: 'Driver Assigned',
   statusPickedUp: 'Picked Up',

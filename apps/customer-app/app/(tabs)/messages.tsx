@@ -5,7 +5,7 @@ import { useAuth } from '../../src/contexts/AuthContext'
 import { useTheme } from '../../src/contexts/ThemeContext'
 import { useLanguage } from '../../src/contexts/LanguageContext'
 import { supabase } from '../../src/lib/supabase'
-import { playNotificationSound } from '../../src/hooks/useNotifications'
+import { playNotificationSound, sendLocalNotification } from '../../src/hooks/useNotifications'
 
 type Conversation = {
   order_id: string
@@ -86,7 +86,7 @@ export default function MessagesScreen() {
     if (!profile) return
     const channel = supabase
       .channel('user-messages')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${profile.id}` }, () => { playNotificationSound('order-update'); load() })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${profile.id}` }, (payload) => { playNotificationSound('order-update'); sendLocalNotification('رسالة جديدة', (payload.new as any).body ?? '', 'messages'); load() })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [profile, load])

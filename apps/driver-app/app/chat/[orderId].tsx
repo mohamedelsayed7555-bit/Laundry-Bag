@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { supabase } from '../../src/lib/supabase'
 import { colors } from '../../src/theme'
-import { playNotificationSound } from '../../src/hooks/useNotifications'
+import { playNotificationSound, sendLocalNotification } from '../../src/hooks/useNotifications'
 
 type Message = {
   id: string
@@ -77,6 +77,7 @@ export default function ChatScreen() {
         setMessages(prev => [...prev, newMsg])
         if (newMsg.sender_id !== profile.id) {
           playNotificationSound('order-update')
+          sendLocalNotification('رسالة جديدة', newMsg.body, 'messages')
         }
         if (newMsg.receiver_id === profile.id) {
           supabase.from('messages').update({ read_at: new Date().toISOString() }).eq('id', newMsg.id)

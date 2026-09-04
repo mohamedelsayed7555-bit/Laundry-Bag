@@ -196,7 +196,7 @@ export default function CartScreen() {
       total: orderTotal,
       payment_method: useSubscription ? 'cash' : paymentMethod,
       notes: notes || null,
-      status: 'pending',
+      status: isScheduled ? 'scheduled' : 'pending',
       payment_status: useSubscription ? 'confirmed' : 'pending',
       subscription_id: useSubscription ? activeSub.id : null,
       address_id: selectedAddress?.id || null,

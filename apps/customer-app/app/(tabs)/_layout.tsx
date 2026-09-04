@@ -25,6 +25,7 @@ export default function TabsLayout() {
         tabBarStyle: [tb.bar, {
           backgroundColor: colors.tabBarBg,
           borderColor: colors.navy[600],
+          flexDirection: 'row-reverse',
         }],
         tabBarLabelStyle: tb.label,
         tabBarItemStyle: { paddingTop: 6 },

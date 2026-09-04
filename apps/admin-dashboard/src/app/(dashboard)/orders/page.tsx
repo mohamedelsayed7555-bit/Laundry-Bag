@@ -23,12 +23,12 @@ import { ORDER_STATUS_LABELS, SERVICE_TYPE_LABELS } from '@cleano/shared-types'
 import type { OrderStatus, ServiceType } from '@cleano/shared-types'
 
 const statusVariant: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'purple'> = {
-  pending: 'warning', assigned: 'info', picked_up: 'purple', processing: 'info',
+  scheduled: 'purple', pending: 'warning', assigned: 'info', picked_up: 'purple', processing: 'info',
   ready: 'success', delivering: 'purple', delivered: 'success', cancelled: 'danger', refunded: 'neutral',
 }
 
 const statusFlow: Record<string, string> = {
-  pending: 'assigned', assigned: 'picked_up', picked_up: 'processing',
+  scheduled: 'pending', pending: 'assigned', assigned: 'picked_up', picked_up: 'processing',
   processing: 'ready', ready: 'delivering', delivering: 'delivered',
 }
 
@@ -269,7 +269,7 @@ export default function OrdersPage() {
     } else { console.error('Order insert error:', error); toast('حدث خطأ', 'error') }
   }
 
-  const allStatuses = ['all', 'pending', 'assigned', 'picked_up', 'processing', 'ready', 'delivering', 'delivered', 'cancelled']
+  const allStatuses = ['all', 'scheduled', 'pending', 'assigned', 'picked_up', 'processing', 'ready', 'delivering', 'delivered', 'cancelled']
   const totalPages = Math.ceil(totalCount / PAGE_SIZE)
   const filtered = useMemo(() => orders.filter(o => {
     if (!search) return true

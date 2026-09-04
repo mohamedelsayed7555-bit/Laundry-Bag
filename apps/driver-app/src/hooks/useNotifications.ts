@@ -58,12 +58,22 @@ async function registerForPushNotifications(): Promise<string | null> {
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 400, 200, 400, 200, 400],
       lightColor: '#00af5f',
+      showBadge: true,
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
     })
     await Notifications.setNotificationChannelAsync('order-updates', {
       name: 'تحديثات الطلبات',
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#00af5f',
+    })
+    await Notifications.setNotificationChannelAsync('messages', {
+      name: 'الرسائل',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 300, 150, 300],
+      lightColor: '#00af5f',
+      showBadge: true,
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
     })
     await Notifications.setNotificationChannelAsync('default', {
       name: 'CLEANO Driver',
@@ -73,7 +83,9 @@ async function registerForPushNotifications(): Promise<string | null> {
     })
   }
 
-  const tokenData = await Notifications.getExpoPushTokenAsync()
+  const tokenData = await Notifications.getExpoPushTokenAsync({
+    projectId: '9f91156d-9d01-4151-ac7c-31ad246b5aae',
+  })
   return tokenData.data
 }
 

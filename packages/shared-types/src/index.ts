@@ -1,6 +1,7 @@
 // ── Enums & Unions ──
 
 export type OrderStatus =
+  | 'scheduled'
   | 'pending'
   | 'assigned'
   | 'picked_up'
@@ -225,6 +226,7 @@ export interface PaginatedResponse<T> {
 // ── Order Flow Helpers ──
 
 export const ORDER_STATUS_FLOW: Record<OrderStatus, OrderStatus[]> = {
+  scheduled: ['pending', 'cancelled'],
   pending: ['assigned', 'cancelled'],
   assigned: ['picked_up', 'cancelled'],
   picked_up: ['processing', 'cancelled'],
@@ -246,6 +248,7 @@ export const SERVICE_TYPE_LABELS: Record<ServiceType, string> = {
 }
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
+  scheduled: 'مجدول',
   pending: 'في الانتظار',
   assigned: 'تم التعيين',
   picked_up: 'تم الاستلام',
