@@ -36,22 +36,28 @@ export default function NotificationsPage() {
   useEffect(() => { loadRecipientCount() }, [target])
 
   async function loadWaCustomers() {
-    setLoadingWa(true)
-    let query = supabase.from('users').select('id, name, phone, customer_code').eq('role', 'customer')
-    if (target === 'subscribers') {
-      const { data: subUsers } = await supabase.from('subscriptions').select('user_id').eq('status', 'active')
-      const ids = (subUsers ?? []).map(s => s.user_id)
-      if (ids.length > 0) query = query.in('id', ids)
-      else { setWaCustomers([]); setLoadingWa(false); setShowWaList(true); return }
-    } else if (target === 'non_subscribers') {
-      const { data: subUsers } = await supabase.from('subscriptions').select('user_id').eq('status', 'active')
-      const ids = (subUsers ?? []).map(s => s.user_id)
-      if (ids.length > 0) query = (query as any).not('id', 'in', `(${ids.join(',')})`)
+    try {
+      setLoadingWa(true)
+      let query = supabase.from('users').select('id, name, phone, customer_code').eq('role', 'customer')
+      if (target === 'subscribers') {
+        const { data: subUsers } = await supabase.from('subscriptions').select('user_id').eq('status', 'active')
+        const ids = (subUsers ?? []).map(s => s.user_id)
+        if (ids.length > 0) query = query.in('id', ids)
+        else { setWaCustomers([]); setLoadingWa(false); setShowWaList(true); return }
+      } else if (target === 'non_subscribers') {
+        const { data: subUsers } = await supabase.from('subscriptions').select('user_id').eq('status', 'active')
+        const ids = (subUsers ?? []).map(s => s.user_id)
+        if (ids.length > 0) query = (query as any).not('id', 'in', `(${ids.join(',')})`)
+      }
+      const { data, error } = await query.order('name')
+      if (error) { toast('خطأ في تحميل العملاء: ' + error.message, 'error'); setLoadingWa(false); return }
+      setWaCustomers(data ?? [])
+      setLoadingWa(false)
+      setShowWaList(true)
+    } catch (e) {
+      toast('حدث خطأ غير متوقع', 'error')
+      setLoadingWa(false)
     }
-    const { data } = await query.order('name')
-    setWaCustomers(data ?? [])
-    setLoadingWa(false)
-    setShowWaList(true)
   }
 
   function getWaLink(phone: string) {

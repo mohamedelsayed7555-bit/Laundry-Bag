@@ -10,9 +10,10 @@ import { LanguageProvider } from '@/lib/language-context'
 import { motion } from 'framer-motion'
 import RealtimeNotifier from '@/components/layout/RealtimeNotifier'
 
-class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
-  state = { hasError: false }
-  static getDerivedStateFromError() { return { hasError: true } }
+class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; errorMsg: string }> {
+  state = { hasError: false, errorMsg: '' }
+  static getDerivedStateFromError(error: Error) { return { hasError: true, errorMsg: error?.message || '' } }
+  componentDidCatch(error: Error) { console.error('ErrorBoundary caught:', error) }
   render() {
     if (this.state.hasError) {
       return (
@@ -20,6 +21,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
           <p className="text-6xl">⚠️</p>
           <h2 className="text-xl font-bold text-gray-800">حدث خطأ غير متوقع</h2>
           <p className="text-gray-500">يرجى تحديث الصفحة أو المحاولة لاحقاً</p>
+          {this.state.errorMsg && <p className="text-xs text-red-400 max-w-md text-center mt-1">{this.state.errorMsg}</p>}
           <button onClick={() => { this.setState({ hasError: false }); window.location.reload() }}
             className="px-6 py-2.5 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors">
             تحديث الصفحة
