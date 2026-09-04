@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from 'react'
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Linking } from 'react-native'
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Linking, AppState } from 'react-native'
 import { useRouter } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated'
@@ -74,6 +74,13 @@ export default function DriverOrdersScreen() {
 
   useEffect(() => { loadOrders() }, [loadOrders])
   useRealtimeDriverOrders(profile?.id, loadOrders)
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') loadOrders()
+    })
+    return () => sub.remove()
+  }, [loadOrders])
   const hasActive = orders.some(o => !['delivered'].includes(o.status))
   useDriverLocation(profile?.id, hasActive)
 

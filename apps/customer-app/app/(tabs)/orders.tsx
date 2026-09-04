@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from 'react'
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Linking } from 'react-native'
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Linking, AppState } from 'react-native'
 import { useRouter } from 'expo-router'
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated'
 import { useAuth } from '../../src/contexts/AuthContext'
@@ -74,6 +74,13 @@ export default function OrdersScreen() {
 
   useEffect(() => { loadOrders() }, [loadOrders])
   useRealtimeOrders(profile?.id, loadOrders)
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') loadOrders()
+    })
+    return () => sub.remove()
+  }, [loadOrders])
 
   const onRefresh = () => { setRefreshing(true); loadOrders() }
 
