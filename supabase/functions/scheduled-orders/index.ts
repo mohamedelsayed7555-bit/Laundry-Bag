@@ -39,9 +39,24 @@ Deno.serve(async (req: Request) => {
   if (dueOrders && dueOrders.length > 0) {
     ids.push(...dueOrders.map((o) => o.id));
 
+    // Find least-busy active driver for auto-assign
+    const { data: driver } = await supabase
+      .from("users")
+      .select("id")
+      .eq("role", "driver")
+      .eq("is_active", true)
+      .limit(1)
+      .single();
+
+    // If we have a driver, assign directly; otherwise set to pending
+    const newStatus = driver ? "assigned" : "pending";
+
+    const updatePayload: Record<string, unknown> = { status: newStatus };
+    if (driver) updatePayload.driver_id = driver.id;
+
     const { error: updateError } = await supabase
       .from("orders")
-      .update({ status: "pending" })
+      .update(updatePayload)
       .in("id", ids);
 
     if (!updateError) {
@@ -49,8 +64,10 @@ Deno.serve(async (req: Request) => {
       for (const order of dueOrders) {
         await supabase.from("order_status_history").insert({
           order_id: order.id,
-          status: "pending",
-          note: "تم تفعيل الطلب المجدول تلقائياً",
+          status: newStatus,
+          note: driver
+            ? "تم تفعيل الطلب المجدول وتعيين سائق تلقائياً"
+            : "تم تفعيل الطلب المجدول تلقائياً",
         });
       }
 
