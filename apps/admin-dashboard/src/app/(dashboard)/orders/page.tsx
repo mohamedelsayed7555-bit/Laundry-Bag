@@ -230,6 +230,8 @@ export default function OrdersPage() {
 
   async function cancelOrder(id: string) {
     const order = orders.find(o => o.id === id)
+    const confirmed = window.confirm(`هل أنت متأكد من إلغاء الطلب ${order?.order_number ?? ''}؟\n\nهذا الإجراء لا يمكن التراجع عنه.`)
+    if (!confirmed) return
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'cancelled' } : o))
     setDetail(null)
     toast('تم إلغاء الطلب', 'warning')
