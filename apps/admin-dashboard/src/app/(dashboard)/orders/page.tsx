@@ -269,7 +269,7 @@ export default function OrdersPage() {
       const psLabels: Record<string, string> = { confirmed: 'مدفوع', pending: 'معلق', failed: 'فشل' }
       return (
         <div className="text-center">
-          <Badge variant={psVariant[item.payment_status] ?? 'neutral'}>{psLabels[item.payment_status] ?? item.payment_status}</Badge>
+          <Badge variant={psVariant[item.payment_status as string] as any ?? 'neutral'}>{psLabels[item.payment_status] ?? item.payment_status}</Badge>
           <p className="text-[10px] text-gray-400 mt-0.5">{pmLabels[item.payment_method] ?? item.payment_method}</p>
         </div>
       )
