@@ -160,6 +160,22 @@ export default function CartScreen() {
     }
 
     setSaving(true)
+
+    if (useSubscription && activeSub) {
+      const { data: freshSub } = await supabase.from('subscriptions').select('status, end_date, items_used, items_limit').eq('id', activeSub.id).single()
+      if (!freshSub || freshSub.status !== 'active' || new Date(freshSub.end_date) < new Date()) {
+        setSaving(false)
+        showAlert({ title: isEn ? 'Subscription expired' : 'الاشتراك انتهى', message: isEn ? 'Your subscription has expired. Please renew or pay normally.' : 'اشتراكك انتهى. جدّد الباقة أو ادفع عادي.', type: 'error' })
+        return
+      }
+      const freshRemaining = (freshSub.items_limit ?? 0) - (freshSub.items_used ?? 0)
+      if (totalItems > freshRemaining) {
+        setSaving(false)
+        showAlert({ title: isEn ? 'Notice' : 'تنبيه', message: isEn ? `Only ${freshRemaining} items left in your plan.` : `رصيد باقتك ${freshRemaining} قطعة فقط.`, type: 'warning' })
+        return
+      }
+    }
+
     const isOnlinePayment = !useSubscription && (paymentMethod === 'visa' || paymentMethod === 'e_wallet')
 
     if (isOnlinePayment && paymentMethod === 'e_wallet' && !walletPhone.match(/^01[0-9]{9}$/)) {
@@ -170,7 +186,7 @@ export default function CartScreen() {
 
     const { data: orderData, error } = await supabase.from('orders').insert({
       customer_id: profile.id,
-      service_type: cart[0].service_type,
+      service_type: [...new Set(cart.map((i: any) => i.service_type))].join('+'),
       items: cart,
       items_count: totalItems,
       subtotal: totalPrice,
@@ -185,7 +201,7 @@ export default function CartScreen() {
       pickup_location: selectedAddress ? { lat: selectedAddress.lat, lng: selectedAddress.lng, label: selectedAddress.label } : null,
       delivery_location: (() => {
         const addr = sameAddress ? selectedAddress : deliveryAddress
-        return addr ? { lat: addr.lat, lng: addr.lng, label: addr.label } : {}
+        return addr ? { lat: addr.lat, lng: addr.lng, label: addr.label } : null
       })(),
       is_scheduled: isScheduled,
       scheduled_at: isScheduled ? scheduledDate.toISOString() : null,

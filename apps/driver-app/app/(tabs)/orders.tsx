@@ -63,7 +63,7 @@ export default function DriverOrdersScreen() {
     if (!profile) return
     const { data } = await supabase
       .from('orders')
-      .select('id, order_number, status, service_type, items_count, total, notes, payment_method, payment_status, delivery_location, created_at, is_scheduled, scheduled_at, customer:users!orders_customer_id_fkey(name, phone, customer_code), address:addresses(label, building, floor, apartment, landmark, lat, lng)')
+      .select('id, order_number, status, service_type, items_count, total, notes, payment_method, payment_status, delivery_location, created_at, is_scheduled, scheduled_at, rating_driver, rating_note, customer:users!orders_customer_id_fkey(name, phone, customer_code), address:addresses(label, building, floor, apartment, landmark, lat, lng)')
       .eq('driver_id', profile.id)
       .not('status', 'in', '("cancelled","refunded")')
       .order('created_at', { ascending: false })
@@ -241,6 +241,14 @@ export default function DriverOrdersScreen() {
           </View>
 
           {item.notes && <Text style={s.notes}>📝 {item.notes}</Text>}
+
+          {item.status === 'delivered' && item.rating_driver != null && (
+            <View style={s.ratingRow}>
+              <Text style={s.ratingLabel}>تقييم العميل:</Text>
+              <Text style={s.ratingStars}>{'⭐'.repeat(item.rating_driver)}</Text>
+              {item.rating_note ? <Text style={s.ratingNote}>{item.rating_note}</Text> : null}
+            </View>
+          )}
 
           {action && (
             <TouchableOpacity
@@ -430,6 +438,10 @@ const s = StyleSheet.create({
   },
   scheduleBadgeText: { fontSize: 12, color: '#f59e0b', fontWeight: '600' },
   notes: { fontSize: 12, color: colors.navy[200], marginTop: 4, marginBottom: 4 },
+  ratingRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 6, marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: colors.navy[700] },
+  ratingLabel: { fontSize: 11, color: colors.navy[300] },
+  ratingStars: { fontSize: 12 },
+  ratingNote: { fontSize: 11, color: colors.navy[300], fontStyle: 'italic' as const, flex: 1 },
 
   actionBtnWrap: { borderRadius: 16, overflow: 'hidden', marginTop: 12 },
   actionBtn: { padding: 14, alignItems: 'center', borderRadius: 16 },

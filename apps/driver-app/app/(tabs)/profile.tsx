@@ -13,7 +13,7 @@ export default function DriverProfileScreen() {
   const { profile, signOut, refreshProfile, biometricEnabled, biometricAvailable, toggleBiometric } = useAuth()
   const router = useRouter()
   const { showAlert, AlertComponent } = useCustomAlert()
-  const [stats, setStats] = useState({ total: 0, delivered: 0, earnings: 0 })
+  const [stats, setStats] = useState({ total: 0, delivered: 0, earnings: 0, avgRating: 0, ratingCount: 0 })
   const [isOnline, setIsOnline] = useState(profile?.is_active ?? false)
   const [toggling, setToggling] = useState(false)
   const [showBioModal, setShowBioModal] = useState(false)
@@ -24,13 +24,17 @@ export default function DriverProfileScreen() {
   useEffect(() => {
     if (profile) {
       setIsOnline(profile.is_active)
-      supabase.from('orders').select('status, total').eq('driver_id', profile.id).then(({ data }) => {
+      supabase.from('orders').select('status, total, rating_driver').eq('driver_id', profile.id).then(({ data }) => {
         const orders = data ?? []
         const delivered = orders.filter(o => o.status === 'delivered')
+        const rated = delivered.filter(o => o.rating_driver != null)
+        const avgRating = rated.length ? rated.reduce((s, o) => s + (o.rating_driver ?? 0), 0) / rated.length : 0
         setStats({
           total: orders.length,
           delivered: delivered.length,
           earnings: delivered.reduce((s, o) => s + (o.total ?? 0), 0),
+          avgRating: Math.round(avgRating * 10) / 10,
+          ratingCount: rated.length,
         })
       })
     }
@@ -102,6 +106,7 @@ export default function DriverProfileScreen() {
           { value: stats.total, label: 'إجمالي الطلبات', glow: colors.primaryGlow },
           { value: stats.delivered, label: 'تم التوصيل', glow: colors.successGlow },
           { value: `${stats.earnings.toFixed(0)}`, label: 'ج.م', glow: colors.goldGlow },
+          { value: stats.ratingCount > 0 ? `⭐ ${stats.avgRating}` : '—', label: `تقييم (${stats.ratingCount})`, glow: colors.accentGlow },
         ].map((stat, i) => (
           <View key={i} style={s.statCard}>
             <View style={[s.statIconWrap, { backgroundColor: stat.glow }]}>
