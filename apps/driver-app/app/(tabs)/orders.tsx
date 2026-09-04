@@ -64,7 +64,7 @@ export default function DriverOrdersScreen() {
       .from('orders')
       .select('id, order_number, status, service_type, items_count, total, notes, payment_method, payment_status, pickup_location, delivery_location, created_at, is_scheduled, scheduled_at, rating_driver, rating_note, customer:users!orders_customer_id_fkey(name, phone, customer_code), address:addresses(label, building, floor, apartment, landmark, lat, lng)')
       .eq('driver_id', profile.id)
-      .not('status', 'in', '("cancelled","refunded")')
+      .not('status', 'in', '("scheduled","cancelled","refunded")')
       .order('created_at', { ascending: false })
       .limit(50)
     setOrders(data ?? [])

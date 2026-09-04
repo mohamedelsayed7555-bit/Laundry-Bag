@@ -27,6 +27,7 @@ export default function HomeScreen() {
   const [recentOrders, setRecentOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [activeSub, setActiveSub] = useState<any>(null)
+  const [unreadCount, setUnreadCount] = useState(0)
 
   useEffect(() => {
     if (!profile) { setLoading(false); return }
@@ -39,6 +40,10 @@ export default function HomeScreen() {
     supabase.from('subscriptions').select('*, plans(name, items_per_month)')
       .eq('user_id', profile.id).eq('status', 'active').single()
       .then(({ data }) => setActiveSub(data))
+
+    supabase.from('notifications').select('id', { count: 'exact', head: true })
+      .eq('user_id', profile.id).is('read_at', null)
+      .then(({ count }) => setUnreadCount(count ?? 0))
   }, [profile])
 
   const greeting = () => {
@@ -68,15 +73,25 @@ export default function HomeScreen() {
           <Text style={[s.greetSmall, { color: colors.navy[200] }]}>{greeting()} 👋</Text>
           <Text style={[s.greetName, { color: colors.text }]}>{profile?.name ?? ''}</Text>
         </View>
-        <TouchableOpacity onPress={() => router.push('/(tabs)/profile')}>
-          {profile?.avatar_url ? (
-            <Image source={{ uri: profile.avatar_url }} style={[s.avatarImg, { borderColor: colors.accentLight }]} />
-          ) : (
-            <View style={[s.avatar, { backgroundColor: colors.accent, borderColor: colors.accentLight }]}>
-              <Text style={s.avatarText}>{profile?.name?.[0] ?? '؟'}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <TouchableOpacity onPress={() => router.push('/notifications')} style={s.bellBtn}>
+            <Text style={{ fontSize: 22 }}>🔔</Text>
+            {unreadCount > 0 && (
+              <View style={[s.badge, { backgroundColor: colors.danger }]}>
+                <Text style={s.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/profile')}>
+            {profile?.avatar_url ? (
+              <Image source={{ uri: profile.avatar_url }} style={[s.avatarImg, { borderColor: colors.accentLight }]} />
+            ) : (
+              <View style={[s.avatar, { backgroundColor: colors.accent, borderColor: colors.accentLight }]}>
+                <Text style={s.avatarText}>{profile?.name?.[0] ?? '؟'}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
       </Animated.View>
 
       {/* Hero CTA */}
@@ -215,6 +230,9 @@ const s = StyleSheet.create({
     borderWidth: 2,
   },
   avatarText: { fontSize: 20, color: '#fff', fontWeight: 'bold' },
+  bellBtn: { position: 'relative', padding: 4 },
+  badge: { position: 'absolute', top: -2, right: -4, minWidth: 18, height: 18, borderRadius: 9, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 },
+  badgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   avatarImg: {
     width: 48, height: 48, borderRadius: 24,
     borderWidth: 2,

@@ -129,17 +129,28 @@ export default function OrdersPage() {
     try {
       const { data: order } = await supabase.from('orders').select('customer_id, order_number').eq('id', orderId).single()
       if (!order) return
-      const { data: customer } = await supabase.from('users').select('fcm_token').eq('id', order.customer_id).single()
-      if (!customer?.fcm_token) return
       const msgs: Record<string, string> = {
         assigned: 'تم تعيين سائق لطلبك', picked_up: 'تم استلام ملابسك', processing: 'ملابسك قيد المعالجة',
         ready: 'ملابسك جاهزة للتوصيل!', delivering: 'السائق في طريقه إليك', delivered: 'تم توصيل طلبك بنجاح!', cancelled: 'تم إلغاء طلبك',
       }
       if (!msgs[newStatus]) return
-      fetch('https://exp.host/--/api/v2/push/send', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: customer.fcm_token, title: `طلب ${order.order_number}`, body: msgs[newStatus], sound: 'default', data: { type: 'order_update', order_id: orderId, status: newStatus } }),
-      }).catch(() => {})
+      const title = `طلب ${order.order_number}`
+      const body = msgs[newStatus]
+      await supabase.from('notifications').insert({
+        user_id: order.customer_id,
+        title,
+        body,
+        type: 'order',
+        data: { type: 'order_update', order_id: orderId, status: newStatus },
+        sent_at: new Date().toISOString(),
+      })
+      const { data: customer } = await supabase.from('users').select('fcm_token').eq('id', order.customer_id).single()
+      if (customer?.fcm_token) {
+        fetch('https://exp.host/--/api/v2/push/send', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to: customer.fcm_token, title, body, sound: 'default', data: { type: 'order_update', order_id: orderId, status: newStatus } }),
+        }).catch(() => {})
+      }
     } catch {}
   }
 

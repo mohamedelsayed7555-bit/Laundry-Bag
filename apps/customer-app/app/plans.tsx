@@ -49,10 +49,9 @@ const tierColors: Record<string, string> = {
 }
 
 const paymentMethods = [
-  { key: 'cash', icon: '💵', label: 'كاش' },
-  { key: 'visa', icon: '💳', label: 'فيزا / ماستركارد' },
-  { key: 'wallet', icon: '📱', label: 'محفظة إلكترونية' },
-  { key: 'instapay', icon: '🏦', label: 'إنستاباي' },
+  { key: 'visa', icon: '💳', label: 'فيزا / ماستركارد', labelEn: 'Visa / Mastercard' },
+  { key: 'wallet', icon: '📱', label: 'محفظة إلكترونية', labelEn: 'E-Wallet' },
+  { key: 'instapay', icon: '🏦', label: 'إنستاباي', labelEn: 'InstaPay' },
 ]
 
 export default function PlansScreen() {
@@ -69,7 +68,7 @@ export default function PlansScreen() {
   const [subscribing, setSubscribing] = useState(false)
   const [discountRates, setDiscountRates] = useState({ quarterly: 10, biannual: 15, annual: 20 })
   const [autoRenew, setAutoRenew] = useState(true)
-  const [selectedPayment, setSelectedPayment] = useState('cash')
+  const [selectedPayment, setSelectedPayment] = useState('visa')
 
   useEffect(() => {
     loadData()
@@ -182,8 +181,8 @@ export default function PlansScreen() {
     showAlert({
       title: `${locale === 'en' ? 'Subscribe' : 'اشتراك'} ${plan.name}`,
       message: locale === 'en'
-        ? `Duration: ${durLabel}\nPrice: ${price} EGP\n${plan.items_per_month} items/month\nPayment: ${paymentMethods.find(p => p.key === selectedPayment)?.label}\nAuto-renew: ${autoRenew ? 'Yes' : 'No'}\n\nYour request will be reviewed after payment`
-        : `المدة: ${durLabel}\nالسعر: ${price} ج.م\n${plan.items_per_month} قطعة/شهر\nطريقة الدفع: ${paymentMethods.find(p => p.key === selectedPayment)?.label}\nتجديد تلقائي: ${autoRenew ? 'نعم' : 'لا'}\n\nسيتم مراجعة طلبك وتفعيله من الإدارة بعد الدفع`,
+        ? `Duration: ${durLabel}\nPrice: ${price} EGP\n${plan.items_per_month} items/month\nPayment: ${paymentMethods.find(p => p.key === selectedPayment)?.labelEn}\nAuto-renew: ${autoRenew ? 'Yes' : 'No'}\n\n${selectedPayment === 'instapay' ? 'Your request will be reviewed after payment confirmation' : 'Your subscription will be activated automatically after payment'}`
+        : `المدة: ${durLabel}\nالسعر: ${price} ج.م\n${plan.items_per_month} قطعة/شهر\nطريقة الدفع: ${paymentMethods.find(p => p.key === selectedPayment)?.label}\nتجديد تلقائي: ${autoRenew ? 'نعم' : 'لا'}\n\n${selectedPayment === 'instapay' ? 'سيتم مراجعة طلبك وتفعيله من الإدارة بعد تأكيد الدفع' : 'سيتم تفعيل اشتراكك تلقائياً بعد نجاح الدفع'}`,
       type: 'confirm',
       buttons: [
         { text: locale === 'en' ? 'Cancel' : 'إلغاء', style: 'cancel' },
@@ -227,7 +226,7 @@ export default function PlansScreen() {
               }
             } else {
               setSubscribing(false)
-              showAlert({ title: locale === 'en' ? 'Done' : 'تم', message: locale === 'en' ? 'Subscription request sent! It will be activated after payment confirmation.' : 'تم إرسال طلب الاشتراك! سيتم تفعيله بعد تأكيد الدفع من الإدارة', type: 'success', buttons: [{ text: t('ok'), onPress: () => loadData() }] })
+              showAlert({ title: locale === 'en' ? 'Done' : 'تم', message: locale === 'en' ? 'Subscription request sent! It will be activated after admin confirms your payment.' : 'تم إرسال طلب الاشتراك! سيتم تفعيله بعد تأكيد الدفع من الإدارة.', type: 'success', buttons: [{ text: t('ok'), onPress: () => loadData() }] })
             }
           },
         },
@@ -345,7 +344,7 @@ export default function PlansScreen() {
             onPress={() => setSelectedPayment(p.key)}
           >
             <Text style={s.paymentIcon}>{p.icon}</Text>
-            <Text style={[s.paymentLabel, { color: colors.navy[200] }, selectedPayment === p.key && { color: colors.text }]}>{p.label}</Text>
+            <Text style={[s.paymentLabel, { color: colors.navy[200] }, selectedPayment === p.key && { color: colors.text }]}>{locale === 'en' ? p.labelEn : p.label}</Text>
             {selectedPayment === p.key && (
               <View style={[s.paymentCheck, { backgroundColor: colors.primary }]}><Text style={s.paymentCheckText}>✓</Text></View>
             )}

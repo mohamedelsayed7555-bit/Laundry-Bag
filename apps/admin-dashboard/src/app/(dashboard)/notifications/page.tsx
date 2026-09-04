@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { motion } from 'framer-motion'
-import { Bell, Send, Users, Crown, UserX, Loader2 } from 'lucide-react'
+import { Bell, Send, Users, Crown, UserX, Loader2, MessageCircle, Download, ExternalLink } from 'lucide-react'
 import Badge from '@/components/ui/Badge'
 import DataTable from '@/components/ui/DataTable'
 import PermissionGate from '@/components/ui/PermissionGate'
@@ -26,11 +26,53 @@ export default function NotificationsPage() {
   const [history, setHistory] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [recipientCount, setRecipientCount] = useState<number | null>(null)
+  const [waCustomers, setWaCustomers] = useState<any[]>([])
+  const [showWaList, setShowWaList] = useState(false)
+  const [loadingWa, setLoadingWa] = useState(false)
   const { toast } = useToast()
   const { user: profile } = useAuth()
 
   useEffect(() => { loadHistory() }, [])
   useEffect(() => { loadRecipientCount() }, [target])
+
+  async function loadWaCustomers() {
+    setLoadingWa(true)
+    let query = supabase.from('users').select('id, name, phone, customer_code').eq('role', 'customer')
+    if (target === 'subscribers') {
+      const { data: subUsers } = await supabase.from('subscriptions').select('user_id').eq('status', 'active')
+      const ids = (subUsers ?? []).map(s => s.user_id)
+      if (ids.length > 0) query = query.in('id', ids)
+      else { setWaCustomers([]); setLoadingWa(false); setShowWaList(true); return }
+    } else if (target === 'non_subscribers') {
+      const { data: subUsers } = await supabase.from('subscriptions').select('user_id').eq('status', 'active')
+      const ids = (subUsers ?? []).map(s => s.user_id)
+      if (ids.length > 0) query = (query as any).not('id', 'in', `(${ids.join(',')})`)
+    }
+    const { data } = await query.order('name')
+    setWaCustomers(data ?? [])
+    setLoadingWa(false)
+    setShowWaList(true)
+  }
+
+  function getWaLink(phone: string) {
+    let num = phone.replace(/\D/g, '')
+    if (num.startsWith('0')) num = '2' + num
+    if (!num.startsWith('20')) num = '20' + num
+    const msg = encodeURIComponent(`${title.trim()}\n\n${body.trim()}`)
+    return `https://wa.me/${num}?text=${msg}`
+  }
+
+  function exportCSV() {
+    const header = 'الاسم,الكود,الرقم\n'
+    const rows = waCustomers.map(c => `${c.name},${c.customer_code ?? ''},${c.phone}`).join('\n')
+    const blob = new Blob(['﻿' + header + rows], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `customers_${target}_${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   async function loadHistory() {
     const { data } = await supabase
@@ -80,53 +122,38 @@ export default function NotificationsPage() {
 
     setSending(true)
 
-    // Get target tokens
-    let tokenQuery = supabase
-      .from('users')
-      .select('fcm_token')
-      .eq('role', 'customer')
-      .not('fcm_token', 'is', null)
-
+    // Get all target customers (for saving notifications)
+    let allQuery = supabase.from('users').select('id, fcm_token').eq('role', 'customer')
     if (target === 'subscribers') {
-      const { data: subUsers } = await supabase
-        .from('subscriptions')
-        .select('user_id')
-        .eq('status', 'active')
+      const { data: subUsers } = await supabase.from('subscriptions').select('user_id').eq('status', 'active')
       const ids = (subUsers ?? []).map(s => s.user_id)
-      if (ids.length === 0) {
-        toast('لا يوجد مشتركين حالياً', 'error')
-        setSending(false)
-        return
-      }
-      tokenQuery = tokenQuery.in('id', ids)
+      if (ids.length === 0) { toast('لا يوجد مشتركين حالياً', 'error'); setSending(false); return }
+      allQuery = allQuery.in('id', ids)
     } else if (target === 'non_subscribers') {
-      const { data: subUsers } = await supabase
-        .from('subscriptions')
-        .select('user_id')
-        .eq('status', 'active')
+      const { data: subUsers } = await supabase.from('subscriptions').select('user_id').eq('status', 'active')
       const ids = (subUsers ?? []).map(s => s.user_id)
-      if (ids.length > 0) {
-        tokenQuery = (tokenQuery as any).not('id', 'in', `(${ids.join(',')})`)
-      }
+      if (ids.length > 0) allQuery = (allQuery as any).not('id', 'in', `(${ids.join(',')})`)
     }
 
-    const { data: users } = await tokenQuery
-    const tokens = (users ?? []).map(u => u.fcm_token).filter(Boolean)
+    const { data: allUsers } = await allQuery
+    if (!allUsers || allUsers.length === 0) { toast('لا يوجد عملاء مستهدفين', 'error'); setSending(false); return }
 
-    if (tokens.length === 0) {
-      toast('لا يوجد عملاء لديهم إشعارات مفعلة', 'error')
-      setSending(false)
-      return
-    }
+    // Save notification for each user
+    const notifRows = allUsers.map(u => ({
+      user_id: u.id,
+      title: title.trim(),
+      body: body.trim(),
+      type: 'offer' as const,
+      data: { type: 'broadcast' },
+      sent_at: new Date().toISOString(),
+    }))
+    await supabase.from('notifications').insert(notifRows)
 
-    // Send in batches of 100
-    const batches = []
-    for (let i = 0; i < tokens.length; i += 100) {
-      batches.push(tokens.slice(i, i + 100))
-    }
-
+    // Send push to users with tokens
+    const tokens = allUsers.map(u => u.fcm_token).filter(Boolean)
     let successCount = 0
-    for (const batch of batches) {
+    for (let i = 0; i < tokens.length; i += 100) {
+      const batch = tokens.slice(i, i + 100)
       try {
         const messages = batch.map(token => ({
           to: token,
@@ -144,16 +171,15 @@ export default function NotificationsPage() {
       } catch {}
     }
 
-    // Log to database
     await supabase.from('broadcast_messages').insert({
       title: title.trim(),
       body: body.trim(),
       target,
       sent_by: profile?.id,
-      recipients_count: successCount,
+      recipients_count: allUsers.length,
     })
 
-    toast(`تم إرسال الإشعار لـ ${successCount} عميل`)
+    toast(`تم إرسال الإشعار لـ ${allUsers.length} عميل (${successCount} push)`)
     setTitle('')
     setBody('')
     setSending(false)
@@ -310,6 +336,69 @@ export default function NotificationsPage() {
               </>
             )}
           </button>
+        </motion.div>
+
+        {/* WhatsApp Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="bg-white rounded-2xl border border-surface-border/60 p-6 space-y-4"
+        >
+          <h3 className="font-semibold text-gray-700 flex items-center gap-2">
+            <MessageCircle size={16} className="text-green-500" />
+            إرسال عبر واتساب
+          </h3>
+          <p className="text-xs text-gray-400">اكتب العنوان والرسالة أعلاه ثم اضغط هنا لإرسالها عبر واتساب للعملاء المستهدفين</p>
+
+          <div className="flex gap-3">
+            <button
+              onClick={loadWaCustomers}
+              disabled={loadingWa || !title.trim() || !body.trim()}
+              className="flex items-center gap-2 bg-green-500 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2.5 px-5 rounded-xl transition-all text-sm"
+            >
+              {loadingWa ? <Loader2 size={14} className="animate-spin" /> : <MessageCircle size={14} />}
+              عرض قائمة العملاء
+            </button>
+            {showWaList && waCustomers.length > 0 && (
+              <button
+                onClick={exportCSV}
+                className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium py-2.5 px-5 rounded-xl transition-all text-sm"
+              >
+                <Download size={14} />
+                تصدير CSV ({waCustomers.length})
+              </button>
+            )}
+          </div>
+
+          {showWaList && (
+            <div className="space-y-2 max-h-[400px] overflow-y-auto">
+              {waCustomers.length === 0 ? (
+                <p className="text-center text-gray-400 py-6 text-sm">لا يوجد عملاء في هذه الفئة</p>
+              ) : (
+                <>
+                  <p className="text-xs text-gray-400">{waCustomers.length} عميل — اضغط على أيقونة الواتساب لفتح المحادثة بالرسالة الجاهزة</p>
+                  {waCustomers.map(c => (
+                    <div key={c.id} className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-700 text-sm truncate">{c.name}</p>
+                        <p className="text-xs text-gray-400">{c.phone} {c.customer_code ? `• ${c.customer_code}` : ''}</p>
+                      </div>
+                      <a
+                        href={getWaLink(c.phone)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-medium py-2 px-3 rounded-lg transition-all shrink-0"
+                      >
+                        <ExternalLink size={12} />
+                        واتساب
+                      </a>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          )}
         </motion.div>
 
         {/* History */}
