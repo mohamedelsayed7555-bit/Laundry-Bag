@@ -425,7 +425,7 @@ export default function OrdersPage() {
                     {detail.payment_status === 'confirmed' ? 'مدفوع' : detail.payment_status === 'failed' ? 'فشل' : 'معلق'}
                   </Badge>
                   <p className="text-[10px] text-gray-400 mt-0.5">
-                    {{ cash: 'كاش', visa: 'فيزا', e_wallet: 'محفظة', instapay: 'إنستاباي' }[detail.payment_method] ?? detail.payment_method}
+                    {{ cash: 'كاش', visa: 'فيزا', e_wallet: 'محفظة', instapay: 'إنستاباي' }[detail.payment_method as string] ?? detail.payment_method}
                   </p>
                 </div> },
               ].map((item, i) => (
