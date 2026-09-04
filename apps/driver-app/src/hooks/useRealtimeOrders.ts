@@ -8,6 +8,7 @@ export function useRealtimeDriverOrders(driverId: string | undefined, onUpdate: 
 
     const channel = supabase
       .channel('driver-orders')
+      // 1) Status changes on MY orders (e.g. ready → loud alert)
       .on(
         'postgres_changes',
         {
@@ -22,10 +23,12 @@ export function useRealtimeDriverOrders(driverId: string | undefined, onUpdate: 
           if (newStatus === 'ready' && oldStatus !== 'ready') {
             sendLocalNotification('طلب جاهز للتوصيل! 🚗', `الطلب رقم ${payload.new.order_number} جاهز — ابدأ التوصيل`, 'new-order')
             playNotificationSound('new-order')
+            playNotificationSound('new-order')
           }
           onUpdate()
         }
       )
+      // 2) New assignment via UPDATE (admin assigns driver_id)
       .on(
         'postgres_changes',
         {
@@ -35,7 +38,24 @@ export function useRealtimeDriverOrders(driverId: string | undefined, onUpdate: 
         },
         (payload) => {
           if (payload.new.driver_id === driverId && payload.old.driver_id !== driverId) {
-            sendLocalNotification('طلب جديد!', `تم تعيين طلب جديد رقم ${payload.new.order_number} لك`, 'new-order')
+            sendLocalNotification('طلب جديد! 📦', `تم تعيين طلب جديد رقم ${payload.new.order_number} لك`, 'new-order')
+            playNotificationSound('new-order')
+            onUpdate()
+          }
+        }
+      )
+      // 3) New assignment via INSERT (order created with driver_id already set)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'orders',
+        },
+        (payload) => {
+          if (payload.new.driver_id === driverId) {
+            sendLocalNotification('طلب جديد! 📦', `طلب جديد رقم ${payload.new.order_number}`, 'new-order')
+            playNotificationSound('new-order')
             onUpdate()
           }
         }

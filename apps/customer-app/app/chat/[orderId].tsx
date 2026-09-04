@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { useTheme } from '../../src/contexts/ThemeContext'
 import { supabase } from '../../src/lib/supabase'
+import { playNotificationSound } from '../../src/hooks/useNotifications'
 
 type Message = {
   id: string
@@ -75,6 +76,9 @@ export default function ChatScreen() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `order_id=eq.${orderId}` }, (payload) => {
         const newMsg = payload.new as Message
         setMessages(prev => [...prev, newMsg])
+        if (newMsg.sender_id !== profile.id) {
+          playNotificationSound('order-update')
+        }
         if (newMsg.receiver_id === profile.id) {
           supabase.from('messages').update({ read_at: new Date().toISOString() }).eq('id', newMsg.id)
         }

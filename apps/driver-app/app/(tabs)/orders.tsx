@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Lin
 import { useRouter } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated'
-import { Phone, MessageCircle, Navigation, MapPin } from 'lucide-react-native'
+import { Phone, MessageCircle, Navigation, MapPin, Package, Truck } from 'lucide-react-native'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { supabase } from '../../src/lib/supabase'
 import { useRealtimeDriverOrders } from '../../src/hooks/useRealtimeOrders'
@@ -24,7 +24,6 @@ const statusConfig: Record<string, { label: string; color: string; icon: string 
 const nextAction: Record<string, { status: string; label: string }> = {
   assigned: { status: 'picked_up', label: 'تأكيد الاستلام من العميل' },
   picked_up: { status: 'processing', label: 'وصلت للمغسلة' },
-  processing: { status: 'ready', label: 'الطلب جاهز' },
   ready: { status: 'delivering', label: 'بدأت التوصيل' },
   delivering: { status: 'delivered', label: 'تم التسليم للعميل' },
 }
@@ -48,7 +47,7 @@ const paymentStatusLabel: Record<string, { label: string; color: string }> = {
   refunded: { label: 'مسترد', color: '#8b5cf6' },
 }
 
-type Filter = 'active' | 'completed' | 'all'
+type Filter = 'pickup' | 'delivery' | 'completed'
 
 export default function DriverOrdersScreen() {
   const { profile } = useAuth()
@@ -57,13 +56,13 @@ export default function DriverOrdersScreen() {
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [filter, setFilter] = useState<Filter>('active')
+  const [filter, setFilter] = useState<Filter>('pickup')
 
   const loadOrders = useCallback(async () => {
     if (!profile) return
     const { data } = await supabase
       .from('orders')
-      .select('id, order_number, status, service_type, items_count, total, notes, payment_method, payment_status, delivery_location, created_at, is_scheduled, scheduled_at, rating_driver, rating_note, customer:users!orders_customer_id_fkey(name, phone, customer_code), address:addresses(label, building, floor, apartment, landmark, lat, lng)')
+      .select('id, order_number, status, service_type, items_count, total, notes, payment_method, payment_status, pickup_location, delivery_location, created_at, is_scheduled, scheduled_at, rating_driver, rating_note, customer:users!orders_customer_id_fkey(name, phone, customer_code), address:addresses(label, building, floor, apartment, landmark, lat, lng)')
       .eq('driver_id', profile.id)
       .not('status', 'in', '("cancelled","refunded")')
       .order('created_at', { ascending: false })
@@ -75,10 +74,30 @@ export default function DriverOrdersScreen() {
 
   useEffect(() => { loadOrders() }, [loadOrders])
   useRealtimeDriverOrders(profile?.id, loadOrders)
-  const hasActive = orders.some(o => o.status !== 'delivered')
+  const hasActive = orders.some(o => !['delivered'].includes(o.status))
   useDriverLocation(profile?.id, hasActive)
 
   const onRefresh = () => { setRefreshing(true); loadOrders() }
+
+  // Pickup: assigned, picked_up (orders to collect from customer → laundry)
+  const pickupOrders = orders
+    .filter(o => ['assigned', 'picked_up'].includes(o.status))
+    .sort((a, b) => {
+      const p: Record<string, number> = { assigned: 0, picked_up: 1 }
+      return (p[a.status] ?? 9) - (p[b.status] ?? 9)
+    })
+
+  // Delivery: ready, delivering (orders to deliver from laundry → customer)
+  const deliveryOrders = orders
+    .filter(o => ['ready', 'delivering'].includes(o.status))
+    .sort((a, b) => {
+      const p: Record<string, number> = { ready: 0, delivering: 1 }
+      return (p[a.status] ?? 9) - (p[b.status] ?? 9)
+    })
+
+  const completedOrders = orders.filter(o => o.status === 'delivered')
+
+  const filteredOrders = filter === 'pickup' ? pickupOrders : filter === 'delivery' ? deliveryOrders : completedOrders
 
   async function updateStatus(orderId: string, newStatus: string) {
     const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId)
@@ -131,34 +150,32 @@ export default function DriverOrdersScreen() {
     } catch {}
   }
 
-  function openNavigation(addr: any) {
-    if (!addr?.lat || !addr?.lng) {
+  function openNavigation(loc: any) {
+    if (!loc?.lat || !loc?.lng) {
       showAlert({ title: 'خطأ', message: 'لا يوجد موقع محدد لهذا العنوان', type: 'error' })
       return
     }
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${addr.lat},${addr.lng}`
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}`
     Linking.openURL(url)
   }
 
-  const statusPriority: Record<string, number> = {
-    assigned: 0, ready: 1, delivering: 2, picked_up: 3, processing: 4, delivered: 5,
+  function getRelevantLocation(item: any) {
+    const isPickupPhase = ['assigned', 'picked_up'].includes(item.status)
+    if (isPickupPhase) {
+      return { loc: item.pickup_location ?? item.address ?? item.delivery_location, label: '📦 عنوان الاستلام', phase: 'pickup' }
+    }
+    return { loc: item.delivery_location ?? item.address ?? item.pickup_location, label: '🚗 عنوان التسليم', phase: 'delivery' }
   }
-
-  const activeOrders = orders
-    .filter(o => !['delivered'].includes(o.status))
-    .sort((a, b) => (statusPriority[a.status] ?? 9) - (statusPriority[b.status] ?? 9))
-  const completedOrders = orders.filter(o => o.status === 'delivered')
-  const filteredOrders = filter === 'active' ? activeOrders : filter === 'completed' ? completedOrders : orders
 
   const renderOrder = ({ item, index }: { item: any; index: number }) => {
     const status = statusConfig[item.status] ?? { label: item.status, color: '#999', icon: '❓' }
     const action = nextAction[item.status]
     const addr = item.address
-    const isActive = item.status !== 'delivered'
+    const { loc: relevantLoc, label: locLabel } = getRelevantLocation(item)
 
     return (
       <Animated.View entering={FadeInRight.duration(400).delay(index * 80)}>
-        <View style={[s.orderCard, isActive && { borderColor: status.color + '40' }]}>
+        <View style={[s.orderCard, item.status !== 'delivered' && { borderColor: status.color + '40' }]}>
           <View style={s.orderHeader}>
             <Text style={s.orderNumber}>{item.order_number}</Text>
             <View style={[s.statusBadge, { backgroundColor: status.color + '20' }]}>
@@ -190,16 +207,17 @@ export default function DriverOrdersScreen() {
             )}
           </View>
 
-          {(addr || item.delivery_location?.lat) && (
+          {/* Address — shows pickup or delivery based on order phase */}
+          {(relevantLoc?.lat || addr?.lat) && (
             <View style={s.addressBox}>
               <View style={s.addressHeader}>
-                <Text style={s.addressLabel}>📍 {addr?.label || item.delivery_location?.label || 'موقع العميل'}</Text>
-                <TouchableOpacity style={s.navBtn} onPress={() => openNavigation(addr || item.delivery_location)}>
+                <Text style={s.addressLabel}>{locLabel} {relevantLoc?.label || addr?.label || ''}</Text>
+                <TouchableOpacity style={s.navBtn} onPress={() => openNavigation(relevantLoc || addr)}>
                   <Navigation size={14} color={colors.primary} />
                   <Text style={s.navBtnText}>اتجاهات</Text>
                 </TouchableOpacity>
               </View>
-              {addr && (
+              {addr && ['assigned', 'picked_up'].includes(item.status) && (
                 <>
                   <Text style={s.addressDetail}>
                     {[addr.building && `مبنى ${addr.building}`, addr.floor && `ط${addr.floor}`, addr.apartment && `ش${addr.apartment}`].filter(Boolean).join(' - ')}
@@ -207,6 +225,21 @@ export default function DriverOrdersScreen() {
                   {addr.landmark && <Text style={s.addressDetail}>📌 {addr.landmark}</Text>}
                 </>
               )}
+            </View>
+          )}
+
+          {/* Show both addresses summary for context */}
+          {item.status !== 'delivered' && item.pickup_location?.lat && item.delivery_location?.lat && (
+            <View style={s.routeSummary}>
+              <TouchableOpacity style={s.routePoint} onPress={() => openNavigation(item.pickup_location)}>
+                <Text style={s.routeIcon}>📦</Text>
+                <Text style={s.routeText} numberOfLines={1}>{item.pickup_location.label || 'الاستلام'}</Text>
+              </TouchableOpacity>
+              <Text style={s.routeArrow}>→</Text>
+              <TouchableOpacity style={s.routePoint} onPress={() => openNavigation(item.delivery_location)}>
+                <Text style={s.routeIcon}>🏠</Text>
+                <Text style={s.routeText} numberOfLines={1}>{item.delivery_location.label || 'التسليم'}</Text>
+              </TouchableOpacity>
             </View>
           )}
 
@@ -222,7 +255,6 @@ export default function DriverOrdersScreen() {
             </View>
           </View>
 
-          {/* Payment Info */}
           <View style={s.paymentRow}>
             <View style={s.paymentItem}>
               <Text style={s.paymentLabel}>الدفع</Text>
@@ -271,8 +303,8 @@ export default function DriverOrdersScreen() {
           )}
 
           <View style={s.contactRow}>
-            {(addr?.lat || item.delivery_location?.lat) && (
-              <TouchableOpacity style={s.mapBtn} onPress={() => openNavigation(addr || item.delivery_location)} activeOpacity={0.7}>
+            {(relevantLoc?.lat || addr?.lat) && (
+              <TouchableOpacity style={s.mapBtn} onPress={() => openNavigation(relevantLoc || addr)} activeOpacity={0.7}>
                 <MapPin size={16} color="#f59e0b" />
                 <Text style={s.mapBtnText}>الخريطة</Text>
               </TouchableOpacity>
@@ -299,7 +331,7 @@ export default function DriverOrdersScreen() {
       <Animated.View entering={FadeInDown.duration(500)} style={s.header}>
         <View>
           <Text style={s.title}>الطلبات</Text>
-          <Text style={s.subtitle}>{activeOrders.length} نشط · {completedOrders.length} مكتمل</Text>
+          <Text style={s.subtitle}>{pickupOrders.length} استلام · {deliveryOrders.length} توصيل · {completedOrders.length} مكتمل</Text>
         </View>
         <View style={s.headerAvatar}>
           <Text style={s.headerAvatarText}>{profile?.name?.[0] ?? '؟'}</Text>
@@ -307,18 +339,30 @@ export default function DriverOrdersScreen() {
       </Animated.View>
 
       <Animated.View entering={FadeInDown.duration(500).delay(100)} style={s.filterRow}>
-        {([['active', 'النشطة'], ['completed', 'المكتملة'], ['all', 'الكل']] as [Filter, string][]).map(([key, label]) => (
-          <TouchableOpacity key={key} style={[s.filterBtn, filter === key && s.filterActive]} onPress={() => setFilter(key)}>
-            <Text style={[s.filterText, filter === key && s.filterTextActive]}>{label}</Text>
-          </TouchableOpacity>
-        ))}
+        <TouchableOpacity style={[s.filterBtn, filter === 'pickup' && s.filterActive]} onPress={() => setFilter('pickup')}>
+          <View style={s.filterInner}>
+            <Package size={14} color={filter === 'pickup' ? colors.primary : colors.navy[300]} />
+            <Text style={[s.filterText, filter === 'pickup' && s.filterTextActive]}>استلام</Text>
+            {pickupOrders.length > 0 && <View style={s.filterBadge}><Text style={s.filterBadgeText}>{pickupOrders.length}</Text></View>}
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity style={[s.filterBtn, filter === 'delivery' && { backgroundColor: '#10b98120', borderColor: '#10b981' }]} onPress={() => setFilter('delivery')}>
+          <View style={s.filterInner}>
+            <Truck size={14} color={filter === 'delivery' ? '#10b981' : colors.navy[300]} />
+            <Text style={[s.filterText, filter === 'delivery' && { color: '#10b981' }]}>توصيل</Text>
+            {deliveryOrders.length > 0 && <View style={[s.filterBadge, { backgroundColor: '#10b981' }]}><Text style={s.filterBadgeText}>{deliveryOrders.length}</Text></View>}
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity style={[s.filterBtn, filter === 'completed' && { backgroundColor: colors.navy[600] + '40', borderColor: colors.navy[400] }]} onPress={() => setFilter('completed')}>
+          <Text style={[s.filterText, filter === 'completed' && { color: colors.navy[100] }]}>مكتمل</Text>
+        </TouchableOpacity>
       </Animated.View>
 
       <Animated.View entering={FadeInDown.duration(500).delay(200)} style={s.statsRow}>
         {[
-          { value: activeOrders.length, label: 'نشط', color: colors.primary },
-          { value: orders.filter(o => o.status === 'delivering').length, label: 'قيد التوصيل', color: colors.warning },
-          { value: completedOrders.length, label: 'مكتمل', color: colors.success },
+          { value: pickupOrders.length, label: 'استلام', color: colors.primary },
+          { value: deliveryOrders.length, label: 'توصيل', color: '#10b981' },
+          { value: orders.filter(o => o.status === 'processing').length, label: 'في المغسلة', color: '#06b6d4' },
         ].map((stat, i) => (
           <View key={i} style={s.statCard}>
             <Text style={[s.statValue, { color: stat.color }]}>{stat.value}</Text>
@@ -335,8 +379,11 @@ export default function DriverOrdersScreen() {
         </Animated.View>
       ) : filteredOrders.length === 0 ? (
         <Animated.View entering={FadeInDown.duration(500).delay(300)} style={s.emptyCard}>
-          <Text style={s.emptyIcon}>📋</Text>
-          <Text style={s.emptyText}>{filter === 'completed' ? 'لا توجد طلبات مكتملة' : 'لا توجد طلبات نشطة'}</Text>
+          <Text style={s.emptyIcon}>{filter === 'pickup' ? '📦' : filter === 'delivery' ? '🚗' : '📋'}</Text>
+          <Text style={s.emptyText}>{filter === 'pickup' ? 'لا توجد طلبات للاستلام' : filter === 'delivery' ? 'لا توجد طلبات للتوصيل' : 'لا توجد طلبات مكتملة'}</Text>
+          {filter === 'delivery' && orders.some(o => o.status === 'processing') && (
+            <Text style={s.emptyHint}>⏳ {orders.filter(o => o.status === 'processing').length} طلبات في المغسلة — ستظهر هنا لما تجهز</Text>
+          )}
         </Animated.View>
       ) : (
         <FlatList
@@ -368,8 +415,11 @@ const s = StyleSheet.create({
   filterRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
   filterBtn: { flex: 1, paddingVertical: 10, borderRadius: 14, alignItems: 'center', backgroundColor: colors.navy[800], borderWidth: 1, borderColor: colors.navy[700] },
   filterActive: { backgroundColor: colors.primary + '20', borderColor: colors.primary },
+  filterInner: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   filterText: { fontSize: 13, color: colors.navy[300], fontWeight: '600' },
   filterTextActive: { color: colors.primary },
+  filterBadge: { backgroundColor: colors.primary, borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
+  filterBadgeText: { fontSize: 10, color: '#fff', fontWeight: '800' },
 
   statsRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
   statCard: {
@@ -410,10 +460,19 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: colors.navy[600],
   },
   addressHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  addressLabel: { fontSize: 13, color: '#fff', fontWeight: '600' },
+  addressLabel: { fontSize: 13, color: '#fff', fontWeight: '600', flex: 1 },
   navBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primaryGlow, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 10 },
   navBtnText: { fontSize: 11, color: colors.primary, fontWeight: '700' },
   addressDetail: { fontSize: 11, color: colors.navy[200], marginTop: 2 },
+
+  routeSummary: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12,
+    backgroundColor: colors.navy[700] + '30', borderRadius: 10, padding: 10,
+  },
+  routePoint: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  routeIcon: { fontSize: 14 },
+  routeText: { fontSize: 11, color: colors.navy[200], flex: 1 },
+  routeArrow: { fontSize: 14, color: colors.navy[400] },
 
   orderDetails: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
   detailChip: {
@@ -438,10 +497,10 @@ const s = StyleSheet.create({
   },
   scheduleBadgeText: { fontSize: 12, color: '#f59e0b', fontWeight: '600' },
   notes: { fontSize: 12, color: colors.navy[200], marginTop: 4, marginBottom: 4 },
-  ratingRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 6, marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: colors.navy[700] },
+  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: colors.navy[700] },
   ratingLabel: { fontSize: 11, color: colors.navy[300] },
   ratingStars: { fontSize: 12 },
-  ratingNote: { fontSize: 11, color: colors.navy[300], fontStyle: 'italic' as const, flex: 1 },
+  ratingNote: { fontSize: 11, color: colors.navy[300], fontStyle: 'italic', flex: 1 },
 
   actionBtnWrap: { borderRadius: 16, overflow: 'hidden', marginTop: 12 },
   actionBtn: { padding: 14, alignItems: 'center', borderRadius: 16 },
@@ -473,4 +532,5 @@ const s = StyleSheet.create({
   },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
   emptyText: { fontSize: 14, color: colors.navy[300] },
+  emptyHint: { fontSize: 12, color: colors.navy[400], marginTop: 8, textAlign: 'center' },
 })

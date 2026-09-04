@@ -61,11 +61,13 @@ export default function CartScreen() {
 
   const loadAddresses = useCallback(async () => {
     if (!profile) return
-    const { data } = await supabase.from('addresses').select('id, label, address, lat, lng, is_default').eq('user_id', profile.id).order('is_default', { ascending: false })
+    const { data } = await supabase.from('addresses').select('id, label, lat, lng, is_default, building, floor, apartment, landmark').eq('user_id', profile.id).order('is_default', { ascending: false })
     if (data) {
       setAddresses(data)
-      const def = data.find((a: any) => a.is_default) ?? data[0]
-      if (def && !selectedAddress) setSelectedAddress(def)
+      setSelectedAddress((prev: any) => {
+        if (prev && data.some((a: any) => a.id === prev.id)) return prev
+        return data.find((a: any) => a.is_default) ?? data[0] ?? null
+      })
     }
   }, [profile])
 
@@ -73,7 +75,7 @@ export default function CartScreen() {
     Promise.all([
       supabase.from('settings').select('key, value').in('key', ['delivery_fee', 'max_zone_km', 'price_per_km', 'base_delivery_km', 'laundry_lat', 'laundry_lng', 'min_order_items']),
       supabase.from('settings').select('key, value').in('key', ['instapay_number', 'wallet_number']),
-      profile ? supabase.from('addresses').select('id, label, address, lat, lng, is_default').eq('user_id', profile.id).order('is_default', { ascending: false }) : null,
+      profile ? supabase.from('addresses').select('id, label, lat, lng, is_default, building, floor, apartment, landmark').eq('user_id', profile.id).order('is_default', { ascending: false }) : null,
       profile ? supabase.from('subscriptions').select('*, plans(name)').eq('user_id', profile.id).eq('status', 'active').single() : null,
     ]).then(([allSettingsRes, settingsRes, addrRes, subRes]) => {
       if (allSettingsRes?.data) {
@@ -322,6 +324,13 @@ export default function CartScreen() {
         )}
 
         <Text style={[s.sectionTitle, { color: colors.text }]}>{isEn ? 'Pickup Address' : 'عنوان الاستلام (البيك أب)'}</Text>
+        {selectedAddress && (
+          <View style={[s.selectedAddrConfirm, { backgroundColor: colors.success + '15', borderColor: colors.success + '40' }]}>
+            <Text style={{ fontSize: 14, color: colors.success, fontWeight: '700' }}>✅ {isEn ? 'Selected:' : 'تم اختيار:'} {selectedAddress.label}</Text>
+            {selectedAddress.building && <Text style={{ fontSize: 12, color: colors.navy[300], marginTop: 2 }}>{[selectedAddress.building && `${isEn ? 'Bldg' : 'مبنى'} ${selectedAddress.building}`, selectedAddress.floor && `${isEn ? 'Floor' : 'ط'}${selectedAddress.floor}`, selectedAddress.apartment && `${isEn ? 'Apt' : 'ش'}${selectedAddress.apartment}`].filter(Boolean).join(' - ')}</Text>}
+            {selectedAddress.landmark && <Text style={{ fontSize: 11, color: colors.navy[400], marginTop: 2 }}>📌 {selectedAddress.landmark}</Text>}
+          </View>
+        )}
         {addresses.length === 0 ? (
           <TouchableOpacity style={[s.addAddressBtn, { backgroundColor: colors.cardBg, borderColor: colors.primary }]} onPress={() => router.push('/addresses')}>
             <Text style={[s.addAddressText, { color: colors.primary }]}>📍 {isEn ? 'Add new address' : 'إضافة عنوان جديد'}</Text>
@@ -331,7 +340,7 @@ export default function CartScreen() {
             {addresses.map(addr => (
               <TouchableOpacity key={addr.id} onPress={() => setSelectedAddress(addr)}
                 style={[s.addressCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, selectedAddress?.id === addr.id && { borderColor: colors.primary, backgroundColor: colors.primary + '10' }]}>
-                <Text style={[s.addressLabel, { color: colors.text }]}>📍 {addr.label}</Text>
+                <Text style={[s.addressLabel, { color: colors.text }]}>{selectedAddress?.id === addr.id ? '✅' : '📍'} {addr.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -528,6 +537,10 @@ const s = StyleSheet.create({
     borderWidth: 1.5, borderStyle: 'dashed',
   },
   addAddressText: { fontSize: 14, fontWeight: '600' },
+  selectedAddrConfirm: {
+    borderRadius: 12, padding: 12, marginBottom: 10,
+    borderWidth: 1,
+  },
   addressList: { gap: 8 },
   addressCard: {
     borderRadius: 12, padding: 12,

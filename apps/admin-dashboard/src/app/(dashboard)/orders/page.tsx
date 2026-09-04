@@ -12,6 +12,7 @@ import {
   Search,
   Eye,
   ArrowRight,
+  CheckSquare,
 } from 'lucide-react'
 import { PageSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
@@ -43,6 +44,8 @@ export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [detail, setDetail] = useState<any>(null)
   const [showAdd, setShowAdd] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulkUpdating, setBulkUpdating] = useState(false)
   const [drivers, setDrivers] = useState<any[]>([])
   const [customers, setCustomers] = useState<any[]>([])
   const [saving, setSaving] = useState(false)
@@ -83,7 +86,7 @@ export default function OrdersPage() {
     return () => { supabase.removeChannel(ch); if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [])
 
-  useEffect(() => { loadOrders() }, [page, statusFilter])
+  useEffect(() => { loadOrders(); setSelected(new Set()) }, [page, statusFilter])
 
   async function loadOrders() {
     let query = supabase.from('orders')
@@ -165,6 +168,40 @@ export default function OrdersPage() {
     }
   }
 
+  async function bulkAdvanceStatus() {
+    if (selected.size === 0) return
+    const selectedOrders = orders.filter(o => selected.has(o.id))
+    const advanceable = selectedOrders.filter(o => {
+      const isWalkin = o.notes?.includes('[من المحل]')
+      const flow = isWalkin ? walkinStatusFlow : statusFlow
+      return !!flow[o.status]
+    })
+    if (advanceable.length === 0) { toast('لا توجد طلبات يمكن تقديم حالتها', 'error'); return }
+    setBulkUpdating(true)
+    for (const order of advanceable) {
+      await advanceStatus(order)
+    }
+    setSelected(new Set())
+    setBulkUpdating(false)
+    toast(`تم تحديث ${advanceable.length} طلب`)
+  }
+
+  function toggleSelect(id: string) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    if (selected.size === filtered.length) {
+      setSelected(new Set())
+    } else {
+      setSelected(new Set(filtered.map(o => o.id)))
+    }
+  }
+
   async function loadMessages(orderId: string) {
     setMsgsLoading(true)
     const { data } = await supabase.from('messages')
@@ -241,6 +278,10 @@ export default function OrdersPage() {
   }), [orders, search])
 
   const columns = [
+    { key: 'select', label: '', render: (item: any) => (
+      <input type="checkbox" checked={selected.has(item.id)} onChange={() => toggleSelect(item.id)}
+        className="w-4 h-4 rounded border-gray-300 text-primary-500 focus:ring-primary-500/20 cursor-pointer" />
+    )},
     { key: 'order_number', label: 'رقم الطلب', render: (item: any) => <span className="font-semibold text-navy-800">{item.order_number}</span> },
     { key: 'customer', label: 'العميل', render: (item: any) => (
       <div>
@@ -321,6 +362,23 @@ export default function OrdersPage() {
           ))}
         </div>
       </motion.div>
+
+      {selected.size > 0 && (
+        <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }}
+          className="flex items-center gap-3 bg-primary-50 border border-primary-200 rounded-xl px-4 py-3">
+          <input type="checkbox" checked={selected.size === filtered.length} onChange={toggleSelectAll}
+            className="w-4 h-4 rounded border-gray-300 text-primary-500 focus:ring-primary-500/20 cursor-pointer" />
+          <span className="text-sm font-medium text-primary-700">تم تحديد {selected.size} طلب</span>
+          <button onClick={bulkAdvanceStatus} disabled={bulkUpdating}
+            className="mr-auto flex items-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:shadow-glow-green transition-all disabled:opacity-50">
+            <ArrowRight size={14} />
+            {bulkUpdating ? 'جاري التحديث...' : 'تقديم الحالة للمحدد'}
+          </button>
+          <button onClick={() => setSelected(new Set())} className="text-sm text-gray-500 hover:text-gray-700 transition-colors">
+            إلغاء التحديد
+          </button>
+        </motion.div>
+      )}
 
       {loading ? (
         <PageSkeleton stats={0} tableRows={6} tableCols={6} />
