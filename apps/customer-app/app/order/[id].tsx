@@ -3,10 +3,10 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Linkin
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { WebView } from 'react-native-webview'
 import { useAuth } from '../../src/contexts/AuthContext'
+import { useTheme } from '../../src/contexts/ThemeContext'
 import { useCustomAlert } from '../../src/components/CustomAlert'
 import { ActivityIndicator } from 'react-native'
 import { supabase } from '../../src/lib/supabase'
-import { colors } from '../../src/theme'
 import { CANCELLABLE_STATUSES } from '../../src/shared/types'
 
 const SUPABASE_URL = 'https://kjqtrmedkvqfofwymoni.supabase.co'
@@ -63,6 +63,7 @@ const steps = ['pending', 'assigned', 'picked_up', 'processing', 'ready', 'deliv
 export default function OrderDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const { profile } = useAuth()
+  const { colors } = useTheme()
   const router = useRouter()
   const { showAlert, AlertComponent } = useCustomAlert()
   const [order, setOrder] = useState<any>(null)
@@ -223,6 +224,8 @@ export default function OrderDetailsScreen() {
     : null
   const etaMinutes = distanceKm !== null ? Math.max(1, Math.round(distanceKm / 0.5)) : null
 
+  const s = getStyles(colors)
+
   if (loading) return <View style={s.container}><Text style={s.loadingText}>جاري التحميل...</Text></View>
   if (!order) return <View style={s.container}><Text style={s.loadingText}>الطلب غير موجود</Text></View>
 
@@ -314,17 +317,17 @@ export default function OrderDetailsScreen() {
 
       <View style={s.detailsCard}>
         <Text style={s.sectionTitle}>تفاصيل الطلب</Text>
-        <DetailRow label="الخدمة" value={serviceLabel[order.service_type] ?? order.service_type} />
-        <DetailRow label="عدد القطع" value={String(order.items_count)} />
-        {order.delivery_fee > 0 && <DetailRow label="رسوم التوصيل" value={`${Number(order.delivery_fee).toFixed(2)} ج.م`} />}
-        <DetailRow label="الإجمالي" value={`${order.total?.toFixed(2)} ج.م`} highlight />
-        <DetailRow label="طريقة الدفع" value={{ cash: 'كاش', visa: 'فيزا', e_wallet: 'محفظة إلكترونية', instapay: 'إنستاباي', wallet: 'محفظة' }[order.payment_method] ?? order.payment_method} />
-        <DetailRow label="حالة الدفع" value={{ confirmed: 'مؤكد', refunded: 'مسترد', failed: 'فشل', pending: 'معلق' }[order.payment_status] ?? 'معلق'} />
+        <DetailRow colors={colors} label="الخدمة" value={serviceLabel[order.service_type] ?? order.service_type} />
+        <DetailRow colors={colors} label="عدد القطع" value={String(order.items_count)} />
+        {order.delivery_fee > 0 && <DetailRow colors={colors} label="رسوم التوصيل" value={`${Number(order.delivery_fee).toFixed(2)} ج.م`} />}
+        <DetailRow colors={colors} label="الإجمالي" value={`${order.total?.toFixed(2)} ج.م`} highlight />
+        <DetailRow colors={colors} label="طريقة الدفع" value={{ cash: 'كاش', visa: 'فيزا', e_wallet: 'محفظة إلكترونية', instapay: 'إنستاباي', wallet: 'محفظة' }[order.payment_method] ?? order.payment_method} />
+        <DetailRow colors={colors} label="حالة الدفع" value={{ confirmed: 'مؤكد', refunded: 'مسترد', failed: 'فشل', pending: 'معلق' }[order.payment_status] ?? 'معلق'} />
         {order.status === 'cancelled' && order.cancellation_fee > 0 && (
-          <DetailRow label="رسوم الإلغاء" value={`${Number(order.cancellation_fee).toFixed(2)} ج.م`} highlight />
+          <DetailRow colors={colors} label="رسوم الإلغاء" value={`${Number(order.cancellation_fee).toFixed(2)} ج.م`} highlight />
         )}
-        <DetailRow label="التاريخ" value={new Date(order.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })} />
-        {order.notes && <DetailRow label="ملاحظات" value={order.notes} />}
+        <DetailRow colors={colors} label="التاريخ" value={new Date(order.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })} />
+        {order.notes && <DetailRow colors={colors} label="ملاحظات" value={order.notes} />}
       </View>
 
       {order.payment_status === 'pending' && ['visa', 'e_wallet'].includes(order.payment_method) && order.status !== 'cancelled' && (
@@ -369,9 +372,9 @@ export default function OrderDetailsScreen() {
       {order.rated_at && (
         <View style={s.detailsCard}>
           <Text style={s.sectionTitle}>التقييم</Text>
-          <DetailRow label="تقييم الخدمة" value={'⭐'.repeat(order.rating_service)} />
-          {order.rating_driver && <DetailRow label="تقييم السائق" value={'⭐'.repeat(order.rating_driver)} />}
-          {order.rating_note && <DetailRow label="ملاحظات" value={order.rating_note} />}
+          <DetailRow colors={colors} label="تقييم الخدمة" value={'⭐'.repeat(order.rating_service)} />
+          {order.rating_driver && <DetailRow colors={colors} label="تقييم السائق" value={'⭐'.repeat(order.rating_driver)} />}
+          {order.rating_note && <DetailRow colors={colors} label="ملاحظات" value={order.rating_note} />}
         </View>
       )}
 
@@ -446,16 +449,16 @@ export default function OrderDetailsScreen() {
   )
 }
 
-function DetailRow({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+function DetailRow({ label, value, highlight, colors: c }: { label: string; value: string; highlight?: boolean; colors: any }) {
   return (
-    <View style={s.detailRow}>
-      <Text style={s.detailLabel}>{label}</Text>
-      <Text style={[s.detailValue, highlight && { color: colors.primary, fontWeight: '700' as const }]}>{value}</Text>
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: c.navy[700] }}>
+      <Text style={{ fontSize: 13, color: c.navy[300] }}>{label}</Text>
+      <Text style={[{ fontSize: 13, color: c.text, fontWeight: '500', maxWidth: '60%', textAlign: 'left' }, highlight && { color: c.primary, fontWeight: '700' as const }]}>{value}</Text>
     </View>
   )
 }
 
-const s = StyleSheet.create({
+function getStyles(colors: any) { return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.navy[900] },
   content: { padding: 20, paddingTop: 56, paddingBottom: 40 },
   loadingText: { color: colors.navy[300], textAlign: 'center', marginTop: 100, fontSize: 16 },
@@ -466,7 +469,7 @@ const s = StyleSheet.create({
     backgroundColor: colors.navy[800], borderRadius: 20, padding: 24,
     alignItems: 'center', gap: 12, borderWidth: 1, borderColor: colors.navy[700], marginBottom: 16,
   },
-  orderNumber: { fontSize: 22, fontWeight: '800', color: '#fff' },
+  orderNumber: { fontSize: 22, fontWeight: '800', color: colors.text },
   statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 },
   statusLabel: { fontSize: 14, fontWeight: '700' },
 
@@ -483,26 +486,26 @@ const s = StyleSheet.create({
   lineDone: { backgroundColor: colors.primary },
   timelineLabel: { fontSize: 13, color: colors.navy[400], marginRight: 12, paddingTop: 0 },
   timelineLabelDone: { color: colors.navy[100] },
-  timelineLabelCurrent: { color: '#fff', fontWeight: '700' },
+  timelineLabelCurrent: { color: colors.text, fontWeight: '700' },
 
   detailsCard: {
     backgroundColor: colors.navy[800], borderRadius: 20, padding: 20,
     borderWidth: 1, borderColor: colors.navy[700], marginBottom: 16,
   },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#fff', marginBottom: 16 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 16 },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.navy[700] },
   detailLabel: { fontSize: 13, color: colors.navy[300] },
-  detailValue: { fontSize: 13, color: '#fff', fontWeight: '500', maxWidth: '60%', textAlign: 'left' },
+  detailValue: { fontSize: 13, color: colors.text, fontWeight: '500', maxWidth: '60%', textAlign: 'left' },
 
   driverInfoRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.navy[700] },
   driverInfoLeft: { flex: 1, gap: 4 },
-  driverInfoName: { fontSize: 15, color: '#fff', fontWeight: '700' },
+  driverInfoName: { fontSize: 15, color: colors.text, fontWeight: '700' },
   driverInfoPhone: { fontSize: 14, color: colors.primary, fontWeight: '500' },
 
   rateBtn: {
     backgroundColor: colors.accent, borderRadius: 16, padding: 16, alignItems: 'center', marginBottom: 16,
   },
-  rateBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  rateBtnText: { color: colors.text, fontSize: 16, fontWeight: '700' },
 
   ratingLabel: { fontSize: 14, color: colors.navy[100], marginBottom: 8, marginTop: 8 },
   starsRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
@@ -510,13 +513,13 @@ const s = StyleSheet.create({
   starActive: { color: '#f59e0b' },
   ratingInput: {
     backgroundColor: colors.navy[700], borderRadius: 12, padding: 12,
-    color: '#fff', fontSize: 14, minHeight: 60, marginTop: 8,
+    color: colors.text, fontSize: 14, minHeight: 60, marginTop: 8,
   },
   ratingActions: { flexDirection: 'row', gap: 12, marginTop: 16 },
   cancelRateBtn: { flex: 1, borderWidth: 1, borderColor: colors.navy[500], borderRadius: 12, padding: 12, alignItems: 'center' },
   cancelRateText: { color: colors.navy[200], fontSize: 14, fontWeight: '600' },
   submitRateBtn: { flex: 2, backgroundColor: colors.accent, borderRadius: 12, padding: 12, alignItems: 'center' },
-  submitRateText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  submitRateText: { color: colors.text, fontSize: 14, fontWeight: '700' },
 
   chatBtn: {
     backgroundColor: colors.primary + '15', borderRadius: 12, padding: 12, alignItems: 'center', marginTop: 12,
@@ -540,7 +543,7 @@ const s = StyleSheet.create({
   retryPayBtn: {
     backgroundColor: '#f59e0b', borderRadius: 16, padding: 16, alignItems: 'center', marginBottom: 12,
   },
-  retryPayText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  retryPayText: { color: colors.text, fontSize: 15, fontWeight: '700' },
 
   editBtn: {
     backgroundColor: colors.navy[800], borderRadius: 16, padding: 16, alignItems: 'center', marginBottom: 16,
@@ -558,6 +561,6 @@ const s = StyleSheet.create({
   map: { flex: 1 },
   etaRow: { flexDirection: 'row', justifyContent: 'space-around' },
   etaItem: { alignItems: 'center', gap: 4 },
-  etaValue: { fontSize: 18, fontWeight: '800', color: '#fff' },
+  etaValue: { fontSize: 18, fontWeight: '800', color: colors.text },
   etaLabel: { fontSize: 11, color: colors.navy[300] },
-})
+}) }
