@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Linking, Platform } from 'rea
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { WebView } from 'react-native-webview'
 import { supabase } from '../../src/lib/supabase'
-import { colors } from '../../src/theme'
+import { useTheme } from '../../src/contexts/ThemeContext'
 
 function buildFullTrackingMapHTML(driverLat: number, driverLng: number, customerLat?: number, customerLng?: number, driverName?: string) {
   const centerLat = customerLat ? (driverLat + customerLat) / 2 : driverLat
@@ -44,6 +44,8 @@ const statusLabels: Record<string, string> = {
 }
 
 export default function TrackingScreen() {
+  const { colors } = useTheme()
+  const s = getStyles(colors)
   const { orderId } = useLocalSearchParams<{ orderId: string }>()
   const router = useRouter()
   const mapWebviewRef = useRef<WebView>(null)
@@ -196,7 +198,7 @@ export default function TrackingScreen() {
   )
 }
 
-const s = StyleSheet.create({
+function getStyles(colors: any) { return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.navy[900] },
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
@@ -205,7 +207,7 @@ const s = StyleSheet.create({
   },
   backBtn: { width: 60 },
   backText: { color: colors.primary, fontSize: 16, fontWeight: '600' },
-  title: { fontSize: 18, fontWeight: '800', color: '#fff' },
+  title: { fontSize: 18, fontWeight: '800', color: colors.text },
 
   mapContainer: { flex: 1 },
   map: { flex: 1 },
@@ -228,7 +230,7 @@ const s = StyleSheet.create({
     backgroundColor: colors.primary + '25', justifyContent: 'center', alignItems: 'center',
   },
   driverAvatarText: { fontSize: 20, fontWeight: '700', color: colors.primary },
-  driverName: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  driverName: { fontSize: 16, fontWeight: '700', color: colors.text },
   statusText: { fontSize: 12, color: colors.primary, marginTop: 2, fontWeight: '600' },
   callBtn: {
     width: 44, height: 44, borderRadius: 22,
@@ -245,6 +247,6 @@ const s = StyleSheet.create({
 
   etaRow: { flexDirection: 'row', justifyContent: 'space-around' },
   etaItem: { alignItems: 'center', gap: 4 },
-  etaValue: { fontSize: 20, fontWeight: '800', color: '#fff' },
+  etaValue: { fontSize: 20, fontWeight: '800', color: colors.text },
   etaLabel: { fontSize: 11, color: colors.navy[300] },
-})
+}) }

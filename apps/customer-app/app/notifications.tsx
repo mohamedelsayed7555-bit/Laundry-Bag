@@ -33,7 +33,7 @@ export default function NotificationsScreen() {
     if (!profile) return
     const { data } = await supabase
       .from('notifications')
-      .select('*')
+      .select('id, title, body, type, data, read_at, created_at')
       .eq('user_id', profile.id)
       .order('created_at', { ascending: false })
       .limit(50)

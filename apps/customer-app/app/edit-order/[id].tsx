@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { useCustomAlert } from '../../src/components/CustomAlert'
 import { supabase } from '../../src/lib/supabase'
-import { colors } from '../../src/theme'
+import { useTheme } from '../../src/contexts/ThemeContext'
 
 const servicesMap = [
   { key: 'wash', icon: '👔', label: 'غسيل' },
@@ -16,6 +16,8 @@ const servicesMap = [
 type OrderItem = { name: string; service_type: string; quantity: number; price: number }
 
 export default function EditOrderScreen() {
+  const { colors } = useTheme()
+  const s = getStyles(colors)
   const { id } = useLocalSearchParams<{ id: string }>()
   const { profile } = useAuth()
   const router = useRouter()
@@ -263,27 +265,27 @@ export default function EditOrderScreen() {
   )
 }
 
-const s = StyleSheet.create({
+function getStyles(colors: any) { return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.navy[900] },
   content: { padding: 20, paddingTop: 56, paddingBottom: 40 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   backText: { color: colors.primary, fontSize: 16, fontWeight: '600' },
-  title: { fontSize: 20, fontWeight: 'bold', color: '#fff' },
+  title: { fontSize: 20, fontWeight: 'bold', color: colors.text },
   orderBadge: { alignSelf: 'center', backgroundColor: colors.navy[800], borderRadius: 12, paddingHorizontal: 20, paddingVertical: 8, marginBottom: 20, borderWidth: 1, borderColor: colors.navy[700] },
-  orderNumber: { fontSize: 16, fontWeight: '700', color: '#fff' },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#fff', marginBottom: 12, marginTop: 20 },
+  orderNumber: { fontSize: 16, fontWeight: '700', color: colors.text },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 12, marginTop: 20 },
   stepLabel: { fontSize: 13, fontWeight: '600', color: colors.navy[200], marginBottom: 8, marginTop: 12 },
 
   cartItem: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: colors.navy[800],
     borderRadius: 12, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: colors.navy[700],
   },
-  cartItemName: { fontSize: 14, fontWeight: '600', color: '#fff' },
+  cartItemName: { fontSize: 14, fontWeight: '600', color: colors.text },
   cartItemDetail: { fontSize: 12, color: colors.navy[300], marginTop: 2 },
   qtyActions: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 8 },
   qtyBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.navy[700], justifyContent: 'center', alignItems: 'center' },
   qtyBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  qtyValue: { color: '#fff', fontSize: 16, fontWeight: '700', minWidth: 24, textAlign: 'center' },
+  qtyValue: { color: colors.text, fontSize: 16, fontWeight: '700', minWidth: 24, textAlign: 'center' },
   removeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.navy[700], justifyContent: 'center', alignItems: 'center' },
   removeBtnText: { color: '#ef4444', fontSize: 14, fontWeight: '700' },
 
@@ -305,7 +307,7 @@ const s = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.navy[700],
   },
   counterText: { fontSize: 20, color: '#fff', fontWeight: '600' },
-  counterValue: { fontSize: 24, fontWeight: 'bold', color: '#fff', minWidth: 32, textAlign: 'center' },
+  counterValue: { fontSize: 24, fontWeight: 'bold', color: colors.text, minWidth: 32, textAlign: 'center' },
   addBtn: { flex: 1, backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
   addBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 
@@ -323,4 +325,4 @@ const s = StyleSheet.create({
   },
   saveBtnText: { fontSize: 18, fontWeight: '700', color: '#fff' },
   backBtnAlt: { marginTop: 24, padding: 12 },
-})
+}) }

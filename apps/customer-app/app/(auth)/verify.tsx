@@ -3,11 +3,13 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingVi
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { useCustomAlert } from '../../src/components/CustomAlert'
-import { colors } from '../../src/theme'
+import { useTheme } from '../../src/contexts/ThemeContext'
 
 const OTP_LENGTH = 6
 
 export default function VerifyScreen() {
+  const { colors } = useTheme()
+  const s = getStyles(colors)
   const { email } = useLocalSearchParams<{ email: string }>()
   const [otp, setOtp] = useState(Array(OTP_LENGTH).fill(''))
   const [loading, setLoading] = useState(false)
@@ -86,20 +88,20 @@ export default function VerifyScreen() {
   )
 }
 
-const s = StyleSheet.create({
+function getStyles(colors: any) { return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.navy[900] },
   content: { flex: 1, justifyContent: 'center', paddingHorizontal: 24 },
   backBtn: { position: 'absolute', top: 60, right: 24 },
   backText: { fontSize: 16, color: colors.primary },
-  title: { fontSize: 28, fontWeight: 'bold', color: '#fff', textAlign: 'center' },
+  title: { fontSize: 28, fontWeight: 'bold', color: colors.text, textAlign: 'center' },
   subtitle: { fontSize: 14, color: colors.navy[200], textAlign: 'center', marginTop: 8, marginBottom: 32 },
   otpRow: { flexDirection: 'row', justifyContent: 'center', gap: 10 },
   otpInput: {
     width: 48, height: 56, borderWidth: 2, borderColor: colors.navy[500], borderRadius: 14,
-    fontSize: 24, fontWeight: 'bold', color: '#fff', backgroundColor: colors.navy[800],
+    fontSize: 24, fontWeight: 'bold', color: colors.text, backgroundColor: colors.navy[800],
   },
   otpFilled: { borderColor: colors.primary, backgroundColor: colors.navy[700] },
   loadingText: { textAlign: 'center', color: colors.primary, marginTop: 16 },
   resendBtn: { marginTop: 32, alignItems: 'center' },
   resendText: { fontSize: 14, color: colors.accent, textDecorationLine: 'underline' },
-})
+}) }

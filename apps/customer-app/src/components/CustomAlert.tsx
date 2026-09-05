@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Animated, Dimensions } from 'react-native'
-import { colors } from '../theme'
+import { useTheme } from '../contexts/ThemeContext'
 
 const { width } = Dimensions.get('window')
 
@@ -29,15 +29,15 @@ const iconMap: Record<AlertType, string> = {
   info: 'ℹ️',
 }
 
-const accentMap: Record<AlertType, string> = {
-  success: colors.success,
-  error: colors.danger,
-  warning: colors.warning,
-  confirm: colors.accent,
-  info: colors.primary,
-}
-
 export default function CustomAlert({ visible, title, message, type = 'info', buttons, onDismiss }: CustomAlertProps) {
+  const { colors } = useTheme()
+  const accentMap: Record<AlertType, string> = {
+    success: colors.success,
+    error: colors.danger,
+    warning: colors.warning,
+    confirm: colors.accent,
+    info: colors.primary,
+  }
   const scaleAnim = useRef(new Animated.Value(0.8)).current
   const opacityAnim = useRef(new Animated.Value(0)).current
 
@@ -53,6 +53,7 @@ export default function CustomAlert({ visible, title, message, type = 'info', bu
     }
   }, [visible])
 
+  const s = getAlertStyles(colors)
   const resolvedButtons = buttons ?? [{ text: 'حسناً', onPress: onDismiss }]
   const accent = accentMap[type]
 
@@ -151,7 +152,7 @@ export function useCustomAlert() {
   return { showAlert, AlertComponent }
 }
 
-const s = StyleSheet.create({
+function getAlertStyles(colors: any) { return StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
@@ -188,7 +189,7 @@ const s = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#fff',
+    color: colors.text,
     textAlign: 'center',
     marginBottom: 8,
   },
@@ -225,4 +226,4 @@ const s = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
   },
-})
+}) }

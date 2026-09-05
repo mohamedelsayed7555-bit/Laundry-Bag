@@ -1,7 +1,7 @@
 import { forwardRef, useCallback, useMemo } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'
 import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet'
-import { colors } from '../theme'
+import { useTheme } from '../contexts/ThemeContext'
 
 interface AppBottomSheetProps {
   title?: string
@@ -12,6 +12,8 @@ interface AppBottomSheetProps {
 
 const AppBottomSheetComponent = forwardRef<BottomSheet, AppBottomSheetProps>(
   ({ title, children, snapPoints: customSnap, onClose }, ref) => {
+    const { colors } = useTheme()
+    const s = getSheetStyles(colors)
     const snapPoints = useMemo(() => customSnap ?? ['50%', '75%'], [customSnap])
 
     const renderBackdrop = useCallback(
@@ -53,7 +55,7 @@ const AppBottomSheetComponent = forwardRef<BottomSheet, AppBottomSheetProps>(
 AppBottomSheetComponent.displayName = 'AppBottomSheet'
 export default AppBottomSheetComponent
 
-const s = StyleSheet.create({
+function getSheetStyles(colors: any) { return StyleSheet.create({
   background: {
     backgroundColor: colors.navy[800],
     borderTopLeftRadius: 24,
@@ -81,7 +83,7 @@ const s = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#fff',
+    color: colors.text,
   },
   closeBtn: {
     width: 32,
@@ -95,4 +97,4 @@ const s = StyleSheet.create({
     color: colors.navy[300],
     fontSize: 16,
   },
-})
+}) }

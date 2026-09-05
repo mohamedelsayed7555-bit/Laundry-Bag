@@ -7,7 +7,7 @@ import Animated, {
   withTiming,
   interpolate,
 } from 'react-native-reanimated'
-import { colors } from '../theme'
+import { useTheme } from '../contexts/ThemeContext'
 
 interface SkeletonProps {
   width?: number | string
@@ -17,6 +17,7 @@ interface SkeletonProps {
 }
 
 export default function Skeleton({ width = '100%', height = 16, borderRadius = 10, style }: SkeletonProps) {
+  const { colors } = useTheme()
   const shimmer = useSharedValue(0)
 
   useEffect(() => {
@@ -44,6 +45,8 @@ export default function Skeleton({ width = '100%', height = 16, borderRadius = 1
 }
 
 export function SkeletonCard({ lines = 3 }: { lines?: number }) {
+  const { colors } = useTheme()
+  const sk = getSkStyles(colors)
   return (
     <View style={sk.card}>
       <View style={sk.row}>
@@ -61,6 +64,8 @@ export function SkeletonCard({ lines = 3 }: { lines?: number }) {
 }
 
 export function SkeletonOrderCard() {
+  const { colors } = useTheme()
+  const sk = getSkStyles(colors)
   return (
     <View style={sk.card}>
       <View style={sk.row}>
@@ -79,7 +84,7 @@ export function SkeletonOrderCard() {
   )
 }
 
-const sk = StyleSheet.create({
+function getSkStyles(colors: any) { return StyleSheet.create({
   card: {
     backgroundColor: colors.navy[800],
     borderRadius: 18,
@@ -96,4 +101,4 @@ const sk = StyleSheet.create({
   textCol: {
     flex: 1,
   },
-})
+}) }

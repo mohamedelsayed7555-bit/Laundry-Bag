@@ -4,10 +4,12 @@ import { useRouter } from 'expo-router'
 import { useAuth } from '../src/contexts/AuthContext'
 import { useCustomAlert } from '../src/components/CustomAlert'
 import { supabase } from '../src/lib/supabase'
-import { colors } from '../src/theme'
+import { useTheme } from '../src/contexts/ThemeContext'
 import * as ImagePicker from 'expo-image-picker'
 
 export default function EditProfileScreen() {
+  const { colors } = useTheme()
+  const s = getStyles(colors)
   const { profile, refreshProfile } = useAuth()
   const router = useRouter()
   const { showAlert, AlertComponent } = useCustomAlert()
@@ -278,12 +280,12 @@ export default function EditProfileScreen() {
   )
 }
 
-const s = StyleSheet.create({
+function getStyles(colors: any) { return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.navy[900] },
   content: { padding: 20, paddingTop: 56, paddingBottom: 40 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
   backText: { color: colors.primary, fontSize: 16, fontWeight: '600' },
-  title: { fontSize: 20, fontWeight: 'bold', color: '#fff' },
+  title: { fontSize: 20, fontWeight: 'bold', color: colors.text },
 
   // Avatar
   avatarSection: { alignItems: 'center', marginBottom: 28 },
@@ -306,14 +308,14 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: colors.navy[700], marginBottom: 16,
   },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#fff', marginBottom: 16 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 16 },
   expandIcon: { fontSize: 12, color: colors.navy[400] },
 
   // Form
   label: { fontSize: 13, fontWeight: '600', color: colors.navy[200], marginBottom: 6, marginTop: 8, textAlign: 'right' },
   input: {
     backgroundColor: colors.navy[700], borderRadius: 14, padding: 16,
-    fontSize: 16, color: '#fff', borderWidth: 1, borderColor: colors.navy[600],
+    fontSize: 16, color: colors.text, borderWidth: 1, borderColor: colors.navy[600],
   },
   disabledInput: { backgroundColor: colors.navy[700], justifyContent: 'center', opacity: 0.6 },
   disabledText: { fontSize: 16, color: colors.navy[400] },
@@ -343,4 +345,4 @@ const s = StyleSheet.create({
     padding: 14, alignItems: 'center', marginTop: 8,
   },
   deleteText: { color: colors.danger, fontSize: 14, fontWeight: '600' },
-})
+}) }

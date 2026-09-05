@@ -5,9 +5,19 @@ const requests = new Map<string, { count: number; resetAt: number }>()
 const WINDOW_MS = 60_000
 const MAX_REQUESTS = 15
 
+let lastCleanup = 0
+
 export function rateLimit(req: NextRequest): NextResponse | null {
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
   const now = Date.now()
+
+  if (now - lastCleanup > WINDOW_MS) {
+    for (const [key, entry] of requests) {
+      if (now > entry.resetAt) requests.delete(key)
+    }
+    lastCleanup = now
+  }
+
   const entry = requests.get(ip)
 
   if (!entry || now > entry.resetAt) {
@@ -25,10 +35,3 @@ export function rateLimit(req: NextRequest): NextResponse | null {
 
   return null
 }
-
-setInterval(() => {
-  const now = Date.now()
-  for (const [ip, entry] of requests) {
-    if (now > entry.resetAt) requests.delete(ip)
-  }
-}, 60_000)

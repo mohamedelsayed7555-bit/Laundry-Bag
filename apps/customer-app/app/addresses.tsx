@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router'
 import { useAuth } from '../src/contexts/AuthContext'
 import { useCustomAlert } from '../src/components/CustomAlert'
 import { supabase } from '../src/lib/supabase'
-import { colors } from '../src/theme'
+import { useTheme } from '../src/contexts/ThemeContext'
 import { WebView } from 'react-native-webview'
 import * as Location from 'expo-location'
 
@@ -45,6 +45,8 @@ function buildPickerMapHTML(lat: number, lng: number) {
 }
 
 export default function AddressesScreen() {
+  const { colors } = useTheme()
+  const s = getStyles(colors)
   const { profile } = useAuth()
   const router = useRouter()
   const { showAlert, AlertComponent } = useCustomAlert()
@@ -279,6 +281,8 @@ export default function AddressesScreen() {
 }
 
 function FormField({ label, value, onChange, placeholder, error }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; error?: string }) {
+  const { colors } = useTheme()
+  const s = getStyles(colors)
   return (
     <View style={{ marginBottom: 12 }}>
       <Text style={s.fieldLabel}>{label}</Text>
@@ -288,11 +292,11 @@ function FormField({ label, value, onChange, placeholder, error }: { label: stri
   )
 }
 
-const s = StyleSheet.create({
+function getStyles(colors: any) { return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.navy[900], padding: 20, paddingTop: 56 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   backText: { color: colors.primary, fontSize: 16, fontWeight: '600' },
-  title: { fontSize: 20, fontWeight: 'bold', color: '#fff' },
+  title: { fontSize: 20, fontWeight: 'bold', color: colors.text },
   addText: { color: colors.accent, fontSize: 14, fontWeight: '700' },
   emptyCard: { backgroundColor: colors.navy[800], borderRadius: 20, padding: 40, alignItems: 'center', borderWidth: 1, borderColor: colors.navy[700] },
   emptyText: { fontSize: 15, color: colors.navy[300], textAlign: 'center' },
@@ -301,7 +305,7 @@ const s = StyleSheet.create({
   card: { backgroundColor: colors.navy[800], borderRadius: 16, padding: 16, borderWidth: 1, borderColor: colors.navy[700] },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   labelRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  cardLabel: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  cardLabel: { fontSize: 15, fontWeight: '700', color: colors.text },
   defaultBadge: { backgroundColor: colors.primary + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
   defaultText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
   editText: { color: colors.accent, fontSize: 13, fontWeight: '600' },
@@ -311,10 +315,10 @@ const s = StyleSheet.create({
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: colors.navy[800], borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '90%' },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: '#fff', marginBottom: 16, textAlign: 'center' },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: 16, textAlign: 'center' },
   row: { flexDirection: 'row', gap: 12 },
   fieldLabel: { fontSize: 12, color: colors.navy[200], marginBottom: 4, textAlign: 'right' },
-  fieldInput: { backgroundColor: colors.navy[700], borderRadius: 10, padding: 12, color: '#fff', fontSize: 14, borderWidth: 1.5, borderColor: 'transparent' },
+  fieldInput: { backgroundColor: colors.navy[700], borderRadius: 10, padding: 12, color: colors.text, fontSize: 14, borderWidth: 1.5, borderColor: 'transparent' },
   fieldInputError: { borderColor: '#ef4444', backgroundColor: '#ef444410' },
   fieldError: { fontSize: 11, color: '#ef4444', textAlign: 'right', marginTop: 3, fontWeight: '500' },
   modalActions: { flexDirection: 'row', gap: 12, marginTop: 20 },
@@ -331,4 +335,4 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: colors.navy[600],
   },
   myLocText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
-})
+}) }

@@ -7,7 +7,6 @@ import Animated, {
   withDelay,
   Easing,
 } from 'react-native-reanimated'
-import { colors } from '../theme'
 
 interface AnimatedCardProps {
   children: React.ReactNode
