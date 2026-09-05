@@ -2,10 +2,18 @@ const { createClient } = require('@supabase/supabase-js')
 
 const supabaseUrl = 'https://kjqtrmedkvqfofwymoni.supabase.co'
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+const adminEmail = process.env.ADMIN_EMAIL || 'admin@cleano.com'
+const adminPassword = process.env.ADMIN_PASSWORD
 
 if (!serviceRoleKey) {
   console.error('Set SUPABASE_SERVICE_ROLE_KEY env var first')
   console.error('Find it at: Supabase Dashboard → Settings → API → service_role key')
+  process.exit(1)
+}
+
+if (!adminPassword) {
+  console.error('Set ADMIN_PASSWORD env var first')
+  console.error('Example: ADMIN_PASSWORD=YourStr0ngP@ss! node scripts/seed-admin.js')
   process.exit(1)
 }
 
@@ -15,8 +23,8 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
 
 async function seedAdmin() {
   const { data, error } = await supabase.auth.admin.createUser({
-    email: 'admin@cleano.com',
-    password: 'Cleano@2024',
+    email: adminEmail,
+    password: adminPassword,
     email_confirm: true,
     user_metadata: { name: 'Mohamed Admin', role: 'admin' }
   })
@@ -41,8 +49,8 @@ async function seedAdmin() {
   }
 
   console.log('\n✅ Admin account ready:')
-  console.log('   Email:    admin@cleano.com')
-  console.log('   Password: Cleano@2024')
+  console.log(`   Email:    ${adminEmail}`)
+  console.log('   Password: (from ADMIN_PASSWORD env var)')
 }
 
 seedAdmin()

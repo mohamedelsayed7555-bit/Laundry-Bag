@@ -78,7 +78,11 @@ Deno.serve(async (req: Request) => {
       console.log("Calculated HMAC (first 20):", calculatedHmac.substring(0, 20));
 
       if (calculatedHmac !== receivedHmac) {
-        console.log("HMAC mismatch - processing anyway for now");
+        console.log("HMAC mismatch - rejecting request");
+        return new Response(JSON.stringify({ error: "Invalid HMAC signature" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
     } else {
       console.log("No HMAC_SECRET set - skipping verification");
