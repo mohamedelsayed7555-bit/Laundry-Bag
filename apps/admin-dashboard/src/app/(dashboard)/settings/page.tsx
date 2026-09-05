@@ -91,17 +91,23 @@ export default function SettingsPage() {
 
   async function handleSaveAll() {
     setSaving(true)
-    const upsertData = settings.map(s => ({ id: s.id, key: s.key, value: editValues[s.id] ?? s.value, description: s.description }))
-    const nameExists = settings.find(s => s.key === 'org_name')
-    const phoneExists = settings.find(s => s.key === 'org_phone')
-    if (nameExists) upsertData.push({ id: nameExists.id, key: 'org_name', value: orgName, description: nameExists.description })
-    if (phoneExists) upsertData.push({ id: phoneExists.id, key: 'org_phone', value: orgPhone, description: phoneExists.description })
-    await supabase.from('settings').upsert(upsertData)
-    if (!nameExists) await supabase.from('settings').upsert({ key: 'org_name', value: orgName, description: 'اسم المؤسسة' })
-    if (!phoneExists) await supabase.from('settings').upsert({ key: 'org_phone', value: orgPhone, description: 'رقم هاتف المؤسسة' })
+    try {
+      for (const s of settings) {
+        let val: any = s.key === 'org_name' ? orgName : s.key === 'org_phone' ? orgPhone : (editValues[s.id] ?? s.value)
+        if (typeof val === 'string' && !isNaN(Number(val)) && val.trim() !== '') val = Number(val)
+        const { error } = await supabase.from('settings').update({ value: val }).eq('id', s.id)
+        if (error) console.error('Save error for', s.key, ':', error.message, error.details, error.code)
+      }
+      const nameExists = settings.find(s => s.key === 'org_name')
+      const phoneExists = settings.find(s => s.key === 'org_phone')
+      if (!nameExists) await supabase.from('settings').insert({ key: 'org_name', value: orgName, description: 'اسم المؤسسة' })
+      if (!phoneExists) await supabase.from('settings').insert({ key: 'org_phone', value: orgPhone, description: 'رقم هاتف المؤسسة' })
+      toast('تم حفظ الإعدادات بنجاح')
+    } catch {
+      toast('حدث خطأ في الحفظ', 'error')
+    }
     setSaving(false)
     loadSettings()
-    toast('تم حفظ الإعدادات بنجاح')
   }
 
   async function handleAddSetting(e: React.FormEvent) {

@@ -31,7 +31,69 @@ Deno.serve(async (req: Request) => {
     if (req.method === "GET") {
       const url = new URL(req.url);
       const success = url.searchParams.get("success") === "true";
-      const orderId = url.searchParams.get("merchant_order_id");
+      const paymobOrderId = url.searchParams.get("order");
+      const txnId = url.searchParams.get("id");
+
+      console.log("GET redirect received - success:", success, "order:", paymobOrderId, "txn:", txnId);
+
+      if (paymobOrderId) {
+        const pid = String(paymobOrderId);
+        const { data: order } = await supabase
+          .from("orders")
+          .select("id")
+          .eq("paymob_order_id", pid)
+          .single();
+
+        if (order) {
+          await supabase
+            .from("orders")
+            .update({ payment_status: success ? "confirmed" : "failed" })
+            .eq("id", order.id);
+          console.log("Order payment_status updated via GET redirect:", order.id, success ? "confirmed" : "failed");
+        } else {
+          const { data: sub } = await supabase
+            .from("subscriptions")
+            .select("id, user_id, duration, plan_id, plans(name, items_per_month)")
+            .eq("paymob_order_id", pid)
+            .single();
+
+          if (sub && success) {
+            const months = sub.duration === "monthly" ? 1 : sub.duration === "quarterly" ? 3 : sub.duration === "biannual" ? 6 : 12;
+            const now = new Date();
+            const endDate = new Date(now);
+            endDate.setMonth(endDate.getMonth() + months);
+            const plan = sub.plans as any;
+            const itemsLimit = (plan?.items_per_month || 0) * months;
+
+            await supabase
+              .from("subscriptions")
+              .update({
+                status: "active",
+                start_date: now.toISOString().split("T")[0],
+                end_date: endDate.toISOString().split("T")[0],
+                items_used: 0,
+                items_limit: itemsLimit,
+              })
+              .eq("id", sub.id);
+
+            await supabase.from("notifications").insert({
+              user_id: sub.user_id,
+              title: "تم تفعيل اشتراكك ✅",
+              body: `تم الدفع وتفعيل باقة ${plan?.name || "الباقة"} بنجاح. رصيدك ${itemsLimit} قطعة.`,
+              type: "system",
+              data: { subscription_id: sub.id },
+              sent_at: new Date().toISOString(),
+            });
+            console.log("Subscription activated via GET redirect:", sub.id);
+          } else if (sub && !success) {
+            await supabase
+              .from("subscriptions")
+              .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
+              .eq("id", sub.id);
+          }
+        }
+      }
+
       const html = success
         ? `<html><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;background:#0f172a;color:#fff;flex-direction:column"><h1>✅</h1><h2>تم الدفع بنجاح</h2><p>يمكنك إغلاق هذه الصفحة</p></body></html>`
         : `<html><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;background:#0f172a;color:#fff;flex-direction:column"><h1>❌</h1><h2>فشل الدفع</h2><p>يرجى المحاولة مرة أخرى</p></body></html>`;

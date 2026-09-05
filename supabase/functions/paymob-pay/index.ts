@@ -97,6 +97,9 @@ Deno.serve(async (req: Request) => {
     const isWallet = payment_method === "wallet";
     const integrationId = isWallet ? WALLET_INTEGRATION_ID : CARD_INTEGRATION_ID;
 
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const callbackUrl = `${SUPABASE_URL}/functions/v1/paymob-callback`;
+
     const nameParts = (profile?.name || "Customer").split(" ");
     const paymentKeyRes = await fetch("https://accept.paymob.com/api/acceptance/payment_keys", {
       method: "POST",
@@ -116,6 +119,8 @@ Deno.serve(async (req: Request) => {
         },
         currency: "EGP",
         integration_id: integrationId,
+        notification_url: callbackUrl,
+        redirection_url: callbackUrl,
       }),
     });
     const { token: paymentKey } = await paymentKeyRes.json();

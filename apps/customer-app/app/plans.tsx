@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Linking } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../src/contexts/AuthContext'
 import { useTheme } from '../src/contexts/ThemeContext'
@@ -221,8 +221,7 @@ export default function PlansScreen() {
               if (payError || payData?.error) {
                 showAlert({ title: locale === 'en' ? 'Error' : 'خطأ', message: payData?.error || (locale === 'en' ? 'Payment failed' : 'فشل في بدء الدفع'), type: 'error' })
               } else if (payData?.iframe_url) {
-                Linking.openURL(payData.iframe_url)
-                showAlert({ title: locale === 'en' ? 'Payment' : 'الدفع', message: locale === 'en' ? 'Payment page opened. Your subscription will be activated automatically after successful payment.' : 'تم فتح صفحة الدفع. بعد الدفع الناجح سيتم تفعيل اشتراكك تلقائياً.', type: 'info', buttons: [{ text: t('ok'), onPress: () => loadData() }] })
+                router.push({ pathname: '/payment', params: { url: payData.iframe_url } })
               }
             } else {
               setSubscribing(false)

@@ -45,6 +45,7 @@ function buildTrackingMapHTML(driverLat: number, driverLng: number, customerLat?
 
 const statusConfig: Record<string, { label: string; color: string; icon: string; step: number }> = {
   pending:    { label: 'في الانتظار',     color: '#f59e0b', icon: '⏳', step: 0 },
+  scheduled:  { label: 'مجدول',           color: '#a855f7', icon: '📅', step: 0 },
   assigned:   { label: 'تم تعيين سائق',   color: '#3b82f6', icon: '🚗', step: 1 },
   picked_up:  { label: 'تم الاستلام',     color: '#8b5cf6', icon: '📦', step: 2 },
   processing: { label: 'جاري المعالجة',   color: '#06b6d4', icon: '🔄', step: 3 },
