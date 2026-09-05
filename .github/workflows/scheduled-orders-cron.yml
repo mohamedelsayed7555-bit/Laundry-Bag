@@ -1,0 +1,19 @@
+name: Activate Scheduled Orders
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  activate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call scheduled-orders function
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            "${{ secrets.SUPABASE_URL }}/functions/v1/scheduled-orders" \
+            -d '{}'
