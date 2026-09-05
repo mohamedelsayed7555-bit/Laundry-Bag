@@ -83,7 +83,9 @@ export default function ChatScreen() {
           supabase.from('messages').update({ read_at: new Date().toISOString() }).eq('id', newMsg.id)
         }
       })
-      .subscribe()
+      .subscribe((status, err) => {
+        if (err) console.warn('driver-chat realtime error:', err.message)
+      })
     return () => { supabase.removeChannel(channel) }
   }, [profile, orderId])
 
@@ -95,7 +97,9 @@ export default function ChatScreen() {
         const newStatus = (payload.new as any).status
         if (newStatus) setOrderStatus(newStatus)
       })
-      .subscribe()
+      .subscribe((status, err) => {
+        if (err) console.warn('driver-order-status realtime error:', err.message)
+      })
     return () => { supabase.removeChannel(channel) }
   }, [orderId])
 

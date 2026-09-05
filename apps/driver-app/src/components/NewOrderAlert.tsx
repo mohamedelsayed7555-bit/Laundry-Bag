@@ -77,7 +77,9 @@ export default function NewOrderAlert() {
           }
         }
       )
-      .subscribe()
+      .subscribe((status, err) => {
+        if (err) console.warn('new-order-alert realtime error:', err.message)
+      })
 
     return () => { supabase.removeChannel(channel) }
   }, [profile?.id, showAlert])

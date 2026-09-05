@@ -49,7 +49,9 @@ export function useRealtimeDriverOrders(driverId: string | undefined, onUpdate: 
           }
         }
       )
-      .subscribe()
+      .subscribe((status, err) => {
+        if (err) console.warn('driver-orders realtime error:', err.message)
+      })
 
     return () => { supabase.removeChannel(channel) }
   }, [driverId, stableOnUpdate])

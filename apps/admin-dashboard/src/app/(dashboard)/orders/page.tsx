@@ -82,7 +82,9 @@ export default function OrdersPage() {
     })
     const ch = supabase.channel('orders-rt')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => debouncedLoadOrders())
-      .subscribe()
+      .subscribe((status, err) => {
+        if (err) console.warn('orders-rt realtime error:', err.message)
+      })
     return () => { supabase.removeChannel(ch); if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [])
 

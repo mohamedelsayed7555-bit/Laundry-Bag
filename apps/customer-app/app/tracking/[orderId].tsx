@@ -57,7 +57,9 @@ export default function TrackingScreen() {
     const ch = supabase
       .channel(`tracking-order-${orderId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` }, () => loadOrder())
-      .subscribe()
+      .subscribe((status, err) => {
+        if (err) console.warn('tracking-order realtime error:', err.message)
+      })
     return () => { supabase.removeChannel(ch) }
   }, [orderId])
 
@@ -78,7 +80,9 @@ export default function TrackingScreen() {
         const loc = payload.new
         if (loc?.lat && loc?.lng) setDriverLoc({ lat: loc.lat, lng: loc.lng })
       })
-      .subscribe()
+      .subscribe((status, err) => {
+        if (err) console.warn('tracking-loc realtime error:', err.message)
+      })
     return () => { supabase.removeChannel(ch) }
   }, [order?.driver_id, order?.status])
 

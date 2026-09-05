@@ -67,7 +67,9 @@ export default function NotificationDropdown() {
       }, (payload) => {
         setNotifications(prev => [payload.new as Notification, ...prev])
       })
-      .subscribe()
+      .subscribe((status, err) => {
+        if (err) console.warn('admin-notifications realtime error:', err.message)
+      })
 
     return () => { supabase.removeChannel(channel) }
   }, [adminId])

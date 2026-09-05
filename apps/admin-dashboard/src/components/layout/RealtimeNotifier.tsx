@@ -25,7 +25,9 @@ export default function RealtimeNotifier() {
         if (!mountedRef.current) return
         toast(`تم إلغاء الطلب #${(payload.new as any).order_number ?? ''}`, 'warning')
       })
-      .subscribe()
+      .subscribe((status, err) => {
+        if (err) console.warn('dashboard-notifications realtime error:', err.message)
+      })
 
     return () => {
       mountedRef.current = false

@@ -80,7 +80,9 @@ export default function MessagesScreen() {
     const channel = supabase
       .channel('driver-messages')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${profile.id}` }, (payload) => { playNotificationSound('order-update'); sendLocalNotification('رسالة جديدة', (payload.new as any).body ?? '', 'messages'); load() })
-      .subscribe()
+      .subscribe((status, err) => {
+        if (err) console.warn('driver-messages realtime error:', err.message)
+      })
     return () => { supabase.removeChannel(channel) }
   }, [profile, load])
 

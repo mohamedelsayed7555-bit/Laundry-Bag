@@ -47,7 +47,9 @@ export function useRealtimeOrders(userId: string | undefined, onUpdate: () => vo
         },
         () => onUpdate()
       )
-      .subscribe()
+      .subscribe((status, err) => {
+        if (err) console.warn('customer-orders realtime error:', err.message)
+      })
 
     return () => { supabase.removeChannel(channel) }
   }, [userId, onUpdate])

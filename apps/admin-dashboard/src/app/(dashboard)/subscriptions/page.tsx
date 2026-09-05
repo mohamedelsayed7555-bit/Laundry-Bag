@@ -64,7 +64,9 @@ export default function SubscriptionsPage() {
     loadOptions()
     const ch = supabase.channel('subs-rt')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'subscriptions' }, () => loadSubs())
-      .subscribe()
+      .subscribe((status, err) => {
+        if (err) console.warn('subs-rt realtime error:', err.message)
+      })
     return () => { supabase.removeChannel(ch) }
   }, [])
 

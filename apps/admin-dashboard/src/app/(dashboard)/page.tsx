@@ -89,7 +89,9 @@ export default function DashboardPage() {
     const channel = supabase.channel('dashboard-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => debouncedLoad())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => debouncedLoad())
-      .subscribe()
+      .subscribe((status, err) => {
+        if (err) console.warn('dashboard-realtime error:', err.message)
+      })
     return () => { supabase.removeChannel(channel); if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [])
 

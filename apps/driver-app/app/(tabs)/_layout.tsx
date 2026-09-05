@@ -33,7 +33,9 @@ function useUnreadMessages() {
     const channel = supabase
       .channel('unread-badge')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `receiver_id=eq.${profile.id}` }, () => debouncedFetch())
-      .subscribe()
+      .subscribe((status, err) => {
+        if (err) console.warn('driver unread-badge realtime error:', err.message)
+      })
     return () => {
       supabase.removeChannel(channel)
       if (timerRef.current) clearTimeout(timerRef.current)
