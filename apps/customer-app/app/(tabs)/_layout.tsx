@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { Tabs } from 'expo-router'
 import { View, StyleSheet, Platform } from 'react-native'
 import { Home, ClipboardList, PlusCircle, MessageCircle, User } from 'lucide-react-native'
@@ -18,6 +18,7 @@ function FloatingAddButton({ color, focused, primary, primaryDark }: { color: st
 function useUnreadMessages() {
   const { profile } = useAuth()
   const [count, setCount] = useState(0)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const fetchCount = useCallback(async () => {
     if (!profile) return
@@ -29,16 +30,24 @@ function useUnreadMessages() {
     setCount(c ?? 0)
   }, [profile])
 
+  const debouncedFetch = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => fetchCount(), 500)
+  }, [fetchCount])
+
   useEffect(() => { fetchCount() }, [fetchCount])
 
   useEffect(() => {
     if (!profile) return
     const channel = supabase
       .channel('unread-badge')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `receiver_id=eq.${profile.id}` }, () => fetchCount())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `receiver_id=eq.${profile.id}` }, () => debouncedFetch())
       .subscribe()
-    return () => { supabase.removeChannel(channel) }
-  }, [profile, fetchCount])
+    return () => {
+      supabase.removeChannel(channel)
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
+  }, [profile, debouncedFetch])
 
   return count
 }
