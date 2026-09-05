@@ -98,6 +98,7 @@ Deno.serve(async (req: Request) => {
       }
 
       for (const order of dueOrders) {
+        // Notify customer
         const { data: user } = await supabase
           .from("users")
           .select("fcm_token")
@@ -116,6 +117,31 @@ Deno.serve(async (req: Request) => {
               data: { type: "order_activated", order_id: order.id },
             }),
           }).catch(() => {});
+        }
+
+        // Notify driver
+        if (driver) {
+          const { data: driverUser } = await supabase
+            .from("users")
+            .select("fcm_token")
+            .eq("id", driver.id)
+            .single();
+
+          if (driverUser?.fcm_token) {
+            fetch("https://exp.host/--/api/v2/push/send", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                to: driverUser.fcm_token,
+                title: "طلب جديد! 🔔",
+                body: `تم تعيين الطلب #${order.order_number} لك`,
+                sound: "new-order.wav",
+                channelId: "new-order",
+                priority: "high",
+                data: { type: "new_order", order_id: order.id },
+              }),
+            }).catch(() => {});
+          }
         }
       }
     }

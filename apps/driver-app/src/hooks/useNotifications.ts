@@ -60,12 +60,15 @@ async function registerForPushNotifications(): Promise<string | null> {
       lightColor: '#00af5f',
       showBadge: true,
       lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      sound: 'new-order.wav',
+      bypassDnd: true,
     })
     await Notifications.setNotificationChannelAsync('order-updates', {
       name: 'تحديثات الطلبات',
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#00af5f',
+      sound: 'order-update.wav',
     })
     await Notifications.setNotificationChannelAsync('messages', {
       name: 'الرسائل',
@@ -74,6 +77,8 @@ async function registerForPushNotifications(): Promise<string | null> {
       lightColor: '#00af5f',
       showBadge: true,
       lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      sound: 'new-order.wav',
+      bypassDnd: true,
     })
     await Notifications.setNotificationChannelAsync('default', {
       name: 'CLEANO Driver',
@@ -90,8 +95,14 @@ async function registerForPushNotifications(): Promise<string | null> {
 }
 
 export async function sendLocalNotification(title: string, body: string, channelId = 'order-updates') {
+  const soundFile = channelId === 'new-order' || channelId === 'messages' ? 'new-order.wav' : 'order-update.wav'
   await Notifications.scheduleNotificationAsync({
-    content: { title, body, sound: true, ...(Platform.OS === 'android' ? {} : {}) },
+    content: {
+      title,
+      body,
+      sound: Platform.OS === 'android' ? soundFile : true,
+      priority: Notifications.AndroidNotificationPriority.MAX,
+    },
     trigger: null,
     ...(Platform.OS === 'android' ? { channelId } : {}),
   })
