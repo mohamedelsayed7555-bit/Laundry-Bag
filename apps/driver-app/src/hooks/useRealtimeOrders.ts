@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react'
+import { Vibration } from 'react-native'
 import { supabase } from '../lib/supabase'
 import { sendLocalNotification, playNotificationSound } from './useNotifications'
 
@@ -23,6 +24,7 @@ export function useRealtimeDriverOrders(driverId: string | undefined, onUpdate: 
           if (wasAssignedToMe) {
             sendLocalNotification('طلب جديد! 📦', `تم تعيين طلب جديد رقم ${payload.new.order_number} لك`, 'new-order')
             playNotificationSound('new-order')
+            Vibration.vibrate([0, 400, 200, 400])
             stableOnUpdate()
             return
           }
@@ -33,6 +35,7 @@ export function useRealtimeDriverOrders(driverId: string | undefined, onUpdate: 
             if (newStatus === 'ready' && oldStatus !== 'ready') {
               sendLocalNotification('طلب جاهز للتوصيل! 🚗', `الطلب رقم ${payload.new.order_number} جاهز — ابدأ التوصيل`, 'new-order')
               playNotificationSound('new-order')
+              Vibration.vibrate(400)
             }
             stableOnUpdate()
           }
@@ -45,6 +48,7 @@ export function useRealtimeDriverOrders(driverId: string | undefined, onUpdate: 
           if (payload.new.driver_id === driverId) {
             sendLocalNotification('طلب جديد! 📦', `طلب جديد رقم ${payload.new.order_number}`, 'new-order')
             playNotificationSound('new-order')
+            Vibration.vibrate([0, 400, 200, 400])
             stableOnUpdate()
           }
         }

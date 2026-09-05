@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native'
+import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Vibration } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { useTheme } from '../../src/contexts/ThemeContext'
@@ -78,6 +78,7 @@ export default function ChatScreen() {
         setMessages(prev => [...prev, newMsg])
         if (newMsg.sender_id !== profile.id) {
           playNotificationSound('order-update')
+          Vibration.vibrate(300)
           sendLocalNotification('رسالة جديدة', newMsg.body, 'messages')
         }
         if (newMsg.receiver_id === profile.id) {

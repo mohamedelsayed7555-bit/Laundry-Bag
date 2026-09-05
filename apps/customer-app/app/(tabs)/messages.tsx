@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl } from 'react-native'
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Vibration } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { useTheme } from '../../src/contexts/ThemeContext'
@@ -86,7 +86,7 @@ export default function MessagesScreen() {
     if (!profile) return
     const channel = supabase
       .channel('user-messages')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${profile.id}` }, (payload) => { playNotificationSound('order-update'); sendLocalNotification('رسالة جديدة', (payload.new as any).body ?? '', 'messages'); load() })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${profile.id}` }, (payload) => { playNotificationSound('order-update'); Vibration.vibrate(300); sendLocalNotification('رسالة جديدة', (payload.new as any).body ?? '', 'messages'); load() })
       .subscribe((status, err) => {
         if (err) console.warn('user-messages realtime error:', err.message)
       })

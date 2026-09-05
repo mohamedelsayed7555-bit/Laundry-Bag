@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { Vibration } from 'react-native'
 import { supabase } from '../lib/supabase'
 import { sendLocalNotification, playNotificationSound } from './useNotifications'
 
@@ -33,6 +34,7 @@ export function useRealtimeOrders(userId: string | undefined, onUpdate: () => vo
           if (message) {
             sendLocalNotification(`طلب ${orderNumber}`, message, 'order-updates')
             playNotificationSound('order-update')
+            Vibration.vibrate(400)
           }
           onUpdate()
         }
