@@ -39,14 +39,29 @@ Deno.serve(async (req: Request) => {
   if (dueOrders && dueOrders.length > 0) {
     ids.push(...dueOrders.map((o) => o.id));
 
-    // Find least-busy active driver for auto-assign
-    const { data: driver } = await supabase
+    // Find least-busy active driver (same logic as the DB trigger)
+    const { data: drivers } = await supabase
       .from("users")
       .select("id")
       .eq("role", "driver")
-      .eq("is_active", true)
-      .limit(1)
-      .single();
+      .eq("is_active", true);
+
+    let driver: { id: string } | null = null;
+    if (drivers && drivers.length > 0) {
+      // Count active orders per driver and pick the least busy
+      const counts = await Promise.all(
+        drivers.map(async (d) => {
+          const { count } = await supabase
+            .from("orders")
+            .select("id", { count: "exact", head: true })
+            .eq("driver_id", d.id)
+            .not("status", "in", '("delivered","cancelled","refunded")');
+          return { id: d.id, count: count ?? 0 };
+        })
+      );
+      counts.sort((a, b) => a.count - b.count);
+      driver = { id: counts[0].id };
+    }
 
     // If we have a driver, assign directly; otherwise set to pending
     const newStatus = driver ? "assigned" : "pending";
