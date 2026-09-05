@@ -197,7 +197,7 @@ export default function PlansScreen() {
               duration: selectedDuration,
               status: 'pending',
               items_used: 0,
-              items_limit: plan.items_per_month,
+              items_limit: plan.items_per_month * durationObj.months,
               auto_renew: autoRenew,
               payment_method: selectedPayment,
               total_paid: price,
