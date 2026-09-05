@@ -104,7 +104,13 @@ const soundFiles: Record<string, any> = {
 
 export async function playNotificationSound(type: 'new-order' | 'order-update' = 'new-order') {
   try {
-    const { sound } = await Audio.Sound.createAsync(soundFiles[type])
+    await Audio.setAudioModeAsync({
+      allowsRecordingIOS: false,
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: false,
+      shouldDuckAndroid: true,
+    })
+    const { sound } = await Audio.Sound.createAsync(soundFiles[type], { volume: 1.0 })
     await sound.playAsync()
     sound.setOnPlaybackStatusUpdate((status) => {
       if ('didJustFinish' in status && status.didJustFinish) {

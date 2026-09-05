@@ -1,8 +1,11 @@
+import { useEffect, useState, useCallback } from 'react'
 import { Tabs } from 'expo-router'
 import { View, StyleSheet, Platform } from 'react-native'
 import { Home, ClipboardList, PlusCircle, MessageCircle, User } from 'lucide-react-native'
 import { useTheme } from '../../src/contexts/ThemeContext'
 import { useLanguage } from '../../src/contexts/LanguageContext'
+import { useAuth } from '../../src/contexts/AuthContext'
+import { supabase } from '../../src/lib/supabase'
 
 function FloatingAddButton({ color, focused, primary, primaryDark }: { color: string; focused: boolean; primary: string; primaryDark: string }) {
   return (
@@ -12,9 +15,38 @@ function FloatingAddButton({ color, focused, primary, primaryDark }: { color: st
   )
 }
 
+function useUnreadMessages() {
+  const { profile } = useAuth()
+  const [count, setCount] = useState(0)
+
+  const fetchCount = useCallback(async () => {
+    if (!profile) return
+    const { count: c } = await supabase
+      .from('messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('receiver_id', profile.id)
+      .is('read_at', null)
+    setCount(c ?? 0)
+  }, [profile])
+
+  useEffect(() => { fetchCount() }, [fetchCount])
+
+  useEffect(() => {
+    if (!profile) return
+    const channel = supabase
+      .channel('unread-badge')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `receiver_id=eq.${profile.id}` }, () => fetchCount())
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [profile, fetchCount])
+
+  return count
+}
+
 export default function TabsLayout() {
   const { colors } = useTheme()
   const { t } = useLanguage()
+  const unread = useUnreadMessages()
 
   return (
     <Tabs
@@ -57,6 +89,8 @@ export default function TabsLayout() {
         options={{
           title: t('tabMessages'),
           tabBarIcon: ({ color, size }) => <MessageCircle size={size} color={color} />,
+          tabBarBadge: unread > 0 ? unread : undefined,
+          tabBarBadgeStyle: { backgroundColor: colors.primary, color: '#fff', fontSize: 10, fontWeight: '700', minWidth: 18, height: 18, lineHeight: 18, borderRadius: 9 },
         }}
       />
       <Tabs.Screen
