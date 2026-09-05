@@ -135,7 +135,7 @@ Deno.serve(async (req: Request) => {
                 to: driverUser.fcm_token,
                 title: "طلب جديد! 🔔",
                 body: `تم تعيين الطلب #${order.order_number} لك`,
-                sound: "new-order.wav",
+                sound: "new_order.wav",
                 channelId: "new-order",
                 priority: "high",
                 data: { type: "new_order", order_id: order.id },

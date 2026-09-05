@@ -36,8 +36,8 @@
         "expo-notifications",
         {
           "sounds": [
-            "./assets/sounds/new-order.wav",
-            "./assets/sounds/order-update.wav"
+            "./assets/sounds/new_order.wav",
+            "./assets/sounds/order_update.wav"
           ]
         }
       ]

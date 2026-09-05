@@ -60,7 +60,7 @@ async function registerForPushNotifications(): Promise<string | null> {
       lightColor: '#00af5f',
       showBadge: true,
       lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-      sound: 'new-order.wav',
+      sound: 'new_order.wav',
       bypassDnd: true,
     })
     await Notifications.setNotificationChannelAsync('order-updates', {
@@ -68,7 +68,7 @@ async function registerForPushNotifications(): Promise<string | null> {
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#00af5f',
-      sound: 'order-update.wav',
+      sound: 'order_update.wav',
     })
     await Notifications.setNotificationChannelAsync('messages', {
       name: 'الرسائل',
@@ -77,7 +77,7 @@ async function registerForPushNotifications(): Promise<string | null> {
       lightColor: '#00af5f',
       showBadge: true,
       lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-      sound: 'new-order.wav',
+      sound: 'new_order.wav',
       bypassDnd: true,
     })
     await Notifications.setNotificationChannelAsync('default', {
@@ -95,7 +95,7 @@ async function registerForPushNotifications(): Promise<string | null> {
 }
 
 export async function sendLocalNotification(title: string, body: string, channelId = 'order-updates') {
-  const soundFile = channelId === 'new-order' || channelId === 'messages' ? 'new-order.wav' : 'order-update.wav'
+  const soundFile = channelId === 'new-order' || channelId === 'messages' ? 'new_order.wav' : 'order_update.wav'
   await Notifications.scheduleNotificationAsync({
     content: {
       title,
@@ -109,8 +109,8 @@ export async function sendLocalNotification(title: string, body: string, channel
 }
 
 const soundFiles: Record<string, any> = {
-  'new-order': require('../../assets/sounds/new-order.wav'),
-  'order-update': require('../../assets/sounds/order-update.wav'),
+  'new-order': require('../../assets/sounds/new_order.wav'),
+  'order-update': require('../../assets/sounds/order_update.wav'),
 }
 
 export async function playNotificationSound(type: 'new-order' | 'order-update' = 'new-order') {
