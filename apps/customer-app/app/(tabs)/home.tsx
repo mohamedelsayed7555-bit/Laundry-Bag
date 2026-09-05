@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native'
 import { useRouter } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -29,13 +29,18 @@ export default function HomeScreen() {
   const [activeSub, setActiveSub] = useState<any>(null)
   const [unreadCount, setUnreadCount] = useState(0)
 
-  useEffect(() => {
-    if (!profile) { setLoading(false); return }
+  const loadRecentOrders = useCallback(() => {
+    if (!profile) return
     supabase.from('orders').select('id, order_number, status, total, created_at')
       .eq('customer_id', profile.id)
       .order('created_at', { ascending: false })
       .limit(3)
       .then(({ data }) => { setRecentOrders(data ?? []); setLoading(false) })
+  }, [profile])
+
+  useEffect(() => {
+    if (!profile) { setLoading(false); return }
+    loadRecentOrders()
 
     supabase.from('subscriptions').select('*, plans(name, items_per_month)')
       .eq('user_id', profile.id).eq('status', 'active').single()
@@ -44,7 +49,19 @@ export default function HomeScreen() {
     supabase.from('notifications').select('id', { count: 'exact', head: true })
       .eq('user_id', profile.id).is('read_at', null)
       .then(({ count }) => setUnreadCount(count ?? 0))
-  }, [profile])
+
+    const channel = supabase
+      .channel('home-orders')
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'orders',
+        filter: `customer_id=eq.${profile.id}`,
+      }, () => loadRecentOrders())
+      .subscribe((status, err) => {
+        if (err) console.warn('home-orders realtime error:', err.message)
+      })
+
+    return () => { supabase.removeChannel(channel) }
+  }, [profile, loadRecentOrders])
 
   const greeting = () => {
     const h = new Date().getHours()
