@@ -44,6 +44,15 @@ function buildPickerMapHTML(lat: number, lng: number) {
 </body></html>`
 }
 
+function ConfirmRow({ label, value, colors }: { label: string; value: string; colors: any }) {
+  return (
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: colors.navy?.[700] || '#333' }}>
+      <Text style={{ color: colors.navy?.[400] || '#999', fontSize: 13 }}>{label}</Text>
+      <Text style={{ color: colors.text, fontSize: 13, fontWeight: '600', maxWidth: '60%', textAlign: 'right' }}>{value}</Text>
+    </View>
+  )
+}
+
 export default function AddressesScreen() {
   const { colors } = useTheme()
   const s = getStyles(colors)
@@ -57,7 +66,27 @@ export default function AddressesScreen() {
   const [form, setForm] = useState({ label: '', building: '', floor: '', apartment: '', landmark: '', notes: '' })
   const [pin, setPin] = useState({ latitude: CAIRO.latitude, longitude: CAIRO.longitude })
   const [locatingMe, setLocatingMe] = useState(false)
+  const [geocoding, setGeocoding] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
   const webviewRef = useRef<WebView>(null)
+
+  async function reverseGeocode(lat: number, lng: number) {
+    setGeocoding(true)
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=ar`, {
+        headers: { 'User-Agent': 'CleanOApp/1.0' },
+      })
+      const data = await res.json()
+      const addr = data.address || {}
+      setForm(f => ({
+        ...f,
+        label: f.label || addr.suburb || addr.neighbourhood || addr.city_district || addr.city || 'عنوان جديد',
+        building: f.building || addr.house_number || '',
+        landmark: f.landmark || addr.road || '',
+      }))
+    } catch {}
+    setGeocoding(false)
+  }
 
   useEffect(() => { loadAddresses() }, [profile])
 
@@ -101,8 +130,8 @@ export default function AddressesScreen() {
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High })
       const coord = { latitude: loc.coords.latitude, longitude: loc.coords.longitude }
       setPin(coord)
-      if (!form.label.trim()) setForm(f => ({ ...f, label: 'موقعي الحالي' }))
       webviewRef.current?.injectJavaScript(`window.setCenter(${coord.latitude}, ${coord.longitude}); true;`)
+      reverseGeocode(coord.latitude, coord.longitude)
     } catch {
       showAlert({ title: 'خطأ', message: 'لم نتمكن من تحديد موقعك', type: 'error' })
     }
@@ -114,18 +143,24 @@ export default function AddressesScreen() {
       const msg = JSON.parse(event.nativeEvent.data)
       if (msg.type === 'pin') {
         setPin({ latitude: msg.lat, longitude: msg.lng })
+        reverseGeocode(msg.lat, msg.lng)
       }
     } catch {}
   }
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
-  async function handleSave() {
+  function handleSave() {
     const e: Record<string, string> = {}
     if (!form.label.trim()) e.label = 'اسم العنوان مطلوب'
     setFormErrors(e)
     if (Object.keys(e).length > 0) return
+    setShowConfirm(true)
+  }
+
+  async function confirmSave() {
     if (!profile) return
+    setShowConfirm(false)
 
     const payload = {
       user_id: profile.id,
@@ -254,6 +289,13 @@ export default function AddressesScreen() {
               </TouchableOpacity>
             </View>
 
+            {geocoding && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={{ color: colors.navy[300], fontSize: 12 }}>جاري تحديد العنوان...</Text>
+              </View>
+            )}
+
             <FormField label="اسم العنوان *" value={form.label} onChange={v => { setForm(f => ({ ...f, label: v })); setFormErrors(p => { const n = {...p}; delete n.label; return n }) }} placeholder="مثال: البيت، الشغل" error={formErrors.label} />
             <FormField label="المبنى" value={form.building} onChange={v => setForm(f => ({ ...f, building: v }))} placeholder="رقم أو اسم المبنى" />
             <View style={s.row}>
@@ -272,6 +314,30 @@ export default function AddressesScreen() {
               </TouchableOpacity>
             </View>
           </ScrollView>
+        </View>
+      </Modal>
+
+      <Modal visible={showConfirm} animationType="fade" transparent>
+        <View style={s.modalOverlay}>
+          <View style={[s.modalContent, { maxHeight: '60%', borderRadius: 24 }]}>
+            <Text style={s.modalTitle}>تأكيد بيانات التوصيل</Text>
+            <View style={{ gap: 10, marginBottom: 20 }}>
+              <ConfirmRow label="اسم العنوان" value={form.label} colors={colors} />
+              {form.building ? <ConfirmRow label="المبنى" value={form.building} colors={colors} /> : null}
+              {form.floor ? <ConfirmRow label="الطابق" value={form.floor} colors={colors} /> : null}
+              {form.apartment ? <ConfirmRow label="الشقة" value={form.apartment} colors={colors} /> : null}
+              {form.landmark ? <ConfirmRow label="علامة مميزة" value={form.landmark} colors={colors} /> : null}
+              {form.notes ? <ConfirmRow label="ملاحظات" value={form.notes} colors={colors} /> : null}
+            </View>
+            <View style={s.modalActions}>
+              <TouchableOpacity style={s.modalCancel} onPress={() => setShowConfirm(false)}>
+                <Text style={s.modalCancelText}>تعديل</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.modalSave} onPress={confirmSave}>
+                <Text style={s.modalSaveText}>تأكيد وحفظ</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </Modal>
     </View>

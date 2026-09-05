@@ -43,6 +43,17 @@ export default function NotificationsScreen() {
 
   useEffect(() => { load() }, [load])
 
+  useEffect(() => {
+    if (!profile) return
+    const channel = supabase
+      .channel('notif-realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${profile.id}` }, () => load())
+      .subscribe((status, err) => {
+        if (err) console.warn('notifications realtime error:', err.message)
+      })
+    return () => { supabase.removeChannel(channel) }
+  }, [profile, load])
+
   useFocusEffect(useCallback(() => {
     load()
     if (profile) {

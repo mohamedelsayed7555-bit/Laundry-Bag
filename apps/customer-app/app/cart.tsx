@@ -51,6 +51,7 @@ export default function CartScreen() {
   const [walletPhone, setWalletPhone] = useState('')
   const [paymentSettings, setPaymentSettings] = useState<{ instapay: string; wallet: string }>({ instapay: '', wallet: '' })
   const [deliveryFee, setDeliveryFee] = useState(0)
+  const [deliveryFeeBase, setDeliveryFeeBase] = useState(0)
   const [minOrderItems, setMinOrderItems] = useState(0)
   const [zoneSettings, setZoneSettings] = useState({ max_zone_km: 30, price_per_km: 2, base_delivery_km: 5, laundry_lat: 30.0444, laundry_lng: 31.2357 })
   const [distanceKm, setDistanceKm] = useState<number | null>(null)
@@ -81,7 +82,9 @@ export default function CartScreen() {
       if (allSettingsRes?.data) {
         const s: any = {}
         allSettingsRes.data.forEach((r: any) => { s[r.key] = r.value })
-        setDeliveryFee(Number(s.delivery_fee) || 0)
+        const baseFee = Number(s.delivery_fee) || 0
+        setDeliveryFee(baseFee)
+        setDeliveryFeeBase(baseFee)
         setMinOrderItems(Number(s.min_order_items) || 0)
         setZoneSettings({
           max_zone_km: Number(s.max_zone_km) || 30,
@@ -118,10 +121,12 @@ export default function CartScreen() {
       setOutOfZone(dist > zoneSettings.max_zone_km)
       if (dist > zoneSettings.base_delivery_km) {
         const extraKm = dist - zoneSettings.base_delivery_km
-        setDeliveryFee(Math.round(extraKm * zoneSettings.price_per_km))
+        setDeliveryFee(deliveryFeeBase + Math.round(extraKm * zoneSettings.price_per_km))
+      } else {
+        setDeliveryFee(deliveryFeeBase)
       }
     }
-  }, [selectedAddress, zoneSettings])
+  }, [selectedAddress, zoneSettings, deliveryFeeBase])
 
   const subRemaining = activeSub ? Math.max(0, activeSub.items_limit - activeSub.items_used) : null
   const subExhausted = activeSub && subRemaining === 0

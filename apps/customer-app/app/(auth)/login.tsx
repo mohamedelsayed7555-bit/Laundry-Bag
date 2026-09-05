@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, ScrollView, Image,
+  KeyboardAvoidingView, Platform, ScrollView, Image, Animated,
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
@@ -26,6 +26,16 @@ export default function LoginScreen() {
   const router = useRouter()
   const { showAlert, AlertComponent } = useCustomAlert()
   const [bioLoading, setBioLoading] = useState(false)
+
+  const glowAnim = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, { toValue: 1, duration: 1500, useNativeDriver: false }),
+        Animated.timing(glowAnim, { toValue: 0, duration: 1500, useNativeDriver: false }),
+      ])
+    ).start()
+  }, [])
 
   function clearError(field: string) {
     setErrors(prev => { const n = { ...prev }; delete n[field]; return n })
@@ -86,7 +96,16 @@ export default function LoginScreen() {
         {/* Logo Section */}
         <View style={s.logoSection}>
           <View style={s.logoGlowWrap}>
-            <View style={[s.logoGlow, { backgroundColor: colors.primaryGlow }]} />
+            <Animated.View style={[s.logoGlow, {
+              backgroundColor: colors.primary,
+              opacity: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.15, 0.45] }),
+              transform: [{ scale: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.18] }) }],
+              shadowColor: colors.primary,
+              shadowOpacity: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.8] }) as any,
+              shadowRadius: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 30] }) as any,
+              shadowOffset: { width: 0, height: 0 },
+              elevation: 15,
+            }]} />
             <Image source={require('../../assets/logo.jpg')} style={[s.logoImage, { borderColor: colors.primary }]} resizeMode="contain" />
           </View>
           <Text style={[s.brandName, { color: colors.text }]}>Laundry Bag</Text>
@@ -134,7 +153,7 @@ export default function LoginScreen() {
                 onChangeText={(v: string) => { setPhone(v); clearError('phone') }}
                 error={errors.phone}
                 keyboardType="phone-pad"
-                textAlign="left"
+                textAlign="right"
               />
             </>
           )}
@@ -148,12 +167,12 @@ export default function LoginScreen() {
             error={errors.email}
             keyboardType={isSignUp ? "email-address" : "default"}
             autoCapitalize="none"
-            textAlign="left"
+            textAlign="right"
           />
 
           <View>
             <Text style={[s.label, { color: colors.navy[100] }]}>🔒  {t('password')}</Text>
-            <View style={[s.inputWrap, { borderColor: colors.inputBorder, backgroundColor: colors.inputBg }, errors.password ? { borderColor: colors.danger, backgroundColor: colors.dangerGlow } : null]}>
+            <View style={[s.inputWrap, { borderColor: colors.inputBorder, backgroundColor: colors.inputBg, flexDirection: 'row-reverse' }, errors.password ? { borderColor: colors.danger, backgroundColor: colors.dangerGlow } : null]}>
               <TextInput
                 style={[s.passwordInput, { color: colors.text }]}
                 placeholder={t('passwordPlaceholder')}
@@ -161,7 +180,7 @@ export default function LoginScreen() {
                 value={password}
                 onChangeText={v => { setPassword(v); clearError('password') }}
                 secureTextEntry={!showPassword}
-                textAlign="left"
+                textAlign="right"
                 autoComplete="off"
                 selectionColor={colors.primary}
               />
@@ -280,7 +299,7 @@ const s = StyleSheet.create({
     overflow: 'hidden',
   },
   input: {
-    paddingHorizontal: 16, paddingVertical: 12, fontSize: 15,
+    flex: 1, paddingHorizontal: 16, paddingVertical: 12, fontSize: 15,
   },
   passwordInput: {
     flex: 1, paddingHorizontal: 16, paddingVertical: 12, fontSize: 15,
