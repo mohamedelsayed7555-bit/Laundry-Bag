@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { Platform } from 'react-native'
+import { Alert, Platform } from 'react-native'
 import { supabase } from '../lib/supabase'
 import * as SecureStore from 'expo-secure-store'
 import * as LocalAuthentication from 'expo-local-authentication'
@@ -60,6 +60,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => subscription.unsubscribe()
   }, [])
+
+  useEffect(() => {
+    if (!state.profile?.id) return
+    const channel = supabase
+      .channel(`user-active-${state.profile.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'users',
+        filter: `id=eq.${state.profile.id}`,
+      }, (payload) => {
+        if (payload.new.is_active === false) {
+          Alert.alert('تم تعطيل حسابك', 'تواصل مع الإدارة لمزيد من المعلومات', [{ text: 'حسناً' }])
+          supabase.auth.signOut()
+          setState(s => ({ ...s, session: null, profile: null, loading: false }))
+        }
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [state.profile?.id])
 
   async function checkBiometricStatus() {
     try {
