@@ -199,6 +199,7 @@ export default function OrderDetailsScreen() {
         body: JSON.stringify({
           order_id: order.id,
           payment_method: order.payment_method === 'visa' ? 'card' : 'wallet',
+          ...(order.payment_method === 'e_wallet' ? { wallet_phone: profile?.phone } : {}),
         }),
       })
       const data = await res.json()
