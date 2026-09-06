@@ -13,6 +13,8 @@ import {
   Eye,
   ArrowRight,
   CheckSquare,
+  Calendar,
+  RotateCcw,
 } from 'lucide-react'
 import { PageSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
@@ -56,6 +58,10 @@ export default function OrdersPage() {
   const [avgPrices, setAvgPrices] = useState<Record<string, number>>({})
   const [page, setPage] = useState(0)
   const [totalCount, setTotalCount] = useState(0)
+  const [payFilter, setPayFilter] = useState('all')
+  const [datePreset, setDatePreset] = useState<'all' | 'today' | 'week' | 'month' | 'custom'>('all')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const { toast } = useToast()
   const PAGE_SIZE = 20
 
@@ -88,7 +94,19 @@ export default function OrdersPage() {
     return () => { supabase.removeChannel(ch); if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [])
 
-  useEffect(() => { loadOrders(); setSelected(new Set()) }, [page, statusFilter])
+  useEffect(() => { loadOrders(); setSelected(new Set()) }, [page, statusFilter, payFilter, datePreset, dateFrom, dateTo])
+
+  function getDateRange(): { from: string | null; to: string | null } {
+    const now = new Date()
+    const todayStr = now.toISOString().split('T')[0]
+    switch (datePreset) {
+      case 'today': return { from: todayStr + 'T00:00:00', to: todayStr + 'T23:59:59' }
+      case 'week': { const w = new Date(now); w.setDate(now.getDate() - 7); return { from: w.toISOString(), to: now.toISOString() } }
+      case 'month': { const m = new Date(now); m.setDate(1); return { from: m.toISOString().split('T')[0] + 'T00:00:00', to: now.toISOString() } }
+      case 'custom': return { from: dateFrom ? dateFrom + 'T00:00:00' : null, to: dateTo ? dateTo + 'T23:59:59' : null }
+      default: return { from: null, to: null }
+    }
+  }
 
   async function loadOrders() {
     let query = supabase.from('orders')
@@ -96,6 +114,11 @@ export default function OrdersPage() {
       .order('created_at', { ascending: false })
 
     if (statusFilter !== 'all') query = query.eq('status', statusFilter)
+    if (payFilter !== 'all') query = query.eq('payment_status', payFilter)
+
+    const { from, to } = getDateRange()
+    if (from) query = query.gte('created_at', from)
+    if (to) query = query.lte('created_at', to)
 
     query = query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
 
@@ -364,11 +387,19 @@ export default function OrdersPage() {
         </button>
       </motion.div>
 
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input type="text" placeholder="بحث برقم الطلب أو اسم العميل..." value={search} onChange={e => setSearch(e.target.value)}
-            className="w-full pr-10 pl-4 py-2.5 bg-white border border-surface-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all" />
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className="space-y-3">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input type="text" placeholder="بحث برقم الطلب أو اسم العميل..." value={search} onChange={e => setSearch(e.target.value)}
+              className="w-full pr-10 pl-4 py-2.5 bg-white border border-surface-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all" />
+          </div>
+          {(statusFilter !== 'all' || payFilter !== 'all' || datePreset !== 'all') && (
+            <button onClick={() => { setStatusFilter('all'); setPayFilter('all'); setDatePreset('all'); setDateFrom(''); setDateTo(''); setPage(0) }}
+              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-500 transition-colors whitespace-nowrap">
+              <RotateCcw size={14} /> إعادة تعيين
+            </button>
+          )}
         </div>
         <div className="flex gap-1.5 overflow-x-auto pb-1">
           {allStatuses.map(s => (
@@ -377,6 +408,36 @@ export default function OrdersPage() {
               {s === 'all' ? 'الكل' : ORDER_STATUS_LABELS[s as OrderStatus] ?? s}
             </button>
           ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Calendar size={14} className="text-gray-400" />
+            <div className="flex gap-1.5">
+              {([['all', 'الكل'], ['today', 'اليوم'], ['week', 'آخر أسبوع'], ['month', 'هذا الشهر'], ['custom', 'مخصص']] as const).map(([key, label]) => (
+                <button key={key} onClick={() => { setDatePreset(key); setPage(0) }}
+                  className={`px-3 py-2 rounded-lg text-[11px] font-medium transition-all whitespace-nowrap ${datePreset === key ? 'bg-navy-900 text-white shadow-premium-md' : 'bg-white text-gray-500 hover:bg-surface-muted border border-surface-border/60'}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            {datePreset === 'custom' && (
+              <div className="flex items-center gap-2">
+                <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(0) }}
+                  className="px-3 py-2 bg-white border border-surface-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 transition-all" />
+                <span className="text-gray-400 text-xs">إلى</span>
+                <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(0) }}
+                  className="px-3 py-2 bg-white border border-surface-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 transition-all" />
+              </div>
+            )}
+          </div>
+          <div className="flex gap-1.5">
+            {[{ key: 'all', label: 'كل الدفع' }, { key: 'pending', label: 'معلق' }, { key: 'confirmed', label: 'مدفوع' }, { key: 'failed', label: 'فشل' }].map(f => (
+              <button key={f.key} onClick={() => { setPayFilter(f.key); setPage(0) }}
+                className={`px-3 py-2 rounded-lg text-[11px] font-medium transition-all whitespace-nowrap ${payFilter === f.key ? 'bg-navy-900 text-white shadow-premium-md' : 'bg-white text-gray-500 hover:bg-surface-muted border border-surface-border/60'}`}>
+                {f.label}
+              </button>
+            ))}
+          </div>
         </div>
       </motion.div>
 
