@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import StatCard from '@/components/ui/StatCard'
 import DataTable from '@/components/ui/DataTable'
 import Badge from '@/components/ui/Badge'
-import { DollarSign, TrendingUp, TrendingDown, CreditCard, Calendar, RotateCcw, Crown, Truck, Download } from 'lucide-react'
+import { DollarSign, TrendingUp, TrendingDown, CreditCard, Calendar, RotateCcw, Crown, Truck, Download, Undo2 } from 'lucide-react'
 import { PageSkeleton } from '@/components/ui/Skeleton'
 import Tooltip from '@/components/ui/Tooltip'
 import PermissionGate from '@/components/ui/PermissionGate'
@@ -28,6 +28,7 @@ export default function FinancePage() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const { toast } = useToast()
+  const [confirmModal, setConfirmModal] = useState<{ type: 'pay' | 'refund'; id: string; amount: number; orderNumber: string } | null>(null)
 
   useEffect(() => { load() }, [preset, dateFrom, dateTo])
 
@@ -160,10 +161,22 @@ export default function FinancePage() {
   async function markPaid(id: string) {
     const row = rows.find(r => r.id === id)
     const amount = row?._amount ?? 0
+    setConfirmModal(null)
     setRows(prev => prev.map(r => r.id === id ? { ...r, payment_status: 'confirmed' } : r))
     setStats(prev => ({ ...prev, paid: prev.paid + amount, unpaid: prev.unpaid - amount }))
     toast('تم تأكيد الدفع بنجاح')
     const { error } = await supabase.from('orders').update({ payment_status: 'confirmed' }).eq('id', id)
+    if (error) { toast('حدث خطأ — جاري التحديث', 'error'); load() }
+  }
+
+  async function markRefunded(id: string) {
+    const row = rows.find(r => r.id === id)
+    const amount = row?._amount ?? 0
+    setConfirmModal(null)
+    setRows(prev => prev.map(r => r.id === id ? { ...r, payment_status: 'refunded', status: 'refunded' } : r))
+    setStats(prev => ({ ...prev, revenue: prev.revenue - amount, paid: prev.paid - amount }))
+    toast('تم استرداد المبلغ بنجاح')
+    const { error } = await supabase.from('orders').update({ payment_status: 'refunded', status: 'refunded' }).eq('id', id)
     if (error) { toast('حدث خطأ — جاري التحديث', 'error'); load() }
   }
 
@@ -192,15 +205,46 @@ export default function FinancePage() {
         <p className="text-[10px] text-gray-400">{new Date(item._date).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</p>
       </div>
     )},
-    { key: 'actions', label: '', render: (item: any) => (
-      item._source === 'order' && item.payment_status !== 'confirmed' ? (
-        <Tooltip content="تأكيد استلام المبلغ">
-          <button onClick={() => markPaid(item.id)} className="text-[11px] bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg font-medium hover:bg-emerald-100 transition-colors">
-            تأكيد الدفع
-          </button>
-        </Tooltip>
-      ) : null
-    )},
+    { key: 'status', label: 'حالة الطلب', render: (item: any) => {
+      if (item._source === 'subscription') return null
+      const statusMap: Record<string, { label: string; variant: string }> = {
+        pending: { label: 'معلق', variant: 'warning' },
+        assigned: { label: 'تم التعيين', variant: 'info' },
+        picked_up: { label: 'تم الاستلام', variant: 'info' },
+        processing: { label: 'جاري المعالجة', variant: 'info' },
+        ready: { label: 'جاهز', variant: 'success' },
+        delivering: { label: 'جاري التوصيل', variant: 'info' },
+        delivered: { label: 'تم التسليم', variant: 'success' },
+        cancelled: { label: 'ملغي', variant: 'danger' },
+        refunded: { label: 'مسترد', variant: 'danger' },
+      }
+      const s = statusMap[item.status] ?? { label: item.status, variant: 'warning' }
+      return <Badge variant={s.variant as any}>{s.label}</Badge>
+    }},
+    { key: 'actions', label: '', render: (item: any) => {
+      if (item._source !== 'order') return null
+      const isCancelled = ['cancelled', 'refunded'].includes(item.status)
+      const canConfirm = item.payment_status === 'pending' && !isCancelled
+      const canRefund = item.payment_status === 'confirmed' && ['visa', 'e_wallet', 'wallet'].includes(item.payment_method) && ['pending', 'assigned', 'picked_up', 'cancelled'].includes(item.status)
+      return (
+        <div className="flex gap-1.5">
+          {canConfirm && (
+            <Tooltip content="تأكيد استلام المبلغ">
+              <button onClick={() => setConfirmModal({ type: 'pay', id: item.id, amount: item._amount, orderNumber: item.order_number })} className="text-[11px] bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg font-medium hover:bg-emerald-100 transition-colors">
+                تأكيد الدفع
+              </button>
+            </Tooltip>
+          )}
+          {canRefund && (
+            <Tooltip content="استرداد المبلغ">
+              <button onClick={() => setConfirmModal({ type: 'refund', id: item.id, amount: item._amount, orderNumber: item.order_number })} className="text-[11px] bg-red-50 text-red-600 px-3 py-1.5 rounded-lg font-medium hover:bg-red-100 transition-colors">
+                استرداد
+              </button>
+            </Tooltip>
+          )}
+        </div>
+      )
+    }},
   ]
 
   const presets: { key: DatePreset; label: string }[] = [
@@ -273,7 +317,7 @@ export default function FinancePage() {
           ))}
         </div>
         <div className="flex gap-1.5">
-          {[{ key: 'all', label: 'الكل' }, { key: 'pending', label: 'غير مدفوع' }, { key: 'confirmed', label: 'مدفوع' }].map(f => (
+          {[{ key: 'all', label: 'الكل' }, { key: 'pending', label: 'غير مدفوع' }, { key: 'confirmed', label: 'مدفوع' }, { key: 'refunded', label: 'مسترد' }].map(f => (
             <button key={f.key} onClick={() => setPayFilter(f.key)}
               className={`px-3 py-2 rounded-lg text-[11px] font-medium transition-all ${payFilter === f.key ? 'bg-navy-900 text-white shadow-premium-md' : 'bg-white text-gray-500 hover:bg-surface-muted border border-surface-border/60'}`}>
               {f.label}
@@ -283,6 +327,41 @@ export default function FinancePage() {
       </div>
 
       <DataTable columns={columns} data={filtered} emptyMessage="لا توجد معاملات" />
+
+      {/* Confirmation Modal */}
+      {confirmModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setConfirmModal(null)}>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-gray-800 mb-2 text-center">
+              {confirmModal.type === 'pay' ? 'تأكيد الدفع' : 'تأكيد الاسترداد'}
+            </h3>
+            <p className="text-sm text-gray-500 text-center mb-1">
+              طلب رقم <span className="font-bold text-gray-800">{confirmModal.orderNumber}</span>
+            </p>
+            <p className="text-center text-2xl font-bold text-gray-800 mb-4">
+              {confirmModal.amount.toFixed(2)} ج.م
+            </p>
+            <p className="text-xs text-gray-400 text-center mb-5">
+              {confirmModal.type === 'pay'
+                ? 'هل أنت متأكد من تأكيد استلام هذا المبلغ؟'
+                : 'هل أنت متأكد من استرداد هذا المبلغ؟ سيتم خصمه من الإيرادات.'}
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmModal(null)}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition-colors">
+                إلغاء
+              </button>
+              <button
+                onClick={() => confirmModal.type === 'pay' ? markPaid(confirmModal.id) : markRefunded(confirmModal.id)}
+                className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-colors ${
+                  confirmModal.type === 'pay' ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-red-500 hover:bg-red-600'
+                }`}>
+                {confirmModal.type === 'pay' ? 'تأكيد الدفع' : 'تأكيد الاسترداد'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
     </PermissionGate>
   )
