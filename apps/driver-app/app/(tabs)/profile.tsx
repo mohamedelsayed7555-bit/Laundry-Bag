@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, TextInput, Modal } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Modal } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import Animated, { FadeInDown } from 'react-native-reanimated'
 import { useRouter } from 'expo-router'
@@ -14,8 +14,6 @@ export default function DriverProfileScreen() {
   const router = useRouter()
   const { showAlert, AlertComponent } = useCustomAlert()
   const [stats, setStats] = useState({ total: 0, delivered: 0, earnings: 0, avgRating: 0, ratingCount: 0 })
-  const [isOnline, setIsOnline] = useState(profile?.is_active ?? false)
-  const [toggling, setToggling] = useState(false)
   const [showBioModal, setShowBioModal] = useState(false)
   const [bioEmail, setBioEmail] = useState('')
   const [bioPassword, setBioPassword] = useState('')
@@ -23,7 +21,6 @@ export default function DriverProfileScreen() {
 
   useEffect(() => {
     if (profile) {
-      setIsOnline(profile.is_active)
       supabase.from('orders').select('status, total, rating_driver').eq('driver_id', profile.id).then(({ data }) => {
         const orders = data ?? []
         const delivered = orders.filter(o => o.status === 'delivered')
@@ -40,19 +37,6 @@ export default function DriverProfileScreen() {
     }
   }, [profile])
 
-  async function toggleAvailability(value: boolean) {
-    if (!profile) return
-    setToggling(true)
-    setIsOnline(value)
-    const { error } = await supabase.from('users').update({ is_active: value }).eq('id', profile.id)
-    if (error) {
-      setIsOnline(!value)
-      showAlert({ title: 'خطأ', message: 'حدث خطأ أثناء تغيير الحالة', type: 'error' })
-    } else {
-      await refreshProfile()
-    }
-    setToggling(false)
-  }
 
   const handleSignOut = () => {
     showAlert({ title: 'تسجيل الخروج', message: 'هل أنت متأكد؟', type: 'confirm', buttons: [
@@ -84,24 +68,7 @@ export default function DriverProfileScreen() {
         </LinearGradient>
       </Animated.View>
 
-      <Animated.View entering={FadeInDown.duration(500).delay(200)} style={s.onlineCard}>
-        <View style={s.onlineRow}>
-          <View style={s.onlineInfo}>
-            <View style={[s.statusDot, { backgroundColor: isOnline ? colors.success : colors.danger }]} />
-            <Text style={s.onlineLabel}>{isOnline ? 'متاح للطلبات' : 'غير متاح'}</Text>
-          </View>
-          <Switch
-            value={isOnline}
-            onValueChange={toggleAvailability}
-            disabled={toggling}
-            trackColor={{ false: colors.navy[600], true: colors.primary + '60' }}
-            thumbColor={isOnline ? colors.primary : colors.navy[400]}
-          />
-        </View>
-        <Text style={s.onlineHint}>{isOnline ? 'ستصلك طلبات جديدة' : 'لن تصلك طلبات جديدة'}</Text>
-      </Animated.View>
-
-      <Animated.View entering={FadeInDown.duration(500).delay(300)} style={s.statsRow}>
+      <Animated.View entering={FadeInDown.duration(500).delay(200)} style={s.statsRow}>
         {[
           { value: stats.total, label: 'إجمالي الطلبات', glow: colors.primaryGlow },
           { value: stats.delivered, label: 'تم التوصيل', glow: colors.successGlow },
@@ -239,15 +206,6 @@ const s = StyleSheet.create({
   },
   roleText: { color: colors.accent, fontSize: 12, fontWeight: '700' },
 
-  onlineCard: {
-    backgroundColor: colors.navy[800], borderRadius: 20, padding: 18,
-    borderWidth: 1, borderColor: colors.navy[700], marginBottom: 16,
-  },
-  onlineRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  onlineInfo: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  statusDot: { width: 12, height: 12, borderRadius: 6 },
-  onlineLabel: { fontSize: 15, color: '#fff', fontWeight: '700' },
-  onlineHint: { fontSize: 11, color: colors.navy[300], marginTop: 8 },
 
   statsRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
   statCard: {
