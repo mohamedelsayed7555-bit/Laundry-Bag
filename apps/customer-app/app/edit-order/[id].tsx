@@ -38,7 +38,7 @@ export default function EditOrderScreen() {
 
   async function loadData() {
     const [orderRes, pricesRes] = await Promise.all([
-      supabase.from('orders').select('id, order_number, status, items, items_count, subtotal, total, delivery_fee, subscription_id, service_type').eq('id', id).single(),
+      supabase.from('orders').select('id, order_number, status, items, items_count, subtotal, total, delivery_fee, subscription_id, service_type, payment_method, payment_status').eq('id', id).single(),
       supabase.from('prices').select('id, item_type, service_type, price').eq('is_active', true),
     ])
 
@@ -149,11 +149,15 @@ export default function EditOrderScreen() {
     return <View style={[s.container, { justifyContent: 'center', alignItems: 'center' }]}><ActivityIndicator size="large" color={colors.primary} /></View>
   }
 
-  if (!order || !['pending', 'assigned'].includes(order.status)) {
+  const isPaidOnline = order && ['visa', 'e_wallet', 'wallet'].includes(order.payment_method) && order.payment_status === 'confirmed'
+
+  if (!order || !['pending', 'assigned'].includes(order.status) || isPaidOnline) {
     return (
       <View style={[s.container, { justifyContent: 'center', alignItems: 'center', padding: 40 }]}>
         <Text style={{ fontSize: 40, marginBottom: 16 }}>⚠️</Text>
-        <Text style={{ color: '#fff', fontSize: 16, textAlign: 'center' }}>لا يمكن تعديل هذا الطلب</Text>
+        <Text style={{ color: '#fff', fontSize: 16, textAlign: 'center' }}>
+          {isPaidOnline ? 'لا يمكن تعديل طلب مدفوع إلكترونياً — تواصل مع الدعم' : 'لا يمكن تعديل هذا الطلب'}
+        </Text>
         <TouchableOpacity style={s.backBtnAlt} onPress={() => router.back()}>
           <Text style={{ color: colors.primary, fontSize: 15, fontWeight: '600' }}>رجوع</Text>
         </TouchableOpacity>
