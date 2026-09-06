@@ -191,6 +191,8 @@ export default function DriverOrdersScreen() {
             </View>
           </View>
 
+          <Text style={{ fontSize: 11, color: colors.navy[400], marginTop: 4 }}>📅 {new Date(item.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' })} — {new Date(item.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</Text>
+
           {item.is_scheduled && item.scheduled_at && (
             <View style={s.scheduleBadge}>
               <Text style={s.scheduleBadgeText}>🕐 موعد: {new Date(item.scheduled_at).toLocaleDateString('ar-EG')} - {new Date(item.scheduled_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</Text>
