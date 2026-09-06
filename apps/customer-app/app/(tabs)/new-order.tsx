@@ -37,6 +37,8 @@ export default function NewOrderScreen() {
   const [itemQty, setItemQty] = useState(1)
   const [activeSub, setActiveSub] = useState<any>(null)
   const [dataLoading, setDataLoading] = useState(true)
+  const [closed, setClosed] = useState(false)
+  const [workHoursText, setWorkHoursText] = useState('')
 
   const barScale = useSharedValue(1)
   const badgeBounce = useSharedValue(1)
@@ -56,11 +58,33 @@ export default function NewOrderScreen() {
     Promise.all([
       supabase.from('prices').select('id, item_type, service_type, price, category_id').eq('is_active', true),
       supabase.from('categories').select('id, name, icon, sort_order').eq('is_active', true).order('sort_order'),
-    ]).then(([pricesRes, catsRes]) => {
+      supabase.from('settings').select('key, value').in('key', ['open_hour', 'close_hour', 'working_hours_enabled']),
+    ]).then(([pricesRes, catsRes, settingsRes]) => {
       setPrices(pricesRes.data ?? [])
       const cats = catsRes.data ?? []
       setCategories(cats)
       if (cats.length > 0) setSelectedCategory(cats[0].id)
+      const sMap: Record<string, string> = {}
+      settingsRes.data?.forEach((s: any) => { sMap[s.key] = String(s.value) })
+      const enabled = sMap['working_hours_enabled'] !== 'false'
+      if (enabled && sMap['open_hour'] && sMap['close_hour']) {
+        const now = new Date()
+        const [oh, om] = sMap['open_hour'].split(':').map(Number)
+        const [ch, cm] = sMap['close_hour'].split(':').map(Number)
+        const nowMins = now.getHours() * 60 + now.getMinutes()
+        const openMins = oh * 60 + om
+        const closeMins = ch * 60 + cm
+        const isOpen = closeMins > openMins ? (nowMins >= openMins && nowMins < closeMins) : (nowMins >= openMins || nowMins < closeMins)
+        if (!isOpen) {
+          setClosed(true)
+          const fmtTime = (h: number, m: number) => {
+            const period = h >= 12 ? 'م' : 'ص'
+            const h12 = h > 12 ? h - 12 : h === 0 ? 12 : h
+            return `${h12}${m > 0 ? ':' + String(m).padStart(2, '0') : ''} ${period}`
+          }
+          setWorkHoursText(`${fmtTime(oh, om)} — ${fmtTime(ch, cm)}`)
+        }
+      }
       setDataLoading(false)
     })
     if (profile) {
@@ -119,6 +143,14 @@ export default function NewOrderScreen() {
     <>
       <ScrollView style={[s.container, { backgroundColor: colors.navy[900] }]} contentContainerStyle={s.content}>
         <Text style={[s.title, { color: colors.text }]}>{t('newOrder')}</Text>
+
+        {closed && (
+          <View style={[s.closedBanner, { backgroundColor: '#ef444415', borderColor: '#ef444430' }]}>
+            <Text style={s.closedIcon}>🔒</Text>
+            <Text style={s.closedTitle}>المغسلة مغلقة حالياً</Text>
+            <Text style={s.closedHours}>ساعات العمل: {workHoursText}</Text>
+          </View>
+        )}
 
         {activeSub && subRemaining !== null && (
           <View style={[s.subBanner, { backgroundColor: colors.primary + '12', borderColor: colors.primary + '30' }]}>
@@ -208,7 +240,7 @@ export default function NewOrderScreen() {
                 <Text style={[s.counterText, { color: colors.text }]}>+</Text>
               </TouchableOpacity>
             </View>
-            <TouchableOpacity style={[s.addBtn, { backgroundColor: colors.primary }]} onPress={handleAddToCart}>
+            <TouchableOpacity style={[s.addBtn, { backgroundColor: closed ? colors.navy[600] : colors.primary }]} onPress={handleAddToCart} disabled={closed}>
               <Text style={s.addBtnText}>{locale === 'en' ? '+ Add to cart' : '+ أضف للسلة'}</Text>
             </TouchableOpacity>
           </View>
@@ -355,4 +387,11 @@ const s = StyleSheet.create({
   floatingBadgeText: { fontSize: 13, fontWeight: '800' },
   floatingBarLabel: { fontSize: 16, fontWeight: '700', color: '#fff' },
   floatingBarPrice: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  closedBanner: {
+    borderRadius: 16, padding: 20, marginBottom: 16, borderWidth: 1,
+    alignItems: 'center', gap: 6,
+  },
+  closedIcon: { fontSize: 32 },
+  closedTitle: { fontSize: 16, fontWeight: '800', color: '#ef4444' },
+  closedHours: { fontSize: 13, color: '#ef4444', fontWeight: '600' },
 })

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Settings, Save, Plus, Trash2, UserCircle, Mail, Lock, Camera, Eye, EyeOff, Check, Users, CreditCard } from 'lucide-react'
+import { Settings, Save, Plus, Trash2, UserCircle, Mail, Lock, Camera, Eye, EyeOff, Check, Users, CreditCard, Clock } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Modal from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/Toast'
@@ -29,6 +29,8 @@ export default function SettingsPage() {
   const [newSetting, setNewSetting] = useState({ key: '', value: '', description: '' })
   const [discounts, setDiscounts] = useState({ quarterly: '10', biannual: '15', annual: '20' })
   const [savingDiscounts, setSavingDiscounts] = useState(false)
+  const [workHours, setWorkHours] = useState({ open: '08:00', close: '22:00', enabled: true })
+  const [savingHours, setSavingHours] = useState(false)
   const { toast } = useToast()
 
   // Profile states
@@ -70,6 +72,14 @@ export default function SettingsPage() {
       quarterly: dq ? String(dq.value) : '10',
       biannual: db ? String(db.value) : '15',
       annual: da ? String(da.value) : '20',
+    })
+    const oh = data?.find(s => s.key === 'open_hour')
+    const ch = data?.find(s => s.key === 'close_hour')
+    const whe = data?.find(s => s.key === 'working_hours_enabled')
+    setWorkHours({
+      open: oh ? String(oh.value) : '08:00',
+      close: ch ? String(ch.value) : '22:00',
+      enabled: whe ? String(whe.value) !== 'false' : true,
     })
     setLoading(false)
   }
@@ -137,6 +147,26 @@ export default function SettingsPage() {
     setSavingDiscounts(false)
     loadSettings()
     toast('تم حفظ نسب الخصم')
+  }
+
+  async function handleSaveWorkHours() {
+    setSavingHours(true)
+    const entries = [
+      { key: 'open_hour', value: workHours.open, description: 'ساعة الفتح' },
+      { key: 'close_hour', value: workHours.close, description: 'ساعة الإغلاق' },
+      { key: 'working_hours_enabled', value: String(workHours.enabled), description: 'تفعيل ساعات العمل' },
+    ]
+    for (const entry of entries) {
+      const existing = settings.find(s => s.key === entry.key)
+      if (existing) {
+        await supabase.from('settings').update({ value: entry.value }).eq('id', existing.id)
+      } else {
+        await supabase.from('settings').upsert(entry)
+      }
+    }
+    setSavingHours(false)
+    loadSettings()
+    toast('تم حفظ ساعات العمل')
   }
 
   async function deleteSetting(id: string) {
@@ -248,6 +278,48 @@ export default function SettingsPage() {
                 <label className="block text-sm font-medium text-gray-600 mb-1">رقم الهاتف</label>
                 <input type="text" value={orgPhone} onChange={e => setOrgPhone(e.target.value)} dir="ltr" className={inputClass} />
               </div>
+            </div>
+          </div>
+
+          <div className={sectionClass + ' p-6'}>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-amber-50 rounded-xl"><Clock size={20} className="text-amber-600" /></div>
+              <div>
+                <h3 className="font-semibold text-gray-800">ساعات العمل</h3>
+                <p className="text-xs text-gray-400 mt-0.5">تحديد مواعيد استقبال الطلبات — خارج الساعات دي العميل مش هيقدر يطلب</p>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div className="flex items-center gap-4 p-4 bg-surface-muted/50 rounded-xl">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-700">تفعيل ساعات العمل</p>
+                  <p className="text-xs text-gray-400">لو مطفي، العميل يقدر يطلب في أي وقت</p>
+                </div>
+                <button onClick={() => setWorkHours({ ...workHours, enabled: !workHours.enabled })}
+                  className={`relative w-12 h-7 rounded-full transition-colors ${workHours.enabled ? 'bg-primary-500' : 'bg-gray-300'}`}>
+                  <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow transition-all ${workHours.enabled ? 'left-[22px]' : 'left-0.5'}`} />
+                </button>
+              </div>
+              {workHours.enabled && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1.5">ساعة الفتح</label>
+                    <input type="time" value={workHours.open} onChange={e => setWorkHours({ ...workHours, open: e.target.value })}
+                      className={inputClass} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1.5">ساعة الإغلاق</label>
+                    <input type="time" value={workHours.close} onChange={e => setWorkHours({ ...workHours, close: e.target.value })}
+                      className={inputClass} />
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end mt-6">
+              <button onClick={handleSaveWorkHours} disabled={savingHours}
+                className="flex items-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:shadow-glow-green disabled:opacity-50 transition-all">
+                <Save size={14} /> {savingHours ? 'جاري الحفظ...' : 'حفظ ساعات العمل'}
+              </button>
             </div>
           </div>
 
