@@ -327,7 +327,7 @@ export default function OrderDetailsScreen() {
         {order.delivery_fee > 0 && <DetailRow colors={colors} label="رسوم التوصيل" value={`${Number(order.delivery_fee).toFixed(2)} ج.م`} />}
         <DetailRow colors={colors} label="الإجمالي" value={`${order.total?.toFixed(2)} ج.م`} highlight />
         <DetailRow colors={colors} label="طريقة الدفع" value={{ cash: 'كاش', visa: 'فيزا', e_wallet: 'محفظة إلكترونية', instapay: 'إنستاباي', wallet: 'محفظة' }[order.payment_method] ?? order.payment_method} />
-        <DetailRow colors={colors} label="حالة الدفع" value={{ confirmed: 'مؤكد', refunded: 'مسترد', failed: 'فشل', pending: 'معلق' }[order.payment_status] ?? 'معلق'} />
+        <DetailRow colors={colors} label="حالة الدفع" value={{ confirmed: 'مؤكد ✅', refunded: 'مسترد', failed: 'فشل الدفع ❌', pending: 'في انتظار الدفع' }[order.payment_status] ?? 'معلق'} warn={order.payment_status === 'failed'} />
         {order.status === 'cancelled' && order.cancellation_fee > 0 && (
           <DetailRow colors={colors} label="رسوم الإلغاء" value={`${Number(order.cancellation_fee).toFixed(2)} ج.م`} highlight />
         )}
@@ -335,7 +335,7 @@ export default function OrderDetailsScreen() {
         {order.notes && <DetailRow colors={colors} label="ملاحظات" value={order.notes} />}
       </View>
 
-      {order.payment_status === 'pending' && ['visa', 'e_wallet'].includes(order.payment_method) && order.status !== 'cancelled' && (
+      {['pending', 'failed'].includes(order.payment_status) && ['visa', 'e_wallet'].includes(order.payment_method) && order.status !== 'cancelled' && (
         <TouchableOpacity
           style={[s.retryPayBtn, retrying && { opacity: 0.6 }]}
           onPress={handleRetryPayment}
@@ -454,11 +454,11 @@ export default function OrderDetailsScreen() {
   )
 }
 
-function DetailRow({ label, value, highlight, colors: c }: { label: string; value: string; highlight?: boolean; colors: any }) {
+function DetailRow({ label, value, highlight, warn, colors: c }: { label: string; value: string; highlight?: boolean; warn?: boolean; colors: any }) {
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: c.navy[700] }}>
       <Text style={{ fontSize: 13, color: c.navy[300] }}>{label}</Text>
-      <Text style={[{ fontSize: 13, color: c.text, fontWeight: '500', maxWidth: '60%', textAlign: 'left' }, highlight && { color: c.primary, fontWeight: '700' as const }]}>{value}</Text>
+      <Text style={[{ fontSize: 13, color: c.text, fontWeight: '500', maxWidth: '60%', textAlign: 'left' }, highlight && { color: c.primary, fontWeight: '700' as const }, warn && { color: '#ef4444', fontWeight: '700' as const }]}>{value}</Text>
     </View>
   )
 }
