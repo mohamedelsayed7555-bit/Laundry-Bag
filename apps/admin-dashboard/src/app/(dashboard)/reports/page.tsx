@@ -53,7 +53,7 @@ export default function ReportsPage() {
     ])
 
     const orderData = orders.data ?? []
-    const totalRevenue = orderData.reduce((s, o) => s + (o.total ?? 0), 0)
+    const totalRevenue = orderData.filter(o => o.status !== 'cancelled' && o.status !== 'refunded').reduce((s, o) => s + (o.total ?? 0), 0)
     const ordersByStatus: Record<string, number> = {}
     const ordersByService: Record<string, number> = {}
     orderData.forEach(o => {
