@@ -48,6 +48,8 @@ const prog = StyleSheet.create({
 })
 
 type TabFilter = 'active' | 'completed'
+type DateRange = '7' | '14' | '30' | 'all'
+const dateRangeLabels: Record<DateRange, string> = { '7': 'آخر 7 أيام', '14': 'آخر 14 يوم', '30': 'آخر 30 يوم', all: 'الكل' }
 
 export default function OrdersScreen() {
   const { profile } = useAuth()
@@ -57,6 +59,8 @@ export default function OrdersScreen() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [tab, setTab] = useState<TabFilter>('active')
+  const [dateRange, setDateRange] = useState<DateRange>('14')
+  const [showDatePicker, setShowDatePicker] = useState(false)
 
   const router = useRouter()
   const loadOrders = useCallback(async () => {
@@ -85,11 +89,14 @@ export default function OrdersScreen() {
   const onRefresh = () => { setRefreshing(true); loadOrders() }
 
   const activeStatuses = ['scheduled', 'pending', 'assigned', 'picked_up', 'processing', 'ready', 'delivering']
-  const filteredOrders = orders.filter(o =>
-    tab === 'active'
-      ? activeStatuses.includes(o.status)
-      : ['delivered', 'cancelled'].includes(o.status)
-  )
+  const filteredOrders = orders.filter(o => {
+    if (tab === 'active') return activeStatuses.includes(o.status)
+    if (!['delivered', 'cancelled'].includes(o.status)) return false
+    if (dateRange === 'all') return true
+    const daysAgo = new Date()
+    daysAgo.setDate(daysAgo.getDate() - Number(dateRange))
+    return new Date(o.created_at) >= daysAgo
+  })
   const activeCount = orders.filter(o => activeStatuses.includes(o.status)).length
   const completedCount = orders.filter(o => ['delivered', 'cancelled'].includes(o.status)).length
 
@@ -204,6 +211,28 @@ export default function OrdersScreen() {
         </TouchableOpacity>
       </View>
 
+      {tab === 'completed' && (
+        <View style={{ marginBottom: 12, zIndex: 10 }}>
+          <TouchableOpacity
+            style={[s.dateFilterBtn, { backgroundColor: colors.navy[800], borderColor: colors.navy[700] }]}
+            onPress={() => setShowDatePicker(!showDatePicker)}>
+            <Text style={[s.dateFilterBtnText, { color: colors.navy[200] }]}>📅 {dateRangeLabels[dateRange]}</Text>
+            <Text style={{ fontSize: 10, color: colors.navy[400] }}>{showDatePicker ? '▲' : '▼'}</Text>
+          </TouchableOpacity>
+          {showDatePicker && (
+            <View style={[s.dateDropdown, { backgroundColor: colors.navy[800], borderColor: colors.navy[700] }]}>
+              {(Object.keys(dateRangeLabels) as DateRange[]).map(key => (
+                <TouchableOpacity key={key}
+                  style={[s.dateDropdownItem, { borderBottomColor: colors.navy[700] }, dateRange === key && { backgroundColor: colors.primary + '20' }]}
+                  onPress={() => { setDateRange(key); setShowDatePicker(false) }}>
+                  <Text style={[s.dateDropdownText, { color: colors.navy[200] }, dateRange === key && { color: colors.primary }]}>{dateRangeLabels[key]}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
+
       {loading ? (
         <View style={{ gap: 12 }}>
           <SkeletonOrderCard />
@@ -306,4 +335,13 @@ const s = StyleSheet.create({
     borderRadius: 14, marginTop: 20,
   },
   emptyBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+
+  dateFilterBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1,
+  },
+  dateFilterBtnText: { fontSize: 13, fontWeight: '600' },
+  dateDropdown: { borderRadius: 12, marginTop: 6, borderWidth: 1, overflow: 'hidden' },
+  dateDropdownItem: { paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: 1 },
+  dateDropdownText: { fontSize: 13, fontWeight: '600' },
 })
