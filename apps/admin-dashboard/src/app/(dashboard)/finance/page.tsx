@@ -32,6 +32,14 @@ export default function FinancePage() {
 
   useEffect(() => { load() }, [preset, dateFrom, dateTo])
 
+  useEffect(() => {
+    const ch = supabase.channel('finance-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'subscriptions' }, () => load())
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [])
+
   function getDateRange(): { from: string | null; to: string | null } {
     const now = new Date()
     switch (preset) {
