@@ -76,6 +76,8 @@ export default function OrderDetailsScreen() {
   const [submitting, setSubmitting] = useState(false)
   const [driverLoc, setDriverLoc] = useState<{ lat: number; lng: number } | null>(null)
   const [retrying, setRetrying] = useState(false)
+  const [showWalletInput, setShowWalletInput] = useState(false)
+  const [walletPhone, setWalletPhone] = useState('')
   const mapWebviewRef = useRef<WebView>(null)
 
   useEffect(() => {
@@ -186,7 +188,17 @@ export default function OrderDetailsScreen() {
     else { setShowRating(false); loadOrder() }
   }
 
-  async function handleRetryPayment() {
+  function handleRetryPayment() {
+    if (order.payment_method === 'e_wallet') {
+      setWalletPhone(profile?.phone || '')
+      setShowWalletInput(true)
+      return
+    }
+    submitRetryPayment()
+  }
+
+  async function submitRetryPayment(phone?: string) {
+    setShowWalletInput(false)
     setRetrying(true)
     try {
       const session = (await supabase.auth.getSession()).data.session
@@ -199,7 +211,7 @@ export default function OrderDetailsScreen() {
         body: JSON.stringify({
           order_id: order.id,
           payment_method: order.payment_method === 'visa' ? 'card' : 'wallet',
-          ...(order.payment_method === 'e_wallet' ? { wallet_phone: profile?.phone } : {}),
+          ...(phone ? { wallet_phone: phone } : {}),
         }),
       })
       const data = await res.json()
@@ -336,7 +348,42 @@ export default function OrderDetailsScreen() {
         {order.notes && <DetailRow colors={colors} label="ملاحظات" value={order.notes} />}
       </View>
 
-      {['pending', 'failed'].includes(order.payment_status) && ['visa', 'e_wallet'].includes(order.payment_method) && order.status !== 'cancelled' && (
+      {showWalletInput && (
+        <View style={{ backgroundColor: colors.navy[800], borderRadius: 16, padding: 16, marginBottom: 12 }}>
+          <Text style={{ color: colors.text, fontSize: 14, fontWeight: '600', textAlign: 'right', marginBottom: 10 }}>📱 أدخل رقم موبايل المحفظة</Text>
+          <TextInput
+            style={{ backgroundColor: colors.navy[700], color: colors.text, borderRadius: 12, padding: 14, fontSize: 18, fontWeight: '600', letterSpacing: 1, textAlign: 'center', borderWidth: 1, borderColor: colors.navy[600] }}
+            value={walletPhone}
+            onChangeText={setWalletPhone}
+            placeholder="01xxxxxxxxx"
+            placeholderTextColor={colors.navy[400]}
+            keyboardType="phone-pad"
+            maxLength={11}
+          />
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+            <TouchableOpacity
+              style={{ flex: 1, backgroundColor: colors.navy[600], borderRadius: 12, padding: 12, alignItems: 'center' }}
+              onPress={() => setShowWalletInput(false)}
+            >
+              <Text style={{ color: colors.text, fontWeight: '600' }}>إلغاء</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{ flex: 1, backgroundColor: '#f59e0b', borderRadius: 12, padding: 12, alignItems: 'center', opacity: walletPhone.match(/^01[0-9]{9}$/) ? 1 : 0.5 }}
+              onPress={() => {
+                if (!walletPhone.match(/^01[0-9]{9}$/)) {
+                  showAlert({ title: 'تنبيه', message: 'أدخل رقم موبايل صحيح (01xxxxxxxxx)', type: 'warning' })
+                  return
+                }
+                submitRetryPayment(walletPhone)
+              }}
+            >
+              <Text style={{ color: '#fff', fontWeight: '700' }}>💳 ادفع</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {['pending', 'failed'].includes(order.payment_status) && ['visa', 'e_wallet'].includes(order.payment_method) && order.status !== 'cancelled' && !showWalletInput && (
         <TouchableOpacity
           style={[s.retryPayBtn, retrying && { opacity: 0.6 }]}
           onPress={handleRetryPayment}
