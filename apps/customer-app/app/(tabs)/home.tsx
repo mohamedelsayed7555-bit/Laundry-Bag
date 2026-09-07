@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, RefreshControl } from 'react-native'
 import { useRouter } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated'
@@ -28,6 +28,24 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true)
   const [activeSub, setActiveSub] = useState<any>(null)
   const [unreadCount, setUnreadCount] = useState(0)
+  const [refreshing, setRefreshing] = useState(false)
+
+  const onRefresh = useCallback(async () => {
+    if (!profile) return
+    setRefreshing(true)
+    await Promise.all([
+      supabase.from('orders').select('id, order_number, status, total, created_at')
+        .eq('customer_id', profile.id).order('created_at', { ascending: false }).limit(3)
+        .then(({ data }) => setRecentOrders(data ?? [])),
+      supabase.from('subscriptions').select('*, plans(name, items_per_month)')
+        .eq('user_id', profile.id).eq('status', 'active').single()
+        .then(({ data }) => setActiveSub(data)),
+      supabase.from('notifications').select('id', { count: 'exact', head: true })
+        .eq('user_id', profile.id).is('read_at', null)
+        .then(({ count }) => setUnreadCount(count ?? 0)),
+    ])
+    setRefreshing(false)
+  }, [profile])
 
   const loadRecentOrders = useCallback(() => {
     if (!profile) return
@@ -85,7 +103,7 @@ export default function HomeScreen() {
   }
 
   return (
-    <ScrollView style={[s.container, { backgroundColor: colors.navy[900] }]} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
+    <ScrollView style={[s.container, { backgroundColor: colors.navy[900] }]} contentContainerStyle={s.content} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}>
       {/* Header */}
       <Animated.View entering={FadeInDown.duration(500)} style={s.header}>
         <View style={{ flex: 1 }}>
