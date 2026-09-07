@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Platform } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Platform, RefreshControl } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter, useFocusEffect } from 'expo-router'
 import DateTimePicker from '@react-native-community/datetimepicker'
@@ -57,6 +57,7 @@ export default function CartScreen() {
   const [distanceKm, setDistanceKm] = useState<number | null>(null)
   const [outOfZone, setOutOfZone] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
 
   const isEn = locale === 'en'
 
@@ -72,45 +73,53 @@ export default function CartScreen() {
     }
   }, [profile])
 
-  useEffect(() => {
-    Promise.all([
+  const loadCartData = useCallback(async () => {
+    const [allSettingsRes, settingsRes, addrRes, subRes] = await Promise.all([
       supabase.from('settings').select('key, value').in('key', ['delivery_fee', 'max_zone_km', 'price_per_km', 'base_delivery_km', 'laundry_lat', 'laundry_lng', 'min_order_items']),
       supabase.from('settings').select('key, value').in('key', ['instapay_number', 'wallet_number']),
       profile ? supabase.from('addresses').select('id, label, lat, lng, is_default, building, floor, apartment, landmark').eq('user_id', profile.id).order('is_default', { ascending: false }) : null,
       profile ? supabase.from('subscriptions').select('*, plans(name)').eq('user_id', profile.id).eq('status', 'active').single() : null,
-    ]).then(([allSettingsRes, settingsRes, addrRes, subRes]) => {
-      if (allSettingsRes?.data) {
-        const s: any = {}
-        allSettingsRes.data.forEach((r: any) => { s[r.key] = r.value })
-        const baseFee = Number(s.delivery_fee) || 0
-        setDeliveryFee(baseFee)
-        setDeliveryFeeBase(baseFee)
-        setMinOrderItems(Number(s.min_order_items) || 0)
-        setZoneSettings({
-          max_zone_km: Number(s.max_zone_km) || 30,
-          price_per_km: Number(s.price_per_km) || 2,
-          base_delivery_km: Number(s.base_delivery_km) || 5,
-          laundry_lat: Number(s.laundry_lat) || 30.0444,
-          laundry_lng: Number(s.laundry_lng) || 31.2357,
-        })
-      }
-      if (settingsRes?.data) {
-        const inst = settingsRes.data.find((s: any) => s.key === 'instapay_number')
-        const wal = settingsRes.data.find((s: any) => s.key === 'wallet_number')
-        setPaymentSettings({
-          instapay: typeof inst?.value === 'string' ? inst.value : String(inst?.value ?? ''),
-          wallet: typeof wal?.value === 'string' ? wal.value : String(wal?.value ?? ''),
-        })
-      }
-      if (addrRes?.data) {
-        setAddresses(addrRes.data)
-        const def = addrRes.data.find((a: any) => a.is_default) ?? addrRes.data[0]
-        if (def) setSelectedAddress(def)
-      }
-      if (subRes?.data) setActiveSub(subRes.data)
-      setLoading(false)
-    })
+    ])
+    if (allSettingsRes?.data) {
+      const s: any = {}
+      allSettingsRes.data.forEach((r: any) => { s[r.key] = r.value })
+      const baseFee = Number(s.delivery_fee) || 0
+      setDeliveryFee(baseFee)
+      setDeliveryFeeBase(baseFee)
+      setMinOrderItems(Number(s.min_order_items) || 0)
+      setZoneSettings({
+        max_zone_km: Number(s.max_zone_km) || 30,
+        price_per_km: Number(s.price_per_km) || 2,
+        base_delivery_km: Number(s.base_delivery_km) || 5,
+        laundry_lat: Number(s.laundry_lat) || 30.0444,
+        laundry_lng: Number(s.laundry_lng) || 31.2357,
+      })
+    }
+    if (settingsRes?.data) {
+      const inst = settingsRes.data.find((s: any) => s.key === 'instapay_number')
+      const wal = settingsRes.data.find((s: any) => s.key === 'wallet_number')
+      setPaymentSettings({
+        instapay: typeof inst?.value === 'string' ? inst.value : String(inst?.value ?? ''),
+        wallet: typeof wal?.value === 'string' ? wal.value : String(wal?.value ?? ''),
+      })
+    }
+    if (addrRes?.data) {
+      setAddresses(addrRes.data)
+      const def = addrRes.data.find((a: any) => a.is_default) ?? addrRes.data[0]
+      if (def) setSelectedAddress(def)
+    }
+    if (subRes?.data) setActiveSub(subRes.data)
   }, [profile])
+
+  useEffect(() => {
+    loadCartData().then(() => setLoading(false))
+  }, [profile])
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true)
+    await loadCartData()
+    setRefreshing(false)
+  }, [loadCartData])
 
   useFocusEffect(useCallback(() => { loadAddresses() }, [loadAddresses]))
 
@@ -292,7 +301,7 @@ export default function CartScreen() {
 
   return (
     <>
-      <ScrollView style={[s.scrollContainer, { backgroundColor: colors.navy[900] }]} contentContainerStyle={s.content}>
+      <ScrollView style={[s.scrollContainer, { backgroundColor: colors.navy[900] }]} contentContainerStyle={s.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}>
         <Text style={[s.title, { color: colors.text }]}>{isEn ? `My Cart (${totalItems} items)` : `سلتي (${totalItems} قطعة)`}</Text>
 
         {cart.map((item, i) => (

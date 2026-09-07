@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, RefreshControl } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withSequence, withTiming } from 'react-native-reanimated'
@@ -39,6 +39,7 @@ export default function NewOrderScreen() {
   const [dataLoading, setDataLoading] = useState(true)
   const [closed, setClosed] = useState(false)
   const [workHoursText, setWorkHoursText] = useState('')
+  const [refreshing, setRefreshing] = useState(false)
 
   const barScale = useSharedValue(1)
   const badgeBounce = useSharedValue(1)
@@ -54,50 +55,61 @@ export default function NewOrderScreen() {
   const barAnimStyle = useAnimatedStyle(() => ({ transform: [{ scale: barScale.value }] }))
   const badgeAnimStyle = useAnimatedStyle(() => ({ transform: [{ scale: badgeBounce.value }] }))
 
-  useEffect(() => {
-    Promise.all([
+  const loadData = useCallback(async () => {
+    const [pricesRes, catsRes, settingsRes] = await Promise.all([
       supabase.from('prices').select('id, item_type, service_type, price, category_id').eq('is_active', true),
       supabase.from('categories').select('id, name, icon, sort_order').eq('is_active', true).order('sort_order'),
       supabase.from('settings').select('key, value').in('key', ['open_hour', 'close_hour', 'working_hours_enabled']),
-    ]).then(([pricesRes, catsRes, settingsRes]) => {
-      setPrices(pricesRes.data ?? [])
-      const cats = catsRes.data ?? []
-      setCategories(cats)
-      if (cats.length > 0) setSelectedCategory(cats[0].id)
-      const sMap: Record<string, string> = {}
-      settingsRes.data?.forEach((s: any) => { sMap[s.key] = String(s.value) })
-      const enabled = sMap['working_hours_enabled'] !== 'false'
-      if (enabled && sMap['open_hour'] && sMap['close_hour']) {
-        const now = new Date()
-        const [oh, om] = sMap['open_hour'].split(':').map(Number)
-        const [ch, cm] = sMap['close_hour'].split(':').map(Number)
-        const nowMins = now.getHours() * 60 + now.getMinutes()
-        const openMins = oh * 60 + om
-        const closeMins = ch * 60 + cm
-        const isOpen = closeMins > openMins ? (nowMins >= openMins && nowMins < closeMins) : (nowMins >= openMins || nowMins < closeMins)
-        if (!isOpen) {
-          setClosed(true)
-          const fmtTime = (h: number, m: number) => {
-            const period = h >= 12 ? 'م' : 'ص'
-            const h12 = h > 12 ? h - 12 : h === 0 ? 12 : h
-            return `${h12}${m > 0 ? ':' + String(m).padStart(2, '0') : ''} ${period}`
-          }
-          setWorkHoursText(`${fmtTime(oh, om)} — ${fmtTime(ch, cm)}`)
+    ])
+    setPrices(pricesRes.data ?? [])
+    const cats = catsRes.data ?? []
+    setCategories(cats)
+    if (cats.length > 0 && !selectedCategory) setSelectedCategory(cats[0].id)
+    const sMap: Record<string, string> = {}
+    settingsRes.data?.forEach((s: any) => { sMap[s.key] = String(s.value) })
+    const enabled = sMap['working_hours_enabled'] !== 'false'
+    setClosed(false)
+    if (enabled && sMap['open_hour'] && sMap['close_hour']) {
+      const now = new Date()
+      const [oh, om] = sMap['open_hour'].split(':').map(Number)
+      const [ch, cm] = sMap['close_hour'].split(':').map(Number)
+      const nowMins = now.getHours() * 60 + now.getMinutes()
+      const openMins = oh * 60 + om
+      const closeMins = ch * 60 + cm
+      const isOpen = closeMins > openMins ? (nowMins >= openMins && nowMins < closeMins) : (nowMins >= openMins || nowMins < closeMins)
+      if (!isOpen) {
+        setClosed(true)
+        const fmtTime = (h: number, m: number) => {
+          const period = h >= 12 ? 'م' : 'ص'
+          const h12 = h > 12 ? h - 12 : h === 0 ? 12 : h
+          return `${h12}${m > 0 ? ':' + String(m).padStart(2, '0') : ''} ${period}`
         }
+        setWorkHoursText(`${fmtTime(oh, om)} — ${fmtTime(ch, cm)}`)
       }
-      setDataLoading(false)
-    })
-    if (profile) {
-      supabase.from('addresses').select('id, label, address, lat, lng, is_default').eq('user_id', profile.id).order('is_default', { ascending: false })
-        .then(({ data }) => {
-          setAddresses(data ?? [])
-          const def = data?.find((a: any) => a.is_default) ?? data?.[0]
-          if (def) setSelectedAddress(def)
-        })
-      supabase.from('subscriptions').select('*, plans(name)').eq('user_id', profile.id).eq('status', 'active').single()
-        .then(({ data }) => setActiveSub(data))
     }
+    if (profile) {
+      await Promise.all([
+        supabase.from('addresses').select('id, label, address, lat, lng, is_default').eq('user_id', profile.id).order('is_default', { ascending: false })
+          .then(({ data }) => {
+            setAddresses(data ?? [])
+            const def = data?.find((a: any) => a.is_default) ?? data?.[0]
+            if (def) setSelectedAddress(def)
+          }),
+        supabase.from('subscriptions').select('*, plans(name)').eq('user_id', profile.id).eq('status', 'active').single()
+          .then(({ data }) => setActiveSub(data)),
+      ])
+    }
+  }, [profile, selectedCategory])
+
+  useEffect(() => {
+    loadData().then(() => setDataLoading(false))
   }, [profile])
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true)
+    await loadData()
+    setRefreshing(false)
+  }, [loadData])
 
   const subRemaining = activeSub ? activeSub.items_limit - activeSub.items_used : null
 
@@ -141,7 +153,7 @@ export default function NewOrderScreen() {
 
   return (
     <>
-      <ScrollView style={[s.container, { backgroundColor: colors.navy[900] }]} contentContainerStyle={s.content}>
+      <ScrollView style={[s.container, { backgroundColor: colors.navy[900] }]} contentContainerStyle={s.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}>
         <Text style={[s.title, { color: colors.text }]}>{t('newOrder')}</Text>
 
         {closed && (
