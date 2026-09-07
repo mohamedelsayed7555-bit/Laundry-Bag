@@ -54,8 +54,10 @@ export default function HomeScreen() {
       .channel('home-orders')
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'orders',
-        filter: `customer_id=eq.${profile.id}`,
-      }, () => loadRecentOrders())
+      }, (payload: any) => {
+        const row = payload.new ?? payload.old
+        if (row?.customer_id === profile.id) loadRecentOrders()
+      })
       .subscribe((status, err) => {
         if (err) console.warn('home-orders realtime error:', err.message)
       })
