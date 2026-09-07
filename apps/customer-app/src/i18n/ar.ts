@@ -92,6 +92,7 @@ export default {
   statusDelivering: 'جاري التوصيل',
   statusDelivered: 'تم التوصيل',
   statusCancelled: 'ملغي',
+  statusRefunded: 'مسترد',
 
   // Profile
   myAccount: 'حسابي',

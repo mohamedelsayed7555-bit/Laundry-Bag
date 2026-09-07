@@ -92,6 +92,7 @@ export default {
   statusDelivering: 'Delivering',
   statusDelivered: 'Delivered',
   statusCancelled: 'Cancelled',
+  statusRefunded: 'Refunded',
 
   // Profile
   myAccount: 'My Account',
