@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Settings, Save, Plus, Trash2, UserCircle, Mail, Lock, Camera, Eye, EyeOff, Check, Users, CreditCard, Clock } from 'lucide-react'
+import { Settings, Save, Plus, Trash2, UserCircle, Mail, Lock, Camera, Eye, EyeOff, Check, Users, CreditCard, Clock, ShoppingBag } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Modal from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/Toast'
@@ -11,6 +11,7 @@ import PermissionGate from '@/components/ui/PermissionGate'
 
 const tabs = [
   { key: 'general', label: 'عام', icon: Settings },
+  { key: 'bag_offer', label: 'عرض الشنطة', icon: ShoppingBag },
   { key: 'subscriptions', label: 'الاشتراكات', icon: CreditCard },
   { key: 'users', label: 'المستخدمين', icon: Users },
   { key: 'profile', label: 'الملف الشخصي', icon: UserCircle },
@@ -31,6 +32,8 @@ export default function SettingsPage() {
   const [savingDiscounts, setSavingDiscounts] = useState(false)
   const [workHours, setWorkHours] = useState({ open: '08:00', close: '22:00', enabled: true })
   const [savingHours, setSavingHours] = useState(false)
+  const [bagOffer, setBagOffer] = useState({ enabled: true, daily_price: 500, original_price: 700, max_items: 15, title: 'شنطة Laundry Bag', subtitle: 'املأ الشنطة غسيل ومكوي بحد أقصى 15 قطعة', badge_text: 'الحق العرض' })
+  const [savingBag, setSavingBag] = useState(false)
   const { toast } = useToast()
 
   // Profile states
@@ -73,6 +76,8 @@ export default function SettingsPage() {
       biannual: db ? String(db.value) : '15',
       annual: da ? String(da.value) : '20',
     })
+    const bagS = data?.find(s => s.key === 'bag_offer')
+    if (bagS && typeof bagS.value === 'object') setBagOffer({ ...bagOffer, ...bagS.value })
     const oh = data?.find(s => s.key === 'open_hour')
     const ch = data?.find(s => s.key === 'close_hour')
     const whe = data?.find(s => s.key === 'working_hours_enabled')
@@ -167,6 +172,19 @@ export default function SettingsPage() {
     setSavingHours(false)
     loadSettings()
     toast('تم حفظ ساعات العمل')
+  }
+
+  async function handleSaveBagOffer() {
+    setSavingBag(true)
+    const existing = settings.find(s => s.key === 'bag_offer')
+    if (existing) {
+      await supabase.from('settings').update({ value: bagOffer }).eq('id', existing.id)
+    } else {
+      await supabase.from('settings').insert({ key: 'bag_offer', value: bagOffer, description: 'إعدادات عرض شنطة Laundry Bag اليومي' })
+    }
+    setSavingBag(false)
+    loadSettings()
+    toast('تم حفظ إعدادات عرض الشنطة')
   }
 
   async function deleteSetting(id: string) {
@@ -340,6 +358,90 @@ export default function SettingsPage() {
               {settings.filter(s => s.key !== 'org_name' && s.key !== 'org_phone').length === 0 && (
                 <p className="text-sm text-gray-400 text-center py-4">لا توجد إعدادات إضافية</p>
               )}
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Bag Offer Tab */}
+      {activeTab === 'bag_offer' && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 max-w-3xl">
+          <div className={sectionClass + ' p-6'}>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-emerald-50 rounded-xl"><ShoppingBag size={20} className="text-emerald-600" /></div>
+              <div>
+                <h3 className="font-semibold text-gray-800">عرض شنطة Laundry Bag</h3>
+                <p className="text-xs text-gray-400 mt-0.5">العرض اليومي اللي بيظهر للعملاء في الرئيسية</p>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div className="flex items-center gap-4 p-4 bg-surface-muted/50 rounded-xl">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-700">تفعيل العرض</p>
+                  <p className="text-xs text-gray-400">لو مطفي مش هيظهر للعملاء</p>
+                </div>
+                <button onClick={() => setBagOffer({ ...bagOffer, enabled: !bagOffer.enabled })}
+                  className={`relative w-12 h-7 rounded-full transition-colors ${bagOffer.enabled ? 'bg-primary-500' : 'bg-gray-300'}`}>
+                  <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow transition-all ${bagOffer.enabled ? 'left-[22px]' : 'left-0.5'}`} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5">عنوان العرض</label>
+                  <input type="text" value={bagOffer.title} onChange={e => setBagOffer({ ...bagOffer, title: e.target.value })} className={inputClass} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5">نص الزر / البادج</label>
+                  <input type="text" value={bagOffer.badge_text} onChange={e => setBagOffer({ ...bagOffer, badge_text: e.target.value })} className={inputClass} />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">الوصف</label>
+                <input type="text" value={bagOffer.subtitle} onChange={e => setBagOffer({ ...bagOffer, subtitle: e.target.value })} className={inputClass} />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5">السعر اليومي (ج.م)</label>
+                  <input type="number" min={0} value={bagOffer.daily_price} onChange={e => setBagOffer({ ...bagOffer, daily_price: +e.target.value })} className={inputClass} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5">السعر قبل الخصم (ج.م)</label>
+                  <input type="number" min={0} value={bagOffer.original_price} onChange={e => setBagOffer({ ...bagOffer, original_price: +e.target.value })} className={inputClass} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5">الحد الأقصى للقطع</label>
+                  <input type="number" min={1} value={bagOffer.max_items} onChange={e => setBagOffer({ ...bagOffer, max_items: +e.target.value })} className={inputClass} />
+                </div>
+              </div>
+
+              {/* Preview */}
+              <div className="mt-6 p-4 bg-gray-900 rounded-2xl">
+                <p className="text-[10px] text-gray-500 mb-3 uppercase tracking-wider">معاينة كما يظهر للعميل</p>
+                <div className="bg-gradient-to-l from-emerald-600 to-emerald-700 rounded-2xl p-5 flex items-center gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="bg-yellow-400 text-yellow-900 text-[10px] font-bold px-2 py-0.5 rounded-full">{bagOffer.badge_text}</span>
+                    </div>
+                    <p className="text-white font-bold text-lg">{bagOffer.title}</p>
+                    <p className="text-emerald-100 text-xs mt-1">{bagOffer.subtitle}</p>
+                    <div className="flex items-center gap-2 mt-3">
+                      <span className="text-white/50 line-through text-sm">{bagOffer.original_price} ج.م</span>
+                      <span className="text-white font-bold text-xl">{bagOffer.daily_price} ج.م</span>
+                      <span className="text-emerald-200 text-xs">/ يومياً</span>
+                    </div>
+                  </div>
+                  <span className="text-5xl">👜</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end mt-6">
+              <button onClick={handleSaveBagOffer} disabled={savingBag}
+                className="flex items-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:shadow-glow-green disabled:opacity-50 transition-all">
+                <Save size={14} /> {savingBag ? 'جاري الحفظ...' : 'حفظ إعدادات العرض'}
+              </button>
             </div>
           </div>
         </motion.div>

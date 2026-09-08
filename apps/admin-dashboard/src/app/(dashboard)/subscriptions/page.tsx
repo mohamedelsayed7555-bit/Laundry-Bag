@@ -10,6 +10,7 @@ import { Crown, Eye, Check, X, Plus, Edit2, Trash2 } from 'lucide-react'
 import { TableSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import PermissionGate from '@/components/ui/PermissionGate'
+import { useAuth } from '@/lib/auth-context'
 
 const statusVariant: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'neutral'> = {
   active: 'success',
@@ -58,6 +59,7 @@ export default function SubscriptionsPage() {
   const [customers, setCustomers] = useState<any[]>([])
   const [plans, setPlans] = useState<any[]>([])
   const { toast } = useToast()
+  const { hasPermission } = useAuth()
 
   useEffect(() => {
     supabase.rpc('expire_subscriptions').then(() => loadSubs())
@@ -283,7 +285,7 @@ export default function SubscriptionsPage() {
     { key: 'status', label: 'الحالة', render: (item: any) => <Badge variant={statusVariant[item.status] ?? 'neutral'}>{statusLabels[item.status] ?? item.status}</Badge> },
     { key: 'actions', label: '', render: (item: any) => (
       <div className="flex gap-1">
-        {item.status === 'pending' && (
+        {item.status === 'pending' && hasPermission('subscriptions.edit') && (
           <>
             <button onClick={() => activateSub(item)} className="p-1.5 hover:bg-green-50 rounded-lg transition-colors" title="تفعيل">
               <Check size={15} className="text-green-500" />
@@ -293,9 +295,11 @@ export default function SubscriptionsPage() {
             </button>
           </>
         )}
-        <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-blue-50 rounded-lg transition-colors" title="تعديل">
-          <Edit2 size={15} className="text-blue-500" />
-        </button>
+        {hasPermission('subscriptions.edit') && (
+          <button onClick={() => openEdit(item)} className="p-1.5 hover:bg-blue-50 rounded-lg transition-colors" title="تعديل">
+            <Edit2 size={15} className="text-blue-500" />
+          </button>
+        )}
         <button onClick={() => setDetail(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors" title="عرض">
           <Eye size={15} className="text-gray-400 hover:text-gray-600" />
         </button>
@@ -380,7 +384,7 @@ export default function SubscriptionsPage() {
   )
 
   return (
-    <PermissionGate permission="plans.manage">
+    <PermissionGate permission="subscriptions.view">
     <div className="space-y-5">
       <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
         <div>
@@ -392,10 +396,12 @@ export default function SubscriptionsPage() {
             {pendingCount > 0 && <span className="text-amber-500 font-semibold mr-2">• {pendingCount} في الانتظار</span>}
           </p>
         </div>
-        <button onClick={() => { setForm(emptyForm); setShowAdd(true) }}
-          className="flex items-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:shadow-glow-green transition-all duration-300">
-          <Plus size={16} /> اشتراك جديد
-        </button>
+        {hasPermission('subscriptions.create') && (
+          <button onClick={() => { setForm(emptyForm); setShowAdd(true) }}
+            className="flex items-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:shadow-glow-green transition-all duration-300">
+            <Plus size={16} /> اشتراك جديد
+          </button>
+        )}
       </motion.div>
 
       <div className="flex gap-1.5 overflow-x-auto pb-1">
@@ -476,7 +482,7 @@ export default function SubscriptionsPage() {
             )}
 
             <div className="flex gap-2 pt-2">
-              {detail.status === 'pending' && (
+              {detail.status === 'pending' && hasPermission('subscriptions.edit') && (
                 <>
                   <button onClick={() => activateSub(detail)}
                     className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-l from-green-500 to-green-600 text-white p-3 rounded-xl font-semibold text-sm hover:shadow-lg transition-all">
@@ -488,16 +494,18 @@ export default function SubscriptionsPage() {
                   </button>
                 </>
               )}
-              {detail.status === 'active' && (
+              {detail.status === 'active' && hasPermission('subscriptions.edit') && (
                 <button onClick={() => cancelSub(detail.id)}
                   className="px-4 py-3 border border-red-200 text-red-500 rounded-xl text-sm font-medium hover:bg-red-50 transition-colors">
                   إلغاء الاشتراك
                 </button>
               )}
-              <button onClick={() => deleteSub(detail.id)}
-                className="px-4 py-3 border border-red-200 text-red-500 rounded-xl text-sm font-medium hover:bg-red-50 transition-colors flex items-center gap-1">
-                <Trash2 size={14} /> حذف
-              </button>
+              {hasPermission('subscriptions.delete') && (
+                <button onClick={() => deleteSub(detail.id)}
+                  className="px-4 py-3 border border-red-200 text-red-500 rounded-xl text-sm font-medium hover:bg-red-50 transition-colors flex items-center gap-1">
+                  <Trash2 size={14} /> حذف
+                </button>
+              )}
             </div>
           </div>
         )}

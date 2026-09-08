@@ -10,6 +10,7 @@ import { motion } from 'framer-motion'
 import { useToast } from '@/components/ui/Toast'
 import Tooltip from '@/components/ui/Tooltip'
 import PermissionGate from '@/components/ui/PermissionGate'
+import { useAuth } from '@/lib/auth-context'
 
 export default function BranchesPage() {
   const [branches, setBranches] = useState<any[]>([])
@@ -19,6 +20,7 @@ export default function BranchesPage() {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ name: '', address: '', phone: '' })
   const { toast } = useToast()
+  const { hasPermission } = useAuth()
 
   useEffect(() => { loadBranches() }, [])
 
@@ -64,8 +66,8 @@ export default function BranchesPage() {
     { key: 'is_active', label: 'الحالة', render: (item: any) => <Badge variant={item.is_active ? 'success' : 'danger'}>{item.is_active ? 'نشط' : 'معطل'}</Badge> },
     { key: 'actions', label: '', render: (item: any) => (
       <div className="flex gap-1">
-        <Tooltip content="تعديل"><button onClick={() => openEdit(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Edit2 size={14} className="text-gray-500" /></button></Tooltip>
-        <Tooltip content={item.is_active ? 'تعطيل' : 'تفعيل'}><button onClick={() => toggleActive(item.id, item.is_active)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Power size={14} className={item.is_active ? 'text-red-400' : 'text-green-500'} /></button></Tooltip>
+        {hasPermission('branches.edit') && <Tooltip content="تعديل"><button onClick={() => openEdit(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Edit2 size={14} className="text-gray-500" /></button></Tooltip>}
+        {hasPermission('branches.edit') && <Tooltip content={item.is_active ? 'تعطيل' : 'تفعيل'}><button onClick={() => toggleActive(item.id, item.is_active)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Power size={14} className={item.is_active ? 'text-red-400' : 'text-green-500'} /></button></Tooltip>}
       </div>
     )},
   ]
@@ -91,17 +93,19 @@ export default function BranchesPage() {
   )
 
   return (
-    <PermissionGate permission="settings.view">
+    <PermissionGate permission="branches.view">
     <div className="space-y-6">
       <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><MapPin className="w-5 h-5 text-blue-500" /> إدارة الفروع</h2>
           <p className="text-sm text-gray-400 mt-0.5">{branches.length} فرع</p>
         </div>
-        <button onClick={() => { setForm({ name: '', address: '', phone: '' }); setShowAdd(true) }}
-          className="flex items-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:shadow-glow-green transition-all duration-300">
-          <Plus size={16} /> فرع جديد
-        </button>
+        {hasPermission('branches.create') && (
+          <button onClick={() => { setForm({ name: '', address: '', phone: '' }); setShowAdd(true) }}
+            className="flex items-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:shadow-glow-green transition-all duration-300">
+            <Plus size={16} /> فرع جديد
+          </button>
+        )}
       </motion.div>
 
       {loading ? <div className="flex items-center justify-center h-32"><div className="w-6 h-6 border-3 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>

@@ -21,7 +21,10 @@ export async function POST(request: NextRequest) {
   }
 
   const updates: Record<string, any> = {}
-  if (email) updates.email = email
+  if (email) {
+    updates.email = email
+    updates.email_confirm = false
+  }
   if (password) {
     if (password.length < 6) {
       return NextResponse.json({ error: 'كلمة المرور يجب أن تكون 6 أحرف على الأقل' }, { status: 400 })
@@ -45,9 +48,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 400 })
   }
 
-  if (email) {
-    await supabaseAdmin.from('users').update({ email }).eq('id', userId)
-  }
-
-  return NextResponse.json({ success: true })
+  return NextResponse.json({
+    success: true,
+    emailPending: !!email,
+  })
 }

@@ -212,6 +212,7 @@ export default function CartScreen() {
       notes: notes || null,
       status: isScheduled ? 'scheduled' : 'pending',
       payment_status: useSubscription ? 'confirmed' : 'pending',
+      order_type: useSubscription ? 'subscription' : 'regular',
       subscription_id: useSubscription ? activeSub.id : null,
       address_id: selectedAddress?.id || null,
       pickup_location: selectedAddress ? { lat: selectedAddress.lat, lng: selectedAddress.lng, label: selectedAddress.label } : null,

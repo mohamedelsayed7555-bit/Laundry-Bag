@@ -12,6 +12,7 @@ import StatCard from '@/components/ui/StatCard'
 import { useToast } from '@/components/ui/Toast'
 import Tooltip from '@/components/ui/Tooltip'
 import PermissionGate from '@/components/ui/PermissionGate'
+import { useAuth } from '@/lib/auth-context'
 
 export default function InventoryPage() {
   const [items, setItems] = useState<any[]>([])
@@ -21,6 +22,7 @@ export default function InventoryPage() {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ name: '', category: 'detergent', quantity: 0, unit: 'لتر', min_quantity: 5 })
   const { toast } = useToast()
+  const { hasPermission } = useAuth()
 
   useEffect(() => { loadItems() }, [])
 
@@ -71,7 +73,7 @@ export default function InventoryPage() {
         : <Badge variant="success">متوفر</Badge>
     )},
     { key: 'actions', label: '', render: (item: any) => (
-      <Tooltip content="تعديل"><button onClick={() => openEdit(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Edit2 size={14} className="text-gray-500" /></button></Tooltip>
+      hasPermission('inventory.edit') ? <Tooltip content="تعديل"><button onClick={() => openEdit(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Edit2 size={14} className="text-gray-500" /></button></Tooltip> : null
     )},
   ]
 
@@ -111,17 +113,19 @@ export default function InventoryPage() {
   )
 
   return (
-    <PermissionGate permission="settings.view">
+    <PermissionGate permission="inventory.view">
     <div className="space-y-6">
       <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Package className="w-5 h-5 text-cyan-500" /> المخزون</h2>
           <p className="text-sm text-gray-400 mt-0.5">إدارة المواد والمستلزمات</p>
         </div>
-        <button onClick={() => { setForm({ name: '', category: 'detergent', quantity: 0, unit: 'لتر', min_quantity: 5 }); setShowAdd(true) }}
-          className="flex items-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:shadow-glow-green transition-all duration-300">
-          <Plus size={16} /> صنف جديد
-        </button>
+        {hasPermission('inventory.create') && (
+          <button onClick={() => { setForm({ name: '', category: 'detergent', quantity: 0, unit: 'لتر', min_quantity: 5 }); setShowAdd(true) }}
+            className="flex items-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:shadow-glow-green transition-all duration-300">
+            <Plus size={16} /> صنف جديد
+          </button>
+        )}
       </motion.div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

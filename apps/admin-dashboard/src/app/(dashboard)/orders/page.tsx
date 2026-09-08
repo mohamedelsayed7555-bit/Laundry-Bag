@@ -20,6 +20,7 @@ import { PageSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import Tooltip from '@/components/ui/Tooltip'
 import PermissionGate from '@/components/ui/PermissionGate'
+import { useAuth } from '@/lib/auth-context'
 import { isValidEgyptianPhone } from '@/lib/utils'
 import { ORDER_STATUS_LABELS, SERVICE_TYPE_LABELS } from '@cleano/shared-types'
 import type { OrderStatus, ServiceType } from '@cleano/shared-types'
@@ -62,7 +63,9 @@ export default function OrdersPage() {
   const [datePreset, setDatePreset] = useState<'all' | 'today' | 'week' | 'month' | 'custom'>('all')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [typeFilter, setTypeFilter] = useState('all')
   const { toast } = useToast()
+  const { hasPermission } = useAuth()
   const PAGE_SIZE = 20
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -94,7 +97,7 @@ export default function OrdersPage() {
     return () => { supabase.removeChannel(ch); if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [])
 
-  useEffect(() => { loadOrders(); setSelected(new Set()) }, [page, statusFilter, payFilter, datePreset, dateFrom, dateTo])
+  useEffect(() => { loadOrders(); setSelected(new Set()) }, [page, statusFilter, payFilter, typeFilter, datePreset, dateFrom, dateTo])
 
   function getDateRange(): { from: string | null; to: string | null } {
     const now = new Date()
@@ -110,11 +113,12 @@ export default function OrdersPage() {
 
   async function loadOrders() {
     let query = supabase.from('orders')
-      .select('id, order_number, status, service_type, items_count, total, delivery_fee, cancellation_fee, cancellation_reason, notes, payment_status, payment_method, subscription_id, customer_id, driver_id, created_at, is_scheduled, scheduled_at, cancelled_at, customer:users!orders_customer_id_fkey(name, phone, customer_code), driver:users!orders_driver_id_fkey(name, phone), subscription:subscriptions(items_used, items_limit)', { count: 'exact' })
+      .select('id, order_number, status, service_type, items, items_count, total, delivery_fee, cancellation_fee, cancellation_reason, notes, payment_status, payment_method, subscription_id, customer_id, driver_id, order_type, created_at, is_scheduled, scheduled_at, cancelled_at, customer:users!orders_customer_id_fkey(name, phone, customer_code), driver:users!orders_driver_id_fkey(name, phone), subscription:subscriptions(items_used, items_limit)', { count: 'exact' })
       .order('created_at', { ascending: false })
 
     if (statusFilter !== 'all') query = query.eq('status', statusFilter)
     if (payFilter !== 'all') query = query.eq('payment_status', payFilter)
+    if (typeFilter !== 'all') query = query.eq('order_type', typeFilter)
 
     const { from, to } = getDateRange()
     if (from) query = query.gte('created_at', from)
@@ -331,7 +335,8 @@ export default function OrdersPage() {
     )},
     { key: 'type', label: 'النوع', render: (item: any) => {
       if (item.notes?.includes('[من المحل]')) return <Badge variant="warning">من المحل</Badge>
-      if (item.subscription_id) return <Badge variant="info">باقة</Badge>
+      if (item.order_type === 'bag_offer') return <Badge variant="success">👜 شنطة</Badge>
+      if (item.order_type === 'subscription' || item.subscription_id) return <Badge variant="info">باقة</Badge>
       return <Badge variant="neutral">عادي</Badge>
     }},
     { key: 'service_type', label: 'الخدمة', render: (item: any) => <span className="text-gray-600 text-xs">{SERVICE_TYPE_LABELS[item.service_type as ServiceType] ?? item.service_type}</span> },
@@ -381,10 +386,12 @@ export default function OrdersPage() {
           </h2>
           <p className="text-sm text-gray-400 mt-0.5">{totalCount} طلب</p>
         </div>
-        <button onClick={() => setShowAdd(true)}
-          className="flex items-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:shadow-glow-green transition-all duration-300">
-          <Plus size={16} /> طلب جديد
-        </button>
+        {hasPermission('orders.create') && (
+          <button onClick={() => setShowAdd(true)}
+            className="flex items-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:shadow-glow-green transition-all duration-300">
+            <Plus size={16} /> طلب جديد
+          </button>
+        )}
       </motion.div>
 
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className="space-y-3">
@@ -394,8 +401,8 @@ export default function OrdersPage() {
             <input type="text" placeholder="بحث برقم الطلب أو اسم العميل..." value={search} onChange={e => setSearch(e.target.value)}
               className="w-full pr-10 pl-4 py-2.5 bg-white border border-surface-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all" />
           </div>
-          {(statusFilter !== 'all' || payFilter !== 'all' || datePreset !== 'all') && (
-            <button onClick={() => { setStatusFilter('all'); setPayFilter('all'); setDatePreset('all'); setDateFrom(''); setDateTo(''); setPage(0) }}
+          {(statusFilter !== 'all' || payFilter !== 'all' || typeFilter !== 'all' || datePreset !== 'all') && (
+            <button onClick={() => { setStatusFilter('all'); setPayFilter('all'); setTypeFilter('all'); setDatePreset('all'); setDateFrom(''); setDateTo(''); setPage(0) }}
               className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-500 transition-colors whitespace-nowrap">
               <RotateCcw size={14} /> إعادة تعيين
             </button>
@@ -434,6 +441,14 @@ export default function OrdersPage() {
             {[{ key: 'all', label: 'كل الدفع' }, { key: 'pending', label: 'معلق' }, { key: 'confirmed', label: 'مدفوع' }, { key: 'failed', label: 'فشل' }].map(f => (
               <button key={f.key} onClick={() => { setPayFilter(f.key); setPage(0) }}
                 className={`px-3 py-2 rounded-lg text-[11px] font-medium transition-all whitespace-nowrap ${payFilter === f.key ? 'bg-navy-900 text-white shadow-premium-md' : 'bg-white text-gray-500 hover:bg-surface-muted border border-surface-border/60'}`}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-1.5">
+            {[{ key: 'all', label: 'كل الأنواع' }, { key: 'regular', label: 'عادي' }, { key: 'subscription', label: 'باقة' }, { key: 'bag_offer', label: '👜 شنطة' }].map(f => (
+              <button key={f.key} onClick={() => { setTypeFilter(f.key); setPage(0) }}
+                className={`px-3 py-2 rounded-lg text-[11px] font-medium transition-all whitespace-nowrap ${typeFilter === f.key ? 'bg-navy-900 text-white shadow-premium-md' : 'bg-white text-gray-500 hover:bg-surface-muted border border-surface-border/60'}`}>
                 {f.label}
               </button>
             ))}
@@ -514,6 +529,28 @@ export default function OrdersPage() {
               ))}
             </div>
 
+            {Array.isArray(detail.items) && detail.items.length > 0 && (
+              <div className="bg-surface-muted/30 rounded-xl p-3 border border-surface-border/60">
+                <p className="text-[10px] text-gray-400 mb-2 font-medium">القطع ({detail.items.length})</p>
+                <div className="space-y-1.5">
+                  {detail.items.map((item: any, i: number) => (
+                    <div key={i} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-800 font-medium">{item.name}</span>
+                        <span className="text-[10px] text-gray-400 bg-surface-muted px-1.5 py-0.5 rounded">
+                          {SERVICE_TYPE_LABELS[item.service_type as ServiceType] ?? item.service_type}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 text-gray-500">
+                        <span className="text-xs">×{item.quantity}</span>
+                        <span className="font-semibold text-gray-700">{(item.price * item.quantity).toFixed(2)} ج.م</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {detail.notes && (
               <div className="bg-amber-50/50 rounded-xl p-3 border border-amber-100">
                 <p className="text-[10px] text-amber-600 mb-0.5">ملاحظات</p>
@@ -557,7 +594,7 @@ export default function OrdersPage() {
               </div>
             )}
 
-            {['pending', 'assigned'].includes(detail.status) && !detail.notes?.includes('[من المحل]') && (
+            {['pending', 'assigned'].includes(detail.status) && !detail.notes?.includes('[من المحل]') && hasPermission('orders.assign') && (
               <div>
                 <p className="text-xs font-medium text-gray-500 mb-1.5">{detail.driver_id ? 'تغيير السائق' : 'تعيين سائق'}</p>
                 <select value={detail.driver_id ?? ''} onChange={e => { if (e.target.value && e.target.value !== detail.driver_id) assignDriver(detail.id, e.target.value) }} className={inputClass}>
@@ -600,14 +637,14 @@ export default function OrdersPage() {
                 const isWalkin = detail.notes?.includes('[من المحل]')
                 const flow = isWalkin ? walkinStatusFlow : statusFlow
                 const next = flow[detail.status]
-                return next ? (
+                return next && hasPermission('orders.edit') ? (
                   <button onClick={() => advanceStatus(detail)}
                     className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white p-3 rounded-xl font-semibold text-sm hover:shadow-glow-green transition-all">
                     <ArrowRight size={16} /> {ORDER_STATUS_LABELS[next as OrderStatus]}
                   </button>
                 ) : null
               })()}
-              {!['delivered', 'cancelled', 'refunded'].includes(detail.status) && (
+              {!['delivered', 'cancelled', 'refunded'].includes(detail.status) && hasPermission('orders.delete') && (
                 <button onClick={() => cancelOrder(detail.id)}
                   className="px-4 py-3 border border-red-200 text-red-500 rounded-xl text-sm font-medium hover:bg-red-50 transition-colors">
                   إلغاء

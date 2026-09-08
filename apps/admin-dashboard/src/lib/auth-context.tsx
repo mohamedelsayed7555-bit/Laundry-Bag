@@ -29,21 +29,59 @@ const AuthContext = createContext<AuthContextType>({
 
 const ALL_PERMISSIONS = [
   'orders.view', 'orders.create', 'orders.edit', 'orders.delete', 'orders.assign',
-  'customers.view', 'customers.edit',
-  'drivers.view', 'drivers.edit',
-  'finance.view', 'finance.edit',
-  'reports.view',
+  'customers.view', 'customers.create', 'customers.edit', 'customers.delete',
+  'drivers.view', 'drivers.create', 'drivers.edit', 'drivers.delete',
+  'prices.view', 'prices.create', 'prices.edit', 'prices.delete',
+  'plans.view', 'plans.create', 'plans.edit', 'plans.delete',
+  'subscriptions.view', 'subscriptions.create', 'subscriptions.edit', 'subscriptions.delete',
+  'branches.view', 'branches.create', 'branches.edit', 'branches.delete',
+  'inventory.view', 'inventory.create', 'inventory.edit', 'inventory.delete',
+  'finance.view', 'finance.edit', 'finance.export',
+  'reports.view', 'reports.export',
   'settings.view', 'settings.edit',
-  'users.manage',
-  'plans.manage',
+  'users.view', 'users.create', 'users.edit', 'users.delete',
+  'notifications.view', 'notifications.create', 'notifications.delete',
+  'ratings.view', 'ratings.delete',
   'audit.view',
 ]
+
+const PERMISSION_IMPLIES: Record<string, string[]> = {
+  'plans.manage': ['plans.view', 'plans.create', 'plans.edit', 'plans.delete', 'subscriptions.view', 'subscriptions.create', 'subscriptions.edit', 'subscriptions.delete'],
+  'users.manage': ['users.view', 'users.create', 'users.edit', 'users.delete'],
+  'finance.view': ['prices.view'],
+  'finance.edit': ['prices.edit', 'prices.create', 'prices.delete'],
+  'settings.view': ['branches.view', 'inventory.view'],
+  'settings.edit': ['branches.create', 'branches.edit', 'branches.delete', 'inventory.create', 'inventory.edit', 'inventory.delete'],
+  'customers.view': ['notifications.view'],
+  'customers.edit': ['notifications.create', 'notifications.delete'],
+  'orders.view': ['ratings.view'],
+  'orders.delete': ['ratings.delete'],
+}
 
 const ROLE_DEFAULTS: Record<string, string[]> = {
   super_admin: ALL_PERMISSIONS,
   admin: ALL_PERMISSIONS,
-  manager: ['orders.view', 'orders.create', 'orders.edit', 'orders.assign', 'customers.view', 'customers.edit', 'drivers.view', 'drivers.edit', 'reports.view', 'finance.view'],
-  accountant: ['orders.view', 'finance.view', 'finance.edit', 'reports.view', 'customers.view'],
+  manager: [
+    'orders.view', 'orders.create', 'orders.edit', 'orders.assign',
+    'customers.view', 'customers.create', 'customers.edit',
+    'drivers.view', 'drivers.create', 'drivers.edit',
+    'prices.view',
+    'branches.view',
+    'inventory.view',
+    'subscriptions.view',
+    'notifications.view', 'notifications.create',
+    'ratings.view',
+    'reports.view',
+    'finance.view',
+  ],
+  accountant: [
+    'orders.view',
+    'customers.view',
+    'finance.view', 'finance.edit', 'finance.export',
+    'prices.view', 'prices.edit',
+    'reports.view', 'reports.export',
+    'subscriptions.view',
+  ],
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -80,7 +118,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   function hasPermission(permission: string): boolean {
     if (!user) return false
     if (user.role === 'super_admin' || user.role === 'admin') return true
-    return user.permissions.includes(permission)
+    if (user.permissions.includes(permission)) return true
+    for (const [legacy, implied] of Object.entries(PERMISSION_IMPLIES)) {
+      if (user.permissions.includes(legacy) && implied.includes(permission)) return true
+    }
+    return false
   }
 
   return (
@@ -98,15 +140,15 @@ export const ROUTE_PERMISSIONS: Record<string, string> = {
   '/orders': 'orders.view',
   '/customers': 'customers.view',
   '/drivers': 'drivers.view',
-  '/branches': 'settings.view',
-  '/prices': 'finance.view',
-  '/plans': 'plans.manage',
-  '/subscriptions': 'plans.manage',
+  '/branches': 'branches.view',
+  '/prices': 'prices.view',
+  '/plans': 'plans.view',
+  '/subscriptions': 'subscriptions.view',
   '/finance': 'finance.view',
-  '/inventory': 'settings.view',
+  '/inventory': 'inventory.view',
   '/reports': 'reports.view',
   '/audit': 'audit.view',
   '/settings': 'settings.view',
-  '/notifications': 'customers.view',
-  '/ratings': 'orders.view',
+  '/notifications': 'notifications.view',
+  '/ratings': 'ratings.view',
 }

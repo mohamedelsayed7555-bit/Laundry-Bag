@@ -122,7 +122,7 @@ export default function RatingsPage() {
   const totalPages = Math.ceil(totalCount / PAGE_SIZE)
 
   return (
-    <PermissionGate permission="orders.view">
+    <PermissionGate permission="ratings.view">
       <div className="space-y-6">
         <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }}>
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">

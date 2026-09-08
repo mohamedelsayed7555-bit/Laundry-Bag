@@ -12,6 +12,7 @@ import { motion } from 'framer-motion'
 import { useToast } from '@/components/ui/Toast'
 import Tooltip from '@/components/ui/Tooltip'
 import PermissionGate from '@/components/ui/PermissionGate'
+import { useAuth } from '@/lib/auth-context'
 
 const serviceVariant: Record<string, 'success' | 'info' | 'purple' | 'warning'> = {
   wash: 'info', iron: 'warning', wash_iron: 'purple', dry_clean: 'success',
@@ -30,6 +31,7 @@ export default function PricesPage() {
   const [showAddCat, setShowAddCat] = useState(false)
   const [editCat, setEditCat] = useState<any>(null)
   const { toast } = useToast()
+  const { hasPermission } = useAuth()
 
   useEffect(() => { loadData() }, [])
 
@@ -111,8 +113,8 @@ export default function PricesPage() {
     { key: 'is_active', label: 'الحالة', render: (item: any) => <Badge variant={item.is_active ? 'success' : 'danger'}>{item.is_active ? 'نشط' : 'معطل'}</Badge> },
     { key: 'actions', label: '', render: (item: any) => (
       <div className="flex gap-1">
-        <Tooltip content="تعديل"><button onClick={() => openEdit(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Edit2 size={14} className="text-gray-400" /></button></Tooltip>
-        <Tooltip content={item.is_active ? 'تعطيل' : 'تفعيل'}><button onClick={() => toggleActive(item.id, item.is_active)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Power size={14} className={item.is_active ? 'text-red-400' : 'text-green-500'} /></button></Tooltip>
+        {hasPermission('prices.edit') && <Tooltip content="تعديل"><button onClick={() => openEdit(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Edit2 size={14} className="text-gray-400" /></button></Tooltip>}
+        {hasPermission('prices.edit') && <Tooltip content={item.is_active ? 'تعطيل' : 'تفعيل'}><button onClick={() => toggleActive(item.id, item.is_active)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Power size={14} className={item.is_active ? 'text-red-400' : 'text-green-500'} /></button></Tooltip>}
       </div>
     )},
   ]
@@ -125,8 +127,8 @@ export default function PricesPage() {
     { key: 'is_active', label: 'الحالة', render: (item: any) => <Badge variant={item.is_active ? 'success' : 'danger'}>{item.is_active ? 'نشط' : 'معطل'}</Badge> },
     { key: 'actions', label: '', render: (item: any) => (
       <div className="flex gap-1">
-        <Tooltip content="تعديل"><button onClick={() => { setCatForm({ name: item.name, icon: item.icon, sort_order: item.sort_order }); setEditCat(item) }} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Edit2 size={14} className="text-gray-400" /></button></Tooltip>
-        <Tooltip content={item.is_active ? 'تعطيل' : 'تفعيل'}><button onClick={() => toggleCatActive(item.id, item.is_active)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Power size={14} className={item.is_active ? 'text-red-400' : 'text-green-500'} /></button></Tooltip>
+        {hasPermission('prices.edit') && <Tooltip content="تعديل"><button onClick={() => { setCatForm({ name: item.name, icon: item.icon, sort_order: item.sort_order }); setEditCat(item) }} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Edit2 size={14} className="text-gray-400" /></button></Tooltip>}
+        {hasPermission('prices.edit') && <Tooltip content={item.is_active ? 'تعطيل' : 'تفعيل'}><button onClick={() => toggleCatActive(item.id, item.is_active)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Power size={14} className={item.is_active ? 'text-red-400' : 'text-green-500'} /></button></Tooltip>}
       </div>
     )},
   ]
@@ -183,17 +185,19 @@ export default function PricesPage() {
   )
 
   return (
-    <PermissionGate permission="finance.view">
+    <PermissionGate permission="prices.view">
     <div className="space-y-6">
       <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Tag className="w-5 h-5 text-accent-purple" /> الأسعار والتصنيفات</h2>
           <p className="text-sm text-gray-400 mt-0.5">{prices.length} سعر · {categories.length} تصنيف</p>
         </div>
-        <button onClick={() => tab === 'prices' ? (setForm({ item_type: '', service_type: 'wash', price: 0, category_id: '' }), setShowAdd(true)) : (setCatForm({ name: '', icon: '👕', sort_order: 0 }), setShowAddCat(true))}
-          className="flex items-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:shadow-glow-green transition-all duration-300">
-          <Plus size={16} /> {tab === 'prices' ? 'سعر جديد' : 'تصنيف جديد'}
-        </button>
+        {hasPermission('prices.create') && (
+          <button onClick={() => tab === 'prices' ? (setForm({ item_type: '', service_type: 'wash', price: 0, category_id: '' }), setShowAdd(true)) : (setCatForm({ name: '', icon: '👕', sort_order: 0 }), setShowAddCat(true))}
+            className="flex items-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:shadow-glow-green transition-all duration-300">
+            <Plus size={16} /> {tab === 'prices' ? 'سعر جديد' : 'تصنيف جديد'}
+          </button>
+        )}
       </motion.div>
 
       {/* Tabs */}

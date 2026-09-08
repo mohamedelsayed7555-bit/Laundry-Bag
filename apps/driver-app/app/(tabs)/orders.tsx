@@ -66,7 +66,7 @@ export default function DriverOrdersScreen() {
     if (!profile) return
     const { data } = await supabase
       .from('orders')
-      .select('id, order_number, status, service_type, items_count, total, notes, payment_method, payment_status, pickup_location, delivery_location, created_at, is_scheduled, scheduled_at, rating_driver, rating_note, customer:users!orders_customer_id_fkey(name, phone, customer_code), address:addresses(label, building, floor, apartment, landmark, lat, lng)')
+      .select('id, order_number, status, service_type, items_count, total, notes, payment_method, payment_status, order_type, pickup_location, delivery_location, created_at, is_scheduled, scheduled_at, rating_driver, rating_note, customer:users!orders_customer_id_fkey(name, phone, customer_code), address:addresses(label, building, floor, apartment, landmark, lat, lng)')
       .eq('driver_id', profile.id)
       .not('status', 'in', '("scheduled","cancelled","refunded")')
       .order('created_at', { ascending: false })
@@ -194,7 +194,14 @@ export default function DriverOrdersScreen() {
       <Animated.View entering={FadeInRight.duration(400).delay(index * 80)}>
         <View style={[s.orderCard, item.status !== 'delivered' && { borderColor: status.color + '40' }]}>
           <View style={s.orderHeader}>
-            <Text style={s.orderNumber}>{item.order_number}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={s.orderNumber}>{item.order_number}</Text>
+              {item.order_type === 'bag_offer' && (
+                <View style={{ backgroundColor: '#05966920', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 }}>
+                  <Text style={{ fontSize: 10, color: '#059669', fontWeight: '700' }}>👜 شنطة</Text>
+                </View>
+              )}
+            </View>
             <View style={[s.statusBadge, { backgroundColor: status.color + '20' }]}>
               <Text style={{ fontSize: 12 }}>{status.icon}</Text>
               <Text style={[s.statusText, { color: status.color }]}>{status.label}</Text>

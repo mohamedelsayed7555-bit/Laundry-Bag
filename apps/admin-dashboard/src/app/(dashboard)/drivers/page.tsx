@@ -12,6 +12,7 @@ import { TableSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import Tooltip from '@/components/ui/Tooltip'
 import PermissionGate from '@/components/ui/PermissionGate'
+import { useAuth } from '@/lib/auth-context'
 import { isValidEgyptianPhone, isValidEmail } from '@/lib/utils'
 
 const PAGE_SIZE = 20
@@ -29,6 +30,7 @@ export default function DriversPage() {
   const [totalCount, setTotalCount] = useState(0)
   const [newCredentials, setNewCredentials] = useState<{ email: string; password: string } | null>(null)
   const { toast } = useToast()
+  const { hasPermission } = useAuth()
 
   useEffect(() => { loadDrivers() }, [page, search])
 
@@ -122,8 +124,8 @@ export default function DriversPage() {
     { key: 'actions', label: '', render: (item: any) => (
       <div className="flex gap-1">
         <Tooltip content="عرض التفاصيل"><button onClick={() => setDetailItem(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Eye size={14} className="text-gray-400" /></button></Tooltip>
-        <Tooltip content="تعديل"><button onClick={() => openEdit(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Edit2 size={14} className="text-gray-400" /></button></Tooltip>
-        <Tooltip content={item.is_active ? 'تعطيل' : 'تفعيل'}><button onClick={() => toggleActive(item.id, item.is_active)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Power size={14} className={item.is_active ? 'text-red-400' : 'text-green-500'} /></button></Tooltip>
+        {hasPermission('drivers.edit') && <Tooltip content="تعديل"><button onClick={() => openEdit(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Edit2 size={14} className="text-gray-400" /></button></Tooltip>}
+        {hasPermission('drivers.edit') && <Tooltip content={item.is_active ? 'تعطيل' : 'تفعيل'}><button onClick={() => toggleActive(item.id, item.is_active)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Power size={14} className={item.is_active ? 'text-red-400' : 'text-green-500'} /></button></Tooltip>}
       </div>
     )},
   ]
@@ -165,10 +167,12 @@ export default function DriversPage() {
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Truck className="w-5 h-5 text-orange-500" /> إدارة السائقين</h2>
           <p className="text-sm text-gray-400 mt-0.5">{totalCount} سائق</p>
         </div>
-        <button onClick={() => { setForm({ name: '', phone: '', email: '', vehicle_type: 'motorcycle', vehicle_number: '' }); setShowAdd(true) }}
-          className="flex items-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:shadow-glow-green transition-all duration-300">
-          <Plus size={16} /> سائق جديد
-        </button>
+        {hasPermission('drivers.create') && (
+          <button onClick={() => { setForm({ name: '', phone: '', email: '', vehicle_type: 'motorcycle', vehicle_number: '' }); setShowAdd(true) }}
+            className="flex items-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:shadow-glow-green transition-all duration-300">
+            <Plus size={16} /> سائق جديد
+          </button>
+        )}
       </motion.div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

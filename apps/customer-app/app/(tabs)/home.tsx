@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, RefreshControl } from 'react-native'
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, RefreshControl, Modal, TextInput } from 'react-native'
 import { useRouter } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated'
@@ -29,6 +29,19 @@ export default function HomeScreen() {
   const [activeSub, setActiveSub] = useState<any>(null)
   const [unreadCount, setUnreadCount] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
+  const [bagOffer, setBagOffer] = useState<any>(null)
+  const [ratingOrder, setRatingOrder] = useState<any>(null)
+  const [ratingService, setRatingService] = useState(0)
+  const [ratingDriver, setRatingDriver] = useState(0)
+  const [ratingNote, setRatingNote] = useState('')
+  const [ratingSubmitting, setRatingSubmitting] = useState(false)
+  const shownRatingIds = useRef(new Set<string>())
+
+  const loadBagOffer = useCallback(async () => {
+    const { data } = await supabase.from('settings').select('value').eq('key', 'bag_offer').single()
+    if (data?.value && typeof data.value === 'object' && (data.value as any).enabled) setBagOffer(data.value)
+    else setBagOffer(null)
+  }, [])
 
   const onRefresh = useCallback(async () => {
     if (!profile) return
@@ -43,9 +56,10 @@ export default function HomeScreen() {
       supabase.from('notifications').select('id', { count: 'exact', head: true })
         .eq('user_id', profile.id).is('read_at', null)
         .then(({ count }) => setUnreadCount(count ?? 0)),
+      loadBagOffer(),
     ])
     setRefreshing(false)
-  }, [profile])
+  }, [profile, loadBagOffer])
 
   const loadRecentOrders = useCallback(() => {
     if (!profile) return
@@ -56,9 +70,50 @@ export default function HomeScreen() {
       .then(({ data }) => { setRecentOrders(data ?? []); setLoading(false) })
   }, [profile])
 
+  const checkUnratedOrder = useCallback(async () => {
+    if (!profile) return
+    const { data } = await supabase.from('orders')
+      .select('id, order_number, driver_id')
+      .eq('customer_id', profile.id)
+      .eq('status', 'delivered')
+      .is('rated_at', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+    if (data && !shownRatingIds.current.has(data.id)) {
+      shownRatingIds.current.add(data.id)
+      setRatingOrder(data)
+    }
+  }, [profile])
+
+  async function handleSubmitRating() {
+    if (!ratingOrder || ratingService === 0) return
+    setRatingSubmitting(true)
+    await supabase.from('orders').update({
+      rating_service: ratingService,
+      rating_driver: ratingDriver || null,
+      rating_note: ratingNote || null,
+      rated_at: new Date().toISOString(),
+    }).eq('id', ratingOrder.id)
+    setRatingSubmitting(false)
+    setRatingOrder(null)
+    setRatingService(0)
+    setRatingDriver(0)
+    setRatingNote('')
+  }
+
+  function dismissRating() {
+    setRatingOrder(null)
+    setRatingService(0)
+    setRatingDriver(0)
+    setRatingNote('')
+  }
+
   useEffect(() => {
     if (!profile) { setLoading(false); return }
     loadRecentOrders()
+    checkUnratedOrder()
+    loadBagOffer()
 
     supabase.from('subscriptions').select('*, plans(name, items_per_month)')
       .eq('user_id', profile.id).eq('status', 'active').single()
@@ -74,14 +129,23 @@ export default function HomeScreen() {
         event: '*', schema: 'public', table: 'orders',
       }, (payload: any) => {
         const row = payload.new ?? payload.old
-        if (row?.customer_id === profile.id) loadRecentOrders()
+        if (row?.customer_id === profile.id) {
+          loadRecentOrders()
+          if (payload.new?.status === 'delivered' && !payload.new?.rated_at) {
+            const o = payload.new
+            if (!shownRatingIds.current.has(o.id)) {
+              shownRatingIds.current.add(o.id)
+              setRatingOrder({ id: o.id, order_number: o.order_number, driver_id: o.driver_id })
+            }
+          }
+        }
       })
       .subscribe((status, err) => {
         if (err) console.warn('home-orders realtime error:', err.message)
       })
 
     return () => { supabase.removeChannel(channel) }
-  }, [profile, loadRecentOrders])
+  }, [profile, loadRecentOrders, checkUnratedOrder, loadBagOffer])
 
   const greeting = () => {
     const h = new Date().getHours()
@@ -103,6 +167,7 @@ export default function HomeScreen() {
   }
 
   return (
+    <>
     <ScrollView style={[s.container, { backgroundColor: colors.navy[900] }]} contentContainerStyle={s.content} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}>
       {/* Header */}
       <Animated.View entering={FadeInDown.duration(500)} style={s.header}>
@@ -130,6 +195,45 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
       </Animated.View>
+
+      {/* Bag Offer Banner */}
+      {bagOffer && (
+        <Animated.View entering={FadeInDown.duration(600).delay(80)}>
+          <TouchableOpacity activeOpacity={0.9} onPress={() => router.push('/bag-order')}
+            style={[bo.card, { backgroundColor: colors.accent, borderColor: colors.accentLight }]}>
+            <LinearGradient
+              colors={['#059669', '#047857']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={bo.gradient}>
+              <View style={bo.badgeWrap}>
+                <View style={bo.badge}><Text style={bo.badgeText}>{bagOffer.badge_text}</Text></View>
+                {bagOffer.original_price > bagOffer.daily_price && (
+                  <View style={bo.discountBadge}>
+                    <Text style={bo.discountText}>-{Math.round((1 - bagOffer.daily_price / bagOffer.original_price) * 100)}%</Text>
+                  </View>
+                )}
+              </View>
+              <View style={bo.row}>
+                <View style={{ flex: 1 }}>
+                  <Text style={bo.title}>{bagOffer.title}</Text>
+                  <Text style={bo.subtitle}>{bagOffer.subtitle}</Text>
+                  <View style={bo.priceRow}>
+                    {bagOffer.original_price > bagOffer.daily_price && (
+                      <Text style={bo.oldPrice}>{bagOffer.original_price} ج.م</Text>
+                    )}
+                    <Text style={bo.price}>{bagOffer.daily_price} ج.م</Text>
+                    <Text style={bo.perDay}>/ يومياً</Text>
+                  </View>
+                </View>
+                <Text style={bo.emoji}>👜</Text>
+              </View>
+              <View style={bo.cta}>
+                <Text style={bo.ctaText}>اطلب الآن</Text>
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
 
       {/* Hero CTA */}
       <Animated.View entering={FadeInDown.duration(500).delay(100)}>
@@ -251,6 +355,61 @@ export default function HomeScreen() {
 
       <View style={{ height: 100 }} />
     </ScrollView>
+
+    <Modal visible={!!ratingOrder} transparent animationType="slide" onRequestClose={dismissRating}>
+      <View style={rs.overlay}>
+        <View style={[rs.card, { backgroundColor: colors.navy[800], borderColor: colors.navy[700] }]}>
+          <Text style={[rs.title, { color: colors.text }]}>⭐ قيّم طلبك</Text>
+          <Text style={[rs.subtitle, { color: colors.navy[300] }]}>طلب {ratingOrder?.order_number}</Text>
+
+          <Text style={[rs.label, { color: colors.navy[100] }]}>تقييم الخدمة</Text>
+          <View style={rs.starsRow}>
+            {[1, 2, 3, 4, 5].map(n => (
+              <TouchableOpacity key={n} onPress={() => setRatingService(n)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
+                <Text style={[rs.star, n <= ratingService && rs.starActive]}>{n <= ratingService ? '⭐' : '☆'}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {ratingOrder?.driver_id && (
+            <>
+              <Text style={[rs.label, { color: colors.navy[100] }]}>تقييم السائق</Text>
+              <View style={rs.starsRow}>
+                {[1, 2, 3, 4, 5].map(n => (
+                  <TouchableOpacity key={n} onPress={() => setRatingDriver(n)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
+                    <Text style={[rs.star, n <= ratingDriver && rs.starActive]}>{n <= ratingDriver ? '⭐' : '☆'}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          )}
+
+          <TextInput
+            style={[rs.input, { backgroundColor: colors.navy[700], color: colors.text, borderColor: colors.navy[600] }]}
+            placeholder="ملاحظاتك (اختياري)..."
+            placeholderTextColor={colors.navy[400]}
+            value={ratingNote}
+            onChangeText={setRatingNote}
+            multiline
+            textAlign="right"
+          />
+
+          <View style={rs.actions}>
+            <TouchableOpacity style={[rs.cancelBtn, { borderColor: colors.navy[500] }]} onPress={dismissRating}>
+              <Text style={[rs.cancelText, { color: colors.navy[200] }]}>لاحقاً</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[rs.submitBtn, { backgroundColor: colors.accent, opacity: ratingService === 0 || ratingSubmitting ? 0.5 : 1 }]}
+              onPress={handleSubmitRating}
+              disabled={ratingService === 0 || ratingSubmitting}
+            >
+              <Text style={[rs.submitText, { color: colors.text }]}>{ratingSubmitting ? 'جاري الإرسال...' : 'إرسال التقييم'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+    </>
   )
 }
 
@@ -354,4 +513,41 @@ const s = StyleSheet.create({
   statusText: { fontSize: 10, fontWeight: '700' },
   orderDate: { fontSize: 11 },
   orderTotal: { fontSize: 15, fontWeight: '800' },
+})
+
+const bo = StyleSheet.create({
+  card: { borderRadius: 24, marginBottom: 16, overflow: 'hidden', shadowColor: '#059669', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 16, elevation: 12 },
+  gradient: { padding: 20, borderRadius: 24 },
+  badgeWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  badge: { backgroundColor: '#fbbf24', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20 },
+  badgeText: { color: '#78350f', fontSize: 11, fontWeight: '800' },
+  discountBadge: { backgroundColor: '#ef4444', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+  discountText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  row: { flexDirection: 'row', alignItems: 'center' },
+  title: { color: '#fff', fontSize: 20, fontWeight: '800', marginBottom: 4 },
+  subtitle: { color: 'rgba(255,255,255,0.75)', fontSize: 12, marginBottom: 12, lineHeight: 18 },
+  priceRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  oldPrice: { color: 'rgba(255,255,255,0.45)', fontSize: 14, textDecorationLine: 'line-through' },
+  price: { color: '#fff', fontSize: 24, fontWeight: '900' },
+  perDay: { color: 'rgba(255,255,255,0.6)', fontSize: 12 },
+  emoji: { fontSize: 52, marginLeft: 8 },
+  cta: { backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'flex-start', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 14, marginTop: 14 },
+  ctaText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+})
+
+const rs = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  card: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40, borderWidth: 1, borderBottomWidth: 0 },
+  title: { fontSize: 20, fontWeight: '800', textAlign: 'center', marginBottom: 4 },
+  subtitle: { fontSize: 13, textAlign: 'center', marginBottom: 20 },
+  label: { fontSize: 14, marginBottom: 8, marginTop: 8 },
+  starsRow: { flexDirection: 'row', gap: 10, marginBottom: 8 },
+  star: { fontSize: 30, color: '#555' },
+  starActive: { color: '#f59e0b' },
+  input: { borderRadius: 14, padding: 14, fontSize: 14, minHeight: 60, marginTop: 12, borderWidth: 1 },
+  actions: { flexDirection: 'row', gap: 12, marginTop: 20 },
+  cancelBtn: { flex: 1, borderWidth: 1.5, borderRadius: 14, padding: 14, alignItems: 'center' },
+  cancelText: { fontSize: 14, fontWeight: '600' },
+  submitBtn: { flex: 2, borderRadius: 14, padding: 14, alignItems: 'center' },
+  submitText: { fontSize: 14, fontWeight: '700' },
 })

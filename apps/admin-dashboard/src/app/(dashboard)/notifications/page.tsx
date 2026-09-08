@@ -30,7 +30,7 @@ export default function NotificationsPage() {
   const [showWaList, setShowWaList] = useState(false)
   const [loadingWa, setLoadingWa] = useState(false)
   const { toast } = useToast()
-  const { user: profile } = useAuth()
+  const { user: profile, hasPermission } = useAuth()
 
   useEffect(() => { loadHistory() }, [])
   useEffect(() => { loadRecipientCount() }, [target])
@@ -248,7 +248,7 @@ export default function NotificationsPage() {
   const inputClass = 'w-full px-4 py-3 bg-white border border-surface-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 transition-all text-right'
 
   return (
-    <PermissionGate permission="customers.view">
+    <PermissionGate permission="notifications.view">
       <div className="space-y-6">
         <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }}>
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
@@ -326,23 +326,25 @@ export default function NotificationsPage() {
           </div>
 
           {/* Send */}
-          <button
-            onClick={handleSend}
-            disabled={sending || !title.trim() || !body.trim()}
-            className="flex items-center justify-center gap-2 w-full bg-primary-500 hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-xl transition-all shadow-premium-md"
-          >
-            {sending ? (
-              <>
-                <Loader2 size={16} className="animate-spin" />
-                جاري الإرسال...
-              </>
-            ) : (
-              <>
-                <Send size={16} />
-                إرسال الإشعار
-              </>
-            )}
-          </button>
+          {hasPermission('notifications.create') && (
+            <button
+              onClick={handleSend}
+              disabled={sending || !title.trim() || !body.trim()}
+              className="flex items-center justify-center gap-2 w-full bg-primary-500 hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-xl transition-all shadow-premium-md"
+            >
+              {sending ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  جاري الإرسال...
+                </>
+              ) : (
+                <>
+                  <Send size={16} />
+                  إرسال الإشعار
+                </>
+              )}
+            </button>
+          )}
         </motion.div>
 
         {/* WhatsApp Section */}

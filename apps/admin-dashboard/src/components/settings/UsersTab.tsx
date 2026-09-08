@@ -40,24 +40,76 @@ const availablePermissions = [
   { key: 'orders.delete', label: 'حذف الطلبات' },
   { key: 'orders.assign', label: 'تعيين سائقين' },
   { key: 'customers.view', label: 'عرض العملاء' },
+  { key: 'customers.create', label: 'إضافة عملاء' },
   { key: 'customers.edit', label: 'تعديل العملاء' },
+  { key: 'customers.delete', label: 'حذف العملاء' },
   { key: 'drivers.view', label: 'عرض السائقين' },
+  { key: 'drivers.create', label: 'إضافة سائقين' },
   { key: 'drivers.edit', label: 'تعديل السائقين' },
+  { key: 'drivers.delete', label: 'حذف السائقين' },
+  { key: 'prices.view', label: 'عرض الأسعار' },
+  { key: 'prices.create', label: 'إضافة أسعار' },
+  { key: 'prices.edit', label: 'تعديل الأسعار' },
+  { key: 'prices.delete', label: 'حذف الأسعار' },
+  { key: 'plans.view', label: 'عرض الباقات' },
+  { key: 'plans.create', label: 'إنشاء باقات' },
+  { key: 'plans.edit', label: 'تعديل الباقات' },
+  { key: 'plans.delete', label: 'حذف الباقات' },
+  { key: 'subscriptions.view', label: 'عرض الاشتراكات' },
+  { key: 'subscriptions.create', label: 'إنشاء اشتراكات' },
+  { key: 'subscriptions.edit', label: 'تعديل الاشتراكات' },
+  { key: 'subscriptions.delete', label: 'حذف الاشتراكات' },
+  { key: 'branches.view', label: 'عرض الفروع' },
+  { key: 'branches.create', label: 'إضافة فروع' },
+  { key: 'branches.edit', label: 'تعديل الفروع' },
+  { key: 'branches.delete', label: 'حذف الفروع' },
+  { key: 'inventory.view', label: 'عرض المخزون' },
+  { key: 'inventory.create', label: 'إضافة للمخزون' },
+  { key: 'inventory.edit', label: 'تعديل المخزون' },
+  { key: 'inventory.delete', label: 'حذف من المخزون' },
   { key: 'finance.view', label: 'عرض المالية' },
   { key: 'finance.edit', label: 'تعديل المالية' },
+  { key: 'finance.export', label: 'تصدير المالية' },
   { key: 'reports.view', label: 'عرض التقارير' },
+  { key: 'reports.export', label: 'تصدير التقارير' },
   { key: 'settings.view', label: 'عرض الإعدادات' },
   { key: 'settings.edit', label: 'تعديل الإعدادات' },
-  { key: 'users.manage', label: 'إدارة المستخدمين' },
-  { key: 'plans.manage', label: 'إدارة الباقات' },
+  { key: 'users.view', label: 'عرض المستخدمين' },
+  { key: 'users.create', label: 'إضافة مستخدمين' },
+  { key: 'users.edit', label: 'تعديل المستخدمين' },
+  { key: 'users.delete', label: 'حذف المستخدمين' },
+  { key: 'notifications.view', label: 'عرض الإشعارات' },
+  { key: 'notifications.create', label: 'إرسال إشعارات' },
+  { key: 'notifications.delete', label: 'حذف الإشعارات' },
+  { key: 'ratings.view', label: 'عرض التقييمات' },
+  { key: 'ratings.delete', label: 'حذف التقييمات' },
   { key: 'audit.view', label: 'عرض سجل النشاطات' },
 ]
 
 const roleDefaults: Record<string, string[]> = {
   super_admin: availablePermissions.map(p => p.key),
   admin: availablePermissions.map(p => p.key),
-  manager: ['orders.view', 'orders.create', 'orders.edit', 'orders.assign', 'customers.view', 'customers.edit', 'drivers.view', 'drivers.edit', 'reports.view', 'finance.view'],
-  accountant: ['orders.view', 'finance.view', 'finance.edit', 'reports.view', 'customers.view'],
+  manager: [
+    'orders.view', 'orders.create', 'orders.edit', 'orders.assign',
+    'customers.view', 'customers.create', 'customers.edit',
+    'drivers.view', 'drivers.create', 'drivers.edit',
+    'prices.view',
+    'branches.view',
+    'inventory.view',
+    'subscriptions.view',
+    'notifications.view', 'notifications.create',
+    'ratings.view',
+    'reports.view',
+    'finance.view',
+  ],
+  accountant: [
+    'orders.view',
+    'customers.view',
+    'finance.view', 'finance.edit', 'finance.export',
+    'prices.view', 'prices.edit',
+    'reports.view', 'reports.export',
+    'subscriptions.view',
+  ],
   driver: ['orders.view'],
   customer: [],
 }
@@ -155,7 +207,7 @@ export default function UsersTab() {
         })
         const result = await res.json()
         if (result.error) { setSaving(false); toast(result.error, 'error'); return }
-        if (emailChanged) update.email = form.email
+        if (result.emailPending) toast('تم إرسال رابط تأكيد للبريد الجديد — الإيميل مش هيتغير غير لما المستخدم يأكد', 'warning')
       }
 
       const { error } = await supabase.from('users').update(update).eq('id', editUser.id)
@@ -234,8 +286,16 @@ export default function UsersTab() {
     { label: 'الطلبات', keys: availablePermissions.filter(p => p.key.startsWith('orders.')) },
     { label: 'العملاء', keys: availablePermissions.filter(p => p.key.startsWith('customers.')) },
     { label: 'السائقين', keys: availablePermissions.filter(p => p.key.startsWith('drivers.')) },
+    { label: 'الأسعار', keys: availablePermissions.filter(p => p.key.startsWith('prices.')) },
+    { label: 'الباقات', keys: availablePermissions.filter(p => p.key.startsWith('plans.')) },
+    { label: 'الاشتراكات', keys: availablePermissions.filter(p => p.key.startsWith('subscriptions.')) },
+    { label: 'الفروع', keys: availablePermissions.filter(p => p.key.startsWith('branches.')) },
+    { label: 'المخزون', keys: availablePermissions.filter(p => p.key.startsWith('inventory.')) },
     { label: 'المالية', keys: availablePermissions.filter(p => p.key.startsWith('finance.')) },
-    { label: 'النظام', keys: availablePermissions.filter(p => ['reports.view', 'settings.view', 'settings.edit', 'users.manage', 'plans.manage', 'audit.view'].includes(p.key)) },
+    { label: 'التقارير', keys: availablePermissions.filter(p => p.key.startsWith('reports.')) },
+    { label: 'الإشعارات', keys: availablePermissions.filter(p => p.key.startsWith('notifications.')) },
+    { label: 'التقييمات', keys: availablePermissions.filter(p => p.key.startsWith('ratings.')) },
+    { label: 'النظام', keys: availablePermissions.filter(p => p.key.startsWith('settings.') || p.key.startsWith('users.') || p.key === 'audit.view') },
   ]
 
   if (loading) return <div className="flex items-center justify-center h-40"><div className="w-7 h-7 border-[3px] border-primary-500 border-t-transparent rounded-full animate-spin" /></div>
@@ -322,7 +382,7 @@ export default function UsersTab() {
 
       {/* Add/Edit Modal */}
       <Modal open={showAdd || !!editUser} onClose={() => { setShowAdd(false); setEditUser(null) }} title={editUser ? 'تعديل مستخدم' : 'مستخدم جديد'}>
-        <form onSubmit={handleSave} className="space-y-4">
+        <form onSubmit={handleSave} className="space-y-4" autoComplete="off">
           <div className="flex justify-center">
             <label className="relative cursor-pointer group">
               <div className="w-20 h-20 rounded-2xl overflow-hidden bg-gradient-to-br from-primary-400 to-accent-purple/80 flex items-center justify-center text-white font-bold text-2xl">
@@ -344,13 +404,13 @@ export default function UsersTab() {
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">البريد الإلكتروني <span className="text-red-400">*</span></label>
-            <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required className={inputClass} />
+            <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required className={inputClass} autoComplete="new-email" />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">{editUser ? 'كلمة المرور الجديدة' : 'كلمة المرور'} {!editUser && <span className="text-red-400">*</span>}</label>
             <div className="relative">
               <input type={showPassword ? 'text' : 'password'} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} {...(!editUser ? { required: true } : {})} minLength={6}
-                className={inputClass + ' pl-10'} placeholder={editUser ? 'اتركها فارغة إن لم ترد التغيير' : '6 أحرف على الأقل'} />
+                className={inputClass + ' pl-10'} placeholder={editUser ? 'اتركها فارغة إن لم ترد التغيير' : '6 أحرف على الأقل'} autoComplete="new-password" />
               <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>

@@ -10,6 +10,7 @@ import { motion } from 'framer-motion'
 import { useToast } from '@/components/ui/Toast'
 import Tooltip from '@/components/ui/Tooltip'
 import PermissionGate from '@/components/ui/PermissionGate'
+import { useAuth } from '@/lib/auth-context'
 
 const tierConfig: Record<string, { icon: typeof Crown; color: string; gradient: string }> = {
   individual: { icon: Users, color: 'text-blue-500', gradient: 'from-blue-500 to-blue-600' },
@@ -54,6 +55,7 @@ export default function PlansPage() {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const { toast } = useToast()
+  const { hasPermission } = useAuth()
 
   useEffect(() => { loadData() }, [])
 
@@ -185,17 +187,19 @@ export default function PlansPage() {
   if (loading) return <PageSkeleton stats={0} tableRows={5} tableCols={4} />
 
   return (
-    <PermissionGate permission="plans.manage">
+    <PermissionGate permission="plans.view">
     <div className="space-y-6">
       <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Crown className="w-5 h-5 text-amber-500" /> الباقات والعروض</h2>
           <p className="text-sm text-gray-400 mt-0.5">إدارة باقات الاشتراك والعروض</p>
         </div>
-        <button onClick={() => { setForm(emptyForm); setShowAdd(true) }}
-          className="flex items-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:shadow-glow-green transition-all duration-300">
-          <Plus size={16} /> باقة جديدة
-        </button>
+        {hasPermission('plans.create') && (
+          <button onClick={() => { setForm(emptyForm); setShowAdd(true) }}
+            className="flex items-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:shadow-glow-green transition-all duration-300">
+            <Plus size={16} /> باقة جديدة
+          </button>
+        )}
       </motion.div>
 
       {/* Stats */}
@@ -253,16 +257,20 @@ export default function PlansPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Tooltip content="تعديل الباقة">
-                    <button onClick={() => openEdit(plan)} className="p-1.5 rounded-lg hover:bg-white/20 transition-colors">
-                      <Edit2 size={14} className="text-white/80" />
-                    </button>
-                  </Tooltip>
-                  <Tooltip content={plan.is_active ? 'تعطيل الباقة' : 'تفعيل الباقة'}>
-                    <button onClick={() => toggleActive(plan)} className="p-1.5 rounded-lg hover:bg-white/20 transition-colors">
-                      <Power size={14} className={plan.is_active ? 'text-white' : 'text-white/40'} />
-                    </button>
-                  </Tooltip>
+                  {hasPermission('plans.edit') && (
+                    <Tooltip content="تعديل الباقة">
+                      <button onClick={() => openEdit(plan)} className="p-1.5 rounded-lg hover:bg-white/20 transition-colors">
+                        <Edit2 size={14} className="text-white/80" />
+                      </button>
+                    </Tooltip>
+                  )}
+                  {hasPermission('plans.edit') && (
+                    <Tooltip content={plan.is_active ? 'تعطيل الباقة' : 'تفعيل الباقة'}>
+                      <button onClick={() => toggleActive(plan)} className="p-1.5 rounded-lg hover:bg-white/20 transition-colors">
+                        <Power size={14} className={plan.is_active ? 'text-white' : 'text-white/40'} />
+                      </button>
+                    </Tooltip>
+                  )}
                 </div>
               </div>
 
