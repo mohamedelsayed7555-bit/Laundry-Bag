@@ -140,6 +140,10 @@ export default function HomeScreen() {
           }
         }
       })
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'settings',
+        filter: 'key=eq.bag_offer',
+      }, () => loadBagOffer())
       .subscribe((status, err) => {
         if (err) console.warn('home-orders realtime error:', err.message)
       })
