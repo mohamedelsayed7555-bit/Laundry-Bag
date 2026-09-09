@@ -36,6 +36,7 @@ export interface User {
   role: UserRole
   tier: UserTier
   points: number
+  avatar_url?: string
   fcm_token?: string
   is_active: boolean
   created_at: string

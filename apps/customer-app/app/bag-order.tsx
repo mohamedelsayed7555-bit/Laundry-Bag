@@ -39,7 +39,9 @@ export default function BagOrderScreen() {
       supabase.from('addresses').select('id, label, lat, lng, is_default, building, floor, apartment, landmark').eq('user_id', profile.id).order('is_default', { ascending: false }),
       supabase.from('settings').select('key, value').in('key', ['instapay_number', 'wallet_number']),
     ])
-    if (bagRes.data?.value) setBagOffer(bagRes.data.value)
+    let bagVal = bagRes.data?.value
+    if (typeof bagVal === 'string') try { bagVal = JSON.parse(bagVal) } catch {}
+    if (bagVal) setBagOffer(bagVal)
     if (addrRes.data) {
       setAddresses(addrRes.data)
       setSelectedAddress(addrRes.data.find((a: any) => a.is_default) ?? addrRes.data[0] ?? null)

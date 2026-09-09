@@ -10,7 +10,7 @@ import { supabase } from '../../src/lib/supabase'
 function FloatingAddButton({ color, focused, primary, primaryDark }: { color: string; focused: boolean; primary: string; primaryDark: string }) {
   return (
     <View style={[tb.fabWrap, { backgroundColor: primary, shadowColor: primary }, focused && { backgroundColor: primaryDark, transform: [{ scale: 1.08 }] }]}>
-      <PlusCircle size={28} color="#fff" />
+      <PlusCircle size={28} stroke="#fff" />
     </View>
   )
 }

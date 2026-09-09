@@ -49,12 +49,11 @@ const prog = StyleSheet.create({
 
 type TabFilter = 'active' | 'completed'
 type DateRange = '7' | '14' | '30' | 'all'
-const dateRangeLabels: Record<DateRange, string> = { '7': 'آخر 7 أيام', '14': 'آخر 14 يوم', '30': 'آخر 30 يوم', all: 'الكل' }
-
 export default function OrdersScreen() {
   const { profile } = useAuth()
   const { colors } = useTheme()
   const { t } = useLanguage()
+  const dateRangeLabels: Record<DateRange, string> = { '7': t('last7Days'), '14': t('last14Days'), '30': t('last30Days'), all: t('allTime') }
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -198,7 +197,7 @@ export default function OrdersScreen() {
           onPress={() => setTab('active')}
         >
           <Text style={[s.tabText, { color: tab === 'active' ? '#fff' : colors.navy[300] }]}>
-            جاري العمل {activeCount > 0 ? `(${activeCount})` : ''}
+            {t('inProgress')} {activeCount > 0 ? `(${activeCount})` : ''}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -206,7 +205,7 @@ export default function OrdersScreen() {
           onPress={() => setTab('completed')}
         >
           <Text style={[s.tabText, { color: tab === 'completed' ? '#fff' : colors.navy[300] }]}>
-            مكتملة {completedCount > 0 ? `(${completedCount})` : ''}
+            {t('completedTab')} {completedCount > 0 ? `(${completedCount})` : ''}
           </Text>
         </TouchableOpacity>
       </View>
@@ -243,7 +242,7 @@ export default function OrdersScreen() {
         <Animated.View entering={FadeInDown.duration(500).delay(200)} style={[s.emptyCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
           <Text style={s.emptyIcon}>{tab === 'active' ? '✅' : '📦'}</Text>
           <Text style={[s.emptyText, { color: colors.navy[200] }]}>
-            {tab === 'active' ? 'لا توجد طلبات حالية' : 'لا توجد طلبات مكتملة'}
+            {tab === 'active' ? t('noActiveOrders') : t('noCompletedOrders')}
           </Text>
           {tab === 'active' && orders.length === 0 && (
             <>

@@ -150,7 +150,9 @@ export default function HomeScreen() {
 
   const loadBagOffer = useCallback(async () => {
     const { data } = await supabase.from('settings').select('value').eq('key', 'bag_offer').single()
-    if (data?.value && typeof data.value === 'object' && (data.value as any).enabled) setBagOffer(data.value)
+    let val = data?.value
+    if (typeof val === 'string') try { val = JSON.parse(val) } catch {}
+    if (val && typeof val === 'object' && val.enabled) setBagOffer(val)
     else setBagOffer(null)
   }, [])
 

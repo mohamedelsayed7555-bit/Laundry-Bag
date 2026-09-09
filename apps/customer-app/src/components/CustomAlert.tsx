@@ -116,6 +116,7 @@ type ShowAlertOptions = {
   message: string
   type?: AlertType
   buttons?: AlertButton[]
+  onConfirm?: () => void
 }
 
 export function useCustomAlert() {

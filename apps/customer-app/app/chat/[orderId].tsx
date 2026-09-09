@@ -3,12 +3,14 @@ import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, Keyboard
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { useTheme } from '../../src/contexts/ThemeContext'
+import { useLanguage } from '../../src/contexts/LanguageContext'
 import { supabase } from '../../src/lib/supabase'
 import { playNotificationSound, sendLocalNotification } from '../../src/hooks/useNotifications'
 
 type Message = {
   id: string
   sender_id: string
+  receiver_id: string
   body: string
   created_at: string
   read_at: string | null
@@ -20,11 +22,13 @@ export default function ChatScreen() {
   const { orderId } = useLocalSearchParams<{ orderId: string }>()
   const { profile } = useAuth()
   const { colors } = useTheme()
+  const { t, locale } = useLanguage()
+  const isEn = locale === 'en'
   const router = useRouter()
   const [messages, setMessages] = useState<Message[]>([])
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
-  const [otherName, setOtherName] = useState('السائق')
+  const [otherName, setOtherName] = useState(t('theDriver'))
   const [orderStatus, setOrderStatus] = useState<string | null>(null)
   const flatListRef = useRef<FlatList>(null)
 
@@ -79,7 +83,7 @@ export default function ChatScreen() {
         if (newMsg.sender_id !== profile.id) {
           playNotificationSound('order-update')
           Vibration.vibrate(300)
-          sendLocalNotification('رسالة جديدة', newMsg.body, 'messages')
+          sendLocalNotification(t('newMessage'), newMsg.body, 'messages')
         }
         if (newMsg.receiver_id === profile.id) {
           supabase.from('messages').update({ read_at: new Date().toISOString() }).eq('id', newMsg.id)
@@ -127,7 +131,7 @@ export default function ChatScreen() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           to: driverData.fcm_token,
-          title: `رسالة من ${profile.name ?? 'العميل'}`,
+          title: `${t('messageFrom')} ${profile.name ?? t('theCustomer')}`,
           body: msgBody.length > 100 ? msgBody.slice(0, 100) + '...' : msgBody,
           sound: 'default',
           data: { type: 'chat', order_id: orderId },
@@ -150,12 +154,12 @@ export default function ChatScreen() {
         </TouchableOpacity>
         <View style={s.headerInfo}>
           <Text style={[s.headerName, { color: colors.text }]}>{otherName}</Text>
-          <Text style={[s.headerSub, { color: colors.navy[300] }]}>طلب #{orderId?.slice(0, 8)}</Text>
+          <Text style={[s.headerSub, { color: colors.navy[300] }]}>{t('orderHash')}{orderId?.slice(0, 8)}</Text>
         </View>
         {chatClosed && (
           <View style={[s.closedBadge, { backgroundColor: colors.navy[700] }]}>
             <Text style={[s.closedBadgeText, { color: colors.navy[200] }]}>
-              {orderStatus === 'delivered' ? '✅ مكتمل' : '❌ ملغي'}
+              {orderStatus === 'delivered' ? t('chatCompleted') : t('chatCancelled')}
             </Text>
           </View>
         )}
@@ -172,14 +176,14 @@ export default function ChatScreen() {
           <View style={[s.bubble, isMe(item) ? [s.bubbleMe, { backgroundColor: colors.primary }] : [s.bubbleOther, { backgroundColor: colors.navy[700] }]]}>
             <Text style={[s.bubbleText, isMe(item) ? s.bubbleTextMe : { color: colors.navy[100] }]}>{item.body}</Text>
             <Text style={[s.bubbleTime, { color: colors.navy[300] }, isMe(item) && s.bubbleTimeMe]}>
-              {new Date(item.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
+              {new Date(item.created_at).toLocaleTimeString(isEn ? 'en-US' : 'ar-EG', { hour: '2-digit', minute: '2-digit' })}
               {isMe(item) && (item.read_at ? ' ✓✓' : ' ✓')}
             </Text>
           </View>
         )}
         ListEmptyComponent={
           <View style={s.emptyChat}>
-            <Text style={[s.emptyChatText, { color: colors.navy[400] }]}>💬 ابدأ المحادثة مع السائق</Text>
+            <Text style={[s.emptyChatText, { color: colors.navy[400] }]}>{t('startChat')}</Text>
           </View>
         }
       />
@@ -188,9 +192,7 @@ export default function ChatScreen() {
       {chatClosed && (
         <View style={[s.closedBanner, { backgroundColor: colors.navy[800], borderTopColor: colors.navy[700] }]}>
           <Text style={[s.closedBannerText, { color: colors.navy[300] }]}>
-            {orderStatus === 'delivered'
-              ? '🔒 تم إغلاق المحادثة — الطلب مكتمل'
-              : '🔒 تم إغلاق المحادثة — الطلب ملغي'}
+            {orderStatus === 'delivered' ? t('chatClosedDelivered') : t('chatClosedCancelled')}
           </Text>
         </View>
       )}
@@ -199,15 +201,15 @@ export default function ChatScreen() {
       {!chatClosed && (
         <View style={[s.inputRow, { backgroundColor: colors.navy[800], borderTopColor: colors.navy[700] }]}>
           <TouchableOpacity style={[s.sendBtn, { backgroundColor: colors.primary }, (!text.trim() || sending) && { opacity: 0.5 }]} onPress={handleSend} disabled={!text.trim() || sending}>
-            <Text style={s.sendText}>إرسال</Text>
+            <Text style={s.sendText}>{t('send')}</Text>
           </TouchableOpacity>
           <TextInput
             style={[s.input, { backgroundColor: colors.navy[700], color: colors.text }]}
             value={text}
             onChangeText={setText}
-            placeholder="اكتب رسالة..."
+            placeholder={t('typeMessage')}
             placeholderTextColor={colors.navy[400]}
-            textAlign="right"
+            textAlign={isEn ? 'left' : 'right'}
             multiline
             maxLength={500}
           />
