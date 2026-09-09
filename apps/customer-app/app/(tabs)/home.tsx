@@ -202,7 +202,7 @@ export default function HomeScreen() {
 
       {/* Bag Offer Banner */}
       {bagOffer && (
-        <Animated.View entering={FadeInDown.duration(600).delay(80)}>
+        <Animated.View entering={FadeInDown.duration(400)}>
           <TouchableOpacity activeOpacity={0.9} onPress={() => router.push('/bag-order')}
             style={[bo.card, { backgroundColor: colors.accent, borderColor: colors.accentLight }]}>
             <LinearGradient
@@ -240,7 +240,7 @@ export default function HomeScreen() {
       )}
 
       {/* Hero CTA */}
-      <Animated.View entering={FadeInDown.duration(500).delay(100)}>
+      <Animated.View entering={FadeInDown.duration(400).delay(50)}>
         <TouchableOpacity activeOpacity={0.85} onPress={() => router.push('/(tabs)/new-order')}>
           <LinearGradient
             colors={colors.gradientAccent as unknown as [string, string]}
@@ -262,7 +262,7 @@ export default function HomeScreen() {
 
       {/* Active Subscription Banner */}
       {activeSub && (
-        <Animated.View entering={FadeInDown.duration(500).delay(150)}>
+        <Animated.View entering={FadeInDown.duration(400).delay(80)}>
           <TouchableOpacity style={[s.subBanner, { backgroundColor: colors.goldGlow, borderColor: '#fbbf2430' }]} activeOpacity={0.8} onPress={() => router.push('/plans')}>
             <View style={s.subBannerIcon}><Text style={{ fontSize: 20 }}>👑</Text></View>
             <View style={{ flex: 1 }}>
@@ -278,7 +278,7 @@ export default function HomeScreen() {
 
       {/* Plans Banner (if no subscription) */}
       {!activeSub && (
-        <Animated.View entering={FadeInDown.duration(500).delay(150)}>
+        <Animated.View entering={FadeInDown.duration(400).delay(80)}>
           <TouchableOpacity style={[s.plansBanner, { backgroundColor: colors.warningGlow, borderColor: '#f59e0b30' }]} activeOpacity={0.85} onPress={() => router.push('/plans')}>
             <View style={s.plansBannerIconWrap}><Text style={{ fontSize: 22 }}>👑</Text></View>
             <View style={{ flex: 1 }}>
@@ -291,12 +291,12 @@ export default function HomeScreen() {
       )}
 
       {/* Services */}
-      <Animated.View entering={FadeInDown.duration(500).delay(250)}>
+      <Animated.View entering={FadeInDown.duration(400).delay(120)}>
         <Text style={[s.sectionTitle, { color: colors.text }]}>{t('services')}</Text>
       </Animated.View>
       <View style={s.servicesGrid}>
         {services.map((svc, i) => (
-          <Animated.View key={svc.key} entering={FadeInDown.duration(400).delay(300 + i * 60)} style={{ width: '47%' }}>
+          <Animated.View key={svc.key} entering={FadeInDown.duration(300).delay(150 + i * 40)} style={{ width: '47%' }}>
             <TouchableOpacity style={[s.serviceCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]} activeOpacity={0.7}
               onPress={() => router.push('/(tabs)/new-order')}>
               <View style={[s.serviceIconWrap, { backgroundColor: colors.navy[700] }]}>
@@ -310,7 +310,7 @@ export default function HomeScreen() {
       </View>
 
       {/* Recent Orders */}
-      <Animated.View entering={FadeInDown.duration(500).delay(550)}>
+      <Animated.View entering={FadeInDown.duration(400).delay(250)}>
         <View style={s.sectionHeader}>
           <Text style={[s.sectionTitle, { color: colors.text }]}>{t('recentOrders')}</Text>
           {recentOrders.length > 0 && (
@@ -327,7 +327,7 @@ export default function HomeScreen() {
           <SkeletonOrderCard />
         </>
       ) : recentOrders.length === 0 ? (
-        <Animated.View entering={FadeInDown.duration(400).delay(600)} style={[s.emptyCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
+        <Animated.View entering={FadeInDown.duration(300).delay(280)} style={[s.emptyCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
           <Text style={s.emptyIcon}>📋</Text>
           <Text style={[s.emptyText, { color: colors.navy[200] }]}>{t('noOrders')}</Text>
           <Text style={[s.emptySubText, { color: colors.navy[400] }]}>{t('startFirstOrder')}</Text>
@@ -337,7 +337,7 @@ export default function HomeScreen() {
           const sColor = statusColors[order.status] ?? '#f59e0b'
           const sIcon = statusIcons[order.status] ?? '⏳'
           return (
-            <Animated.View key={order.id} entering={FadeInRight.duration(400).delay(600 + i * 80)}>
+            <Animated.View key={order.id} entering={FadeInRight.duration(300).delay(280 + i * 60)}>
               <TouchableOpacity style={[s.orderCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]} onPress={() => router.push(`/order/${order.id}`)}>
                 <View style={s.orderRow}>
                   <Text style={[s.orderNumber, { color: colors.text }]}>{order.order_number}</Text>

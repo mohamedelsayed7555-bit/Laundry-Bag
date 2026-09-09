@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, TextInput } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import Animated, { FadeInDown } from 'react-native-reanimated'
@@ -7,6 +7,8 @@ import { useAuth } from '../src/contexts/AuthContext'
 import { useTheme } from '../src/contexts/ThemeContext'
 import { useCustomAlert } from '../src/components/CustomAlert'
 import { supabase } from '../src/lib/supabase'
+
+const SUPABASE_URL = 'https://kjqtrmedkvqfofwymoni.supabase.co'
 
 const PAYMENT_METHODS = [
   { key: 'cash', icon: '💵', label: 'كاش' },
@@ -25,19 +27,30 @@ export default function BagOrderScreen() {
   const [addresses, setAddresses] = useState<any[]>([])
   const [selectedAddress, setSelectedAddress] = useState<any>(null)
   const [paymentMethod, setPaymentMethod] = useState('cash')
+  const [walletPhone, setWalletPhone] = useState('')
+  const [paymentSettings, setPaymentSettings] = useState<{ instapay: string; wallet: string }>({ instapay: '', wallet: '' })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
   const loadData = useCallback(async () => {
     if (!profile) return
-    const [bagRes, addrRes] = await Promise.all([
+    const [bagRes, addrRes, settingsRes] = await Promise.all([
       supabase.from('settings').select('value').eq('key', 'bag_offer').single(),
       supabase.from('addresses').select('id, label, lat, lng, is_default, building, floor, apartment, landmark').eq('user_id', profile.id).order('is_default', { ascending: false }),
+      supabase.from('settings').select('key, value').in('key', ['instapay_number', 'wallet_number']),
     ])
     if (bagRes.data?.value) setBagOffer(bagRes.data.value)
     if (addrRes.data) {
       setAddresses(addrRes.data)
       setSelectedAddress(addrRes.data.find((a: any) => a.is_default) ?? addrRes.data[0] ?? null)
+    }
+    if (settingsRes.data) {
+      const inst = settingsRes.data.find((s: any) => s.key === 'instapay_number')
+      const wal = settingsRes.data.find((s: any) => s.key === 'wallet_number')
+      setPaymentSettings({
+        instapay: typeof inst?.value === 'string' ? inst.value : String(inst?.value ?? ''),
+        wallet: typeof wal?.value === 'string' ? wal.value : String(wal?.value ?? ''),
+      })
     }
     setLoading(false)
   }, [profile])
@@ -50,6 +63,14 @@ export default function BagOrderScreen() {
       showAlert({ title: 'تنبيه', message: 'اختار عنوان التوصيل', type: 'warning' })
       return
     }
+
+    const isOnlinePayment = paymentMethod === 'visa' || paymentMethod === 'e_wallet'
+
+    if (paymentMethod === 'e_wallet' && !walletPhone.match(/^01[0-9]{9}$/)) {
+      showAlert({ title: 'تنبيه', message: 'أدخل رقم موبايل المحفظة بشكل صحيح (01xxxxxxxxx)', type: 'warning' })
+      return
+    }
+
     setSaving(true)
     const { data, error } = await supabase.from('orders').insert({
       customer_id: profile.id,
@@ -68,9 +89,38 @@ export default function BagOrderScreen() {
       notes: `عرض الشنطة — حد أقصى ${bagOffer.max_items} قطعة`,
     }).select('id').single()
 
-    setSaving(false)
     if (error) {
+      setSaving(false)
       showAlert({ title: 'خطأ', message: error.message, type: 'error' })
+      return
+    }
+
+    if (isOnlinePayment && data) {
+      try {
+        const session = (await supabase.auth.getSession()).data.session
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/paymob-pay`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({
+            order_id: data.id,
+            payment_method: paymentMethod === 'visa' ? 'card' : 'wallet',
+            ...(paymentMethod === 'e_wallet' ? { wallet_phone: walletPhone } : {}),
+          }),
+        })
+        const paymentData = await res.json()
+        setSaving(false)
+        if (paymentData.iframe_url) {
+          router.push({ pathname: '/payment', params: { url: paymentData.iframe_url } })
+        } else if (paymentData.error) {
+          showAlert({ title: 'خطأ', message: paymentData.error, type: 'error' })
+        }
+      } catch (e) {
+        setSaving(false)
+        showAlert({ title: 'خطأ', message: 'حدث خطأ في الاتصال بخدمة الدفع', type: 'error' })
+      }
       return
     }
 
@@ -83,6 +133,7 @@ export default function BagOrderScreen() {
       sent_at: new Date().toISOString(),
     })
 
+    setSaving(false)
     showAlert({
       title: 'تم بنجاح! 🎉',
       message: `تم طلب شنطة Laundry Bag\nالحد الأقصى: ${bagOffer.max_items} قطعة\nالمبلغ: ${bagOffer.daily_price} ج.م`,
@@ -172,6 +223,31 @@ export default function BagOrderScreen() {
               </TouchableOpacity>
             ))}
           </View>
+
+          {/* E-Wallet phone input */}
+          {paymentMethod === 'e_wallet' && (
+            <View style={[s.paymentInfoCard, { backgroundColor: colors.cardBg, borderColor: colors.primary + '30' }]}>
+              <Text style={[s.paymentInfoTitle, { color: colors.text }]}>📱 رقم موبايل المحفظة</Text>
+              <TextInput
+                style={[s.walletInput, { color: colors.text, borderColor: colors.navy[600], backgroundColor: colors.navy[800] }]}
+                placeholder="01xxxxxxxxx"
+                placeholderTextColor={colors.navy[400]}
+                value={walletPhone}
+                onChangeText={setWalletPhone}
+                keyboardType="phone-pad"
+                maxLength={11}
+              />
+            </View>
+          )}
+
+          {/* InstaPay info */}
+          {paymentMethod === 'instapay' && paymentSettings.instapay && (
+            <View style={[s.paymentInfoCard, { backgroundColor: colors.cardBg, borderColor: colors.primary + '30' }]}>
+              <Text style={[s.paymentInfoTitle, { color: colors.text }]}>🏦 حوّل على رقم الإنستاباي</Text>
+              <Text style={[s.paymentInfoNumber, { color: colors.primary }]} selectable>{paymentSettings.instapay}</Text>
+              <Text style={[s.paymentInfoHint, { color: colors.navy[300] }]}>حوّل المبلغ وأرسل صورة الإيصال للسائق في المحادثة</Text>
+            </View>
+          )}
         </Animated.View>
 
         {/* Summary */}
@@ -232,6 +308,11 @@ const s = StyleSheet.create({
   addressLabel: { fontSize: 14, fontWeight: '600' },
   paymentCard: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, padding: 14, borderWidth: 1.5 },
   paymentLabel: { fontSize: 14, fontWeight: '600' },
+  paymentInfoCard: { borderRadius: 16, padding: 16, marginTop: 12, borderWidth: 1 },
+  paymentInfoTitle: { fontSize: 14, fontWeight: '700', marginBottom: 8 },
+  paymentInfoNumber: { fontSize: 22, fontWeight: 'bold', textAlign: 'center', marginBottom: 8, letterSpacing: 2 },
+  paymentInfoHint: { fontSize: 11, textAlign: 'center', marginTop: 8 },
+  walletInput: { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 18, textAlign: 'center', fontWeight: '700', letterSpacing: 2 },
   summaryCard: { borderRadius: 18, padding: 18, marginTop: 16, borderWidth: 1 },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6 },
   summaryDivider: { height: 1, marginVertical: 8 },
