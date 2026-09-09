@@ -189,4 +189,24 @@ export default {
   tabNewOrder: 'New Order',
   tabMessages: 'Messages',
   tabProfile: 'Profile',
+
+  // Categories (DB names → English)
+  'cat:ملابس عادية': 'Regular Clothes',
+  'cat:ملابس رسمية': 'Formal Clothes',
+  'cat:مفروشات': 'Bedding & Linen',
+  'cat:بطاطين': 'Blankets',
+  'cat:أخرى': 'Other',
+
+  // Item types (DB names → English)
+  'item:تيشيرت': 'T-Shirt',
+  'item:بنطلون': 'Pants',
+  'item:قميص': 'Shirt',
+  'item:قميص حرير': 'Silk Shirt',
+  'item:فستان': 'Dress',
+  'item:بدلة': 'Suit',
+  'item:طرحة': 'Scarf',
+  'item:ملاية سرير': 'Bed Sheet',
+  'item:ستارة': 'Curtain',
+  'item:بطاطين خفيفه': 'Light Blanket',
+  'item:غطاء سيارة': 'Car Cover',
 }

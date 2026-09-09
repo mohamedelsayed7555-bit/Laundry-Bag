@@ -148,6 +148,8 @@ export default function CartScreen() {
     return svc ? (isEn ? svc.labelEn : svc.label) : key
   }
 
+  const itemName = (name: string) => isEn ? (t(`item:${name}`) !== `item:${name}` ? t(`item:${name}`) : name) : name
+
   async function handleSubmit() {
     if (!profile) return
     if (!selectedAddress) {
@@ -308,7 +310,7 @@ export default function CartScreen() {
         {cart.map((item, i) => (
           <View key={i} style={[s.cartItem, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
             <View style={{ flex: 1 }}>
-              <Text style={[s.cartItemName, { color: colors.text }]}>{item.name} — {serviceLabel(item.service_type)}</Text>
+              <Text style={[s.cartItemName, { color: colors.text }]}>{itemName(item.name)} — {serviceLabel(item.service_type)}</Text>
               <Text style={[s.cartItemPrice, { color: colors.navy[300] }]}>{item.price} {t('currency')} / {isEn ? 'item' : 'قطعة'}</Text>
             </View>
             <View style={s.cartItemActions}>

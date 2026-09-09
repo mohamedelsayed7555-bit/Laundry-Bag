@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, RefreshControl, Modal, TextInput } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, RefreshControl, Modal, TextInput, Dimensions } from 'react-native'
 import { useRouter } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated'
@@ -17,6 +17,117 @@ const statusIcons: Record<string, string> = {
 const statusColors: Record<string, string> = {
   pending: '#f59e0b', assigned: '#3b82f6', picked_up: '#8b5cf6', processing: '#06b6d4',
   ready: '#10b981', delivering: '#8b5cf6', delivered: '#10b981', cancelled: '#ef4444',
+}
+
+const SCREEN_WIDTH = Dimensions.get('window').width
+const BANNER_WIDTH = SCREEN_WIDTH - 40
+
+function BannersCarousel({ bagOffer, activeSub, colors, t, onBagPress, onNewOrderPress, onPlansPress }: any) {
+  const [activeIndex, setActiveIndex] = useState(0)
+  const banners: { key: string; node: React.ReactNode }[] = []
+
+  if (bagOffer) {
+    banners.push({
+      key: 'bag',
+      node: (
+        <TouchableOpacity activeOpacity={0.9} onPress={onBagPress} style={{ width: BANNER_WIDTH }}>
+          <LinearGradient colors={['#059669', '#047857']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={cr.bannerGradient}>
+            <View style={cr.badgeWrap}>
+              <View style={cr.badge}><Text style={cr.badgeText}>{bagOffer.badge_text}</Text></View>
+              {bagOffer.original_price > bagOffer.daily_price && (
+                <View style={cr.discountBadge}><Text style={cr.discountText}>-{Math.round((1 - bagOffer.daily_price / bagOffer.original_price) * 100)}%</Text></View>
+              )}
+            </View>
+            <View style={cr.row}>
+              <View style={{ flex: 1 }}>
+                <Text style={cr.title}>{bagOffer.title}</Text>
+                <Text style={cr.subtitle}>{bagOffer.subtitle}</Text>
+                <View style={cr.priceRow}>
+                  {bagOffer.original_price > bagOffer.daily_price && <Text style={cr.oldPrice}>{bagOffer.original_price} ج.م</Text>}
+                  <Text style={cr.price}>{bagOffer.daily_price} ج.م</Text>
+                  <Text style={cr.perDay}>/ يومياً</Text>
+                </View>
+              </View>
+              <Text style={{ fontSize: 48 }}>👜</Text>
+            </View>
+          </LinearGradient>
+        </TouchableOpacity>
+      ),
+    })
+  }
+
+  banners.push({
+    key: 'newOrder',
+    node: (
+      <TouchableOpacity activeOpacity={0.85} onPress={onNewOrderPress} style={{ width: BANNER_WIDTH }}>
+        <LinearGradient colors={colors.gradientAccent as unknown as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={cr.bannerGradient}>
+          <View style={cr.row}>
+            <View style={{ flex: 1 }}>
+              <Text style={cr.title}>{t('newOrder')}</Text>
+              <Text style={cr.subtitle}>{t('newOrderSub')}</Text>
+              <View style={cr.ctaWrap}><Text style={cr.ctaText}>{t('startNow')}</Text></View>
+            </View>
+            <Text style={{ fontSize: 48 }}>🧺</Text>
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
+    ),
+  })
+
+  banners.push({
+    key: 'plans',
+    node: activeSub ? (
+      <TouchableOpacity activeOpacity={0.8} onPress={onPlansPress} style={{ width: BANNER_WIDTH }}>
+        <View style={[cr.plansBanner, { backgroundColor: colors.goldGlow, borderColor: '#fbbf2430' }]}>
+          <View style={cr.plansIcon}><Text style={{ fontSize: 22 }}>👑</Text></View>
+          <View style={{ flex: 1 }}>
+            <Text style={[cr.plansTitle, { color: colors.gold }]}>{t('packagePrefix')} {activeSub.plans?.name}</Text>
+            <Text style={[cr.plansSub, { color: colors.navy[200] }]}>{t('remaining')} {(activeSub.plans?.items_per_month ?? 0) - (activeSub.items_used ?? 0)} {t('pieces')}</Text>
+          </View>
+          <Text style={{ fontSize: 20, color: colors.gold }}>←</Text>
+        </View>
+      </TouchableOpacity>
+    ) : (
+      <TouchableOpacity activeOpacity={0.85} onPress={onPlansPress} style={{ width: BANNER_WIDTH }}>
+        <View style={[cr.plansBanner, { backgroundColor: colors.warningGlow, borderColor: '#f59e0b30' }]}>
+          <View style={[cr.plansIcon, { backgroundColor: '#f59e0b20' }]}><Text style={{ fontSize: 22 }}>👑</Text></View>
+          <View style={{ flex: 1 }}>
+            <Text style={[cr.plansTitle, { color: '#f59e0b' }]}>{t('subscriptionPlans')}</Text>
+            <Text style={[cr.plansSub, { color: colors.navy[200] }]}>{t('saveMore')}</Text>
+          </View>
+          <Text style={{ fontSize: 20, color: '#f59e0b' }}>←</Text>
+        </View>
+      </TouchableOpacity>
+    ),
+  })
+
+  const handleScroll = (e: any) => {
+    const x = e.nativeEvent.contentOffset.x
+    const idx = Math.round(x / BANNER_WIDTH)
+    if (idx !== activeIndex && idx >= 0 && idx < banners.length) setActiveIndex(idx)
+  }
+
+  return (
+    <Animated.View entering={FadeInDown.duration(400)} style={{ marginBottom: 16 }}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={handleScroll}
+        snapToInterval={BANNER_WIDTH + 12}
+        decelerationRate="fast"
+        contentContainerStyle={{ gap: 12 }}
+      >
+        {banners.map(b => <View key={b.key}>{b.node}</View>)}
+      </ScrollView>
+      {banners.length > 1 && (
+        <View style={cr.dots}>
+          {banners.map((b, i) => (
+            <View key={b.key} style={[cr.dot, { backgroundColor: i === activeIndex ? colors.primary : colors.navy[600] }]} />
+          ))}
+        </View>
+      )}
+    </Animated.View>
+  )
 }
 
 export default function HomeScreen() {
@@ -200,95 +311,16 @@ export default function HomeScreen() {
         </View>
       </Animated.View>
 
-      {/* Bag Offer Banner */}
-      {bagOffer && (
-        <Animated.View entering={FadeInDown.duration(400)}>
-          <TouchableOpacity activeOpacity={0.9} onPress={() => router.push('/bag-order')}
-            style={[bo.card, { backgroundColor: colors.accent, borderColor: colors.accentLight }]}>
-            <LinearGradient
-              colors={['#059669', '#047857']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={bo.gradient}>
-              <View style={bo.badgeWrap}>
-                <View style={bo.badge}><Text style={bo.badgeText}>{bagOffer.badge_text}</Text></View>
-                {bagOffer.original_price > bagOffer.daily_price && (
-                  <View style={bo.discountBadge}>
-                    <Text style={bo.discountText}>-{Math.round((1 - bagOffer.daily_price / bagOffer.original_price) * 100)}%</Text>
-                  </View>
-                )}
-              </View>
-              <View style={bo.row}>
-                <View style={{ flex: 1 }}>
-                  <Text style={bo.title}>{bagOffer.title}</Text>
-                  <Text style={bo.subtitle}>{bagOffer.subtitle}</Text>
-                  <View style={bo.priceRow}>
-                    {bagOffer.original_price > bagOffer.daily_price && (
-                      <Text style={bo.oldPrice}>{bagOffer.original_price} ج.م</Text>
-                    )}
-                    <Text style={bo.price}>{bagOffer.daily_price} ج.م</Text>
-                    <Text style={bo.perDay}>/ يومياً</Text>
-                  </View>
-                </View>
-                <Text style={bo.emoji}>👜</Text>
-              </View>
-              <View style={bo.cta}>
-                <Text style={bo.ctaText}>اطلب الآن</Text>
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
-        </Animated.View>
-      )}
-
-      {/* Hero CTA */}
-      <Animated.View entering={FadeInDown.duration(400).delay(50)}>
-        <TouchableOpacity activeOpacity={0.85} onPress={() => router.push('/(tabs)/new-order')}>
-          <LinearGradient
-            colors={colors.gradientAccent as unknown as [string, string]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={s.heroCard}
-          >
-            <View style={s.heroContent}>
-              <Text style={s.heroTitle}>{t('newOrder')}</Text>
-              <Text style={s.heroSub}>{t('newOrderSub')}</Text>
-              <View style={s.heroBtnWrap}>
-                <Text style={s.heroBtnText}>{t('startNow')}</Text>
-              </View>
-            </View>
-            <Text style={s.heroEmoji}>🧺</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      </Animated.View>
-
-      {/* Active Subscription Banner */}
-      {activeSub && (
-        <Animated.View entering={FadeInDown.duration(400).delay(80)}>
-          <TouchableOpacity style={[s.subBanner, { backgroundColor: colors.goldGlow, borderColor: '#fbbf2430' }]} activeOpacity={0.8} onPress={() => router.push('/plans')}>
-            <View style={s.subBannerIcon}><Text style={{ fontSize: 20 }}>👑</Text></View>
-            <View style={{ flex: 1 }}>
-              <Text style={[s.subBannerTitle, { color: colors.gold }]}>{t('packagePrefix')} {activeSub.plans?.name}</Text>
-              <Text style={[s.subBannerSub, { color: colors.navy[200] }]}>
-                {t('remaining')} {(activeSub.plans?.items_per_month ?? 0) - (activeSub.items_used ?? 0)} {t('pieces')}
-              </Text>
-            </View>
-            <Text style={[s.subBannerArrow, { color: colors.gold }]}>←</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      )}
-
-      {/* Plans Banner (if no subscription) */}
-      {!activeSub && (
-        <Animated.View entering={FadeInDown.duration(400).delay(80)}>
-          <TouchableOpacity style={[s.plansBanner, { backgroundColor: colors.warningGlow, borderColor: '#f59e0b30' }]} activeOpacity={0.85} onPress={() => router.push('/plans')}>
-            <View style={s.plansBannerIconWrap}><Text style={{ fontSize: 22 }}>👑</Text></View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.plansBannerTitle}>{t('subscriptionPlans')}</Text>
-              <Text style={[s.plansBannerSub, { color: colors.navy[200] }]}>{t('saveMore')}</Text>
-            </View>
-            <Text style={s.plansBannerArrow}>←</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      )}
+      {/* Banners Carousel */}
+      <BannersCarousel
+        bagOffer={bagOffer}
+        activeSub={activeSub}
+        colors={colors}
+        t={t}
+        onBagPress={() => router.push('/bag-order')}
+        onNewOrderPress={() => router.push('/(tabs)/new-order')}
+        onPlansPress={() => router.push('/plans')}
+      />
 
       {/* Services */}
       <Animated.View entering={FadeInDown.duration(400).delay(120)}>
@@ -438,47 +470,6 @@ const s = StyleSheet.create({
     borderWidth: 2,
   },
 
-  heroCard: {
-    flexDirection: 'row', borderRadius: 24,
-    padding: 24, marginBottom: 16, alignItems: 'center',
-    shadowColor: '#00c966', shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35, shadowRadius: 20, elevation: 14,
-  },
-  heroContent: { flex: 1 },
-  heroTitle: { fontSize: 22, fontWeight: '800', color: '#fff' },
-  heroSub: { fontSize: 13, color: 'rgba(255,255,255,0.75)', marginTop: 4 },
-  heroBtnWrap: {
-    backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'flex-start',
-    paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, marginTop: 12,
-  },
-  heroBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  heroEmoji: { fontSize: 48 },
-
-  subBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    borderRadius: 16, padding: 16, marginBottom: 20,
-    borderWidth: 1,
-  },
-  subBannerIcon: {
-    width: 40, height: 40, borderRadius: 12, backgroundColor: '#fbbf2420',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  subBannerTitle: { fontSize: 15, fontWeight: '700' },
-  subBannerSub: { fontSize: 12, marginTop: 2 },
-  subBannerArrow: { fontSize: 20 },
-
-  plansBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    borderRadius: 16, padding: 16, marginBottom: 20,
-    borderWidth: 1,
-  },
-  plansBannerIconWrap: {
-    width: 40, height: 40, borderRadius: 12, backgroundColor: '#f59e0b20',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  plansBannerTitle: { fontSize: 15, fontWeight: '700', color: '#f59e0b' },
-  plansBannerSub: { fontSize: 12, marginTop: 2 },
-  plansBannerArrow: { fontSize: 20, color: '#f59e0b' },
 
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   sectionTitle: { fontSize: 18, fontWeight: '700', marginBottom: 2 },
@@ -519,9 +510,8 @@ const s = StyleSheet.create({
   orderTotal: { fontSize: 15, fontWeight: '800' },
 })
 
-const bo = StyleSheet.create({
-  card: { borderRadius: 24, marginBottom: 16, overflow: 'hidden', shadowColor: '#059669', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 16, elevation: 12 },
-  gradient: { padding: 20, borderRadius: 24 },
+const cr = StyleSheet.create({
+  bannerGradient: { padding: 20, borderRadius: 24 },
   badgeWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   badge: { backgroundColor: '#fbbf24', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20 },
   badgeText: { color: '#78350f', fontSize: 11, fontWeight: '800' },
@@ -534,9 +524,14 @@ const bo = StyleSheet.create({
   oldPrice: { color: 'rgba(255,255,255,0.45)', fontSize: 14, textDecorationLine: 'line-through' },
   price: { color: '#fff', fontSize: 24, fontWeight: '900' },
   perDay: { color: 'rgba(255,255,255,0.6)', fontSize: 12 },
-  emoji: { fontSize: 52, marginLeft: 8 },
-  cta: { backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'flex-start', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 14, marginTop: 14 },
-  ctaText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  ctaWrap: { backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'flex-start', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, marginTop: 12 },
+  ctaText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  plansBanner: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 24, padding: 20, borderWidth: 1, minHeight: 80 },
+  plansIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#fbbf2420', justifyContent: 'center', alignItems: 'center' },
+  plansTitle: { fontSize: 15, fontWeight: '700' },
+  plansSub: { fontSize: 12, marginTop: 2 },
+  dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 10 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
 })
 
 const rs = StyleSheet.create({

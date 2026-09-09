@@ -5,18 +5,21 @@ import { useAuth } from '../../src/contexts/AuthContext'
 import { useCustomAlert } from '../../src/components/CustomAlert'
 import { supabase } from '../../src/lib/supabase'
 import { useTheme } from '../../src/contexts/ThemeContext'
+import { useLanguage } from '../../src/contexts/LanguageContext'
 
 const servicesMap = [
-  { key: 'wash', icon: '👔', label: 'غسيل' },
-  { key: 'dry_clean', icon: '🧹', label: 'تنظيف جاف' },
-  { key: 'iron', icon: '👕', label: 'كي فقط' },
-  { key: 'wash_iron', icon: '✨', label: 'غسيل وكي' },
+  { key: 'wash', icon: '👔', label: 'غسيل', labelEn: 'Wash' },
+  { key: 'dry_clean', icon: '🧹', label: 'تنظيف جاف', labelEn: 'Dry Clean' },
+  { key: 'iron', icon: '👕', label: 'كي فقط', labelEn: 'Iron Only' },
+  { key: 'wash_iron', icon: '✨', label: 'غسيل وكي', labelEn: 'Wash & Iron' },
 ]
 
 type OrderItem = { name: string; service_type: string; quantity: number; price: number }
 
 export default function EditOrderScreen() {
   const { colors } = useTheme()
+  const { t, locale } = useLanguage()
+  const isEn = locale === 'en'
   const s = getStyles(colors)
   const { id } = useLocalSearchParams<{ id: string }>()
   const { profile } = useAuth()
@@ -62,6 +65,12 @@ export default function EditOrderScreen() {
     return servicesMap.filter(s => prices.some(p => p.item_type === selectedItemType && p.service_type === s.key))
   }
 
+  const serviceLabel = (key: string) => {
+    const svc = servicesMap.find(s => s.key === key)
+    return svc ? (isEn ? svc.labelEn : svc.label) : key
+  }
+  const itemName = (name: string) => isEn ? (t(`item:${name}`) !== `item:${name}` ? t(`item:${name}`) : name) : name
+
   const addToCart = () => {
     if (!selectedItemType || !selectedService) return
     const unitPrice = getPrice(selectedItemType, selectedService)
@@ -92,7 +101,6 @@ export default function EditOrderScreen() {
 
   const totalPrice = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0)
-  const serviceLabel = (key: string) => servicesMap.find(s => s.key === key)?.label ?? key
 
   async function handleSave() {
     if (cart.length === 0) { showAlert({ title: 'تنبيه', message: 'أضف قطعة واحدة على الأقل', type: 'warning' }); return }
@@ -185,7 +193,7 @@ export default function EditOrderScreen() {
       {cart.map((item, i) => (
         <View key={i} style={s.cartItem}>
           <View style={{ flex: 1 }}>
-            <Text style={s.cartItemName}>{item.name} — {serviceLabel(item.service_type)}</Text>
+            <Text style={s.cartItemName}>{itemName(item.name)} — {serviceLabel(item.service_type)}</Text>
             <Text style={s.cartItemDetail}>{item.quantity} × {item.price} = {item.quantity * item.price} ج.م</Text>
           </View>
           <View style={s.qtyActions}>
@@ -210,7 +218,7 @@ export default function EditOrderScreen() {
         {itemTypes.map(type => (
           <TouchableOpacity key={type} onPress={() => { setSelectedItemType(type); setSelectedService('') }}
             style={[s.optionCard, selectedItemType === type && s.optionSelected]}>
-            <Text style={[s.optionLabel, selectedItemType === type && s.optionLabelSelected]}>{type}</Text>
+            <Text style={[s.optionLabel, selectedItemType === type && s.optionLabelSelected]}>{itemName(type)}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -223,7 +231,7 @@ export default function EditOrderScreen() {
               <TouchableOpacity key={svc.key} onPress={() => setSelectedService(svc.key)}
                 style={[s.optionCard, selectedService === svc.key && s.optionSelected]}>
                 <Text style={s.optionIcon}>{svc.icon}</Text>
-                <Text style={[s.optionLabel, selectedService === svc.key && s.optionLabelSelected]}>{svc.label}</Text>
+                <Text style={[s.optionLabel, selectedService === svc.key && s.optionLabelSelected]}>{isEn ? svc.labelEn : svc.label}</Text>
                 <Text style={s.priceHint}>{getPrice(selectedItemType, svc.key)} ج.م</Text>
               </TouchableOpacity>
             ))}

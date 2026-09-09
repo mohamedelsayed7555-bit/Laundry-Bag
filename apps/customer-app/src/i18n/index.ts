@@ -1,7 +1,6 @@
-import { createContext, useContext } from 'react'
 import { I18nManager } from 'react-native'
 import { I18n } from 'i18n-js'
-import * as Localization from 'expo-localization'
+import * as Updates from 'expo-updates'
 import ar from './ar'
 import en from './en'
 
@@ -12,12 +11,26 @@ i18n.enableFallback = true
 
 export type Locale = 'ar' | 'en'
 
+let pendingReload = false
+
 export function setLocale(locale: Locale) {
   i18n.locale = locale
   const isRTL = locale === 'ar'
   if (I18nManager.isRTL !== isRTL) {
     I18nManager.allowRTL(isRTL)
     I18nManager.forceRTL(isRTL)
+    pendingReload = true
+  }
+}
+
+export function applyRTLChange() {
+  if (!pendingReload) return
+  pendingReload = false
+  if (__DEV__) {
+    const { DevSettings } = require('react-native')
+    DevSettings?.reload?.()
+  } else {
+    Updates.reloadAsync().catch(() => {})
   }
 }
 

@@ -143,6 +143,9 @@ export default function NewOrderScreen() {
     return locale === 'en' ? svc.labelEn : svc.label
   }
 
+  const catName = (name: string) => locale === 'en' ? (t(`cat:${name}`) !== `cat:${name}` ? t(`cat:${name}`) : name) : name
+  const itemName = (name: string) => locale === 'en' ? (t(`item:${name}`) !== `item:${name}` ? t(`item:${name}`) : name) : name
+
   if (dataLoading) {
     return (
       <View style={[s.loadingContainer, { backgroundColor: colors.navy[900] }]}>
@@ -210,7 +213,7 @@ export default function NewOrderScreen() {
             <TouchableOpacity key={cat.id} onPress={() => { setSelectedCategory(cat.id); setSelectedItemType(''); setSelectedService('') }}
               style={[s.categoryChip, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, selectedCategory === cat.id && { borderColor: colors.primary, backgroundColor: colors.primary + '15' }]}>
               <Text style={s.categoryChipIcon}>{cat.icon}</Text>
-              <Text style={[s.categoryChipLabel, { color: colors.navy[200] }, selectedCategory === cat.id && { color: colors.primary }]}>{cat.name}</Text>
+              <Text style={[s.categoryChipLabel, { color: colors.navy[200] }, selectedCategory === cat.id && { color: colors.primary }]}>{catName(cat.name)}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -220,7 +223,7 @@ export default function NewOrderScreen() {
           {filteredItemTypes.map(type => (
             <TouchableOpacity key={type} onPress={() => { setSelectedItemType(type); setSelectedService('') }}
               style={[s.optionCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, selectedItemType === type && { borderColor: colors.primary, backgroundColor: colors.primary + '15' }]}>
-              <Text style={[s.optionLabel, { color: colors.navy[200] }, selectedItemType === type && { color: colors.primary }]}>{type}</Text>
+              <Text style={[s.optionLabel, { color: colors.navy[200] }, selectedItemType === type && { color: colors.primary }]}>{itemName(type)}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -264,7 +267,7 @@ export default function NewOrderScreen() {
             {cart.map((item, i) => (
               <View key={i} style={[s.cartItem, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
                 <View style={{ flex: 1 }}>
-                  <Text style={[s.cartItemName, { color: colors.text }]}>{item.name} — {svcLabel(item.service_type)}</Text>
+                  <Text style={[s.cartItemName, { color: colors.text }]}>{itemName(item.name)} — {svcLabel(item.service_type)}</Text>
                   <Text style={[s.cartItemDetail, { color: colors.navy[300] }]}>{item.quantity} × {item.price} = {item.quantity * item.price} {t('currency')}</Text>
                 </View>
                 <View style={s.cartItemActions}>

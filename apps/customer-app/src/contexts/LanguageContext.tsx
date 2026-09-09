@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { setLocale, getCurrentLocale, t as translate, isRTL as checkRTL, Locale } from '../i18n'
+import { setLocale, getCurrentLocale, t as translate, isRTL as checkRTL, applyRTLChange, Locale } from '../i18n'
 
 interface LanguageContextType {
   locale: Locale
@@ -34,7 +34,9 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const setLanguage = useCallback((lang: Locale) => {
     setLocale(lang)
     setLocaleState(lang)
-    AsyncStorage.setItem(STORAGE_KEY, lang)
+    AsyncStorage.setItem(STORAGE_KEY, lang).then(() => {
+      applyRTLChange()
+    })
     forceUpdate(n => n + 1)
   }, [])
 
