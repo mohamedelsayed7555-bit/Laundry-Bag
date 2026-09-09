@@ -205,7 +205,7 @@ export default function NewOrderScreen() {
 
         <Text style={[s.sectionTitle, { color: colors.text }]}>{locale === 'en' ? 'Add item' : 'إضافة قطعة'}</Text>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.categoryScroll} contentContainerStyle={s.categoryScrollContent}>
+        <ScrollView key={`cat-${locale}`} horizontal showsHorizontalScrollIndicator={false} style={s.categoryScroll} contentContainerStyle={s.categoryScrollContent}>
           {categories.map(cat => (
             <TouchableOpacity key={cat.id} onPress={() => { setSelectedCategory(cat.id); setSelectedItemType(''); setSelectedService('') }}
               style={[s.categoryChip, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, selectedCategory === cat.id && { borderColor: colors.primary, backgroundColor: colors.primary + '15' }]}>

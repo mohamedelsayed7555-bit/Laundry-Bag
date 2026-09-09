@@ -39,6 +39,7 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const [collapsed, setCollapsed] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
     <ThemeProvider>
@@ -47,14 +48,25 @@ export default function DashboardLayout({
           <ToastProvider>
             <RealtimeNotifier />
             <div className="min-h-screen bg-surface">
-              <Sidebar collapsed={collapsed} onToggleCollapse={() => setCollapsed(c => !c)} />
-              <div className={`${collapsed ? 'mr-[72px]' : 'mr-[260px]'} transition-all duration-300`}>
-                <Header />
+              <Sidebar
+                collapsed={collapsed}
+                onToggleCollapse={() => setCollapsed(c => !c)}
+                mobileOpen={mobileOpen}
+                onMobileClose={() => setMobileOpen(false)}
+              />
+              {mobileOpen && (
+                <div
+                  className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+                  onClick={() => setMobileOpen(false)}
+                />
+              )}
+              <div className={`transition-all duration-300 ${collapsed ? 'lg:mr-[72px]' : 'lg:mr-[260px]'} mr-0`}>
+                <Header onMobileMenuToggle={() => setMobileOpen(o => !o)} />
                 <motion.main
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ duration: 0.3, delay: 0.1 }}
-                  className="p-6"
+                  className="p-3 sm:p-4 lg:p-6"
                 >
                   <ErrorBoundary>
                     {children}

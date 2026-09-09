@@ -71,7 +71,7 @@ function useNavGroups() {
   ]
 }
 
-export default function Sidebar({ collapsed, onToggleCollapse }: { collapsed?: boolean; onToggleCollapse?: () => void } = {}) {
+export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onMobileClose }: { collapsed?: boolean; onToggleCollapse?: () => void; mobileOpen?: boolean; onMobileClose?: () => void } = {}) {
   const pathname = usePathname()
   const router = useRouter()
   const { hasPermission } = useAuth()
@@ -92,6 +92,8 @@ export default function Sidebar({ collapsed, onToggleCollapse }: { collapsed?: b
     <aside
       className={cn(
         'fixed right-0 top-0 h-screen flex flex-col z-50 transition-all duration-300',
+        'max-lg:w-[260px]',
+        mobileOpen ? 'max-lg:translate-x-0' : 'max-lg:translate-x-full',
         sidebarWidth
       )}
       style={{
@@ -130,7 +132,7 @@ export default function Sidebar({ collapsed, onToggleCollapse }: { collapsed?: b
         {!isCollapsed && (
           <button
             onClick={toggleCollapse}
-            className="p-1.5 rounded-lg hover:bg-white/[0.06] text-navy-400 hover:text-white transition-colors"
+            className="p-1.5 rounded-lg hover:bg-white/[0.06] text-navy-400 hover:text-white transition-colors hidden lg:block"
           >
             <ChevronLeft size={16} className="rotate-180" />
           </button>
@@ -138,7 +140,7 @@ export default function Sidebar({ collapsed, onToggleCollapse }: { collapsed?: b
         {isCollapsed && (
           <button
             onClick={toggleCollapse}
-            className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-navy-800 border border-white/10 rounded-full flex items-center justify-center text-navy-400 hover:text-white hover:bg-navy-700 transition-all shadow-md z-10"
+            className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-navy-800 border border-white/10 rounded-full hidden lg:flex items-center justify-center text-navy-400 hover:text-white hover:bg-navy-700 transition-all shadow-md z-10"
           >
             <ChevronLeft size={12} />
           </button>
@@ -177,6 +179,7 @@ export default function Sidebar({ collapsed, onToggleCollapse }: { collapsed?: b
                     key={item.href}
                     href={item.href}
                     prefetch={true}
+                    onClick={onMobileClose}
                     className={cn(
                       'group relative flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-200',
                       isCollapsed ? 'justify-center p-2.5' : 'px-3 py-2.5',

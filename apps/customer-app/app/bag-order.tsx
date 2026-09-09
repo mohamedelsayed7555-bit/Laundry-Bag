@@ -109,7 +109,7 @@ export default function BagOrderScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.navy[900] }}>
-      <AlertComponent />
+      {AlertComponent}
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
         {/* Offer Card */}
         <Animated.View entering={FadeInDown.duration(500)}>
