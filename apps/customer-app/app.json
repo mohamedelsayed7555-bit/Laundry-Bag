@@ -9,7 +9,10 @@
     "newArchEnabled": false,
     "ios": {
       "bundleIdentifier": "com.cleano.customer",
-      "supportsTablet": false
+      "supportsTablet": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.cleano.customer",
@@ -18,7 +21,10 @@
       },
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.RECORD_AUDIO"
       ],
       "config": {
         "googleMaps": {
@@ -40,9 +46,9 @@
         "origin": false
       },
       "eas": {
-        "projectId": "178256af-c74c-4880-9722-8d30ba1e3e8b"
+        "projectId": "278296f6-7a0c-4237-97ae-326fab30b0c6"
       }
     },
-    "owner": "mohamed_hassan12"
+    "owner": "mohameddhassan12s-team"
   }
 }

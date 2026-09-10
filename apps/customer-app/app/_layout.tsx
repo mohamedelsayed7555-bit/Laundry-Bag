@@ -14,15 +14,16 @@ I18nManager.allowRTL(true)
 I18nManager.forceRTL(true)
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
-  state = { hasError: false }
-  static getDerivedStateFromError() { return { hasError: true } }
+  state = { hasError: false, errorMsg: '' }
+  static getDerivedStateFromError(error: Error) { return { hasError: true, errorMsg: error?.message || 'Unknown error' } }
+  componentDidCatch(error: Error, info: any) { console.error('ErrorBoundary caught:', error?.message, info?.componentStack) }
   render() {
     if (this.state.hasError) {
       return (
         <View style={ebStyles.container}>
           <Text style={ebStyles.icon}>⚠️</Text>
           <Text style={ebStyles.title}>حدث خطأ غير متوقع</Text>
-          <Text style={ebStyles.message}>يرجى إعادة فتح التطبيق</Text>
+          <Text style={ebStyles.message}>{this.state.errorMsg}</Text>
           <TouchableOpacity style={ebStyles.btn} onPress={() => this.setState({ hasError: false })}>
             <Text style={ebStyles.btnText}>إعادة المحاولة</Text>
           </TouchableOpacity>
