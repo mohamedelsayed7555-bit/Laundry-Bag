@@ -42,7 +42,7 @@ export default function EditOrderScreen() {
   async function loadData() {
     const [orderRes, pricesRes] = await Promise.all([
       supabase.from('orders').select('id, order_number, status, items, items_count, subtotal, total, delivery_fee, subscription_id, service_type, payment_method, payment_status').eq('id', id).eq('customer_id', profile!.id).single(),
-      supabase.from('prices').select('id, item_type, service_type, price').eq('is_active', true),
+      supabase.from('prices').select('id, item_type, service_type, price').eq('is_active', true).limit(200),
     ])
 
     if (orderRes.data) {

@@ -90,25 +90,15 @@ export default function ChatScreen() {
           supabase.from('messages').update({ read_at: new Date().toISOString() }).eq('id', newMsg.id)
         }
       })
-      .subscribe((status, err) => {
-        if (err) console.warn('chat realtime error:', err.message)
-      })
-    return () => { supabase.removeChannel(channel) }
-  }, [profile, orderId])
-
-  useEffect(() => {
-    if (!orderId) return
-    const channel = supabase
-      .channel(`order-status-${orderId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` }, (payload) => {
         const newStatus = (payload.new as any).status
         if (newStatus) setOrderStatus(newStatus)
       })
       .subscribe((status, err) => {
-        if (err) console.warn('order-status realtime error:', err.message)
+        if (err) console.warn('chat realtime error:', err.message)
       })
     return () => { supabase.removeChannel(channel) }
-  }, [orderId])
+  }, [profile, orderId])
 
   async function handleSend() {
     if (!text.trim() || !profile || !orderId || chatClosed) return
@@ -124,21 +114,6 @@ export default function ChatScreen() {
       receiver_id: order.driver_id,
       body: msgBody,
     })
-
-    const { data: driverData } = await supabase.from('users').select('fcm_token').eq('id', order.driver_id).single()
-    if (driverData?.fcm_token) {
-      fetch('https://exp.host/--/api/v2/push/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: driverData.fcm_token,
-          title: `${t('messageFrom')} ${profile.name ?? t('theCustomer')}`,
-          body: msgBody.length > 100 ? msgBody.slice(0, 100) + '...' : msgBody,
-          sound: 'default',
-          data: { type: 'chat', order_id: orderId },
-        }),
-      }).catch(() => {})
-    }
 
     setText('')
     setSending(false)

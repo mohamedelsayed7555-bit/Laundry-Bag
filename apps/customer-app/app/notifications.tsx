@@ -56,14 +56,20 @@ export default function NotificationsScreen() {
 
   useFocusEffect(useCallback(() => {
     load()
-    if (profile) {
+  }, [load]))
+
+  useEffect(() => {
+    if (!profile || notifications.length === 0) return
+    const unreadIds = notifications.filter(n => !n.read_at).map(n => n.id)
+    if (unreadIds.length === 0) return
+    const timer = setTimeout(() => {
       supabase.from('notifications')
         .update({ read_at: new Date().toISOString() })
-        .eq('user_id', profile.id)
-        .is('read_at', null)
+        .in('id', unreadIds)
         .then(() => {})
-    }
-  }, [profile, load]))
+    }, 1000)
+    return () => clearTimeout(timer)
+  }, [profile, notifications])
 
   const orderTypes = ['order', 'order_update', 'order_activated', 'reminder']
   const filtered = notifications.filter(n => {

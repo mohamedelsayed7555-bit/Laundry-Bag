@@ -142,7 +142,7 @@ export default function BagOrderScreen() {
       title: `${t('success')}! 🎉`,
       message: `${t('bagOrderSuccess')}\n${t('bagMaxItems')}: ${bagOffer.max_items} ${t('pieces')}\n${t('total')}: ${bagOffer.daily_price} ${t('currency')}`,
       type: 'success',
-      onConfirm: () => router.replace('/(tabs)/orders'),
+      onConfirm: () => router.replace(`/tracking/${data?.id}`),
     })
   }
 

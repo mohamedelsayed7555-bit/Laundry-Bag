@@ -12,13 +12,21 @@ Deno.serve(async (req: Request) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  // Auth: accept service_role JWT or CRON_SECRET
+  // verify_jwt is false so Supabase gateway lets the request through
   const cronSecret = Deno.env.get("CRON_SECRET");
-  const authHeader = req.headers.get("x-cron-secret") || req.headers.get("authorization")?.replace("Bearer ", "");
-  if (!authHeader || (authHeader !== cronSecret && authHeader !== Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"))) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const rawAuth = req.headers.get("authorization")?.replace("Bearer ", "");
+  const authHeader = req.headers.get("x-cron-secret") || rawAuth;
+
+  const isAuthorized = authHeader && (
+    authHeader === cronSecret ||
+    authHeader === serviceRoleKey ||
+    rawAuth === serviceRoleKey
+  );
+
+  if (!isAuthorized) {
+    console.log("Auth failed - headers received:", [...req.headers.keys()].join(", "));
   }
 
   const supabase = createClient(

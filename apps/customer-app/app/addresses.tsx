@@ -201,8 +201,7 @@ export default function AddressesScreen() {
 
   async function setDefault(id: string) {
     if (!profile) return
-    await supabase.from('addresses').update({ is_default: false }).eq('user_id', profile.id)
-    await supabase.from('addresses').update({ is_default: true }).eq('id', id)
+    await supabase.rpc('set_default_address', { p_user_id: profile.id, p_address_id: id })
     loadAddresses()
   }
 

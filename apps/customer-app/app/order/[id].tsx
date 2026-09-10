@@ -127,7 +127,7 @@ export default function OrderDetailsScreen() {
     if (!profile?.id) return
     const { data } = await supabase
       .from('orders')
-      .select('*, driver:users!orders_driver_id_fkey(name, phone)')
+      .select('id, order_number, status, service_type, items_count, total, delivery_fee, cancellation_fee, notes, payment_method, payment_status, driver_id, rated_at, rating_service, rating_speed, rating_comment, created_at, driver:users!orders_driver_id_fkey(name, phone)')
       .eq('id', id)
       .eq('customer_id', profile.id)
       .single()

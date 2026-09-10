@@ -74,15 +74,14 @@ export default function CartScreen() {
   }, [profile])
 
   const loadCartData = useCallback(async () => {
-    const [allSettingsRes, settingsRes, addrRes, subRes] = await Promise.all([
-      supabase.from('settings').select('key, value').in('key', ['delivery_fee', 'max_zone_km', 'price_per_km', 'base_delivery_km', 'laundry_lat', 'laundry_lng', 'min_order_items']),
-      supabase.from('settings').select('key, value').in('key', ['instapay_number', 'wallet_number']),
+    const [settingsRes, addrRes, subRes] = await Promise.all([
+      supabase.from('settings').select('key, value').in('key', ['delivery_fee', 'max_zone_km', 'price_per_km', 'base_delivery_km', 'laundry_lat', 'laundry_lng', 'min_order_items', 'instapay_number', 'wallet_number']),
       profile ? supabase.from('addresses').select('id, label, lat, lng, is_default, building, floor, apartment, landmark').eq('user_id', profile.id).order('is_default', { ascending: false }) : null,
       profile ? supabase.from('subscriptions').select('*, plans(name)').eq('user_id', profile.id).eq('status', 'active').single() : null,
     ])
-    if (allSettingsRes?.data) {
+    if (settingsRes?.data) {
       const s: any = {}
-      allSettingsRes.data.forEach((r: any) => { s[r.key] = r.value })
+      settingsRes.data.forEach((r: any) => { s[r.key] = r.value })
       const baseFee = Number(s.delivery_fee) || 0
       setDeliveryFee(baseFee)
       setDeliveryFeeBase(baseFee)
@@ -94,13 +93,11 @@ export default function CartScreen() {
         laundry_lat: Number(s.laundry_lat) || 30.0444,
         laundry_lng: Number(s.laundry_lng) || 31.2357,
       })
-    }
-    if (settingsRes?.data) {
-      const inst = settingsRes.data.find((s: any) => s.key === 'instapay_number')
-      const wal = settingsRes.data.find((s: any) => s.key === 'wallet_number')
+      const inst = s.instapay_number
+      const wal = s.wallet_number
       setPaymentSettings({
-        instapay: typeof inst?.value === 'string' ? inst.value : String(inst?.value ?? ''),
-        wallet: typeof wal?.value === 'string' ? wal.value : String(wal?.value ?? ''),
+        instapay: typeof inst === 'string' ? inst : String(inst ?? ''),
+        wallet: typeof wal === 'string' ? wal : String(wal ?? ''),
       })
     }
     if (addrRes?.data) {
@@ -228,15 +225,7 @@ export default function CartScreen() {
     }).select('id').single()
 
     if (!error && useSubscription) {
-      // Atomic-ish update: use freshSub value + guard against concurrent changes
-      const { data: freshSub2 } = await supabase.from('subscriptions').select('items_used').eq('id', activeSub.id).single()
-      const currentUsed = freshSub2?.items_used ?? 0
-      const newUsed = currentUsed + totalItems
-      await supabase
-        .from('subscriptions')
-        .update({ items_used: newUsed })
-        .eq('id', activeSub.id)
-        .eq('items_used', currentUsed)
+      await supabase.rpc('increment_subscription_usage', { p_sub_id: activeSub.id, p_count: totalItems })
     }
 
     if (error) {

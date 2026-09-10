@@ -84,7 +84,18 @@ export default function PlansScreen() {
   }
 
   async function loadData() {
-    const { data: settingsData } = await supabase.from('settings').select('key, value').in('key', ['discount_quarterly', 'discount_biannual', 'discount_annual'])
+    const results = await Promise.all([
+      supabase.from('settings').select('key, value').in('key', ['discount_quarterly', 'discount_biannual', 'discount_annual']),
+      supabase.from('plans')
+        .select('id, name, description, tier, items_per_month, includes_all_services, monthly_price, quarterly_price, biannual_price, annual_price, is_active')
+        .eq('is_active', true)
+        .order('monthly_price', { ascending: true }),
+      profile ? supabase.from('subscriptions').select('*, plans(name)')
+        .eq('user_id', profile.id).in('status', ['active', 'pending'])
+        .order('created_at', { ascending: false }) : null,
+    ])
+
+    const settingsData = results[0]?.data
     if (settingsData) {
       const rates = { ...discountRates }
       settingsData.forEach(s => {
@@ -95,28 +106,16 @@ export default function PlansScreen() {
       setDiscountRates(rates)
     }
 
-    const { data: plansData } = await supabase
-      .from('plans')
-      .select('id, name, description, tier, items_per_month, includes_all_services, monthly_price, quarterly_price, biannual_price, annual_price, is_active')
-      .eq('is_active', true)
-      .order('monthly_price', { ascending: true })
-    setPlans((plansData ?? []) as Plan[])
+    setPlans((results[1]?.data ?? []) as Plan[])
 
-    if (profile) {
-      const { data: subData } = await supabase
-        .from('subscriptions')
-        .select('*, plans(name)')
-        .eq('user_id', profile.id)
-        .in('status', ['active', 'pending'])
-        .order('created_at', { ascending: false })
-      if (subData) {
-        const active = subData.find((s: any) => s.status === 'active')
-        const pending = subData.find((s: any) => s.status === 'pending')
-        if (active) setActiveSub({ ...active, plan_name: (active as any).plans?.name } as any)
-        else setActiveSub(null)
-        if (pending) setPendingSub({ ...pending, plan_name: (pending as any).plans?.name } as any)
-        else setPendingSub(null)
-      }
+    const subData = results[2]?.data
+    if (subData) {
+      const active = subData.find((s: any) => s.status === 'active')
+      const pending = subData.find((s: any) => s.status === 'pending')
+      if (active) setActiveSub({ ...active, plan_name: (active as any).plans?.name } as any)
+      else setActiveSub(null)
+      if (pending) setPendingSub({ ...pending, plan_name: (pending as any).plans?.name } as any)
+      else setPendingSub(null)
     }
     setLoading(false)
   }

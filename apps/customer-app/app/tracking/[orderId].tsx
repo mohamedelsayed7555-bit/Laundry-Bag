@@ -95,7 +95,7 @@ export default function TrackingScreen() {
   async function loadOrder() {
     const { data } = await supabase
       .from('orders')
-      .select('*, driver:users!orders_driver_id_fkey(name, phone)')
+      .select('id, order_number, status, driver_id, delivery_location, driver:users!orders_driver_id_fkey(name, phone)')
       .eq('id', orderId)
       .single()
     setOrder(data)

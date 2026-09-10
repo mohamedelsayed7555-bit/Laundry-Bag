@@ -27,56 +27,16 @@ export default function MessagesScreen() {
 
   const load = useCallback(async () => {
     if (!profile) return
-    const { data: msgs } = await supabase
-      .from('messages')
-      .select('id, order_id, sender_id, receiver_id, body, read_at, created_at')
-      .or(`sender_id.eq.${profile.id},receiver_id.eq.${profile.id}`)
-      .order('created_at', { ascending: false })
-      .limit(500)
+    const { data, error } = await supabase.rpc('get_conversations', { p_user_id: profile.id })
 
-    if (!msgs || msgs.length === 0) {
+    if (error || !data || data.length === 0) {
       setConversations([])
       setLoading(false)
       setRefreshing(false)
       return
     }
 
-    const orderMap = new Map<string, { msgs: any[] }>()
-    for (const m of msgs) {
-      if (!orderMap.has(m.order_id)) orderMap.set(m.order_id, { msgs: [] })
-      orderMap.get(m.order_id)!.msgs.push(m)
-    }
-
-    const otherIds = new Set<string>()
-    for (const m of msgs) {
-      const otherId = m.sender_id === profile.id ? m.receiver_id : m.sender_id
-      otherIds.add(otherId)
-    }
-
-    const { data: users } = await supabase
-      .from('users')
-      .select('id, name')
-      .in('id', [...otherIds])
-
-    const userMap = new Map<string, string>()
-    for (const u of users ?? []) userMap.set(u.id, u.name)
-
-    const convos: Conversation[] = []
-    for (const [orderId, { msgs: orderMsgs }] of orderMap) {
-      const last = orderMsgs[0]
-      const otherId = last.sender_id === profile.id ? last.receiver_id : last.sender_id
-      const unread = orderMsgs.filter(m => m.receiver_id === profile.id && !m.read_at).length
-      convos.push({
-        order_id: orderId,
-        other_id: otherId,
-        other_name: userMap.get(otherId) ?? 'Driver',
-        last_message: last.body,
-        last_time: last.created_at,
-        unread,
-      })
-    }
-
-    setConversations(convos)
+    setConversations(data)
     setLoading(false)
     setRefreshing(false)
   }, [profile])

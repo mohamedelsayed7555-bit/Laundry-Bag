@@ -99,7 +99,7 @@ export default function NewOrderScreen() {
           .then(({ data }) => setActiveSub(data)),
       ])
     }
-  }, [profile, selectedCategory])
+  }, [profile])
 
   useEffect(() => {
     loadData().then(() => setDataLoading(false))

@@ -8,6 +8,7 @@ import { useTheme } from '../../src/contexts/ThemeContext'
 import { useLanguage } from '../../src/contexts/LanguageContext'
 import { supabase } from '../../src/lib/supabase'
 import { SkeletonOrderCard } from '../../src/components/Skeleton'
+import { useRealtimeOrders } from '../../src/hooks/useRealtimeOrders'
 
 const statusIcons: Record<string, string> = {
   pending: '⏳', assigned: '🚗', picked_up: '📦', processing: '🔄',
@@ -255,48 +256,41 @@ export default function HomeScreen() {
     setRatingNote('')
   }
 
-  useEffect(() => {
-    if (!profile) { setLoading(false); return }
+  const handleOrderUpdate = useCallback(() => {
     loadRecentOrders()
     checkUnratedOrder()
-    loadBagOffer()
+  }, [loadRecentOrders, checkUnratedOrder])
 
-    supabase.from('subscriptions').select('*, plans(name, items_per_month)')
-      .eq('user_id', profile.id).eq('status', 'active').single()
-      .then(({ data }) => setActiveSub(data))
+  useRealtimeOrders(profile?.id, handleOrderUpdate)
 
-    supabase.from('notifications').select('id', { count: 'exact', head: true })
-      .eq('user_id', profile.id).is('read_at', null)
-      .then(({ count }) => setUnreadCount(count ?? 0))
+  useEffect(() => {
+    if (!profile) { setLoading(false); return }
+    Promise.all([
+      supabase.from('orders').select('id, order_number, status, total, created_at')
+        .eq('customer_id', profile.id).order('created_at', { ascending: false }).limit(3)
+        .then(({ data }) => { setRecentOrders(data ?? []); setLoading(false) }),
+      supabase.from('subscriptions').select('*, plans(name, items_per_month)')
+        .eq('user_id', profile.id).eq('status', 'active').single()
+        .then(({ data }) => setActiveSub(data)),
+      supabase.from('notifications').select('id', { count: 'exact', head: true })
+        .eq('user_id', profile.id).is('read_at', null)
+        .then(({ count }) => setUnreadCount(count ?? 0)),
+      loadBagOffer(),
+      checkUnratedOrder(),
+    ])
 
     const channel = supabase
-      .channel('home-orders')
-      .on('postgres_changes', {
-        event: '*', schema: 'public', table: 'orders',
-        filter: `customer_id=eq.${profile.id}`,
-      }, (payload: any) => {
-        const row = payload.new ?? payload.old
-        if (row?.customer_id === profile.id) {
-          loadRecentOrders()
-          if (payload.new?.status === 'delivered' && !payload.new?.rated_at) {
-            const o = payload.new
-            if (!shownRatingIds.current.has(o.id)) {
-              shownRatingIds.current.add(o.id)
-              setRatingOrder({ id: o.id, order_number: o.order_number, driver_id: o.driver_id })
-            }
-          }
-        }
-      })
+      .channel('home-settings')
       .on('postgres_changes', {
         event: 'UPDATE', schema: 'public', table: 'settings',
         filter: 'key=eq.bag_offer',
       }, () => loadBagOffer())
       .subscribe((status, err) => {
-        if (err) console.warn('home-orders realtime error:', err.message)
+        if (err) console.warn('home-settings realtime error:', err.message)
       })
 
     return () => { supabase.removeChannel(channel) }
-  }, [profile, loadRecentOrders, checkUnratedOrder, loadBagOffer])
+  }, [profile, loadBagOffer])
 
   const greeting = () => {
     const h = new Date().getHours()
