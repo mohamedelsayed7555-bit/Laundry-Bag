@@ -89,7 +89,7 @@ export default function NewOrderScreen() {
     }
     if (profile) {
       await Promise.all([
-        supabase.from('addresses').select('id, label, address, lat, lng, is_default').eq('user_id', profile.id).order('is_default', { ascending: false })
+        supabase.from('addresses').select('id, label, building, floor, apartment, lat, lng, is_default').eq('user_id', profile.id).order('is_default', { ascending: false })
           .then(({ data }) => {
             setAddresses(data ?? [])
             const def = data?.find((a: any) => a.is_default) ?? data?.[0]
