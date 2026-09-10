@@ -22,7 +22,7 @@ const statusColors: Record<string, string> = {
 const SCREEN_WIDTH = Dimensions.get('window').width
 const BANNER_WIDTH = SCREEN_WIDTH - 40
 
-function BannersCarousel({ bagOffer, activeSub, colors, t, onBagPress, onNewOrderPress, onPlansPress }: any) {
+function BannersCarousel({ bagOffer, activeSub, colors, t, locale, onBagPress, onNewOrderPress, onPlansPress }: any) {
   const [activeIndex, setActiveIndex] = useState(0)
   const scrollRef = useRef<ScrollView>(null)
   const autoScrollTimer = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -350,6 +350,7 @@ export default function HomeScreen() {
         activeSub={activeSub}
         colors={colors}
         t={t}
+        locale={locale}
         onBagPress={() => router.push('/bag-order')}
         onNewOrderPress={() => router.push('/(tabs)/new-order')}
         onPlansPress={() => router.push('/plans')}
