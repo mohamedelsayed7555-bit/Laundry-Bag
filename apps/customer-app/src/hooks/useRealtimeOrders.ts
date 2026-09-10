@@ -13,12 +13,14 @@ const statusMessages: Record<string, string> = {
   cancelled: 'تم إلغاء طلبك',
 }
 
+let channelCounter = 0
+
 export function useRealtimeOrders(userId: string | undefined, onUpdate: () => void) {
   useEffect(() => {
     if (!userId) return
 
     const channel = supabase
-      .channel('customer-orders')
+      .channel(`customer-orders-${++channelCounter}`)
       .on(
         'postgres_changes',
         {
