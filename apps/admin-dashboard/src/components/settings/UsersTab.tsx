@@ -1,11 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, logAuditClient } from '@/lib/supabase'
 import { motion } from 'framer-motion'
 import Modal from '@/components/ui/Modal'
 import Badge from '@/components/ui/Badge'
 import { useToast } from '@/components/ui/Toast'
+import { useAuth } from '@/lib/auth-context'
 import {
   Users, Plus, Edit2, Power, Shield, ShieldCheck, ShieldAlert,
   Truck, UserCircle, Save, Search, Eye, EyeOff, Camera, Key, Mail,
@@ -130,6 +131,7 @@ export default function UsersTab() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const { toast } = useToast()
+  const { user: currentUser } = useAuth()
 
   useEffect(() => { loadUsers() }, [])
 
@@ -188,6 +190,9 @@ export default function UsersTab() {
     setSaving(true)
 
     if (editUser) {
+      if (['super_admin', 'admin'].includes(form.role) && currentUser?.role !== 'super_admin') {
+        setSaving(false); toast('فقط الـ Super Admin يمكنه تعيين هذا الدور', 'error'); return
+      }
       const update: any = { name: form.name, phone: form.phone || null, role: form.role, permissions: form.permissions }
 
       const avatarUrl = await uploadAvatar(editUser.id)
@@ -212,7 +217,7 @@ export default function UsersTab() {
 
       const { error } = await supabase.from('users').update(update).eq('id', editUser.id)
       setSaving(false)
-      if (!error) { setEditUser(null); loadUsers(); toast('تم تعديل المستخدم') }
+      if (!error) { logAuditClient('update_user', 'user', editUser.id, { name: form.name, role: form.role }); setEditUser(null); loadUsers(); toast('تم تعديل المستخدم') }
       else { toast('حدث خطأ', 'error'); console.error(error) }
     } else {
       if (!form.password || form.password.length < 6) { setSaving(false); return toast('كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'warning') }
@@ -246,13 +251,14 @@ export default function UsersTab() {
     setSaving(true)
     const { error } = await supabase.from('users').update({ permissions: form.permissions }).eq('id', showPermissions.id)
     setSaving(false)
-    if (!error) { setShowPermissions(null); loadUsers(); toast('تم تحديث الصلاحيات') }
+    if (!error) { logAuditClient('update_permissions', 'user', showPermissions.id, { permissions: form.permissions }); setShowPermissions(null); loadUsers(); toast('تم تحديث الصلاحيات') }
     else toast('حدث خطأ', 'error')
   }
 
   async function toggleActive(user: SystemUser) {
     const { error } = await supabase.from('users').update({ is_active: !user.is_active }).eq('id', user.id)
     if (error) { console.error('toggleActive error:', error); toast('حدث خطأ: ' + error.message); return }
+    logAuditClient(user.is_active ? 'deactivate_user' : 'activate_user', 'user', user.id)
     loadUsers()
     toast(user.is_active ? 'تم تعطيل المستخدم' : 'تم تفعيل المستخدم')
   }

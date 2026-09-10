@@ -232,6 +232,22 @@ export default {
   messageFrom: 'رسالة من',
   theCustomer: 'العميل',
 
+  // Bag Order
+  bagSelectAddress: 'اختار عنوان التوصيل',
+  bagWalletPhoneInvalid: 'أدخل رقم موبايل المحفظة بشكل صحيح (01xxxxxxxxx)',
+  bagOfferUnavailable: 'العرض غير متاح حالياً',
+  bagPerDay: 'يومياً',
+  bagMaxItems: 'الحد الأقصى',
+  bagFreeDelivery: 'التوصيل مجاني',
+  bagPrice: 'سعر الشنطة',
+  bagFree: 'مجاناً',
+  bagOrderNow: 'اطلب الشنطة الآن',
+  bagOrderSuccess: 'تم طلب شنطة Laundry Bag',
+  bagInstapayTitle: 'حوّل على رقم الإنستاباي',
+  bagInstapayHint: 'حوّل المبلغ وأرسل صورة الإيصال للسائق في المحادثة',
+  bagBuilding: 'مبنى',
+  bagFloor: 'ط',
+
   // New Order
   newOrderTitle: 'طلب جديد',
   pickupAddress: 'عنوان الاستلام',

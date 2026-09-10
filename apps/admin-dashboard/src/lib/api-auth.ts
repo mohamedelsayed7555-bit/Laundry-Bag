@@ -31,3 +31,16 @@ export async function requireAdmin(req: NextRequest): Promise<{ userId: string; 
 
   return { userId: session.user.id, role: profile.role }
 }
+
+export async function logAudit(userId: string, action: string, entityType: string, entityId: string, details?: Record<string, unknown>) {
+  try {
+    await supabaseAdmin.from('audit_logs').insert({
+      user_id: userId,
+      action,
+      entity_type: entityType,
+      entity_id: entityId,
+      details: details ?? {},
+      created_at: new Date().toISOString(),
+    })
+  } catch {}
+}

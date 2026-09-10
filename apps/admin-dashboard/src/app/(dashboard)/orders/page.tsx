@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { supabase } from '@/lib/supabase'
+import { supabase, logAuditClient } from '@/lib/supabase'
 import DataTable from '@/components/ui/DataTable'
 import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
@@ -190,12 +190,17 @@ export default function OrdersPage() {
     const flow = isWalkin ? walkinStatusFlow : statusFlow
     const next = flow[order.status]
     if (!next) return
+    const needsDriver = ['assigned', 'picked_up', 'processing', 'ready', 'delivering', 'delivered']
+    if (!isWalkin && needsDriver.includes(next) && !order.driver_id) {
+      toast('لا يمكن تقديم الحالة — الطلب بدون سائق معين', 'error'); return
+    }
     setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: next } : o))
     setDetail((prev: any) => prev ? { ...prev, status: next } : null)
     toast(`تم تحديث الحالة إلى: ${ORDER_STATUS_LABELS[next as OrderStatus]}`)
     const { error } = await supabase.from('orders').update({ status: next }).eq('id', order.id)
     if (error) { toast('حدث خطأ — جاري التحديث', 'error'); loadOrders(); return }
     await supabase.from('order_status_history').insert({ order_id: order.id, status: next })
+    logAuditClient('update_order_status', 'order', order.id, { from: order.status, to: next })
     sendPushToCustomer(order.id, next)
     if (next === 'ready') {
       const lat = order.delivery_location?.lat
@@ -269,11 +274,13 @@ export default function OrdersPage() {
     const { error } = await supabase.from('orders').update({ status: 'cancelled' }).eq('id', id)
     if (error) { toast('حدث خطأ — جاري التحديث', 'error'); loadOrders(); return }
     await supabase.from('order_status_history').insert({ order_id: id, status: 'cancelled' })
+    logAuditClient('cancel_order', 'order', id, { order_number: order?.order_number })
     if (order?.subscription_id && order.items_count) {
       const { data: sub } = await supabase.from('subscriptions').select('items_used').eq('id', order.subscription_id).single()
       if (sub) {
-        const newUsed = Math.max(0, (sub.items_used ?? 0) - order.items_count)
-        await supabase.from('subscriptions').update({ items_used: newUsed }).eq('id', order.subscription_id)
+        const currentUsed = sub.items_used ?? 0
+        const newUsed = Math.max(0, currentUsed - order.items_count)
+        await supabase.from('subscriptions').update({ items_used: newUsed }).eq('id', order.subscription_id).eq('items_used', currentUsed)
       }
     }
   }
@@ -575,6 +582,7 @@ export default function OrdersPage() {
               <div className="flex gap-2">
                 <button onClick={async () => {
                   await supabase.from('orders').update({ payment_status: 'confirmed' }).eq('id', detail.id)
+                  logAuditClient('confirm_payment', 'order', detail.id, { order_number: detail.order_number })
                   setDetail({ ...detail, payment_status: 'confirmed' })
                   setOrders(prev => prev.map(o => o.id === detail.id ? { ...o, payment_status: 'confirmed' } : o))
                   toast('تم تأكيد الدفع')
@@ -584,6 +592,7 @@ export default function OrdersPage() {
                 {detail.payment_status !== 'failed' && (
                   <button onClick={async () => {
                     await supabase.from('orders').update({ payment_status: 'failed' }).eq('id', detail.id)
+                    logAuditClient('reject_payment', 'order', detail.id, { order_number: detail.order_number })
                     setDetail({ ...detail, payment_status: 'failed' })
                     setOrders(prev => prev.map(o => o.id === detail.id ? { ...o, payment_status: 'failed' } : o))
                     toast('تم رفض الدفع')

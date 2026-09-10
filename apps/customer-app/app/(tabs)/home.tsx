@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, RefreshControl, Modal, TextInput, Dimensions } from 'react-native'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, RefreshControl, Modal, TextInput, Dimensions, NativeScrollEvent, NativeSyntheticEvent } from 'react-native'
 import { useRouter } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated'
@@ -24,6 +24,8 @@ const BANNER_WIDTH = SCREEN_WIDTH - 40
 
 function BannersCarousel({ bagOffer, activeSub, colors, t, onBagPress, onNewOrderPress, onPlansPress }: any) {
   const [activeIndex, setActiveIndex] = useState(0)
+  const scrollRef = useRef<ScrollView>(null)
+  const autoScrollTimer = useRef<ReturnType<typeof setInterval> | null>(null)
   const banners: { key: string; node: React.ReactNode }[] = []
 
   if (bagOffer) {
@@ -43,9 +45,9 @@ function BannersCarousel({ bagOffer, activeSub, colors, t, onBagPress, onNewOrde
                 <Text style={cr.title}>{bagOffer.title}</Text>
                 <Text style={cr.subtitle}>{bagOffer.subtitle}</Text>
                 <View style={cr.priceRow}>
-                  {bagOffer.original_price > bagOffer.daily_price && <Text style={cr.oldPrice}>{bagOffer.original_price} ج.م</Text>}
-                  <Text style={cr.price}>{bagOffer.daily_price} ج.م</Text>
-                  <Text style={cr.perDay}>/ يومياً</Text>
+                  {bagOffer.original_price > bagOffer.daily_price && <Text style={cr.oldPrice}>{bagOffer.original_price} {t('currency')}</Text>}
+                  <Text style={cr.price}>{bagOffer.daily_price} {t('currency')}</Text>
+                  <Text style={cr.perDay}>/ {t('bagPerDay')}</Text>
                 </View>
               </View>
               <Text style={{ fontSize: 48 }}>👜</Text>
@@ -81,7 +83,7 @@ function BannersCarousel({ bagOffer, activeSub, colors, t, onBagPress, onNewOrde
         <View style={[cr.plansBanner, { backgroundColor: colors.goldGlow, borderColor: '#fbbf2430' }]}>
           <View style={cr.plansIcon}><Text style={{ fontSize: 22 }}>👑</Text></View>
           <View style={{ flex: 1 }}>
-            <Text style={[cr.plansTitle, { color: colors.gold }]}>{t('packagePrefix')} {activeSub.plans?.name}</Text>
+            <Text style={[cr.plansTitle, { color: colors.gold }]}>{t('packagePrefix')} {locale === 'en' && activeSub.plans?.name ? (t(`plan:${activeSub.plans.name}` as any) !== `plan:${activeSub.plans.name}` ? t(`plan:${activeSub.plans.name}` as any) : activeSub.plans.name) : activeSub.plans?.name}</Text>
             <Text style={[cr.plansSub, { color: colors.navy[200] }]}>{t('remaining')} {(activeSub.plans?.items_per_month ?? 0) - (activeSub.items_used ?? 0)} {t('pieces')}</Text>
           </View>
           <Text style={{ fontSize: 20, color: colors.gold }}>←</Text>
@@ -101,18 +103,47 @@ function BannersCarousel({ bagOffer, activeSub, colors, t, onBagPress, onNewOrde
     ),
   })
 
-  const handleScroll = (e: any) => {
+  const bannerCount = banners.length
+
+  useEffect(() => {
+    if (bannerCount <= 1) return
+    autoScrollTimer.current = setInterval(() => {
+      setActiveIndex(prev => {
+        const next = (prev + 1) % bannerCount
+        scrollRef.current?.scrollTo({ x: next * (BANNER_WIDTH + 12), animated: true })
+        return next
+      })
+    }, 4000)
+    return () => { if (autoScrollTimer.current) clearInterval(autoScrollTimer.current) }
+  }, [bannerCount])
+
+  const handleScrollBegin = () => {
+    if (autoScrollTimer.current) clearInterval(autoScrollTimer.current)
+  }
+
+  const handleScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const x = e.nativeEvent.contentOffset.x
-    const idx = Math.round(x / BANNER_WIDTH)
-    if (idx !== activeIndex && idx >= 0 && idx < banners.length) setActiveIndex(idx)
+    const idx = Math.round(x / (BANNER_WIDTH + 12))
+    if (idx >= 0 && idx < bannerCount) setActiveIndex(idx)
+    if (bannerCount > 1) {
+      autoScrollTimer.current = setInterval(() => {
+        setActiveIndex(prev => {
+          const next = (prev + 1) % bannerCount
+          scrollRef.current?.scrollTo({ x: next * (BANNER_WIDTH + 12), animated: true })
+          return next
+        })
+      }, 4000)
+    }
   }
 
   return (
     <Animated.View entering={FadeInDown.duration(400)} style={{ marginBottom: 16 }}>
       <ScrollView
+        ref={scrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={handleScroll}
+        onScrollBeginDrag={handleScrollBegin}
+        onMomentumScrollEnd={handleScrollEnd}
         snapToInterval={BANNER_WIDTH + 12}
         decelerationRate="fast"
         contentContainerStyle={{ gap: 12 }}
@@ -133,7 +164,7 @@ function BannersCarousel({ bagOffer, activeSub, colors, t, onBagPress, onNewOrde
 export default function HomeScreen() {
   const { profile } = useAuth()
   const { colors } = useTheme()
-  const { t } = useLanguage()
+  const { t, locale } = useLanguage()
   const router = useRouter()
   const [recentOrders, setRecentOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -397,10 +428,10 @@ export default function HomeScreen() {
     <Modal visible={!!ratingOrder} transparent animationType="slide" onRequestClose={dismissRating}>
       <View style={rs.overlay}>
         <View style={[rs.card, { backgroundColor: colors.navy[800], borderColor: colors.navy[700] }]}>
-          <Text style={[rs.title, { color: colors.text }]}>⭐ قيّم طلبك</Text>
-          <Text style={[rs.subtitle, { color: colors.navy[300] }]}>طلب {ratingOrder?.order_number}</Text>
+          <Text style={[rs.title, { color: colors.text }]}>{t('rateOrderTitle')}</Text>
+          <Text style={[rs.subtitle, { color: colors.navy[300] }]}>{t('orderHash')}{ratingOrder?.order_number}</Text>
 
-          <Text style={[rs.label, { color: colors.navy[100] }]}>تقييم الخدمة</Text>
+          <Text style={[rs.label, { color: colors.navy[100] }]}>{t('serviceRating')}</Text>
           <View style={rs.starsRow}>
             {[1, 2, 3, 4, 5].map(n => (
               <TouchableOpacity key={n} onPress={() => setRatingService(n)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
@@ -411,7 +442,7 @@ export default function HomeScreen() {
 
           {ratingOrder?.driver_id && (
             <>
-              <Text style={[rs.label, { color: colors.navy[100] }]}>تقييم السائق</Text>
+              <Text style={[rs.label, { color: colors.navy[100] }]}>{t('driverRating')}</Text>
               <View style={rs.starsRow}>
                 {[1, 2, 3, 4, 5].map(n => (
                   <TouchableOpacity key={n} onPress={() => setRatingDriver(n)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
@@ -424,7 +455,7 @@ export default function HomeScreen() {
 
           <TextInput
             style={[rs.input, { backgroundColor: colors.navy[700], color: colors.text, borderColor: colors.navy[600] }]}
-            placeholder="ملاحظاتك (اختياري)..."
+            placeholder={t('ratingNotes')}
             placeholderTextColor={colors.navy[400]}
             value={ratingNote}
             onChangeText={setRatingNote}
@@ -434,14 +465,14 @@ export default function HomeScreen() {
 
           <View style={rs.actions}>
             <TouchableOpacity style={[rs.cancelBtn, { borderColor: colors.navy[500] }]} onPress={dismissRating}>
-              <Text style={[rs.cancelText, { color: colors.navy[200] }]}>لاحقاً</Text>
+              <Text style={[rs.cancelText, { color: colors.navy[200] }]}>{t('later')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[rs.submitBtn, { backgroundColor: colors.accent, opacity: ratingService === 0 || ratingSubmitting ? 0.5 : 1 }]}
               onPress={handleSubmitRating}
               disabled={ratingService === 0 || ratingSubmitting}
             >
-              <Text style={[rs.submitText, { color: colors.text }]}>{ratingSubmitting ? 'جاري الإرسال...' : 'إرسال التقييم'}</Text>
+              <Text style={[rs.submitText, { color: colors.text }]}>{ratingSubmitting ? t('submittingRating') : t('submitRating')}</Text>
             </TouchableOpacity>
           </View>
         </View>

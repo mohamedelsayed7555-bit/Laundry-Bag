@@ -17,7 +17,7 @@ const services = [
   { key: 'wash_iron', icon: '✨', label: 'غسيل وكي', labelEn: 'Wash & Iron' },
 ]
 
-const SUPABASE_URL = 'https://kjqtrmedkvqfofwymoni.supabase.co'
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!
 
 export default function NewOrderScreen() {
   const { profile } = useAuth()
@@ -145,6 +145,7 @@ export default function NewOrderScreen() {
 
   const catName = (name: string) => locale === 'en' ? (t(`cat:${name}`) !== `cat:${name}` ? t(`cat:${name}`) : name) : name
   const itemName = (name: string) => locale === 'en' ? (t(`item:${name}`) !== `item:${name}` ? t(`item:${name}`) : name) : name
+  const pName = (name: string) => locale === 'en' ? (t(`plan:${name}` as any) !== `plan:${name}` ? t(`plan:${name}` as any) : name) : name
 
   if (dataLoading) {
     return (
@@ -170,7 +171,7 @@ export default function NewOrderScreen() {
         {activeSub && subRemaining !== null && (
           <View style={[s.subBanner, { backgroundColor: colors.primary + '12', borderColor: colors.primary + '30' }]}>
             <View style={s.subBannerRow}>
-              <Text style={[s.subBannerName, { color: colors.text }]}>👑 {activeSub.plans?.name ?? t('subscriptionPlans')}</Text>
+              <Text style={[s.subBannerName, { color: colors.text }]}>👑 {pName(activeSub.plans?.name ?? '') || t('subscriptionPlans')}</Text>
               <Text style={[s.subBannerRemaining, { color: colors.primary }]}>{subRemaining - totalItems} {t('remaining')}</Text>
             </View>
             <View style={[s.subProgressBar, { backgroundColor: colors.navy[700] }]}>

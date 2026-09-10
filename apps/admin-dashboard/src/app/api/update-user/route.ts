@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { rateLimit } from '@/lib/rate-limit'
-import { requireAdmin } from '@/lib/api-auth'
+import { requireAdmin, logAudit } from '@/lib/api-auth'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -47,6 +47,8 @@ export async function POST(request: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 })
   }
+
+  await logAudit(auth.userId, 'update_user', 'user', userId, { emailChanged: !!email, passwordChanged: !!password })
 
   return NextResponse.json({
     success: true,

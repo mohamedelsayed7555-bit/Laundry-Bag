@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { supabase } from '@/lib/supabase'
+import { supabase, logAuditClient } from '@/lib/supabase'
 import DataTable from '@/components/ui/DataTable'
 import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
@@ -40,7 +40,8 @@ export default function DriversPage() {
     const to = from + PAGE_SIZE - 1
     let query = supabase.from('users').select('id, name, phone, email, vehicle_type, vehicle_number, is_active, created_at', { count: 'exact' }).eq('role', 'driver')
     if (search) {
-      query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%`)
+      const s = search.replace(/[%_\\]/g, c => `\\${c}`)
+      query = query.or(`name.ilike.%${s}%,phone.ilike.%${s}%`)
     }
     const { data, count } = await query.order('created_at', { ascending: false }).range(from, to)
     setDrivers(data ?? [])
@@ -93,6 +94,7 @@ export default function DriversPage() {
     setDrivers(prev => prev.map(d => d.id === id ? { ...d, is_active: !current } : d))
     const { error } = await supabase.from('users').update({ is_active: !current }).eq('id', id)
     if (error) { toast('حدث خطأ — جاري التحديث', 'error'); loadDrivers(); return }
+    logAuditClient(current ? 'deactivate_driver' : 'activate_driver', 'user', id)
     if (current) {
       const { data: count } = await supabase.rpc('redistribute_driver_orders', { p_driver_id: id })
       toast(count && count > 0 ? `تم تعطيل السائق وتوزيع ${count} طلب` : 'تم تعطيل السائق')

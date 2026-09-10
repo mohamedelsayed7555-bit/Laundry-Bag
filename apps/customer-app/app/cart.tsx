@@ -26,7 +26,7 @@ const services = [
   { key: 'wash_iron', label: 'غسيل وكي', labelEn: 'Wash & Iron' },
 ]
 
-const SUPABASE_URL = 'https://kjqtrmedkvqfofwymoni.supabase.co'
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!
 
 export default function CartScreen() {
   const { profile } = useAuth()
@@ -228,10 +228,15 @@ export default function CartScreen() {
     }).select('id').single()
 
     if (!error && useSubscription) {
+      // Atomic-ish update: use freshSub value + guard against concurrent changes
+      const { data: freshSub2 } = await supabase.from('subscriptions').select('items_used').eq('id', activeSub.id).single()
+      const currentUsed = freshSub2?.items_used ?? 0
+      const newUsed = currentUsed + totalItems
       await supabase
         .from('subscriptions')
-        .update({ items_used: activeSub.items_used + totalItems })
+        .update({ items_used: newUsed })
         .eq('id', activeSub.id)
+        .eq('items_used', currentUsed)
     }
 
     if (error) {
@@ -425,7 +430,7 @@ export default function CartScreen() {
                   ? `${totalItems} items will be deducted — ${subRemaining! - totalItems} remaining after this order`
                   : `سيتم خصم ${totalItems} قطعة — متبقي ${subRemaining! - totalItems} قطعة بعد الطلب`}
               </Text>
-              <Text style={[s.subCoverPlan, { color: colors.navy[400] }]}>📦 {activeSub.plans?.name ?? (isEn ? 'Subscription' : 'الباقة')}</Text>
+              <Text style={[s.subCoverPlan, { color: colors.navy[400] }]}>📦 {isEn && activeSub.plans?.name ? (t(`plan:${activeSub.plans.name}` as any) !== `plan:${activeSub.plans.name}` ? t(`plan:${activeSub.plans.name}` as any) : activeSub.plans.name) : activeSub.plans?.name ?? (isEn ? 'Subscription' : 'الباقة')}</Text>
             </View>
           </View>
         )}

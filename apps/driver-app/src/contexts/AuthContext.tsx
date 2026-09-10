@@ -103,10 +103,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq('id', session.user.id)
       .single()
 
-    if (checkDeactivation && data && data.is_active === false && data.role === 'driver') {
-      await supabase.auth.signOut()
-      setState(s => ({ ...s, session: null, profile: null, loading: false }))
-      return
+    if (checkDeactivation && data) {
+      if (data.role !== 'driver') {
+        await supabase.auth.signOut()
+        setState(s => ({ ...s, session: null, profile: null, loading: false }))
+        return
+      }
+      if (data.is_active === false) {
+        await supabase.auth.signOut()
+        setState(s => ({ ...s, session: null, profile: null, loading: false }))
+        return
+      }
     }
 
     setState(s => ({
@@ -147,7 +154,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) return { error: error.message }
 
     if (data.user) {
-      const { data: profile } = await supabase.from('users').select('is_active').eq('id', data.user.id).single()
+      const { data: profile } = await supabase.from('users').select('is_active, role').eq('id', data.user.id).single()
+      if (profile && profile.role !== 'driver') {
+        await supabase.auth.signOut()
+        return { error: 'هذا الحساب غير مسجل كسائق' }
+      }
       if (profile && profile.is_active === false) {
         await supabase.auth.signOut()
         return { error: 'تم تعطيل حسابك — تواصل مع الإدارة' }
@@ -169,7 +180,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) return { error: error.message }
 
     if (data.user) {
-      const { data: profile } = await supabase.from('users').select('is_active').eq('id', data.user.id).single()
+      const { data: profile } = await supabase.from('users').select('is_active, role').eq('id', data.user.id).single()
+      if (profile && profile.role !== 'driver') {
+        await supabase.auth.signOut()
+        return { error: 'هذا الحساب غير مسجل كسائق' }
+      }
       if (profile && profile.is_active === false) {
         await supabase.auth.signOut()
         return { error: 'تم تعطيل حسابك — تواصل مع الإدارة' }

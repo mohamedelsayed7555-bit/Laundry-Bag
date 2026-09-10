@@ -10,7 +10,7 @@ import { ActivityIndicator } from 'react-native'
 import { supabase } from '../../src/lib/supabase'
 import { CANCELLABLE_STATUSES } from '../../src/shared/types'
 
-const SUPABASE_URL = 'https://kjqtrmedkvqfofwymoni.supabase.co'
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!
 
 function buildTrackingMapHTML(driverLat: number, driverLng: number, customerLat?: number, customerLng?: number) {
   const centerLat = customerLat ? (driverLat + customerLat) / 2 : driverLat
@@ -124,10 +124,12 @@ export default function OrderDetailsScreen() {
   }, [driverLoc])
 
   async function loadOrder() {
+    if (!profile?.id) return
     const { data } = await supabase
       .from('orders')
       .select('*, driver:users!orders_driver_id_fkey(name, phone)')
       .eq('id', id)
+      .eq('customer_id', profile.id)
       .single()
     setOrder(data)
     setLoading(false)
@@ -152,7 +154,7 @@ export default function OrderDetailsScreen() {
             cancellation_reason: driverArrived ? 'إلغاء بعد الاستلام — رسوم توصيل' : 'إلغاء بواسطة العميل',
             cancellation_fee: fee,
             cancelled_at: new Date().toISOString(),
-          }).eq('id', id)
+          }).eq('id', id).eq('customer_id', profile!.id)
           if (error) {
             showAlert({ title: t('error'), message: t('connectionError'), type: 'error' })
           } else {
@@ -185,7 +187,7 @@ export default function OrderDetailsScreen() {
       rating_driver: ratingDriver || null,
       rating_note: ratingNote || null,
       rated_at: new Date().toISOString(),
-    }).eq('id', id)
+    }).eq('id', id).eq('customer_id', profile!.id)
     setSubmitting(false)
     if (error) showAlert({ title: t('error'), message: t('connectionError'), type: 'error' })
     else { setShowRating(false); loadOrder() }

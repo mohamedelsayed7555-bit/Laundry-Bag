@@ -110,7 +110,7 @@ export default function ProfileScreen() {
           icon={<Crown size={20} color={colors.gold} />}
           label={t('plansAndSub')}
           onPress={() => router.push('/plans')}
-          badge={activeSub ? activeSub.plans?.name : undefined}
+          badge={activeSub ? (locale === 'en' && activeSub.plans?.name ? (t(`plan:${activeSub.plans.name}` as any) !== `plan:${activeSub.plans.name}` ? t(`plan:${activeSub.plans.name}` as any) : activeSub.plans.name) : activeSub.plans?.name) : undefined}
         />
 
         {/* Theme Toggle */}

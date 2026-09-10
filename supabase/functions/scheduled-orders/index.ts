@@ -13,14 +13,12 @@ Deno.serve(async (req: Request) => {
   }
 
   const cronSecret = Deno.env.get("CRON_SECRET");
-  if (cronSecret) {
-    const authHeader = req.headers.get("x-cron-secret") || req.headers.get("authorization")?.replace("Bearer ", "");
-    if (authHeader !== cronSecret && authHeader !== Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+  const authHeader = req.headers.get("x-cron-secret") || req.headers.get("authorization")?.replace("Bearer ", "");
+  if (!authHeader || (authHeader !== cronSecret && authHeader !== Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"))) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   const supabase = createClient(
@@ -175,11 +173,54 @@ Deno.serve(async (req: Request) => {
     cancelledCount = staleIds.length;
   }
 
+  // --- Cancel orphaned pending orders (no driver assigned after 48 hours) ---
+  const orphanCutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+  const { data: orphanedOrders } = await supabase
+    .from("orders")
+    .select("id, order_number, customer_id")
+    .eq("status", "pending")
+    .is("driver_id", null)
+    .lt("created_at", orphanCutoff);
+
+  let orphanedCount = 0;
+  if (orphanedOrders && orphanedOrders.length > 0) {
+    const orphanIds = orphanedOrders.map((o) => o.id);
+    await supabase
+      .from("orders")
+      .update({ status: "cancelled", cancellation_reason: "إلغاء تلقائي — لم يتم تعيين سائق خلال 48 ساعة", cancelled_at: now })
+      .in("id", orphanIds);
+
+    for (const o of orphanedOrders) {
+      await supabase.from("order_status_history").insert({
+        order_id: o.id,
+        status: "cancelled",
+        note: "إلغاء تلقائي — لم يتم تعيين سائق خلال 48 ساعة",
+      });
+
+      const { data: user } = await supabase.from("users").select("fcm_token").eq("id", o.customer_id).single();
+      if (user?.fcm_token) {
+        fetch("https://exp.host/--/api/v2/push/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            to: user.fcm_token,
+            title: "تم إلغاء طلبك",
+            body: `الطلب #${o.order_number} تم إلغاؤه تلقائياً لعدم توفر سائق. يمكنك إعادة الطلب.`,
+            sound: "default",
+            data: { type: "order_cancelled", order_id: o.id },
+          }),
+        }).catch(() => {});
+      }
+    }
+    orphanedCount = orphanIds.length;
+  }
+
   return new Response(
     JSON.stringify({
-      message: `Activated ${activatedCount} scheduled orders, cancelled ${cancelledCount} stale unpaid orders`,
+      message: `Activated ${activatedCount}, cancelled ${cancelledCount} unpaid, cancelled ${orphanedCount} orphaned`,
       activated: activatedCount,
       cancelled: cancelledCount,
+      orphaned: orphanedCount,
       order_ids: ids,
     }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }

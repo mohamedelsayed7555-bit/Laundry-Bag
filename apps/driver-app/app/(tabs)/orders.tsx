@@ -11,6 +11,7 @@ import { useDriverLocation } from '../../src/hooks/useDriverLocation'
 import { colors } from '../../src/theme'
 import { SkeletonOrderCard } from '../../src/components/Skeleton'
 import { useCustomAlert } from '../../src/components/CustomAlert'
+import { canTransitionTo } from '../../src/shared/utils'
 
 const statusConfig: Record<string, { label: string; color: string; icon: string }> = {
   assigned: { label: 'بانتظار الاستلام', color: '#3b82f6', icon: '📋' },
@@ -117,7 +118,13 @@ export default function DriverOrdersScreen() {
   const filteredOrders = filter === 'pickup' ? pickupOrders : filter === 'delivery' ? deliveryOrders : completedOrders
 
   async function updateStatus(orderId: string, newStatus: string) {
-    const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId)
+    // Validate transition and ownership
+    const currentOrder = orders.find(o => o.id === orderId)
+    if (currentOrder && !canTransitionTo(currentOrder.status as any, newStatus as any)) {
+      showAlert({ title: 'خطأ', message: 'لا يمكن الانتقال لهذه الحالة', type: 'error' })
+      return
+    }
+    const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId).eq('driver_id', profile?.id)
     if (error) {
       showAlert({ title: 'خطأ', message: 'حدث خطأ أثناء تحديث الحالة', type: 'error' })
     } else {

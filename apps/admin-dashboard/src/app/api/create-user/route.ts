@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { rateLimit } from '@/lib/rate-limit'
-import { requireAdmin } from '@/lib/api-auth'
+import { requireAdmin, logAudit } from '@/lib/api-auth'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -18,6 +18,11 @@ export async function POST(request: NextRequest) {
 
   if (!email || !password || !name || !role) {
     return NextResponse.json({ error: 'الاسم والإيميل وكلمة المرور والدور مطلوبين' }, { status: 400 })
+  }
+
+  const PRIVILEGED_ROLES = ['super_admin', 'admin']
+  if (PRIVILEGED_ROLES.includes(role) && auth.role !== 'super_admin') {
+    return NextResponse.json({ error: 'فقط الـ Super Admin يمكنه إنشاء حسابات بهذا الدور' }, { status: 403 })
   }
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -57,6 +62,8 @@ export async function POST(request: NextRequest) {
   if (phone) updates.phone = phone
 
   await supabaseAdmin.from('users').update(updates).eq('id', authData.user.id)
+
+  await logAudit(auth.userId, 'create_user', 'user', authData.user.id, { name, role, email })
 
   return NextResponse.json({ success: true, id: authData.user.id })
 }

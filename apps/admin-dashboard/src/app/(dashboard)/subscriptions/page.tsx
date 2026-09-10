@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { supabase } from '@/lib/supabase'
+import { supabase, logAuditClient } from '@/lib/supabase'
 import DataTable from '@/components/ui/DataTable'
 import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
@@ -33,6 +33,30 @@ const durationLabels: Record<string, string> = {
   quarterly: 'ربع سنوي',
   biannual: 'نصف سنوي',
   annual: 'سنوي',
+}
+
+const paymentMethodLabels: Record<string, string> = {
+  cash: 'كاش',
+  visa: 'فيزا',
+  instapay: 'إنستاباي',
+  e_wallet: 'محفظة',
+  wallet: 'محفظة',
+}
+
+const paymentStatusLabels: Record<string, string> = {
+  paid: 'مدفوع',
+  confirmed: 'مؤكد',
+  pending: 'في الانتظار',
+  failed: 'فشل',
+  refunded: 'مسترد',
+}
+
+const paymentStatusVariant: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'neutral'> = {
+  paid: 'success',
+  confirmed: 'success',
+  pending: 'warning',
+  failed: 'danger',
+  refunded: 'info',
 }
 
 const emptyForm = {
@@ -161,6 +185,7 @@ export default function SubscriptionsPage() {
         }).catch(() => {})
       }
 
+      logAuditClient('create_subscription', 'subscription', '', { user_id: form.user_id, plan_id: form.plan_id })
       setShowAdd(false); setForm(emptyForm); loadSubs(); toast('تم إضافة الاشتراك بنجاح')
     } else { toast('حدث خطأ: ' + error.message, 'error') }
   }
@@ -181,7 +206,7 @@ export default function SubscriptionsPage() {
       auto_renew: form.auto_renew,
     }).eq('id', editSub.id)
     setSaving(false)
-    if (!error) { setEditSub(null); loadSubs(); toast('تم تعديل الاشتراك') }
+    if (!error) { logAuditClient('update_subscription', 'subscription', editSub.id); setEditSub(null); loadSubs(); toast('تم تعديل الاشتراك') }
     else { toast('حدث خطأ: ' + error.message, 'error') }
   }
 
@@ -207,7 +232,7 @@ export default function SubscriptionsPage() {
     if (linkedOrders && linkedOrders.length > 0) { toast('لا يمكن الحذف — يوجد طلبات مرتبطة لم تكتمل بعد', 'error'); return }
     if (!confirm('هل أنت متأكد من حذف هذا الاشتراك؟')) return
     const { error } = await supabase.from('subscriptions').delete().eq('id', id)
-    if (!error) { loadSubs(); setDetail(null); toast('تم حذف الاشتراك', 'warning') }
+    if (!error) { logAuditClient('delete_subscription', 'subscription', id); loadSubs(); setDetail(null); toast('تم حذف الاشتراك', 'warning') }
     else { toast('حدث خطأ أثناء الحذف', 'error') }
   }
 
@@ -282,6 +307,11 @@ export default function SubscriptionsPage() {
     { key: 'duration', label: 'المدة', render: (item: any) => <span className="text-gray-600 text-xs">{durationLabels[item.duration] ?? item.duration}</span> },
     { key: 'items', label: 'القطع', render: (item: any) => <span className="text-gray-600">{item.items_used ?? 0} / {item.items_limit}</span> },
     { key: 'total_paid', label: 'المبلغ', render: (item: any) => <span className="font-semibold text-gray-800">{item.total_paid ? `${item.total_paid} ج.م` : '—'}</span> },
+    { key: 'payment_method', label: 'طريقة الدفع', render: (item: any) => <span className="text-gray-600 text-xs">{paymentMethodLabels[item.payment_method] ?? item.payment_method ?? '—'}</span> },
+    { key: 'payment_status', label: 'حالة الدفع', render: (item: any) => {
+      const ps = item.payment_status ?? (item.status === 'active' ? 'paid' : 'pending')
+      return <Badge variant={paymentStatusVariant[ps] ?? 'neutral'}>{paymentStatusLabels[ps] ?? ps}</Badge>
+    }},
     { key: 'status', label: 'الحالة', render: (item: any) => <Badge variant={statusVariant[item.status] ?? 'neutral'}>{statusLabels[item.status] ?? item.status}</Badge> },
     { key: 'actions', label: '', render: (item: any) => (
       <div className="flex gap-1">
@@ -457,6 +487,8 @@ export default function SubscriptionsPage() {
                 { label: 'الحالة', value: <Badge variant={statusVariant[detail.status]}>{statusLabels[detail.status]}</Badge> },
                 { label: 'المدة', value: durationLabels[detail.duration] },
                 { label: 'المبلغ', value: `${detail.total_paid ?? '—'} ج.م` },
+                { label: 'طريقة الدفع', value: paymentMethodLabels[detail.payment_method] ?? detail.payment_method ?? '—' },
+                { label: 'حالة الدفع', value: (() => { const ps = detail.payment_status ?? (detail.status === 'active' ? 'paid' : 'pending'); return <Badge variant={paymentStatusVariant[ps] ?? 'neutral'}>{paymentStatusLabels[ps] ?? ps}</Badge> })() },
                 { label: 'تاريخ البداية', value: detail.start_date ?? '—' },
                 { label: 'تاريخ الانتهاء', value: detail.end_date ?? '—' },
                 { label: 'الأيام المتبقية', value: detail.end_date ? `${Math.max(0, Math.ceil((new Date(detail.end_date).getTime() - Date.now()) / 86400000))} يوم` : '—' },

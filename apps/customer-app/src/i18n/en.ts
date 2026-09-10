@@ -153,6 +153,22 @@ export default {
   activeSince: 'Active since',
   expiresOn: 'Expires on',
 
+  // Bag Order
+  bagSelectAddress: 'Select delivery address',
+  bagWalletPhoneInvalid: 'Enter a valid wallet phone number (01xxxxxxxxx)',
+  bagOfferUnavailable: 'This offer is currently unavailable',
+  bagPerDay: 'daily',
+  bagMaxItems: 'Max items',
+  bagFreeDelivery: 'Free delivery',
+  bagPrice: 'Bag price',
+  bagFree: 'Free',
+  bagOrderNow: 'Order Bag Now',
+  bagOrderSuccess: 'Laundry Bag order placed',
+  bagInstapayTitle: 'Transfer to InstaPay number',
+  bagInstapayHint: 'Transfer the amount and send the receipt to the driver in chat',
+  bagBuilding: 'Bldg',
+  bagFloor: 'F',
+
   // New Order
   newOrderTitle: 'New Order',
   pickupAddress: 'Pickup Address',
@@ -287,4 +303,20 @@ export default {
   'item:ستارة': 'Curtain',
   'item:بطاطين خفيفه': 'Light Blanket',
   'item:غطاء سيارة': 'Car Cover',
+
+  // Plan names (DB names → English)
+  'plan:باقة فردي': 'Individual Plan',
+  'plan:باقة زوجي': 'Couple Plan',
+  'plan:باقة عائلي': 'Family Plan',
+  'plan:باقة بريميوم': 'Premium Plan',
+  'plan:فردي': 'Individual',
+  'plan:زوجي': 'Couple',
+  'plan:عائلي': 'Family',
+  'plan:بريميوم': 'Premium',
+
+  // Plan tiers
+  'tier:individual': 'Individual',
+  'tier:couple': 'Couple',
+  'tier:family': 'Family',
+  'tier:premium': 'Premium',
 }

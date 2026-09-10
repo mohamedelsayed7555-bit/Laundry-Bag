@@ -48,6 +48,7 @@ export default function ChatScreen() {
         .from('orders')
         .select('status')
         .eq('id', orderId)
+        .eq('customer_id', profile.id)
         .single(),
     ])
 
@@ -112,7 +113,7 @@ export default function ChatScreen() {
   async function handleSend() {
     if (!text.trim() || !profile || !orderId || chatClosed) return
 
-    const { data: order } = await supabase.from('orders').select('driver_id').eq('id', orderId).single()
+    const { data: order } = await supabase.from('orders').select('driver_id').eq('id', orderId).eq('customer_id', profile.id).single()
     if (!order?.driver_id) return
 
     setSending(true)

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../src/contexts/AuthContext'
 import { useTheme } from '../src/contexts/ThemeContext'
@@ -58,6 +58,7 @@ export default function PlansScreen() {
   const { profile } = useAuth()
   const { colors } = useTheme()
   const { t, locale } = useLanguage()
+  const planName = (name: string) => locale === 'en' ? (t(`plan:${name}` as any) !== `plan:${name}` ? t(`plan:${name}` as any) : name) : name
   const router = useRouter()
   const { showAlert, AlertComponent } = useCustomAlert()
   const [plans, setPlans] = useState<Plan[]>([])
@@ -69,6 +70,7 @@ export default function PlansScreen() {
   const [discountRates, setDiscountRates] = useState({ quarterly: 10, biannual: 15, annual: 20 })
   const [autoRenew, setAutoRenew] = useState(true)
   const [selectedPayment, setSelectedPayment] = useState('visa')
+  const [walletPhone, setWalletPhone] = useState('')
 
   useEffect(() => {
     loadData()
@@ -123,7 +125,9 @@ export default function PlansScreen() {
     if (!activeSub) return
     showAlert({
       title: t('cancelSubscription') || 'إلغاء الاشتراك',
-      message: `هل أنت متأكد من إلغاء اشتراك "${activeSub.plan_name}"?\n\n⚠️ لن يتم استرداد المبلغ المدفوع (${activeSub.total_paid} ج.م)`,
+      message: locale === 'en'
+        ? `Are you sure you want to cancel "${planName(activeSub.plan_name ?? '')}"?\n\n⚠️ Paid amount (${activeSub.total_paid} EGP) is non-refundable.`
+        : `هل أنت متأكد من إلغاء اشتراك "${activeSub.plan_name}"?\n\n⚠️ لن يتم استرداد المبلغ المدفوع (${activeSub.total_paid} ج.م)`,
       type: 'confirm',
       buttons: [
         { text: locale === 'en' ? 'Cancel' : 'تراجع', style: 'cancel' },
@@ -153,7 +157,7 @@ export default function PlansScreen() {
       showAlert({
         title: locale === 'en' ? 'Upgrade plan' : 'ترقية الباقة',
         message: locale === 'en'
-          ? `You are subscribed to "${activeSub.plan_name}".\n\n⚠️ Paid amount (${activeSub.total_paid} EGP) is non-refundable.\n\nUpgrade to "${plan.name}"?`
+          ? `You are subscribed to "${planName(activeSub.plan_name ?? '')}". ⚠️ Paid amount (${activeSub.total_paid} EGP) is non-refundable.\n\nUpgrade to "${planName(plan.name)}"?`
           : `أنت مشترك حالياً في "${activeSub.plan_name}".\n\n⚠️ المبلغ المدفوع للباقة الحالية (${activeSub.total_paid} ج.م) لن يُسترد.\n\nهل تريد الترقية إلى "${plan.name}"؟`,
         type: 'confirm',
         buttons: [
@@ -174,12 +178,16 @@ export default function PlansScreen() {
   }
 
   async function doSubscribe(plan: Plan) {
+    if (selectedPayment === 'wallet' && !walletPhone.match(/^01[0-9]{9}$/)) {
+      showAlert({ title: locale === 'en' ? 'Notice' : 'تنبيه', message: locale === 'en' ? 'Enter a valid wallet phone number (01xxxxxxxxx)' : 'أدخل رقم موبايل المحفظة بشكل صحيح (01xxxxxxxxx)', type: 'warning' })
+      return
+    }
     const dur = durationsMeta.find(d => d.key === selectedDuration)!
     const price = calcPrice(plan.monthly_price, selectedDuration)
     const durLabel = locale === 'en' ? dur.labelEn : dur.label
 
     showAlert({
-      title: `${locale === 'en' ? 'Subscribe' : 'اشتراك'} ${plan.name}`,
+      title: `${locale === 'en' ? 'Subscribe' : 'اشتراك'} ${planName(plan.name)}`,
       message: locale === 'en'
         ? `Duration: ${durLabel}\nPrice: ${price} EGP\n${plan.items_per_month} items/month\nPayment: ${paymentMethods.find(p => p.key === selectedPayment)?.labelEn}\nAuto-renew: ${autoRenew ? 'Yes' : 'No'}\n\n${selectedPayment === 'instapay' ? 'Your request will be reviewed after payment confirmation' : 'Your subscription will be activated automatically after payment'}`
         : `المدة: ${durLabel}\nالسعر: ${price} ج.م\n${plan.items_per_month} قطعة/شهر\nطريقة الدفع: ${paymentMethods.find(p => p.key === selectedPayment)?.label}\nتجديد تلقائي: ${autoRenew ? 'نعم' : 'لا'}\n\n${selectedPayment === 'instapay' ? 'سيتم مراجعة طلبك وتفعيله من الإدارة بعد تأكيد الدفع' : 'سيتم تفعيل اشتراكك تلقائياً بعد نجاح الدفع'}`,
@@ -214,7 +222,7 @@ export default function PlansScreen() {
                 body: {
                   subscription_id: newSub.id,
                   payment_method: selectedPayment === 'visa' ? 'card' : 'wallet',
-                  wallet_phone: profile!.phone,
+                  wallet_phone: selectedPayment === 'wallet' ? walletPhone : profile!.phone,
                 },
               })
               setSubscribing(false)
@@ -258,7 +266,7 @@ export default function PlansScreen() {
       {pendingSub && (
         <View style={[s.pendingSubCard, { borderColor: '#f59e0b40' }]}>
           <Text style={s.pendingSubBadge}>⏳ {locale === 'en' ? 'Pending subscription request' : 'طلب اشتراك قيد المراجعة'}</Text>
-          <Text style={[s.pendingSubName, { color: colors.text }]}>{pendingSub.plan_name}</Text>
+          <Text style={[s.pendingSubName, { color: colors.text }]}>{planName(pendingSub.plan_name ?? '')}</Text>
           <Text style={[s.pendingSubHint, { color: colors.navy[300] }]}>{locale === 'en' ? 'Will be activated after admin review and payment confirmation' : 'سيتم تفعيل اشتراكك بعد مراجعة الإدارة وتأكيد الدفع'}</Text>
         </View>
       )}
@@ -272,7 +280,7 @@ export default function PlansScreen() {
           <View style={s.activeSubHeader}>
             <Text style={[s.activeSubBadge, { color: colors.primary }]}>{locale === 'en' ? 'Active subscription ✓' : 'اشتراك نشط ✓'}</Text>
           </View>
-          <Text style={[s.activeSubName, { color: colors.text }]}>{activeSub.plan_name}</Text>
+          <Text style={[s.activeSubName, { color: colors.text }]}>{planName(activeSub.plan_name ?? '')}</Text>
 
           {exhausted && (
             <View style={[s.exhaustedBanner, { backgroundColor: colors.danger + '15', borderColor: colors.danger + '30' }]}>
@@ -351,6 +359,21 @@ export default function PlansScreen() {
         ))}
       </View>
 
+      {selectedPayment === 'wallet' && (
+        <View style={[s.walletPhoneCard, { backgroundColor: colors.cardBg, borderColor: colors.primary + '30' }]}>
+          <Text style={[s.walletPhoneLabel, { color: colors.text }]}>📱 {locale === 'en' ? 'Wallet phone number' : 'رقم موبايل المحفظة'}</Text>
+          <TextInput
+            style={[s.walletPhoneInput, { color: colors.text, borderColor: colors.navy[600], backgroundColor: colors.navy[800] }]}
+            placeholder="01xxxxxxxxx"
+            placeholderTextColor={colors.navy[400]}
+            value={walletPhone}
+            onChangeText={setWalletPhone}
+            keyboardType="phone-pad"
+            maxLength={11}
+          />
+        </View>
+      )}
+
       <TouchableOpacity style={[s.autoRenewRow, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]} onPress={() => setAutoRenew(!autoRenew)} activeOpacity={0.7}>
         <View style={s.autoRenewInfo}>
           <Text style={[s.autoRenewLabel, { color: colors.text }]}>{locale === 'en' ? 'Auto-renew' : 'تجديد تلقائي'}</Text>
@@ -372,7 +395,7 @@ export default function PlansScreen() {
               <View style={[s.currentBadge, { backgroundColor: colors.primary }]}><Text style={s.currentBadgeText}>{locale === 'en' ? 'Current plan' : 'باقتك الحالية'}</Text></View>
             )}
             <View style={[s.planTierDot, { backgroundColor: tierColor }]} />
-            <Text style={[s.planName, { color: colors.text }]}>{plan.name}</Text>
+            <Text style={[s.planName, { color: colors.text }]}>{planName(plan.name)}</Text>
             <Text style={[s.planDesc, { color: colors.navy[300] }]}>{plan.description}</Text>
 
             <View style={s.planPriceRow}>
@@ -481,6 +504,9 @@ const s = StyleSheet.create({
   },
   paymentCheckText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
+  walletPhoneCard: { borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1 },
+  walletPhoneLabel: { fontSize: 14, fontWeight: '700', marginBottom: 8 },
+  walletPhoneInput: { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 18, textAlign: 'center', fontWeight: '700', letterSpacing: 2 },
   autoRenewRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1,

@@ -6,15 +6,16 @@ import Animated, { FadeInDown } from 'react-native-reanimated'
 import { useAuth } from '../src/contexts/AuthContext'
 import { useTheme } from '../src/contexts/ThemeContext'
 import { useCustomAlert } from '../src/components/CustomAlert'
+import { useLanguage } from '../src/contexts/LanguageContext'
 import { supabase } from '../src/lib/supabase'
 
-const SUPABASE_URL = 'https://kjqtrmedkvqfofwymoni.supabase.co'
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!
 
 const PAYMENT_METHODS = [
-  { key: 'cash', icon: '💵', label: 'كاش' },
-  { key: 'visa', icon: '💳', label: 'فيزا' },
-  { key: 'instapay', icon: '📱', label: 'إنستاباي' },
-  { key: 'e_wallet', icon: '📲', label: 'محفظة إلكترونية' },
+  { key: 'cash', icon: '💵', labelKey: 'pmCash' },
+  { key: 'visa', icon: '💳', labelKey: 'pmVisa' },
+  { key: 'instapay', icon: '📱', labelKey: 'pmInstapay' },
+  { key: 'e_wallet', icon: '📲', labelKey: 'pmWallet' },
 ]
 
 export default function BagOrderScreen() {
@@ -22,6 +23,7 @@ export default function BagOrderScreen() {
   const { colors } = useTheme()
   const router = useRouter()
   const { showAlert, AlertComponent } = useCustomAlert()
+  const { t, locale } = useLanguage()
 
   const [bagOffer, setBagOffer] = useState<any>(null)
   const [addresses, setAddresses] = useState<any[]>([])
@@ -62,14 +64,14 @@ export default function BagOrderScreen() {
   async function handleOrder() {
     if (!profile || !bagOffer) return
     if (!selectedAddress) {
-      showAlert({ title: 'تنبيه', message: 'اختار عنوان التوصيل', type: 'warning' })
+      showAlert({ title: t('warning'), message: t('bagSelectAddress'), type: 'warning' })
       return
     }
 
     const isOnlinePayment = paymentMethod === 'visa' || paymentMethod === 'e_wallet'
 
     if (paymentMethod === 'e_wallet' && !walletPhone.match(/^01[0-9]{9}$/)) {
-      showAlert({ title: 'تنبيه', message: 'أدخل رقم موبايل المحفظة بشكل صحيح (01xxxxxxxxx)', type: 'warning' })
+      showAlert({ title: t('warning'), message: t('bagWalletPhoneInvalid'), type: 'warning' })
       return
     }
 
@@ -93,7 +95,7 @@ export default function BagOrderScreen() {
 
     if (error) {
       setSaving(false)
-      showAlert({ title: 'خطأ', message: error.message, type: 'error' })
+      showAlert({ title: t('error'), message: error.message, type: 'error' })
       return
     }
 
@@ -117,11 +119,11 @@ export default function BagOrderScreen() {
         if (paymentData.iframe_url) {
           router.push({ pathname: '/payment', params: { url: paymentData.iframe_url } })
         } else if (paymentData.error) {
-          showAlert({ title: 'خطأ', message: paymentData.error, type: 'error' })
+          showAlert({ title: t('error'), message: paymentData.error, type: 'error' })
         }
       } catch (e) {
         setSaving(false)
-        showAlert({ title: 'خطأ', message: 'حدث خطأ في الاتصال بخدمة الدفع', type: 'error' })
+        showAlert({ title: t('error'), message: t('connectionError'), type: 'error' })
       }
       return
     }
@@ -137,8 +139,8 @@ export default function BagOrderScreen() {
 
     setSaving(false)
     showAlert({
-      title: 'تم بنجاح! 🎉',
-      message: `تم طلب شنطة Laundry Bag\nالحد الأقصى: ${bagOffer.max_items} قطعة\nالمبلغ: ${bagOffer.daily_price} ج.م`,
+      title: `${t('success')}! 🎉`,
+      message: `${t('bagOrderSuccess')}\n${t('bagMaxItems')}: ${bagOffer.max_items} ${t('pieces')}\n${t('total')}: ${bagOffer.daily_price} ${t('currency')}`,
       type: 'success',
       onConfirm: () => router.replace('/(tabs)/orders'),
     })
@@ -152,7 +154,7 @@ export default function BagOrderScreen() {
 
   if (!bagOffer) return (
     <View style={[s.center, { backgroundColor: colors.navy[900] }]}>
-      <Text style={{ color: colors.navy[300], fontSize: 16 }}>العرض غير متاح حالياً</Text>
+      <Text style={{ color: colors.navy[300], fontSize: 16 }}>{t('bagOfferUnavailable')}</Text>
     </View>
   )
 
@@ -176,26 +178,26 @@ export default function BagOrderScreen() {
                 <Text style={s.offerTitle}>{bagOffer.title}</Text>
                 <Text style={s.offerSub}>{bagOffer.subtitle}</Text>
                 <View style={s.priceRow}>
-                  {discount > 0 && <Text style={s.oldPrice}>{bagOffer.original_price} ج.م</Text>}
-                  <Text style={s.price}>{bagOffer.daily_price} ج.م</Text>
-                  <Text style={s.perDay}>/ يومياً</Text>
+                  {discount > 0 && <Text style={s.oldPrice}>{bagOffer.original_price} {t('currency')}</Text>}
+                  <Text style={s.price}>{bagOffer.daily_price} {t('currency')}</Text>
+                  <Text style={s.perDay}>/ {t('bagPerDay')}</Text>
                 </View>
               </View>
               <Text style={{ fontSize: 52 }}>👜</Text>
             </View>
             <View style={s.infoRow}>
-              <Text style={s.infoText}>📦 الحد الأقصى: {bagOffer.max_items} قطعة</Text>
-              <Text style={s.infoText}>🚚 التوصيل مجاني</Text>
+              <Text style={s.infoText}>📦 {t('bagMaxItems')}: {bagOffer.max_items} {t('pieces')}</Text>
+              <Text style={s.infoText}>🚚 {t('bagFreeDelivery')}</Text>
             </View>
           </LinearGradient>
         </Animated.View>
 
         {/* Address */}
         <Animated.View entering={FadeInDown.duration(500).delay(100)}>
-          <Text style={[s.sectionTitle, { color: colors.text }]}>📍 عنوان التوصيل</Text>
+          <Text style={[s.sectionTitle, { color: colors.text }]}>📍 {t('deliveryAddress')}</Text>
           {addresses.length === 0 ? (
             <TouchableOpacity style={[s.addAddressBtn, { borderColor: colors.navy[600] }]} onPress={() => router.push('/addresses')}>
-              <Text style={{ color: colors.primary, fontWeight: '700' }}>+ أضف عنوان</Text>
+              <Text style={{ color: colors.primary, fontWeight: '700' }}>+ {t('selectAddress')}</Text>
             </TouchableOpacity>
           ) : (
             <View style={{ gap: 8 }}>
@@ -205,7 +207,7 @@ export default function BagOrderScreen() {
                   <Text style={[s.addressLabel, { color: selectedAddress?.id === addr.id ? colors.primary : colors.text }]}>
                     {selectedAddress?.id === addr.id ? '✅ ' : ''}{addr.label}
                   </Text>
-                  {addr.building && <Text style={{ color: colors.navy[400], fontSize: 11 }}>مبنى {addr.building}{addr.floor ? ` — ط${addr.floor}` : ''}</Text>}
+                  {addr.building && <Text style={{ color: colors.navy[400], fontSize: 11 }}>{t('bagBuilding')} {addr.building}{addr.floor ? ` — ${t('bagFloor')}${addr.floor}` : ''}</Text>}
                 </TouchableOpacity>
               ))}
             </View>
@@ -214,13 +216,13 @@ export default function BagOrderScreen() {
 
         {/* Payment */}
         <Animated.View entering={FadeInDown.duration(500).delay(200)}>
-          <Text style={[s.sectionTitle, { color: colors.text }]}>💳 طريقة الدفع</Text>
+          <Text style={[s.sectionTitle, { color: colors.text }]}>💳 {t('paymentMethod')}</Text>
           <View style={{ gap: 8 }}>
             {PAYMENT_METHODS.map(pm => (
               <TouchableOpacity key={pm.key} onPress={() => setPaymentMethod(pm.key)}
                 style={[s.paymentCard, { backgroundColor: colors.cardBg, borderColor: paymentMethod === pm.key ? colors.primary : colors.navy[700] }]}>
                 <Text style={{ fontSize: 22 }}>{pm.icon}</Text>
-                <Text style={[s.paymentLabel, { color: paymentMethod === pm.key ? colors.primary : colors.text }]}>{pm.label}</Text>
+                <Text style={[s.paymentLabel, { color: paymentMethod === pm.key ? colors.primary : colors.text }]}>{t(pm.labelKey)}</Text>
                 {paymentMethod === pm.key && <Text style={{ color: colors.primary, marginLeft: 'auto' }}>✓</Text>}
               </TouchableOpacity>
             ))}
@@ -229,7 +231,7 @@ export default function BagOrderScreen() {
           {/* E-Wallet phone input */}
           {paymentMethod === 'e_wallet' && (
             <View style={[s.paymentInfoCard, { backgroundColor: colors.cardBg, borderColor: colors.primary + '30' }]}>
-              <Text style={[s.paymentInfoTitle, { color: colors.text }]}>📱 رقم موبايل المحفظة</Text>
+              <Text style={[s.paymentInfoTitle, { color: colors.text }]}>📱 {t('enterWalletPhone')}</Text>
               <TextInput
                 style={[s.walletInput, { color: colors.text, borderColor: colors.navy[600], backgroundColor: colors.navy[800] }]}
                 placeholder="01xxxxxxxxx"
@@ -245,9 +247,9 @@ export default function BagOrderScreen() {
           {/* InstaPay info */}
           {paymentMethod === 'instapay' && paymentSettings.instapay && (
             <View style={[s.paymentInfoCard, { backgroundColor: colors.cardBg, borderColor: colors.primary + '30' }]}>
-              <Text style={[s.paymentInfoTitle, { color: colors.text }]}>🏦 حوّل على رقم الإنستاباي</Text>
+              <Text style={[s.paymentInfoTitle, { color: colors.text }]}>🏦 {t('bagInstapayTitle')}</Text>
               <Text style={[s.paymentInfoNumber, { color: colors.primary }]} selectable>{paymentSettings.instapay}</Text>
-              <Text style={[s.paymentInfoHint, { color: colors.navy[300] }]}>حوّل المبلغ وأرسل صورة الإيصال للسائق في المحادثة</Text>
+              <Text style={[s.paymentInfoHint, { color: colors.navy[300] }]}>{t('bagInstapayHint')}</Text>
             </View>
           )}
         </Animated.View>
@@ -256,17 +258,17 @@ export default function BagOrderScreen() {
         <Animated.View entering={FadeInDown.duration(500).delay(300)}>
           <View style={[s.summaryCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
             <View style={s.summaryRow}>
-              <Text style={{ color: colors.navy[300], fontSize: 14 }}>سعر الشنطة</Text>
-              <Text style={{ color: colors.text, fontSize: 14, fontWeight: '700' }}>{bagOffer.daily_price} ج.م</Text>
+              <Text style={{ color: colors.navy[300], fontSize: 14 }}>{t('bagPrice')}</Text>
+              <Text style={{ color: colors.text, fontSize: 14, fontWeight: '700' }}>{bagOffer.daily_price} {t('currency')}</Text>
             </View>
             <View style={s.summaryRow}>
-              <Text style={{ color: colors.navy[300], fontSize: 14 }}>التوصيل</Text>
-              <Text style={{ color: colors.primary, fontSize: 14, fontWeight: '700' }}>مجاناً</Text>
+              <Text style={{ color: colors.navy[300], fontSize: 14 }}>{t('deliveryFee')}</Text>
+              <Text style={{ color: colors.primary, fontSize: 14, fontWeight: '700' }}>{t('bagFree')}</Text>
             </View>
             <View style={[s.summaryDivider, { backgroundColor: colors.navy[700] }]} />
             <View style={s.summaryRow}>
-              <Text style={{ color: colors.text, fontSize: 16, fontWeight: '800' }}>الإجمالي</Text>
-              <Text style={{ color: colors.primary, fontSize: 20, fontWeight: '900' }}>{bagOffer.daily_price} ج.م</Text>
+              <Text style={{ color: colors.text, fontSize: 16, fontWeight: '800' }}>{t('total')}</Text>
+              <Text style={{ color: colors.primary, fontSize: 20, fontWeight: '900' }}>{bagOffer.daily_price} {t('currency')}</Text>
             </View>
           </View>
         </Animated.View>
@@ -279,7 +281,7 @@ export default function BagOrderScreen() {
         <TouchableOpacity onPress={handleOrder} disabled={saving || !selectedAddress} activeOpacity={0.85}>
           <LinearGradient colors={['#059669', '#047857']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={[s.orderBtn, { opacity: saving || !selectedAddress ? 0.5 : 1 }]}>
-            {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.orderBtnText}>اطلب الشنطة الآن 👜</Text>}
+            {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.orderBtnText}>{t('bagOrderNow')} 👜</Text>}
           </LinearGradient>
         </TouchableOpacity>
       </View>

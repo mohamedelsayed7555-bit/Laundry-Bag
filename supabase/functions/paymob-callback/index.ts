@@ -4,7 +4,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 const HMAC_SECRET = Deno.env.get("PAYMOB_HMAC_SECRET")!;
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": "https://accept.paymob.com",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
@@ -28,71 +28,13 @@ Deno.serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // GET = browser redirect from Paymob — display-only, no DB writes
+    // Actual payment confirmation happens via the POST webhook with HMAC
     if (req.method === "GET") {
       const url = new URL(req.url);
       const success = url.searchParams.get("success") === "true";
-      const paymobOrderId = url.searchParams.get("order");
-      const txnId = url.searchParams.get("id");
 
-      console.log("GET redirect received - success:", success, "order:", paymobOrderId, "txn:", txnId);
-
-      if (paymobOrderId) {
-        const pid = String(paymobOrderId);
-        const { data: order } = await supabase
-          .from("orders")
-          .select("id")
-          .eq("paymob_order_id", pid)
-          .single();
-
-        if (order) {
-          await supabase
-            .from("orders")
-            .update({ payment_status: success ? "confirmed" : "failed" })
-            .eq("id", order.id);
-          console.log("Order payment_status updated via GET redirect:", order.id, success ? "confirmed" : "failed");
-        } else {
-          const { data: sub } = await supabase
-            .from("subscriptions")
-            .select("id, user_id, duration, plan_id, plans(name, items_per_month)")
-            .eq("paymob_order_id", pid)
-            .single();
-
-          if (sub && success) {
-            const months = sub.duration === "monthly" ? 1 : sub.duration === "quarterly" ? 3 : sub.duration === "biannual" ? 6 : 12;
-            const now = new Date();
-            const endDate = new Date(now);
-            endDate.setMonth(endDate.getMonth() + months);
-            const plan = sub.plans as any;
-            const itemsLimit = (plan?.items_per_month || 0) * months;
-
-            await supabase
-              .from("subscriptions")
-              .update({
-                status: "active",
-                start_date: now.toISOString().split("T")[0],
-                end_date: endDate.toISOString().split("T")[0],
-                items_used: 0,
-                items_limit: itemsLimit,
-              })
-              .eq("id", sub.id);
-
-            await supabase.from("notifications").insert({
-              user_id: sub.user_id,
-              title: "تم تفعيل اشتراكك ✅",
-              body: `تم الدفع وتفعيل باقة ${plan?.name || "الباقة"} بنجاح. رصيدك ${itemsLimit} قطعة.`,
-              type: "system",
-              data: { subscription_id: sub.id },
-              sent_at: new Date().toISOString(),
-            });
-            console.log("Subscription activated via GET redirect:", sub.id);
-          } else if (sub && !success) {
-            await supabase
-              .from("subscriptions")
-              .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
-              .eq("id", sub.id);
-          }
-        }
-      }
+      console.log("GET redirect received (display only) - success:", success);
 
       const html = success
         ? `<html><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;background:#0f172a;color:#fff;flex-direction:column"><h1>✅</h1><h2>تم الدفع بنجاح</h2><p>يمكنك إغلاق هذه الصفحة</p></body></html>`
@@ -107,8 +49,15 @@ Deno.serve(async (req: Request) => {
     console.log("Callback received, success:", obj.success, "order_id:", obj.order?.id);
     console.log("HMAC_SECRET set:", !!HMAC_SECRET, "length:", HMAC_SECRET?.length);
 
-    // Verify HMAC
-    if (HMAC_SECRET) {
+    // Verify HMAC — mandatory
+    if (!HMAC_SECRET) {
+      console.error("PAYMOB_HMAC_SECRET not configured — rejecting webhook");
+      return new Response(JSON.stringify({ error: "Server misconfiguration" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    {
       const hmacFields = [
         obj.amount_cents,
         obj.created_at,
@@ -146,8 +95,6 @@ Deno.serve(async (req: Request) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-    } else {
-      console.log("No HMAC_SECRET set - skipping verification");
     }
 
     const paymobOrderId = String(obj.order?.id);
@@ -156,11 +103,31 @@ Deno.serve(async (req: Request) => {
     // Find our order by paymob_order_id
     const { data: order } = await supabase
       .from("orders")
-      .select("id")
+      .select("id, payment_status, total_price")
       .eq("paymob_order_id", paymobOrderId)
       .single();
 
     if (order) {
+      // Idempotency: skip if already confirmed
+      if (order.payment_status === "confirmed") {
+        console.log("Order already confirmed, skipping:", order.id);
+        return new Response(JSON.stringify({ received: true, skipped: "already_confirmed" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Amount verification: compare paymob amount_cents with our total_price
+      if (isSuccess && order.total_price != null) {
+        const expectedCents = Math.round(order.total_price * 100);
+        if (obj.amount_cents !== expectedCents) {
+          console.error("Amount mismatch! Expected:", expectedCents, "Got:", obj.amount_cents, "Order:", order.id);
+          return new Response(JSON.stringify({ error: "Amount mismatch" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+
       await supabase
         .from("orders")
         .update({
@@ -171,9 +138,17 @@ Deno.serve(async (req: Request) => {
       // Check if it's a subscription payment
       const { data: sub } = await supabase
         .from("subscriptions")
-        .select("id, user_id, duration, plan_id, plans(name, items_per_month)")
+        .select("id, user_id, duration, plan_id, status, plans(name, items_per_month)")
         .eq("paymob_order_id", paymobOrderId)
         .single();
+
+      // Idempotency: skip if already active
+      if (sub?.status === "active") {
+        console.log("Subscription already active, skipping:", sub.id);
+        return new Response(JSON.stringify({ received: true, skipped: "already_active" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
       if (sub && isSuccess) {
         const months = sub.duration === "monthly" ? 1 : sub.duration === "quarterly" ? 3 : sub.duration === "biannual" ? 6 : 12;

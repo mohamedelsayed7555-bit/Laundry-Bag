@@ -41,7 +41,7 @@ export default function EditOrderScreen() {
 
   async function loadData() {
     const [orderRes, pricesRes] = await Promise.all([
-      supabase.from('orders').select('id, order_number, status, items, items_count, subtotal, total, delivery_fee, subscription_id, service_type, payment_method, payment_status').eq('id', id).single(),
+      supabase.from('orders').select('id, order_number, status, items, items_count, subtotal, total, delivery_fee, subscription_id, service_type, payment_method, payment_status').eq('id', id).eq('customer_id', profile!.id).single(),
       supabase.from('prices').select('id, item_type, service_type, price').eq('is_active', true),
     ])
 
@@ -129,7 +129,7 @@ export default function EditOrderScreen() {
       subtotal: totalPrice,
       total: newTotal,
       service_type: cart[0].service_type,
-    }).eq('id', id)
+    }).eq('id', id).eq('customer_id', profile!.id)
 
     // Update subscription items_used if subscription order
     if (!error && isSubOrder) {
@@ -138,7 +138,8 @@ export default function EditOrderScreen() {
       if (diff !== 0) {
         const { data: subData } = await supabase.from('subscriptions').select('items_used').eq('id', order.subscription_id).single()
         if (subData) {
-          await supabase.from('subscriptions').update({ items_used: subData.items_used + diff }).eq('id', order.subscription_id)
+          const currentUsed = subData.items_used ?? 0
+          await supabase.from('subscriptions').update({ items_used: currentUsed + diff }).eq('id', order.subscription_id).eq('items_used', currentUsed)
         }
       }
     }

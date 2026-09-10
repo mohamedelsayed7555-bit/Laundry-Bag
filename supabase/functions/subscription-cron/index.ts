@@ -2,8 +2,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const PAYMOB_API_KEY = Deno.env.get("PAYMOB_API_KEY")!;
-const CARD_INTEGRATION_ID = 5736172;
-const IFRAME_ID = 1054112;
+const CARD_INTEGRATION_ID = Number(Deno.env.get("PAYMOB_CARD_INTEGRATION_ID") || "5736172");
+const IFRAME_ID = Number(Deno.env.get("PAYMOB_IFRAME_ID") || "1054112");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,14 +16,12 @@ Deno.serve(async (req: Request) => {
   }
 
   const cronSecret = Deno.env.get("CRON_SECRET");
-  if (cronSecret) {
-    const authHeader = req.headers.get("x-cron-secret") || req.headers.get("authorization")?.replace("Bearer ", "");
-    if (authHeader !== cronSecret && authHeader !== Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+  const authHeader = req.headers.get("x-cron-secret") || req.headers.get("authorization")?.replace("Bearer ", "");
+  if (!authHeader || (authHeader !== cronSecret && authHeader !== Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"))) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   const supabase = createClient(

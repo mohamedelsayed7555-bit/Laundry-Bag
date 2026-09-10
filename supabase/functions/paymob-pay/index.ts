@@ -2,9 +2,9 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const PAYMOB_API_KEY = Deno.env.get("PAYMOB_API_KEY")!;
-const CARD_INTEGRATION_ID = 5736172;
-const WALLET_INTEGRATION_ID = 5736188;
-const IFRAME_ID = 1054112;
+const CARD_INTEGRATION_ID = Number(Deno.env.get("PAYMOB_CARD_INTEGRATION_ID") || "5736172");
+const WALLET_INTEGRATION_ID = Number(Deno.env.get("PAYMOB_WALLET_INTEGRATION_ID") || "5736188");
+const IFRAME_ID = Number(Deno.env.get("PAYMOB_IFRAME_ID") || "1054112");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

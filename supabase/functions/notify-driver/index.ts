@@ -12,6 +12,15 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    const authHeader = req.headers.get("authorization")?.replace("Bearer ", "");
+    const webhookSecret = Deno.env.get("WEBHOOK_SECRET");
+    if (!authHeader || (authHeader !== Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") && authHeader !== webhookSecret)) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
