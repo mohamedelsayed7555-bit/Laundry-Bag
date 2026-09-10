@@ -5,6 +5,7 @@ import { useAuth } from '../src/contexts/AuthContext'
 import { useCustomAlert } from '../src/components/CustomAlert'
 import { supabase } from '../src/lib/supabase'
 import { useTheme } from '../src/contexts/ThemeContext'
+import { useLanguage } from '../src/contexts/LanguageContext'
 import { WebView } from 'react-native-webview'
 import * as Location from 'expo-location'
 
@@ -55,6 +56,7 @@ function ConfirmRow({ label, value, colors }: { label: string; value: string; co
 
 export default function AddressesScreen() {
   const { colors } = useTheme()
+  const { t } = useLanguage()
   const s = getStyles(colors)
   const { profile } = useAuth()
   const router = useRouter()
@@ -123,7 +125,7 @@ export default function AddressesScreen() {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync()
       if (status !== 'granted') {
-        showAlert({ title: 'صلاحية الموقع', message: 'يرجى السماح بالوصول للموقع من الإعدادات', type: 'warning' })
+        showAlert({ title: t('locationPermission'), message: t('locationPermissionMsg'), type: 'warning' })
         setLocatingMe(false)
         return
       }
@@ -133,7 +135,7 @@ export default function AddressesScreen() {
       webviewRef.current?.injectJavaScript(`window.setCenter(${coord.latitude}, ${coord.longitude}); true;`)
       reverseGeocode(coord.latitude, coord.longitude)
     } catch {
-      showAlert({ title: 'خطأ', message: 'لم نتمكن من تحديد موقعك', type: 'error' })
+      showAlert({ title: t('error'), message: t('locationError'), type: 'error' })
     }
     setLocatingMe(false)
   }
@@ -152,7 +154,7 @@ export default function AddressesScreen() {
 
   function handleSave() {
     const e: Record<string, string> = {}
-    if (!form.label.trim()) e.label = 'اسم العنوان مطلوب'
+    if (!form.label.trim()) e.label = t('addressNameRequired')
     setFormErrors(e)
     if (Object.keys(e).length > 0) return
     setShowConfirm(true)
@@ -180,7 +182,7 @@ export default function AddressesScreen() {
       : await supabase.from('addresses').insert(payload)
 
     if (error) {
-      showAlert({ title: 'خطأ', message: error.message || 'حدث خطأ أثناء حفظ العنوان', type: 'error' })
+      showAlert({ title: t('error'), message: error.message || t('addressSaveError'), type: 'error' })
       return
     }
     setShowModal(false)
@@ -188,9 +190,9 @@ export default function AddressesScreen() {
   }
 
   async function handleDelete(id: string) {
-    showAlert({ title: 'حذف العنوان', message: 'هل أنت متأكد؟', type: 'confirm', buttons: [
-      { text: 'إلغاء', style: 'cancel' },
-      { text: 'حذف', style: 'destructive', onPress: async () => {
+    showAlert({ title: t('deleteAddress'), message: t('deleteAddressConfirm'), type: 'confirm', buttons: [
+      { text: t('cancel'), style: 'cancel' },
+      { text: t('delete'), style: 'destructive', onPress: async () => {
         await supabase.from('addresses').delete().eq('id', id)
         loadAddresses()
       }},
@@ -209,22 +211,22 @@ export default function AddressesScreen() {
     <View style={s.container}>
       <View style={s.headerRow}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={s.backText}>→ رجوع</Text>
+          <Text style={s.backText}>→ {t('back')}</Text>
         </TouchableOpacity>
-        <Text style={s.title}>عناويني</Text>
+        <Text style={s.title}>{t('myAddressesTitle')}</Text>
         <TouchableOpacity onPress={openAdd}>
-          <Text style={s.addText}>+ إضافة</Text>
+          <Text style={s.addText}>{t('addAddress')}</Text>
         </TouchableOpacity>
       </View>
 
       {loading ? (
-        <Text style={s.emptyText}>جاري التحميل...</Text>
+        <Text style={s.emptyText}>{t('loading')}</Text>
       ) : addresses.length === 0 ? (
         <View style={s.emptyCard}>
           <Text style={{ fontSize: 40, marginBottom: 12 }}>📍</Text>
-          <Text style={s.emptyText}>لا توجد عناوين محفوظة</Text>
+          <Text style={s.emptyText}>{t('noAddresses')}</Text>
           <TouchableOpacity style={s.addBtn} onPress={openAdd}>
-            <Text style={s.addBtnText}>إضافة عنوان</Text>
+            <Text style={s.addBtnText}>{t('addAddressBtn')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -237,24 +239,24 @@ export default function AddressesScreen() {
               <View style={s.cardHeader}>
                 <View style={s.labelRow}>
                   <Text style={s.cardLabel}>📍 {item.label}</Text>
-                  {item.is_default && <View style={s.defaultBadge}><Text style={s.defaultText}>افتراضي</Text></View>}
+                  {item.is_default && <View style={s.defaultBadge}><Text style={s.defaultText}>{t('defaultLabel')}</Text></View>}
                 </View>
                 <TouchableOpacity onPress={() => openEdit(item)}>
-                  <Text style={s.editText}>تعديل</Text>
+                  <Text style={s.editText}>{t('edit')}</Text>
                 </TouchableOpacity>
               </View>
-              {item.building && <Text style={s.cardDetail}>المبنى: {item.building}</Text>}
-              {item.floor && <Text style={s.cardDetail}>الطابق: {item.floor}</Text>}
-              {item.apartment && <Text style={s.cardDetail}>الشقة: {item.apartment}</Text>}
-              {item.landmark && <Text style={s.cardDetail}>علامة مميزة: {item.landmark}</Text>}
+              {item.building && <Text style={s.cardDetail}>{t('theBuilding')}: {item.building}</Text>}
+              {item.floor && <Text style={s.cardDetail}>{t('theFloor')}: {item.floor}</Text>}
+              {item.apartment && <Text style={s.cardDetail}>{t('theApartment')}: {item.apartment}</Text>}
+              {item.landmark && <Text style={s.cardDetail}>{t('theLandmark')}: {item.landmark}</Text>}
               <View style={s.cardActions}>
                 {!item.is_default && (
                   <TouchableOpacity onPress={() => setDefault(item.id)}>
-                    <Text style={s.actionText}>تعيين كافتراضي</Text>
+                    <Text style={s.actionText}>{t('setAsDefault')}</Text>
                   </TouchableOpacity>
                 )}
                 <TouchableOpacity onPress={() => handleDelete(item.id)}>
-                  <Text style={[s.actionText, { color: colors.danger }]}>حذف</Text>
+                  <Text style={[s.actionText, { color: colors.danger }]}>{t('delete')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -265,9 +267,9 @@ export default function AddressesScreen() {
       <Modal visible={showModal} animationType="slide" transparent>
         <View style={s.modalOverlay}>
           <ScrollView style={s.modalContent} contentContainerStyle={{ paddingBottom: 40 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            <Text style={s.modalTitle}>{editing ? 'تعديل العنوان' : 'إضافة عنوان'}</Text>
+            <Text style={s.modalTitle}>{editing ? t('editAddress') : t('addNewAddress')}</Text>
 
-            <Text style={s.fieldLabel}>حدد الموقع على الخريطة</Text>
+            <Text style={s.fieldLabel}>{t('selectMapLocation')}</Text>
             <View style={s.mapContainer}>
               <WebView
                 ref={webviewRef}
@@ -284,7 +286,7 @@ export default function AddressesScreen() {
               <TouchableOpacity style={s.myLocBtn} onPress={useMyLocation} disabled={locatingMe}>
                 {locatingMe
                   ? <ActivityIndicator size="small" color={colors.primary} />
-                  : <Text style={s.myLocText}>📍 موقعي الحالي</Text>
+                  : <Text style={s.myLocText}>{t('myCurrentLocation')}</Text>
                 }
               </TouchableOpacity>
             </View>
@@ -292,25 +294,25 @@ export default function AddressesScreen() {
             {geocoding && (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <ActivityIndicator size="small" color={colors.primary} />
-                <Text style={{ color: colors.navy[300], fontSize: 12 }}>جاري تحديد العنوان...</Text>
+                <Text style={{ color: colors.navy[300], fontSize: 12 }}>{t('locatingAddress')}</Text>
               </View>
             )}
 
-            <FormField label="اسم العنوان *" value={form.label} onChange={v => { setForm(f => ({ ...f, label: v })); setFormErrors(p => { const n = {...p}; delete n.label; return n }) }} placeholder="مثال: البيت، الشغل" error={formErrors.label} />
-            <FormField label="المبنى" value={form.building} onChange={v => setForm(f => ({ ...f, building: v }))} placeholder="رقم أو اسم المبنى" />
+            <FormField label={t('addressName')} value={form.label} onChange={v => { setForm(f => ({ ...f, label: v })); setFormErrors(p => { const n = {...p}; delete n.label; return n }) }} placeholder={t('addressNamePlaceholder')} error={formErrors.label} />
+            <FormField label={t('theBuilding')} value={form.building} onChange={v => setForm(f => ({ ...f, building: v }))} placeholder={t('buildingPlaceholder')} />
             <View style={s.row}>
-              <View style={{ flex: 1 }}><FormField label="الطابق" value={form.floor} onChange={v => setForm(f => ({ ...f, floor: v }))} placeholder="3" /></View>
-              <View style={{ flex: 1 }}><FormField label="الشقة" value={form.apartment} onChange={v => setForm(f => ({ ...f, apartment: v }))} placeholder="12" /></View>
+              <View style={{ flex: 1 }}><FormField label={t('theFloor')} value={form.floor} onChange={v => setForm(f => ({ ...f, floor: v }))} placeholder="3" /></View>
+              <View style={{ flex: 1 }}><FormField label={t('theApartment')} value={form.apartment} onChange={v => setForm(f => ({ ...f, apartment: v }))} placeholder="12" /></View>
             </View>
-            <FormField label="علامة مميزة" value={form.landmark} onChange={v => setForm(f => ({ ...f, landmark: v }))} placeholder="بجوار مسجد..." />
-            <FormField label="ملاحظات" value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} placeholder="تفاصيل إضافية" />
+            <FormField label={t('theLandmark')} value={form.landmark} onChange={v => setForm(f => ({ ...f, landmark: v }))} placeholder={t('landmarkPlaceholder')} />
+            <FormField label={t('theNotes')} value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} placeholder={t('notesFieldPlaceholder')} />
 
             <View style={s.modalActions}>
               <TouchableOpacity style={s.modalCancel} onPress={() => setShowModal(false)}>
-                <Text style={s.modalCancelText}>إلغاء</Text>
+                <Text style={s.modalCancelText}>{t('cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={s.modalSave} onPress={handleSave}>
-                <Text style={s.modalSaveText}>حفظ</Text>
+                <Text style={s.modalSaveText}>{t('save')}</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -320,21 +322,21 @@ export default function AddressesScreen() {
       <Modal visible={showConfirm} animationType="fade" transparent>
         <View style={s.modalOverlay}>
           <View style={[s.modalContent, { maxHeight: '60%', borderRadius: 24 }]}>
-            <Text style={s.modalTitle}>تأكيد بيانات التوصيل</Text>
+            <Text style={s.modalTitle}>{t('confirmDeliveryInfo')}</Text>
             <View style={{ gap: 10, marginBottom: 20 }}>
-              <ConfirmRow label="اسم العنوان" value={form.label} colors={colors} />
-              {form.building ? <ConfirmRow label="المبنى" value={form.building} colors={colors} /> : null}
-              {form.floor ? <ConfirmRow label="الطابق" value={form.floor} colors={colors} /> : null}
-              {form.apartment ? <ConfirmRow label="الشقة" value={form.apartment} colors={colors} /> : null}
-              {form.landmark ? <ConfirmRow label="علامة مميزة" value={form.landmark} colors={colors} /> : null}
-              {form.notes ? <ConfirmRow label="ملاحظات" value={form.notes} colors={colors} /> : null}
+              <ConfirmRow label={t('addressName')} value={form.label} colors={colors} />
+              {form.building ? <ConfirmRow label={t('theBuilding')} value={form.building} colors={colors} /> : null}
+              {form.floor ? <ConfirmRow label={t('theFloor')} value={form.floor} colors={colors} /> : null}
+              {form.apartment ? <ConfirmRow label={t('theApartment')} value={form.apartment} colors={colors} /> : null}
+              {form.landmark ? <ConfirmRow label={t('theLandmark')} value={form.landmark} colors={colors} /> : null}
+              {form.notes ? <ConfirmRow label={t('theNotes')} value={form.notes} colors={colors} /> : null}
             </View>
             <View style={s.modalActions}>
               <TouchableOpacity style={s.modalCancel} onPress={() => setShowConfirm(false)}>
-                <Text style={s.modalCancelText}>تعديل</Text>
+                <Text style={s.modalCancelText}>{t('edit')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={s.modalSave} onPress={confirmSave}>
-                <Text style={s.modalSaveText}>تأكيد وحفظ</Text>
+                <Text style={s.modalSaveText}>{t('confirmAndSave')}</Text>
               </TouchableOpacity>
             </View>
           </View>

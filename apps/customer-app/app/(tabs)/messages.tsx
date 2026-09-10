@@ -32,6 +32,7 @@ export default function MessagesScreen() {
       .select('id, order_id, sender_id, receiver_id, body, read_at, created_at')
       .or(`sender_id.eq.${profile.id},receiver_id.eq.${profile.id}`)
       .order('created_at', { ascending: false })
+      .limit(500)
 
     if (!msgs || msgs.length === 0) {
       setConversations([])
@@ -157,7 +158,7 @@ const s = StyleSheet.create({
   emptyIcon: { fontSize: 40, marginBottom: 12 },
   emptyText: { fontSize: 15, textAlign: 'center' },
   convoCard: {
-    flexDirection: 'row', alignItems: 'center',
+    flexDirection: 'row', alignItems: 'center', gap: 12,
     borderRadius: 16, padding: 14, borderWidth: 1,
   },
   avatar: {

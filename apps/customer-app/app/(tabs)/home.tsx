@@ -104,36 +104,38 @@ function BannersCarousel({ bagOffer, activeSub, colors, t, locale, onBagPress, o
   })
 
   const bannerCount = banners.length
+  const bannerCountRef = useRef(bannerCount)
+  bannerCountRef.current = bannerCount
+  const SNAP = BANNER_WIDTH + 12
 
-  useEffect(() => {
-    if (bannerCount <= 1) return
+  const startAutoScroll = useCallback(() => {
+    if (autoScrollTimer.current) clearInterval(autoScrollTimer.current)
+    if (bannerCountRef.current <= 1) return
     autoScrollTimer.current = setInterval(() => {
       setActiveIndex(prev => {
-        const next = (prev + 1) % bannerCount
-        scrollRef.current?.scrollTo({ x: next * (BANNER_WIDTH + 12), animated: true })
+        const count = bannerCountRef.current
+        const next = (prev + 1) % count
+        scrollRef.current?.scrollTo({ x: next * SNAP, animated: true })
         return next
       })
     }, 4000)
+  }, [])
+
+  useEffect(() => {
+    startAutoScroll()
     return () => { if (autoScrollTimer.current) clearInterval(autoScrollTimer.current) }
-  }, [bannerCount])
+  }, [startAutoScroll])
 
   const handleScrollBegin = () => {
     if (autoScrollTimer.current) clearInterval(autoScrollTimer.current)
+    autoScrollTimer.current = null
   }
 
   const handleScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const x = e.nativeEvent.contentOffset.x
-    const idx = Math.round(x / (BANNER_WIDTH + 12))
+    const idx = Math.round(x / SNAP)
     if (idx >= 0 && idx < bannerCount) setActiveIndex(idx)
-    if (bannerCount > 1) {
-      autoScrollTimer.current = setInterval(() => {
-        setActiveIndex(prev => {
-          const next = (prev + 1) % bannerCount
-          scrollRef.current?.scrollTo({ x: next * (BANNER_WIDTH + 12), animated: true })
-          return next
-        })
-      }, 4000)
-    }
+    startAutoScroll()
   }
 
   return (
@@ -144,11 +146,11 @@ function BannersCarousel({ bagOffer, activeSub, colors, t, locale, onBagPress, o
         showsHorizontalScrollIndicator={false}
         onScrollBeginDrag={handleScrollBegin}
         onMomentumScrollEnd={handleScrollEnd}
-        snapToInterval={BANNER_WIDTH + 12}
+        snapToInterval={SNAP}
         decelerationRate="fast"
-        contentContainerStyle={{ gap: 12 }}
+        contentContainerStyle={{ paddingHorizontal: 0 }}
       >
-        {banners.map(b => <View key={b.key}>{b.node}</View>)}
+        {banners.map((b, i) => <View key={b.key} style={{ width: BANNER_WIDTH, marginRight: i < bannerCount - 1 ? 12 : 0 }}>{b.node}</View>)}
       </ScrollView>
       {banners.length > 1 && (
         <View style={cr.dots}>
@@ -271,6 +273,7 @@ export default function HomeScreen() {
       .channel('home-orders')
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'orders',
+        filter: `customer_id=eq.${profile.id}`,
       }, (payload: any) => {
         const row = payload.new ?? payload.old
         if (row?.customer_id === profile.id) {

@@ -172,7 +172,7 @@ export default function ChatScreen() {
         data={messages}
         keyExtractor={i => i.id}
         contentContainerStyle={s.msgList}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
         renderItem={({ item }) => (
           <View style={[s.bubble, isMe(item) ? [s.bubbleMe, { backgroundColor: colors.primary }] : [s.bubbleOther, { backgroundColor: colors.navy[700] }]]}>
             <Text style={[s.bubbleText, isMe(item) ? s.bubbleTextMe : { color: colors.navy[100] }]}>{item.body}</Text>

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, useMemo, useCallback, type ReactNode } from 'react'
 import { Alert, Platform } from 'react-native'
 import { supabase } from '../lib/supabase'
 import * as SecureStore from 'expo-secure-store'
@@ -250,11 +250,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const value = useMemo(() => ({
+    ...state, signInWithOtp, verifyOtp, signInWithPassword, signUp,
+    signOut, refreshProfile, toggleBiometric, signInWithBiometric,
+  }), [state])
+
   return (
-    <AuthContext.Provider value={{
-      ...state, signInWithOtp, verifyOtp, signInWithPassword, signUp,
-      signOut, refreshProfile, toggleBiometric, signInWithBiometric,
-    }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   )

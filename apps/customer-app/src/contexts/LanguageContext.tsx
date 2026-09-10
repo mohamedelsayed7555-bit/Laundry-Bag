@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { setLocale, getCurrentLocale, t as translate, isRTL as checkRTL, applyRTLChange, Locale } from '../i18n'
 
@@ -44,8 +44,10 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     return translate(key, options)
   }, [locale])
 
+  const value = useMemo(() => ({ locale, isRTL: locale === 'ar', setLanguage, t }), [locale, setLanguage, t])
+
   return (
-    <LanguageContext.Provider value={{ locale, isRTL: locale === 'ar', setLanguage, t }}>
+    <LanguageContext.Provider value={value}>
       {children}
     </LanguageContext.Provider>
   )

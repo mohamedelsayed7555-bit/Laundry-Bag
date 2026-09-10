@@ -5,10 +5,12 @@ import { useAuth } from '../src/contexts/AuthContext'
 import { useCustomAlert } from '../src/components/CustomAlert'
 import { supabase } from '../src/lib/supabase'
 import { useTheme } from '../src/contexts/ThemeContext'
+import { useLanguage } from '../src/contexts/LanguageContext'
 import * as ImagePicker from 'expo-image-picker'
 
 export default function EditProfileScreen() {
   const { colors } = useTheme()
+  const { t } = useLanguage()
   const s = getStyles(colors)
   const { profile, refreshProfile } = useAuth()
   const router = useRouter()
@@ -35,7 +37,7 @@ export default function EditProfileScreen() {
   async function pickImage() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
     if (status !== 'granted') {
-      showAlert({ title: 'صلاحية', message: 'يرجى السماح بالوصول للصور من الإعدادات', type: 'warning' })
+      showAlert({ title: t('permissionTitle'), message: t('permissionPhotos'), type: 'warning' })
       return
     }
 
@@ -64,7 +66,7 @@ export default function EditProfileScreen() {
         .upload(path, arrayBuffer, { upsert: true, contentType: `image/${ext}` })
 
       if (uploadError) {
-        showAlert({ title: 'خطأ', message: 'فشل رفع الصورة', type: 'error' })
+        showAlert({ title: t('error'), message: t('uploadError'), type: 'error' })
         setUploading(false)
         return
       }
@@ -75,18 +77,18 @@ export default function EditProfileScreen() {
       await supabase.from('users').update({ avatar_url: url }).eq('id', profile!.id)
       setAvatarUrl(url)
       await refreshProfile()
-      showAlert({ title: 'تم', message: 'تم تحديث الصورة الشخصية', type: 'success' })
+      showAlert({ title: t('success'), message: t('photoUpdated'), type: 'success' })
     } catch {
-      showAlert({ title: 'خطأ', message: 'حدث خطأ أثناء رفع الصورة', type: 'error' })
+      showAlert({ title: t('error'), message: t('uploadErrorGeneric'), type: 'error' })
     }
     setUploading(false)
   }
 
   async function handleSave() {
     const e: Record<string, string> = {}
-    if (!name.trim()) e.name = 'الاسم مطلوب'
-    if (!phone.trim()) e.phone = 'رقم التليفون مطلوب'
-    else if (!/^01[0-9]{9}$/.test(phone.trim())) e.phone = 'رقم تليفون غير صحيح'
+    if (!name.trim()) e.name = t('nameRequiredMsg')
+    if (!phone.trim()) e.phone = t('phoneRequiredMsg')
+    else if (!/^01[0-9]{9}$/.test(phone.trim())) e.phone = t('phoneInvalidMsg')
     setErrors(e)
     if (Object.keys(e).length > 0) return
     if (!profile) return
@@ -97,48 +99,48 @@ export default function EditProfileScreen() {
     }).eq('id', profile.id)
     setSaving(false)
     if (error) {
-      showAlert({ title: 'خطأ', message: 'حدث خطأ أثناء التحديث', type: 'error' })
+      showAlert({ title: t('error'), message: t('updateError'), type: 'error' })
     } else {
       await refreshProfile()
-      showAlert({ title: 'تم', message: 'تم تحديث البيانات بنجاح', type: 'success' })
+      showAlert({ title: t('success'), message: t('profileUpdated'), type: 'success' })
     }
   }
 
   async function handleChangePassword() {
     if (newPassword.length < 6) {
-      showAlert({ title: 'خطأ', message: 'كلمة المرور يجب أن تكون 6 أحرف على الأقل', type: 'error' })
+      showAlert({ title: t('error'), message: t('passwordMinError'), type: 'error' })
       return
     }
     if (newPassword !== confirmPassword) {
-      showAlert({ title: 'خطأ', message: 'كلمة المرور غير متطابقة', type: 'error' })
+      showAlert({ title: t('error'), message: t('passwordMismatchError'), type: 'error' })
       return
     }
     setSavingPassword(true)
     const { error } = await supabase.auth.updateUser({ password: newPassword })
     setSavingPassword(false)
     if (error) {
-      showAlert({ title: 'خطأ', message: error.message || 'حدث خطأ', type: 'error' })
+      showAlert({ title: t('error'), message: error.message || t('updateError'), type: 'error' })
     } else {
       setNewPassword('')
       setConfirmPassword('')
       setShowPassword(false)
-      showAlert({ title: 'تم', message: 'تم تغيير كلمة المرور بنجاح', type: 'success' })
+      showAlert({ title: t('success'), message: t('passwordChanged'), type: 'success' })
     }
   }
 
   async function handleDeleteAccount() {
     showAlert({
-      title: 'حذف الحساب',
-      message: 'هل أنت متأكد؟ سيتم حذف حسابك نهائياً ولن تتمكن من استرجاعه.',
+      title: t('deleteAccountTitle'),
+      message: t('deleteAccountMsg'),
       type: 'confirm',
       buttons: [
-        { text: 'إلغاء', style: 'cancel' },
+        { text: t('cancel'), style: 'cancel' },
         {
-          text: 'حذف نهائي', style: 'destructive', onPress: () => {
-            showAlert({ title: 'تأكيد أخير', message: 'هذا الإجراء لا يمكن التراجع عنه!', type: 'confirm', buttons: [
-              { text: 'تراجع', style: 'cancel' },
+          text: t('delete'), style: 'destructive', onPress: () => {
+            showAlert({ title: t('finalConfirm'), message: t('cannotUndo'), type: 'confirm', buttons: [
+              { text: t('cancel'), style: 'cancel' },
               {
-                text: 'احذف حسابي', style: 'destructive', onPress: async () => {
+                text: t('deleteMyAccount'), style: 'destructive', onPress: async () => {
                   if (!profile) return
                   await supabase.from('users').update({ is_active: false }).eq('id', profile.id)
                   await supabase.auth.signOut()
@@ -153,7 +155,7 @@ export default function EditProfileScreen() {
   }
 
   const passwordStrength = newPassword.length >= 12 ? 4 : newPassword.length >= 8 ? 3 : newPassword.length >= 6 ? 2 : newPassword.length > 0 ? 1 : 0
-  const strengthLabel = ['', 'ضعيفة', 'مقبولة', 'جيدة', 'قوية'][passwordStrength]
+  const strengthLabel = ['', t('strengthWeak'), t('strengthFair'), t('strengthGood'), t('strengthStrong')][passwordStrength]
   const strengthColor = ['', colors.danger, colors.warning, colors.primary, colors.success][passwordStrength]
 
   return (
@@ -161,9 +163,9 @@ export default function EditProfileScreen() {
     <ScrollView style={s.container} contentContainerStyle={s.content}>
       <View style={s.headerRow}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={s.backText}>→ رجوع</Text>
+          <Text style={s.backText}>→ {t('back')}</Text>
         </TouchableOpacity>
-        <Text style={s.title}>تعديل البيانات</Text>
+        <Text style={s.title}>{t('editProfileTitle')}</Text>
         <View style={{ width: 60 }} />
       </View>
 
@@ -185,46 +187,46 @@ export default function EditProfileScreen() {
             )}
           </View>
         </TouchableOpacity>
-        <Text style={s.changePhotoText}>اضغط لتغيير الصورة</Text>
+        <Text style={s.changePhotoText}>{t('tapToChangePhoto')}</Text>
       </View>
 
       {/* Personal Info */}
       <View style={s.section}>
-        <Text style={s.sectionTitle}>البيانات الشخصية</Text>
+        <Text style={s.sectionTitle}>{t('personalInfo')}</Text>
 
-        <Text style={s.label}>الاسم</Text>
-        <TextInput style={[s.input, errors.name ? s.inputError : null]} value={name} onChangeText={v => { setName(v); clearError('name') }} placeholder="الاسم الكامل" placeholderTextColor={colors.navy[400]} textAlign="right" />
+        <Text style={s.label}>{t('theName')}</Text>
+        <TextInput style={[s.input, errors.name ? s.inputError : null]} value={name} onChangeText={v => { setName(v); clearError('name') }} placeholder={t('fullNamePlaceholder')} placeholderTextColor={colors.navy[400]} textAlign="right" />
         {errors.name ? <Text style={s.errorText}>{errors.name}</Text> : null}
 
-        <Text style={s.label}>رقم التليفون</Text>
+        <Text style={s.label}>{t('thePhone')}</Text>
         <TextInput style={[s.input, errors.phone ? s.inputError : null]} value={phone} onChangeText={v => { setPhone(v); clearError('phone') }} placeholder="01xxxxxxxxx" placeholderTextColor={colors.navy[400]} keyboardType="phone-pad" textAlign="left" />
         {errors.phone ? <Text style={s.errorText}>{errors.phone}</Text> : null}
 
-        <Text style={s.label}>البريد الإلكتروني</Text>
+        <Text style={s.label}>{t('theEmail')}</Text>
         <View style={[s.input, s.disabledInput]}>
           <Text style={s.disabledText}>{profile?.email ?? '-'}</Text>
         </View>
 
         <TouchableOpacity style={[s.saveBtn, saving && { opacity: 0.6 }]} onPress={handleSave} disabled={saving}>
-          <Text style={s.saveBtnText}>{saving ? 'جاري الحفظ...' : 'حفظ التعديلات'}</Text>
+          <Text style={s.saveBtnText}>{saving ? t('savingText') : t('saveChanges')}</Text>
         </TouchableOpacity>
       </View>
 
       {/* Change Password */}
       <View style={s.section}>
         <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={s.sectionHeader}>
-          <Text style={s.sectionTitle}>🔒 تغيير كلمة المرور</Text>
+          <Text style={s.sectionTitle}>🔒 {t('changePassword')}</Text>
           <Text style={s.expandIcon}>{showPassword ? '▲' : '▼'}</Text>
         </TouchableOpacity>
 
         {showPassword && (
           <View style={s.passwordForm}>
-            <Text style={s.label}>كلمة المرور الجديدة</Text>
+            <Text style={s.label}>{t('newPasswordLabel')}</Text>
             <TextInput
               style={s.input}
               value={newPassword}
               onChangeText={setNewPassword}
-              placeholder="6 أحرف على الأقل"
+              placeholder={t('newPasswordPlaceholder')}
               placeholderTextColor={colors.navy[400]}
               secureTextEntry
               textAlign="left"
@@ -239,22 +241,22 @@ export default function EditProfileScreen() {
               </View>
             )}
 
-            <Text style={s.label}>تأكيد كلمة المرور</Text>
+            <Text style={s.label}>{t('confirmPasswordLabel')}</Text>
             <TextInput
               style={s.input}
               value={confirmPassword}
               onChangeText={setConfirmPassword}
-              placeholder="أعد كتابة كلمة المرور"
+              placeholder={t('confirmPasswordPlaceholder')}
               placeholderTextColor={colors.navy[400]}
               secureTextEntry
               textAlign="left"
             />
 
             {confirmPassword.length > 0 && confirmPassword !== newPassword && (
-              <Text style={s.errorText}>كلمة المرور غير متطابقة</Text>
+              <Text style={s.errorText}>{t('passwordMismatch')}</Text>
             )}
             {confirmPassword.length > 0 && confirmPassword === newPassword && (
-              <Text style={s.matchText}>✓ متطابقة</Text>
+              <Text style={s.matchText}>{t('passwordMatch')}</Text>
             )}
 
             <TouchableOpacity
@@ -262,7 +264,7 @@ export default function EditProfileScreen() {
               onPress={handleChangePassword}
               disabled={savingPassword || !newPassword || newPassword !== confirmPassword}
             >
-              <Text style={s.passwordBtnText}>{savingPassword ? 'جاري التغيير...' : 'تغيير كلمة المرور'}</Text>
+              <Text style={s.passwordBtnText}>{savingPassword ? t('changingPassword') : t('changePasswordBtn')}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -270,7 +272,7 @@ export default function EditProfileScreen() {
 
       {/* Delete Account */}
       <TouchableOpacity style={s.deleteBtn} onPress={handleDeleteAccount}>
-        <Text style={s.deleteText}>🗑️ حذف الحساب نهائياً</Text>
+        <Text style={s.deleteText}>{t('deleteAccount')}</Text>
       </TouchableOpacity>
 
       <View style={{ height: 40 }} />

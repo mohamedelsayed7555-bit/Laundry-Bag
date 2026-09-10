@@ -82,11 +82,14 @@ Deno.serve(async (req: Request) => {
       ];
       const concatenated = hmacFields.map(v => String(v ?? "")).join("");
       const calculatedHmac = await computeHmac(concatenated, HMAC_SECRET);
-      const receivedHmac = body.hmac;
+      // Paymob may send HMAC in body OR in URL query string
+      const urlHmac = new URL(req.url).searchParams.get("hmac");
+      const receivedHmac = body.hmac || urlHmac;
 
       console.log("HMAC match:", calculatedHmac === receivedHmac);
       console.log("Received HMAC (first 20):", receivedHmac?.substring(0, 20));
       console.log("Calculated HMAC (first 20):", calculatedHmac.substring(0, 20));
+      console.log("HMAC source:", body.hmac ? "body" : urlHmac ? "url" : "none");
 
       if (calculatedHmac !== receivedHmac) {
         console.log("HMAC mismatch - rejecting request");
@@ -99,16 +102,18 @@ Deno.serve(async (req: Request) => {
 
     const paymobOrderId = String(obj.order?.id);
     const isSuccess = obj.success === true;
+    console.log("Looking for paymob_order_id:", paymobOrderId, "isSuccess:", isSuccess);
 
     // Find our order by paymob_order_id
-    const { data: order } = await supabase
+    const { data: order, error: orderErr } = await supabase
       .from("orders")
-      .select("id, payment_status, total_price")
+      .select("id, payment_status, total")
       .eq("paymob_order_id", paymobOrderId)
       .single();
 
+    console.log("Order lookup result:", order ? `found ${order.id}` : "not found", "error:", orderErr?.message);
+
     if (order) {
-      // Idempotency: skip if already confirmed
       if (order.payment_status === "confirmed") {
         console.log("Order already confirmed, skipping:", order.id);
         return new Response(JSON.stringify({ received: true, skipped: "already_confirmed" }), {
@@ -116,9 +121,8 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      // Amount verification: compare paymob amount_cents with our total_price
-      if (isSuccess && order.total_price != null) {
-        const expectedCents = Math.round(order.total_price * 100);
+      if (isSuccess && order.total != null) {
+        const expectedCents = Math.round(order.total * 100);
         if (obj.amount_cents !== expectedCents) {
           console.error("Amount mismatch! Expected:", expectedCents, "Got:", obj.amount_cents, "Order:", order.id);
           return new Response(JSON.stringify({ error: "Amount mismatch" }), {
@@ -128,19 +132,19 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      await supabase
+      const newStatus = isSuccess ? "confirmed" : "failed";
+      const { error: updateErr } = await supabase
         .from("orders")
-        .update({
-          payment_status: isSuccess ? "confirmed" : "failed",
-        })
+        .update({ payment_status: newStatus })
         .eq("id", order.id);
+      console.log("Order update to", newStatus, "result:", updateErr ? `ERROR: ${updateErr.message}` : "success");
     } else {
-      // Check if it's a subscription payment
-      const { data: sub } = await supabase
+      const { data: sub, error: subErr } = await supabase
         .from("subscriptions")
         .select("id, user_id, duration, plan_id, status, plans(name, items_per_month)")
         .eq("paymob_order_id", paymobOrderId)
         .single();
+      console.log("Subscription lookup result:", sub ? `found ${sub.id}` : "not found", "error:", subErr?.message);
 
       // Idempotency: skip if already active
       if (sub?.status === "active") {

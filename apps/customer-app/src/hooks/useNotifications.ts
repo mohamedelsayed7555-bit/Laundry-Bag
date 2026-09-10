@@ -119,8 +119,9 @@ export async function playNotificationSound(type: 'order-update' | 'order-placed
     await sound.playAsync()
     sound.setOnPlaybackStatusUpdate((status) => {
       if ('didJustFinish' in status && status.didJustFinish) {
-        sound.unloadAsync()
+        sound.unloadAsync().catch(() => {})
       }
     })
+    setTimeout(() => { sound.unloadAsync().catch(() => {}) }, 10000)
   } catch {}
 }

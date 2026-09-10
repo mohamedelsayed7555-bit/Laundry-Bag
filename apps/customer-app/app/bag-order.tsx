@@ -90,7 +90,7 @@ export default function BagOrderScreen() {
       address_id: selectedAddress.id,
       pickup_location: { lat: selectedAddress.lat, lng: selectedAddress.lng, label: selectedAddress.label },
       delivery_location: { lat: selectedAddress.lat, lng: selectedAddress.lng, label: selectedAddress.label },
-      notes: `عرض الشنطة — حد أقصى ${bagOffer.max_items} قطعة`,
+      notes: `${t('bagNotePrefix')} ${bagOffer.max_items} ${t('bagNoteSuffix')}`,
     }).select('id').single()
 
     if (error) {
@@ -130,8 +130,8 @@ export default function BagOrderScreen() {
 
     await supabase.from('notifications').insert({
       user_id: profile.id,
-      title: 'تم إنشاء طلب شنطة Laundry Bag',
-      body: `طلبك بقيمة ${bagOffer.daily_price} ج.م — حد أقصى ${bagOffer.max_items} قطعة. السائق في الطريق إليك.`,
+      title: t('bagOrderCreated'),
+      body: `${t('bagOrderNotifBody')} ${bagOffer.daily_price} ${t('currency')} — ${t('bagOrderNotifMax')} ${bagOffer.max_items} ${t('bagOrderNotifPieces')}`,
       type: 'order',
       data: { order_id: data?.id },
       sent_at: new Date().toISOString(),

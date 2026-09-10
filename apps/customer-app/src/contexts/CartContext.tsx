@@ -100,8 +100,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const totalPrice = useMemo(() => cart.reduce((s, i) => s + i.price * i.quantity, 0), [cart])
   const totalItems = useMemo(() => cart.reduce((s, i) => s + i.quantity, 0), [cart])
 
+  const value = useMemo(() => ({ cart, addItem, removeItem, updateQuantity, clearCart, totalPrice, totalItems, lastAddedIndex, clearLastAdded }), [cart, addItem, removeItem, updateQuantity, clearCart, totalPrice, totalItems, lastAddedIndex, clearLastAdded])
+
   return (
-    <CartContext.Provider value={{ cart, addItem, removeItem, updateQuantity, clearCart, totalPrice, totalItems, lastAddedIndex, clearLastAdded }}>
+    <CartContext.Provider value={value}>
       {children}
     </CartContext.Provider>
   )
