@@ -75,12 +75,21 @@ export default function DriverOrdersScreen() {
   const [pickupSub, setPickupSub] = useState<'all' | 'assigned' | 'picked_up'>('all')
   const driverLocRef = useRef<{ lat: number; lng: number } | null>(null)
 
+  useEffect(() => {
+    if (!profile) return
+    Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
+      .then(loc => { driverLocRef.current = { lat: loc.coords.latitude, lng: loc.coords.longitude } })
+      .catch(() => {})
+  }, [profile])
+
   const loadOrders = useCallback(async () => {
     if (!profile) return
-    try {
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
-      driverLocRef.current = { lat: loc.coords.latitude, lng: loc.coords.longitude }
-    } catch {}
+    if (!driverLocRef.current) {
+      try {
+        const { data: dl } = await supabase.from('driver_locations').select('lat, lng').eq('driver_id', profile.id).single()
+        if (dl) driverLocRef.current = { lat: dl.lat, lng: dl.lng }
+      } catch {}
+    }
     const { data } = await supabase
       .from('orders')
       .select('id, order_number, status, service_type, items_count, total, notes, payment_method, payment_status, order_type, pickup_location, delivery_location, created_at, is_scheduled, scheduled_at, rating_driver, rating_note, customer:users!orders_customer_id_fkey(name, phone, customer_code), address:addresses(label, building, floor, apartment, landmark, lat, lng)')
