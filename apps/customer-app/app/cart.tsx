@@ -135,11 +135,16 @@ export default function CartScreen() {
     }
   }, [selectedAddress, zoneSettings, deliveryFeeBase])
 
+  const tailorItems = cart.filter((i: any) => i.service_type === 'tailor')
+  const nonTailorItems = cart.filter((i: any) => i.service_type !== 'tailor')
+  const tailorTotal = tailorItems.reduce((sum: number, i: any) => sum + (i.price * i.quantity), 0)
+  const tailorCount = tailorItems.reduce((sum: number, i: any) => sum + i.quantity, 0)
+  const nonTailorCount = nonTailorItems.reduce((sum: number, i: any) => sum + i.quantity, 0)
   const subRemaining = activeSub ? Math.max(0, activeSub.items_limit - activeSub.items_used) : null
   const subExhausted = activeSub && subRemaining === 0
-  const useSubscription = activeSub && subRemaining !== null && subRemaining > 0 && subRemaining >= totalItems && totalItems > 0
-  const fee = useSubscription ? 0 : deliveryFee
-  const orderTotal = useSubscription ? 0 : totalPrice + fee
+  const useSubscription = activeSub && subRemaining !== null && subRemaining > 0 && subRemaining >= nonTailorCount && nonTailorCount > 0
+  const fee = useSubscription && tailorCount === 0 ? 0 : deliveryFee
+  const orderTotal = useSubscription ? tailorTotal + fee : totalPrice + fee
 
   const serviceLabel = (key: string) => {
     const svc = services.find(s => s.key === key)
@@ -170,8 +175,8 @@ export default function CartScreen() {
       showAlert({ title: isEn ? 'Out of zone' : 'خارج نطاق التوصيل', message: isEn ? `Address is ${distanceKm} km away — max ${zoneSettings.max_zone_km} km` : `العنوان المختار يبعد ${distanceKm} كم — الحد الأقصى ${zoneSettings.max_zone_km} كم`, type: 'warning' })
       return
     }
-    if (activeSub && subRemaining !== null && subRemaining > 0 && totalItems > subRemaining) {
-      showAlert({ title: isEn ? 'Notice' : 'تنبيه', message: isEn ? `Your plan has ${subRemaining} items left but you need ${totalItems}. Upgrade or reduce items.` : `رصيد باقتك ${subRemaining} قطعة فقط وأنت محتاج ${totalItems} قطعة.\nيمكنك ترقية باقتك أو تقليل عدد القطع.`, type: 'warning' })
+    if (activeSub && subRemaining !== null && subRemaining > 0 && nonTailorCount > subRemaining) {
+      showAlert({ title: isEn ? 'Notice' : 'تنبيه', message: isEn ? `Your plan has ${subRemaining} items left but you need ${nonTailorCount}. Upgrade or reduce items.` : `رصيد باقتك ${subRemaining} قطعة فقط وأنت محتاج ${nonTailorCount} قطعة.\nيمكنك ترقية باقتك أو تقليل عدد القطع.`, type: 'warning' })
       return
     }
 
@@ -185,14 +190,15 @@ export default function CartScreen() {
         return
       }
       const freshRemaining = (freshSub.items_limit ?? 0) - (freshSub.items_used ?? 0)
-      if (totalItems > freshRemaining) {
+      if (nonTailorCount > freshRemaining) {
         setSaving(false)
         showAlert({ title: isEn ? 'Notice' : 'تنبيه', message: isEn ? `Only ${freshRemaining} items left in your plan.` : `رصيد باقتك ${freshRemaining} قطعة فقط.`, type: 'warning' })
         return
       }
     }
 
-    const isOnlinePayment = !useSubscription && (paymentMethod === 'visa' || paymentMethod === 'e_wallet')
+    const hasPaidAmount = useSubscription ? (tailorTotal + fee) > 0 : true
+    const isOnlinePayment = hasPaidAmount && (paymentMethod === 'visa' || paymentMethod === 'e_wallet')
 
     if (isOnlinePayment && paymentMethod === 'e_wallet' && !walletPhone.match(/^01[0-9]{9}$/)) {
       setSaving(false)
@@ -226,7 +232,7 @@ export default function CartScreen() {
     }).select('id').single()
 
     if (!error && useSubscription) {
-      await supabase.rpc('increment_subscription_usage', { p_sub_id: activeSub.id, p_count: totalItems })
+      await supabase.rpc('increment_subscription_usage', { p_sub_id: activeSub.id, p_count: nonTailorCount })
     }
 
     if (error) {
@@ -269,7 +275,7 @@ export default function CartScreen() {
     clearCart()
     playNotificationSound('order-placed')
     const msg = useSubscription
-      ? (isEn ? `Order created! ${totalItems} items deducted from plan (${subRemaining! - totalItems} remaining)` : `تم إنشاء طلبك بنجاح!\nتم خصم ${totalItems} قطعة من باقتك (متبقي ${subRemaining! - totalItems})`)
+      ? (isEn ? `Order created! ${nonTailorCount} items deducted from plan (${subRemaining! - nonTailorCount} remaining)${tailorCount > 0 ? ` + ${tailorCount} tailor items charged separately` : ''}` : `تم إنشاء طلبك بنجاح!\nتم خصم ${nonTailorCount} قطعة من باقتك (متبقي ${subRemaining! - nonTailorCount})${tailorCount > 0 ? `\n+ ${tailorCount} قطعة تفصيل محاسبة بشكل منفصل` : ''}`)
       : (isEn ? 'Order created! A driver will be assigned soon' : 'تم إنشاء طلبك بنجاح! سيتم تعيين سائق قريباً')
     showAlert({ title: isEn ? 'Done' : 'تم', message: msg, type: 'success', buttons: [
       { text: t('ok'), onPress: () => router.replace('/(tabs)/orders') },
@@ -417,8 +423,8 @@ export default function CartScreen() {
               <Text style={[s.subCoverTitle, { color: '#10b981' }]}>{isEn ? 'Covered by your plan' : 'مغطى من باقتك'}</Text>
               <Text style={[s.subCoverDetail, { color: colors.navy[300] }]}>
                 {isEn
-                  ? `${totalItems} items will be deducted — ${subRemaining! - totalItems} remaining after this order`
-                  : `سيتم خصم ${totalItems} قطعة — متبقي ${subRemaining! - totalItems} قطعة بعد الطلب`}
+                  ? `${nonTailorCount} items will be deducted — ${subRemaining! - nonTailorCount} remaining after this order${tailorCount > 0 ? `\n${tailorCount} tailor items charged separately (${tailorTotal.toFixed(2)} ${t('currency')})` : ''}`
+                  : `سيتم خصم ${nonTailorCount} قطعة — متبقي ${subRemaining! - nonTailorCount} قطعة بعد الطلب${tailorCount > 0 ? `\n${tailorCount} قطعة تفصيل محاسبة منفصلة (${tailorTotal.toFixed(2)} ${t('currency')})` : ''}`}
               </Text>
               <Text style={[s.subCoverPlan, { color: colors.navy[400] }]}>📦 {isEn && activeSub.plans?.name ? (t(`plan:${activeSub.plans.name}` as any) !== `plan:${activeSub.plans.name}` ? t(`plan:${activeSub.plans.name}` as any) : activeSub.plans.name) : activeSub.plans?.name ?? (isEn ? 'Subscription' : 'الباقة')}</Text>
             </View>
