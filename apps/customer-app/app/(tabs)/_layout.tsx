@@ -6,6 +6,7 @@ import { useTheme } from '../../src/contexts/ThemeContext'
 import { useLanguage } from '../../src/contexts/LanguageContext'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { supabase } from '../../src/lib/supabase'
+import ContactFAB from '../../src/components/ContactFAB'
 
 function FloatingAddButton({ color, focused, primary, primaryDark }: { color: string; focused: boolean; primary: string; primaryDark: string }) {
   return (
@@ -60,6 +61,8 @@ export default function TabsLayout() {
   const unread = useUnreadMessages()
 
   return (
+    <>
+    <ContactFAB />
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -112,6 +115,7 @@ export default function TabsLayout() {
         }}
       />
     </Tabs>
+    </>
   )
 }
 

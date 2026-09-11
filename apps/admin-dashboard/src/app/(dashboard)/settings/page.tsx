@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Settings, Save, Plus, Trash2, UserCircle, Mail, Lock, Camera, Eye, EyeOff, Check, Users, CreditCard, Clock, ShoppingBag, Palette } from 'lucide-react'
+import { Settings, Save, Plus, Trash2, UserCircle, Mail, Lock, Camera, Eye, EyeOff, Check, Users, CreditCard, Clock, ShoppingBag, Palette, Phone } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Modal from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/Toast'
@@ -14,6 +14,7 @@ const tabs = [
   { key: 'bag_offer', label: 'عرض الشنطة', icon: ShoppingBag },
   { key: 'subscriptions', label: 'الاشتراكات', icon: CreditCard },
   { key: 'brand', label: 'الألوان', icon: Palette },
+  { key: 'contact', label: 'التواصل', icon: Phone },
   { key: 'users', label: 'المستخدمين', icon: Users },
   { key: 'profile', label: 'الملف الشخصي', icon: UserCircle },
   { key: 'security', label: 'الأمان', icon: Lock },
@@ -37,6 +38,8 @@ export default function SettingsPage() {
   const [savingBag, setSavingBag] = useState(false)
   const [brandColor, setBrandColor] = useState('#00c966')
   const [savingBrand, setSavingBrand] = useState(false)
+  const [contactInfo, setContactInfo] = useState({ whatsapp: '', phone: '', facebook: '', instagram: '', tiktok: '', address: '', google_maps: '' })
+  const [savingContact, setSavingContact] = useState(false)
   const { toast } = useToast()
 
   const brandColors = [
@@ -99,6 +102,8 @@ export default function SettingsPage() {
     else if (brandS && typeof brandS.value === 'string' && brandS.value.startsWith('#')) setBrandColor(brandS.value)
     const bagS = data?.find(s => s.key === 'bag_offer')
     if (bagS && typeof bagS.value === 'object') setBagOffer({ ...bagOffer, ...bagS.value })
+    const contactS = data?.find(s => s.key === 'contact_info')
+    if (contactS && typeof contactS.value === 'object') setContactInfo(prev => ({ ...prev, ...contactS.value as any }))
     const oh = data?.find(s => s.key === 'open_hour')
     const ch = data?.find(s => s.key === 'close_hour')
     const whe = data?.find(s => s.key === 'working_hours_enabled')
@@ -220,6 +225,19 @@ export default function SettingsPage() {
     setSavingBrand(false)
     loadSettings()
     toast('تم حفظ لون العلامة التجارية — سيتم تحديث التطبيق تلقائياً')
+  }
+
+  async function handleSaveContact() {
+    setSavingContact(true)
+    const existing = settings.find(s => s.key === 'contact_info')
+    if (existing) {
+      await supabase.from('settings').update({ value: contactInfo }).eq('id', existing.id)
+    } else {
+      await supabase.from('settings').insert({ key: 'contact_info', value: contactInfo, description: 'بيانات التواصل المعروضة في تطبيق العميل' })
+    }
+    setSavingContact(false)
+    loadSettings()
+    toast('تم حفظ بيانات التواصل')
   }
 
   async function deleteSetting(id: string) {
@@ -586,6 +604,61 @@ export default function SettingsPage() {
               <button onClick={handleSaveDiscounts} disabled={savingDiscounts}
                 className="flex items-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:shadow-glow-green disabled:opacity-50 transition-all">
                 <Save size={14} /> {savingDiscounts ? 'جاري الحفظ...' : 'حفظ نسب الخصم'}
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Contact Tab */}
+      {activeTab === 'contact' && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 max-w-3xl">
+          <div className={sectionClass + ' p-6'}>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-green-50 rounded-xl"><Phone size={20} className="text-green-600" /></div>
+              <div>
+                <h3 className="font-semibold text-gray-800">بيانات التواصل</h3>
+                <p className="text-xs text-gray-400 mt-0.5">البيانات دي هتظهر للعميل في زر التواصل بالتطبيق</p>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5">📱 رقم الواتساب</label>
+                  <input type="text" value={contactInfo.whatsapp} onChange={e => setContactInfo({ ...contactInfo, whatsapp: e.target.value })} className={inputClass} placeholder="201000000000" dir="ltr" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5">📞 رقم الهاتف</label>
+                  <input type="text" value={contactInfo.phone} onChange={e => setContactInfo({ ...contactInfo, phone: e.target.value })} className={inputClass} placeholder="201000000000" dir="ltr" />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5">📘 فيسبوك (الرابط)</label>
+                  <input type="text" value={contactInfo.facebook} onChange={e => setContactInfo({ ...contactInfo, facebook: e.target.value })} className={inputClass} placeholder="https://facebook.com/..." dir="ltr" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5">📸 انستجرام (الرابط)</label>
+                  <input type="text" value={contactInfo.instagram} onChange={e => setContactInfo({ ...contactInfo, instagram: e.target.value })} className={inputClass} placeholder="https://instagram.com/..." dir="ltr" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">🎵 تيك توك (الرابط)</label>
+                <input type="text" value={contactInfo.tiktok} onChange={e => setContactInfo({ ...contactInfo, tiktok: e.target.value })} className={inputClass} placeholder="https://tiktok.com/@..." dir="ltr" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">📍 العنوان</label>
+                <input type="text" value={contactInfo.address} onChange={e => setContactInfo({ ...contactInfo, address: e.target.value })} className={inputClass} placeholder="مثلاً: 15 شارع التحرير، الدقي، الجيزة" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">🗺️ رابط خرائط جوجل</label>
+                <input type="text" value={contactInfo.google_maps} onChange={e => setContactInfo({ ...contactInfo, google_maps: e.target.value })} className={inputClass} placeholder="https://maps.google.com/..." dir="ltr" />
+              </div>
+            </div>
+            <div className="flex justify-end mt-6">
+              <button onClick={handleSaveContact} disabled={savingContact}
+                className="flex items-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:shadow-glow-green disabled:opacity-50 transition-all">
+                <Save size={14} /> {savingContact ? 'جاري الحفظ...' : 'حفظ بيانات التواصل'}
               </button>
             </div>
           </div>

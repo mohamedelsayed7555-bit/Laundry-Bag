@@ -16,7 +16,7 @@ const services = [
   { key: 'iron', icon: '👕', label: 'كي فقط', labelEn: 'Iron Only' },
   { key: 'wash_iron', icon: '✨', label: 'غسيل وكي', labelEn: 'Wash & Iron' },
   { key: 'tailor', icon: '✂️', label: 'تفصيل وتعديلات', labelEn: 'Tailoring' },
-  { key: 'carpet', icon: '🧹', label: 'سجاد وبطاطين', labelEn: 'Carpets & Blankets' },
+  { key: 'carpet', icon: '🛋️', label: 'سجاد وبطاطين', labelEn: 'Carpets & Blankets' },
 ]
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!
@@ -37,7 +37,6 @@ export default function NewOrderScreen() {
   const [selectedService, setSelectedService] = useState('')
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({})
   const [showAddressPicker, setShowAddressPicker] = useState(false)
-  const [showCartItems, setShowCartItems] = useState(true)
   const [activeSub, setActiveSub] = useState<any>(null)
   const [dataLoading, setDataLoading] = useState(true)
   const [closed, setClosed] = useState(false)
@@ -156,12 +155,6 @@ export default function NewOrderScreen() {
     addItem({ name: itemType, service_type: selectedService, quantity: 1, price: unitPrice })
   }
 
-  const svcLabel = (key: string) => {
-    const svc = services.find(s => s.key === key)
-    if (!svc) return key
-    return locale === 'en' ? svc.labelEn : svc.label
-  }
-
   const catName = (name: string) => locale === 'en' ? (t(`cat:${name}`) !== `cat:${name}` ? t(`cat:${name}`) : name) : name
   const itemName = (name: string) => locale === 'en' ? (t(`item:${name}`) !== `item:${name}` ? t(`item:${name}`) : name) : name
   const pName = (name: string) => locale === 'en' ? (t(`plan:${name}` as any) !== `plan:${name}` ? t(`plan:${name}` as any) : name) : name
@@ -277,6 +270,9 @@ export default function NewOrderScreen() {
                             </View>
                             {inCart ? (
                               <View style={s.inCartCounter}>
+                                <TouchableOpacity onPress={() => { const i = cart.indexOf(inCart); removeItem(i) }} style={[s.inCartRemoveBtn, { backgroundColor: colors.danger + '20' }]}>
+                                  <Text style={[s.inCartRemoveBtnText, { color: colors.danger }]}>✕</Text>
+                                </TouchableOpacity>
                                 <TouchableOpacity onPress={() => { const i = cart.indexOf(inCart); updateQuantity(i, inCart.quantity - 1) }} style={[s.inCartBtn, { backgroundColor: colors.navy[700] }]}>
                                   <Text style={s.inCartBtnText}>−</Text>
                                 </TouchableOpacity>
@@ -301,34 +297,6 @@ export default function NewOrderScreen() {
           </>
         )}
 
-        {cart.length > 0 && (
-          <>
-            <TouchableOpacity onPress={() => setShowCartItems(!showCartItems)} style={s.cartSectionHeader} activeOpacity={0.7}>
-              <Text style={[s.sectionTitle, { color: colors.text, marginBottom: 0, marginTop: 0 }]}>{locale === 'en' ? `Added items (${totalItems})` : `القطع المضافة (${totalItems})`}</Text>
-              <Text style={[s.accordionArrow, { color: colors.navy[400] }]}>{showCartItems ? '▲' : '▼'}</Text>
-            </TouchableOpacity>
-            {showCartItems && cart.map((item, i) => (
-              <View key={i} style={[s.cartItem, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[s.cartItemName, { color: colors.text }]}>{itemName(item.name)} — {svcLabel(item.service_type)}</Text>
-                  <Text style={[s.cartItemDetail, { color: colors.navy[300] }]}>{item.quantity} × {item.price} = {item.quantity * item.price} {t('currency')}</Text>
-                </View>
-                <View style={s.cartItemActions}>
-                  <TouchableOpacity onPress={() => updateQuantity(i, item.quantity - 1)} style={[s.qtyBtn, { backgroundColor: colors.navy[700] }]}>
-                    <Text style={s.qtyBtnText}>−</Text>
-                  </TouchableOpacity>
-                  <Text style={[s.qtyDisplay, { color: colors.text }]}>{item.quantity}</Text>
-                  <TouchableOpacity onPress={() => updateQuantity(i, item.quantity + 1)} style={[s.qtyBtn, { backgroundColor: colors.navy[700] }]}>
-                    <Text style={s.qtyBtnText}>+</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => removeItem(i)} style={[s.removeBtn, { backgroundColor: colors.danger + '20' }]}>
-                    <Text style={[s.removeBtnText, { color: colors.danger }]}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
-          </>
-        )}
 
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -346,8 +314,14 @@ export default function NewOrderScreen() {
                 <Text style={[s.floatingBadgeText, { color: colors.primary }]}>{totalItems}</Text>
               </Animated.View>
             </View>
-            <Text style={s.floatingBarLabel}>{locale === 'en' ? 'View cart' : 'عرض السلة'}</Text>
-            <Text style={s.floatingBarPrice}>{totalPrice.toFixed(2)} {t('currency')}</Text>
+            <View style={s.floatingBarCenter}>
+              <Text style={s.floatingBarLabel}>{locale === 'en' ? 'Complete order' : 'إتمام الطلب'}</Text>
+              <Text style={s.floatingBarHint}>{locale === 'en' ? 'Tap to review & confirm' : 'اضغط لمراجعة وتأكيد'}</Text>
+            </View>
+            <View style={s.floatingBarRight}>
+              <Text style={s.floatingBarPrice}>{totalPrice.toFixed(2)} {t('currency')}</Text>
+              <Text style={s.floatingBarArrow}>←</Text>
+            </View>
           </TouchableOpacity>
         </Animated.View>
       )}
@@ -365,11 +339,11 @@ const s = StyleSheet.create({
   sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 12, marginTop: 20 },
   serviceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   serviceCard: {
-    width: '47%', borderRadius: 16, padding: 14,
-    alignItems: 'center', gap: 6, borderWidth: 1.5,
+    width: '30%', flexGrow: 1, borderRadius: 16, padding: 12,
+    alignItems: 'center', gap: 4, borderWidth: 1.5,
   },
-  serviceCardIcon: { fontSize: 28 },
-  serviceCardLabel: { fontSize: 13, fontWeight: '600', textAlign: 'center' },
+  serviceCardIcon: { fontSize: 24 },
+  serviceCardLabel: { fontSize: 11, fontWeight: '600', textAlign: 'center' },
   accordionSection: { borderRadius: 12, borderWidth: 1, marginBottom: 10, overflow: 'hidden' },
   accordionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 },
   accordionHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -384,25 +358,12 @@ const s = StyleSheet.create({
   accordionItemPrice: { fontSize: 12, marginTop: 2 },
   addItemBtn: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
   addItemBtnText: { color: '#fff', fontSize: 20, fontWeight: '600' },
-  inCartCounter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  inCartCounter: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   inCartBtn: { width: 30, height: 30, borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
   inCartBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  inCartRemoveBtn: { width: 26, height: 26, borderRadius: 13, justifyContent: 'center', alignItems: 'center', marginRight: 2 },
+  inCartRemoveBtnText: { fontSize: 11, fontWeight: '700' },
   inCartQty: { fontSize: 16, fontWeight: '700', minWidth: 20, textAlign: 'center' },
-  cartItem: {
-    flexDirection: 'row', alignItems: 'center',
-    borderRadius: 12, padding: 14, marginBottom: 8, borderWidth: 1,
-  },
-  cartItemName: { fontSize: 14, fontWeight: '600' },
-  cartItemDetail: { fontSize: 12, marginTop: 2 },
-  cartItemActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  qtyBtn: {
-    width: 28, height: 28, borderRadius: 14,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  qtyBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  qtyDisplay: { fontSize: 14, fontWeight: '700', minWidth: 20, textAlign: 'center' },
-  removeBtn: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginLeft: 4 },
-  removeBtnText: { fontSize: 12, fontWeight: '700' },
   addAddressBtn: {
     borderRadius: 16, padding: 16, alignItems: 'center',
     borderWidth: 1.5, borderStyle: 'dashed',
@@ -418,7 +379,6 @@ const s = StyleSheet.create({
   },
   changeBtn: { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1.5 },
   changeBtnText: { fontSize: 13, fontWeight: '700' },
-  cartSectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, marginBottom: 12 },
   addressLabel: { fontSize: 14, fontWeight: '600' },
   addressDetail: { fontSize: 11, marginTop: 2 },
   manageAddressText: { fontSize: 12, fontWeight: '600', textAlign: 'center', marginTop: 8 },
@@ -446,8 +406,12 @@ const s = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center', paddingHorizontal: 6, marginLeft: 6,
   },
   floatingBadgeText: { fontSize: 13, fontWeight: '800' },
-  floatingBarLabel: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  floatingBarCenter: { alignItems: 'center', flex: 1 },
+  floatingBarLabel: { fontSize: 16, fontWeight: '800', color: '#fff' },
+  floatingBarHint: { fontSize: 10, color: 'rgba(255,255,255,0.7)', fontWeight: '600', marginTop: 1 },
+  floatingBarRight: { alignItems: 'flex-end' },
   floatingBarPrice: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  floatingBarArrow: { fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 1 },
   closedBanner: {
     borderRadius: 16, padding: 20, marginBottom: 16, borderWidth: 1,
     alignItems: 'center', gap: 6,

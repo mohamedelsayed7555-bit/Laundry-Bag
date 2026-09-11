@@ -73,6 +73,7 @@ export default function PlansScreen() {
   const [selectedPayment, setSelectedPayment] = useState('visa')
   const [walletPhone, setWalletPhone] = useState('')
   const [refreshing, setRefreshing] = useState(false)
+  const [serviceFilter, setServiceFilter] = useState('all')
 
   useEffect(() => {
     loadData()
@@ -332,66 +333,39 @@ export default function PlansScreen() {
         )
       })()}
 
-      <Text style={[s.sectionTitle, { color: colors.text }]}>{activeSub ? (locale === 'en' ? 'Upgrade plan' : 'ترقية الباقة') : (locale === 'en' ? 'Choose duration' : 'اختر مدة الاشتراك')}</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.durScroll} contentContainerStyle={s.durRow}>
-        {durationsMeta.map(d => {
-          const rate = d.key !== 'monthly' ? discountRates[d.key as keyof typeof discountRates] : 0
-          return (
-            <TouchableOpacity
-              key={d.key}
-              style={[s.durChip, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, selectedDuration === d.key && { borderColor: colors.primary, backgroundColor: colors.primary + '15' }]}
-              onPress={() => setSelectedDuration(d.key)}
-            >
-              <Text style={[s.durLabel, { color: colors.navy[200] }, selectedDuration === d.key && { color: colors.primary }]}>{locale === 'en' ? d.labelEn : d.label}</Text>
-              {rate > 0 && <Text style={[s.durSave, { color: colors.success }]}>{locale === 'en' ? `Save ${rate}%` : `وفّر ${rate}%`}</Text>}
-            </TouchableOpacity>
-          )
-        })}
-      </ScrollView>
-
-      <Text style={[s.sectionTitle, { color: colors.text }]}>{locale === 'en' ? 'Payment method' : 'طريقة الدفع'}</Text>
-      <View style={s.paymentList}>
-        {paymentMethods.map(p => (
+      {/* ── Service Filter ── */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }} contentContainerStyle={s.filterRow}>
+        {[
+          { key: 'all', icon: '📋', label: 'الكل', labelEn: 'All' },
+          { key: 'clothes', icon: '👔', label: 'ملابس', labelEn: 'Clothes' },
+          { key: 'carpet', icon: '🧹', label: 'سجاد وبطاطين', labelEn: 'Carpets' },
+          { key: 'tailor', icon: '✂️', label: 'تفصيل', labelEn: 'Tailoring' },
+        ].map(f => (
           <TouchableOpacity
-            key={p.key}
-            style={[s.paymentCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, selectedPayment === p.key && { borderColor: colors.primary, backgroundColor: colors.primary + '10' }]}
-            onPress={() => setSelectedPayment(p.key)}
+            key={f.key}
+            style={[s.filterChip, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, serviceFilter === f.key && { borderColor: colors.primary, backgroundColor: colors.primary + '15' }]}
+            onPress={() => setServiceFilter(f.key)}
           >
-            <Text style={s.paymentIcon}>{p.icon}</Text>
-            <Text style={[s.paymentLabel, { color: colors.navy[200] }, selectedPayment === p.key && { color: colors.text }]}>{locale === 'en' ? p.labelEn : p.label}</Text>
-            {selectedPayment === p.key && (
-              <View style={[s.paymentCheck, { backgroundColor: colors.primary }]}><Text style={s.paymentCheckText}>✓</Text></View>
-            )}
+            <Text style={s.filterIcon}>{f.icon}</Text>
+            <Text style={[s.filterLabel, { color: colors.navy[300] }, serviceFilter === f.key && { color: colors.primary }]}>
+              {locale === 'en' ? f.labelEn : f.label}
+            </Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </ScrollView>
 
-      {selectedPayment === 'wallet' && (
-        <View style={[s.walletPhoneCard, { backgroundColor: colors.cardBg, borderColor: colors.primary + '30' }]}>
-          <Text style={[s.walletPhoneLabel, { color: colors.text }]}>📱 {locale === 'en' ? 'Wallet phone number' : 'رقم موبايل المحفظة'}</Text>
-          <TextInput
-            style={[s.walletPhoneInput, { color: colors.text, borderColor: colors.navy[600], backgroundColor: colors.navy[800] }]}
-            placeholder="01xxxxxxxxx"
-            placeholderTextColor={colors.navy[400]}
-            value={walletPhone}
-            onChangeText={setWalletPhone}
-            keyboardType="phone-pad"
-            maxLength={11}
-          />
-        </View>
-      )}
+      {/* ── Plans List ── */}
+      <Text style={[s.sectionTitle, { color: colors.text }]}>{activeSub ? (locale === 'en' ? 'Upgrade or add plan' : 'ترقية أو إضافة باقة') : (locale === 'en' ? 'Available plans' : 'الباقات المتاحة')}</Text>
 
-      <TouchableOpacity style={[s.autoRenewRow, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]} onPress={() => setAutoRenew(!autoRenew)} activeOpacity={0.7}>
-        <View style={s.autoRenewInfo}>
-          <Text style={[s.autoRenewLabel, { color: colors.text }]}>{locale === 'en' ? 'Auto-renew' : 'تجديد تلقائي'}</Text>
-          <Text style={[s.autoRenewHint, { color: colors.navy[300] }]}>{locale === 'en' ? 'Plan renews automatically when it ends' : 'الباقة تتجدد تلقائي لما تخلص'}</Text>
-        </View>
-        <View style={[s.toggleTrack, { backgroundColor: colors.navy[600] }, autoRenew && { backgroundColor: colors.primary }]}>
-          <View style={[s.toggleThumb, autoRenew && s.toggleThumbActive]} />
-        </View>
-      </TouchableOpacity>
-
-      {plans.map(plan => {
+      {plans.filter(plan => {
+        if (serviceFilter === 'all') return true
+        if (plan.includes_all_services) return true
+        const cs = plan.covered_services ?? []
+        if (serviceFilter === 'clothes') return cs.some(s => ['wash', 'iron', 'wash_iron', 'dry_clean'].includes(s))
+        if (serviceFilter === 'carpet') return cs.includes('carpet')
+        if (serviceFilter === 'tailor') return cs.includes('tailor')
+        return true
+      }).map(plan => {
         const price = calcPrice(plan.monthly_price, selectedDuration)
         const tierColor = tierColors[plan.tier] ?? colors.primary
         const isCurrentPlan = activeSub?.plan_id === plan.id
@@ -433,6 +407,73 @@ export default function PlansScreen() {
         )
       })}
 
+      {/* ── Subscription Settings ── */}
+      <View style={[s.settingsSection, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
+        <Text style={[s.settingsSectionTitle, { color: colors.text }]}>⚙️ {locale === 'en' ? 'Subscription settings' : 'إعدادات الاشتراك'}</Text>
+
+        {/* Duration */}
+        <Text style={[s.settingsLabel, { color: colors.navy[300] }]}>{locale === 'en' ? 'Duration' : 'مدة الاشتراك'}</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }} contentContainerStyle={s.durRow}>
+          {durationsMeta.map(d => {
+            const rate = d.key !== 'monthly' ? discountRates[d.key as keyof typeof discountRates] : 0
+            return (
+              <TouchableOpacity
+                key={d.key}
+                style={[s.durChip, { backgroundColor: colors.navy[800], borderColor: colors.navy[600] }, selectedDuration === d.key && { borderColor: colors.primary, backgroundColor: colors.primary + '15' }]}
+                onPress={() => setSelectedDuration(d.key)}
+              >
+                <Text style={[s.durLabel, { color: colors.navy[200] }, selectedDuration === d.key && { color: colors.primary }]}>{locale === 'en' ? d.labelEn : d.label}</Text>
+                {rate > 0 && <Text style={[s.durSave, { color: colors.success }]}>{locale === 'en' ? `Save ${rate}%` : `وفّر ${rate}%`}</Text>}
+              </TouchableOpacity>
+            )
+          })}
+        </ScrollView>
+
+        {/* Payment */}
+        <Text style={[s.settingsLabel, { color: colors.navy[300] }]}>{locale === 'en' ? 'Payment method' : 'طريقة الدفع'}</Text>
+        <View style={s.paymentList}>
+          {paymentMethods.map(p => (
+            <TouchableOpacity
+              key={p.key}
+              style={[s.paymentCard, { backgroundColor: colors.navy[800], borderColor: colors.navy[600] }, selectedPayment === p.key && { borderColor: colors.primary, backgroundColor: colors.primary + '10' }]}
+              onPress={() => setSelectedPayment(p.key)}
+            >
+              <Text style={s.paymentIcon}>{p.icon}</Text>
+              <Text style={[s.paymentLabel, { color: colors.navy[200] }, selectedPayment === p.key && { color: colors.text }]}>{locale === 'en' ? p.labelEn : p.label}</Text>
+              {selectedPayment === p.key && (
+                <View style={[s.paymentCheck, { backgroundColor: colors.primary }]}><Text style={s.paymentCheckText}>✓</Text></View>
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {selectedPayment === 'wallet' && (
+          <View style={[s.walletPhoneCard, { backgroundColor: colors.navy[800], borderColor: colors.primary + '30' }]}>
+            <Text style={[s.walletPhoneLabel, { color: colors.text }]}>📱 {locale === 'en' ? 'Wallet phone number' : 'رقم موبايل المحفظة'}</Text>
+            <TextInput
+              style={[s.walletPhoneInput, { color: colors.text, borderColor: colors.navy[600], backgroundColor: colors.navy[700] }]}
+              placeholder="01xxxxxxxxx"
+              placeholderTextColor={colors.navy[400]}
+              value={walletPhone}
+              onChangeText={setWalletPhone}
+              keyboardType="phone-pad"
+              maxLength={11}
+            />
+          </View>
+        )}
+
+        {/* Auto-renew */}
+        <TouchableOpacity style={s.autoRenewInline} onPress={() => setAutoRenew(!autoRenew)} activeOpacity={0.7}>
+          <View style={s.autoRenewInfo}>
+            <Text style={[s.autoRenewLabel, { color: colors.text }]}>{locale === 'en' ? 'Auto-renew' : 'تجديد تلقائي'}</Text>
+            <Text style={[s.autoRenewHint, { color: colors.navy[400] }]}>{locale === 'en' ? 'Renews when it ends' : 'تتجدد لما تخلص'}</Text>
+          </View>
+          <View style={[s.toggleTrack, { backgroundColor: colors.navy[600] }, autoRenew && { backgroundColor: colors.primary }]}>
+            <View style={[s.toggleThumb, autoRenew && s.toggleThumbActive]} />
+          </View>
+        </TouchableOpacity>
+      </View>
+
       <View style={{ height: 40 }} />
     </ScrollView>
     {AlertComponent}
@@ -470,6 +511,24 @@ const s = StyleSheet.create({
   subDetailRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
   subDetailLabel: { fontSize: 12 },
   subDetailValue: { fontSize: 12, fontWeight: '600' },
+
+  filterRow: { gap: 8, paddingVertical: 4 },
+  filterChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderRadius: 14, paddingHorizontal: 16, paddingVertical: 10, borderWidth: 1.5,
+  },
+  filterIcon: { fontSize: 16 },
+  filterLabel: { fontSize: 13, fontWeight: '600' },
+
+  settingsSection: {
+    borderRadius: 20, padding: 20, marginTop: 8, marginBottom: 8, borderWidth: 1,
+  },
+  settingsSectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 16 },
+  settingsLabel: { fontSize: 13, fontWeight: '600', marginBottom: 8 },
+  autoRenewInline: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginTop: 8, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)',
+  },
 
   durScroll: { marginBottom: 20 },
   durRow: { gap: 8 },
