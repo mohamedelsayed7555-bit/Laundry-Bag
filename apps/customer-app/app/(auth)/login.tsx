@@ -91,6 +91,7 @@ export default function LoginScreen() {
 
   return (
     <>
+    <View style={{ flex: 1, backgroundColor: colors.navy[900] }}>
     <KeyboardAvoidingView style={[s.container, { backgroundColor: colors.navy[900] }]} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView style={{ backgroundColor: colors.navy[900] }} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
         {/* Logo Section */}
@@ -172,7 +173,10 @@ export default function LoginScreen() {
 
           <View>
             <Text style={[s.label, { color: colors.navy[100] }]}>🔒  {t('password')}</Text>
-            <View style={[s.inputWrap, { borderColor: colors.inputBorder, backgroundColor: colors.inputBg, flexDirection: 'row-reverse' }, errors.password ? { borderColor: colors.danger, backgroundColor: colors.dangerGlow } : null]}>
+            <View style={[s.inputWrap, { borderColor: colors.inputBorder, backgroundColor: colors.inputBg }, errors.password ? { borderColor: colors.danger, backgroundColor: colors.dangerGlow } : null]}>
+              <TouchableOpacity style={s.eyeBtn} onPress={() => setShowPassword(!showPassword)}>
+                <Text style={s.eyeIcon}>{showPassword ? '🙈' : '👁️'}</Text>
+              </TouchableOpacity>
               <TextInput
                 style={[s.passwordInput, { color: colors.text }]}
                 placeholder={t('passwordPlaceholder')}
@@ -184,9 +188,6 @@ export default function LoginScreen() {
                 autoComplete="off"
                 selectionColor={colors.primary}
               />
-              <TouchableOpacity style={s.eyeBtn} onPress={() => setShowPassword(!showPassword)}>
-                <Text style={s.eyeIcon}>{showPassword ? '🙈' : '👁️'}</Text>
-              </TouchableOpacity>
             </View>
             {errors.password ? <Text style={[s.errorText, { color: colors.danger }]}>{errors.password}</Text> : null}
             {isSignUp && !errors.password && (
@@ -237,9 +238,16 @@ export default function LoginScreen() {
               {isSignUp ? t('haveAccount') : t('newUser')}
             </Text>
           </TouchableOpacity>
+
+          <View style={s.devBrand}>
+            <View style={[s.devBrandLine, { backgroundColor: colors.navy[700] }]} />
+            <Text style={[s.devBrandText, { color: colors.navy[500] }]}>MH</Text>
+            <View style={[s.devBrandLine, { backgroundColor: colors.navy[700] }]} />
+          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
+    </View>
     {AlertComponent}
     </>
   )
@@ -338,4 +346,12 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   bioButtonText: { fontSize: 16, fontWeight: '700' },
+  devBrand: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    marginTop: 32, gap: 12,
+  },
+  devBrandLine: { flex: 1, height: 0.5, maxWidth: 60 },
+  devBrandText: {
+    fontSize: 18, fontWeight: '900', letterSpacing: 6,
+  },
 })

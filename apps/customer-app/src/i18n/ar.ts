@@ -26,7 +26,7 @@ export default {
   namePlaceholder: 'محمد أحمد',
   phonePlaceholder: '01xxxxxxxxx',
   emailPlaceholder: 'example@email.com',
-  emailOrPhonePlaceholder: 'example@email.com أو 01xxxxxxxxx',
+  emailOrPhonePlaceholder: 'الإيميل أو رقم الموبايل',
   passwordPlaceholder: '••••••••',
   passwordHint: '6 أحرف على الأقل - حروف إنجليزي وأرقام',
   nameRequired: 'الاسم مطلوب',

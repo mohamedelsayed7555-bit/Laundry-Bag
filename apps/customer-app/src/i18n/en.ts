@@ -26,7 +26,7 @@ export default {
   namePlaceholder: 'John Doe',
   phonePlaceholder: '01xxxxxxxxx',
   emailPlaceholder: 'example@email.com',
-  emailOrPhonePlaceholder: 'example@email.com or 01xxxxxxxxx',
+  emailOrPhonePlaceholder: 'Email or phone number',
   passwordPlaceholder: '••••••••',
   passwordHint: 'At least 6 characters - letters and numbers',
   nameRequired: 'Name is required',
