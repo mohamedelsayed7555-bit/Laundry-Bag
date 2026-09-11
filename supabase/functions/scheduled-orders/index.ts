@@ -112,7 +112,7 @@ Deno.serve(async (req: Request) => {
           .single();
 
         if (user?.fcm_token) {
-          fetch("https://exp.host/--/api/v2/push/send", {
+          await fetch("https://exp.host/--/api/v2/push/send", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -134,7 +134,7 @@ Deno.serve(async (req: Request) => {
             .single();
 
           if (driverUser?.fcm_token) {
-            fetch("https://exp.host/--/api/v2/push/send", {
+            await fetch("https://exp.host/--/api/v2/push/send", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -207,7 +207,7 @@ Deno.serve(async (req: Request) => {
 
       const { data: user } = await supabase.from("users").select("fcm_token").eq("id", o.customer_id).single();
       if (user?.fcm_token) {
-        fetch("https://exp.host/--/api/v2/push/send", {
+        await fetch("https://exp.host/--/api/v2/push/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
