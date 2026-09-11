@@ -314,7 +314,7 @@ export default function HomeScreen() {
 
   return (
     <>
-    <ScrollView style={[s.container, { backgroundColor: colors.navy[900] }]} contentContainerStyle={s.content} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}>
+    <ScrollView style={[s.container, { backgroundColor: colors.navy[900] }]} contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}>
       {/* Header */}
       <Animated.View entering={FadeInDown.duration(500)} style={s.header}>
         <View style={{ flex: 1 }}>
@@ -362,7 +362,7 @@ export default function HomeScreen() {
         {services.map((svc, i) => (
           <Animated.View key={svc.key} entering={FadeInDown.duration(300).delay(150 + i * 40)}>
             <TouchableOpacity style={[s.serviceCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]} activeOpacity={0.7}
-              onPress={() => router.push('/(tabs)/new-order')}>
+              onPress={() => router.push({ pathname: '/(tabs)/new-order', params: { service: svc.key } })}>
               <View style={[s.serviceIconWrap, { backgroundColor: colors.navy[700] }]}>
                 <Text style={s.serviceIcon}>{svc.icon}</Text>
               </View>

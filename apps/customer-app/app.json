@@ -17,7 +17,7 @@
     "android": {
       "package": "com.cleano.customer",
       "adaptiveIcon": {
-        "backgroundColor": "#00af5f"
+        "backgroundColor": "#0ea5e9"
       },
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",

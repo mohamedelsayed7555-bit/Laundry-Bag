@@ -30,7 +30,7 @@ const nextAction: Record<string, { status: string; label: string }> = {
 }
 
 const serviceLabel: Record<string, string> = {
-  wash: 'غسيل', iron: 'كي', wash_iron: 'غسيل وكي', dry_clean: 'تنظيف جاف',
+  wash: 'غسيل', iron: 'كي', wash_iron: 'غسيل وكي', dry_clean: 'تنظيف جاف', tailor: 'تفصيل وتعديلات',
 }
 
 const paymentMethodLabel: Record<string, { label: string; icon: string }> = {
@@ -208,6 +208,11 @@ export default function DriverOrdersScreen() {
                   <Text style={{ fontSize: 10, color: '#059669', fontWeight: '700' }}>👜 شنطة</Text>
                 </View>
               )}
+              {item.order_type === 'subscription' && (
+                <View style={{ backgroundColor: '#8b5cf620', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 }}>
+                  <Text style={{ fontSize: 10, color: '#8b5cf6', fontWeight: '700' }}>👑 باقة</Text>
+                </View>
+              )}
             </View>
             <View style={[s.statusBadge, { backgroundColor: status.color + '20' }]}>
               <Text style={{ fontSize: 12 }}>{status.icon}</Text>
@@ -304,6 +309,13 @@ export default function DriverOrdersScreen() {
               </View>
             </View>
           </View>
+
+          {item.order_type === 'subscription' && item.total > 0 && (
+            <View style={{ backgroundColor: '#f59e0b15', borderColor: '#f59e0b30', borderWidth: 1, borderRadius: 10, padding: 10, marginTop: 6 }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: '#f59e0b' }}>💰 مطلوب تحصيل: {item.total.toFixed(2)} ج.م</Text>
+              <Text style={{ fontSize: 10, color: colors.navy[400], marginTop: 2 }}>قطع التفصيل خارج الباقة</Text>
+            </View>
+          )}
 
           {item.notes && <Text style={s.notes}>📝 {item.notes}</Text>}
 

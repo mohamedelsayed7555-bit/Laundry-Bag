@@ -73,6 +73,13 @@ export default function PaymentScreen() {
           style={s.webview}
           onLoadEnd={() => setLoading(false)}
           onNavigationStateChange={handleNavigationChange}
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+          startInLoadingState={false}
+          scalesPageToFit={true}
+          allowsInlineMediaPlayback={true}
+          mixedContentMode="compatibility"
+          originWhitelist={['*']}
         />
       )}
       <TouchableOpacity style={[s.cancelBar, { backgroundColor: colors.navy[800] }]} onPress={() => router.back()}>

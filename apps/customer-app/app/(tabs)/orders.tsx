@@ -31,7 +31,7 @@ function OrderProgress({ status, trackColor }: { status: string; trackColor: str
   return (
     <View style={prog.container}>
       <View style={[prog.track, { backgroundColor: trackColor }]}>
-        <View style={[prog.fill, { width: `${progress}%`, backgroundColor: statusColors[status] ?? '#00c966' }]} />
+        <View style={[prog.fill, { width: `${progress}%`, backgroundColor: statusColors[status] ?? '#0ea5e9' }]} />
       </View>
       <Text style={[prog.label, { color: statusColors[status] }]}>
         {idx + 1}/{statusFlow.length}

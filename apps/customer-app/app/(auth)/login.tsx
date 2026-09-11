@@ -321,7 +321,7 @@ const s = StyleSheet.create({
   },
   button: {
     borderRadius: 16, overflow: 'hidden', marginTop: 4,
-    shadowColor: '#00c966', shadowOffset: { width: 0, height: 6 },
+    shadowColor: '#0ea5e9', shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35, shadowRadius: 14, elevation: 10,
   },
   buttonGradient: {

@@ -177,7 +177,7 @@ export default function EditOrderScreen() {
 
   return (
     <>
-    <ScrollView style={s.container} contentContainerStyle={s.content}>
+    <ScrollView style={s.container} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
       <View style={s.headerRow}>
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={s.backText}>→ رجوع</Text>

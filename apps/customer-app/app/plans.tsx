@@ -260,7 +260,7 @@ export default function PlansScreen() {
 
   return (
     <>
-    <ScrollView style={[s.container, { backgroundColor: colors.navy[900] }]} contentContainerStyle={s.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}>
+    <ScrollView style={[s.container, { backgroundColor: colors.navy[900] }]} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}>
       <View style={s.headerRow}>
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={[s.backText, { color: colors.primary }]}>→ {locale === 'en' ? 'Back' : 'رجوع'}</Text>

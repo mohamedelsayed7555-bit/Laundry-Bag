@@ -92,7 +92,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const baseColors = isDark ? darkColors : lightColors
 
   const themeColors = useMemo(() => {
-    if (!brandColor || brandColor === '#00c966') return baseColors
+    if (!brandColor || brandColor === '#0ea5e9') return baseColors
     return applyBrandColor(baseColors, brandColor)
   }, [baseColors, brandColor])
 

@@ -172,7 +172,7 @@ export default function BagOrderScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.navy[900] }}>
       {AlertComponent}
-      <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}>
+      <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}>
         {/* Offer Card */}
         <Animated.View entering={FadeInDown.duration(500)}>
           <LinearGradient colors={['#059669', '#047857']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.offerCard}>

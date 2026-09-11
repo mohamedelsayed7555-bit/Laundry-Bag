@@ -74,6 +74,10 @@ export default function CartScreen() {
         if (prev && data.some((a: any) => a.id === prev.id)) return prev
         return data.find((a: any) => a.is_default) ?? data[0] ?? null
       })
+      setDeliveryAddress((prev: any) => {
+        if (prev && data.some((a: any) => a.id === prev.id)) return prev
+        return data.find((a: any) => a.is_default) ?? data[0] ?? null
+      })
     }
   }, [profile])
 
@@ -107,7 +111,7 @@ export default function CartScreen() {
     if (addrRes?.data) {
       setAddresses(addrRes.data)
       const def = addrRes.data.find((a: any) => a.is_default) ?? addrRes.data[0]
-      if (def) setSelectedAddress(def)
+      if (def) { setSelectedAddress(def); setDeliveryAddress(def) }
     }
     if (subRes?.data) setActiveSub(subRes.data)
   }, [profile])
@@ -308,7 +312,7 @@ export default function CartScreen() {
 
   return (
     <>
-      <ScrollView style={[s.scrollContainer, { backgroundColor: colors.navy[900] }]} contentContainerStyle={s.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}>
+      <ScrollView style={[s.scrollContainer, { backgroundColor: colors.navy[900] }]} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}>
         <Text style={[s.title, { color: colors.text }]}>{isEn ? `My Cart (${totalItems} items)` : `سلتي (${totalItems} قطعة)`}</Text>
 
         {cart.map((item, i) => (
@@ -332,7 +336,7 @@ export default function CartScreen() {
           </View>
         ))}
 
-        <TouchableOpacity onPress={() => router.back()} style={s.addMoreBtn}>
+        <TouchableOpacity onPress={() => { const svc = cart[0]?.service_type; router.push({ pathname: '/(tabs)/new-order', params: svc ? { service: svc } : {} }) }} style={s.addMoreBtn}>
           <Text style={[s.addMoreText, { color: colors.primary }]}>{isEn ? '+ Add more items' : '+ إضافة قطع أخرى'}</Text>
         </TouchableOpacity>
 
@@ -347,7 +351,7 @@ export default function CartScreen() {
         <Text style={[s.sectionTitle, { color: colors.text }]}>📍 {isEn ? 'Pickup Address' : 'عنوان الاستلام'}</Text>
         {selectedAddress && !showPickupPicker ? (
           <View style={[s.compactAddrCard, { backgroundColor: colors.cardBg, borderColor: colors.primary }]}>
-            <TouchableOpacity onPress={() => setShowPickupPicker(true)} style={[s.addrChangeBtn, { backgroundColor: colors.primary + '15' }]}>
+            <TouchableOpacity onPress={() => setShowPickupPicker(true)} style={[s.addrChangeBtn, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '40' }]}>
               <Text style={[s.addrChangeBtnText, { color: colors.primary }]}>{isEn ? 'Change' : 'تغيير'}</Text>
             </TouchableOpacity>
             <View style={{ flex: 1 }}>
@@ -387,7 +391,7 @@ export default function CartScreen() {
             <Text style={[s.sectionTitle, { color: colors.text }]}>📦 {isEn ? 'Delivery Address' : 'عنوان التسليم'}</Text>
             {deliveryAddress && !showDeliveryPicker ? (
               <View style={[s.compactAddrCard, { backgroundColor: colors.cardBg, borderColor: colors.accent }]}>
-                <TouchableOpacity onPress={() => setShowDeliveryPicker(true)} style={[s.addrChangeBtn, { backgroundColor: colors.accent + '15' }]}>
+                <TouchableOpacity onPress={() => setShowDeliveryPicker(true)} style={[s.addrChangeBtn, { backgroundColor: colors.accent + '15', borderColor: colors.accent + '40' }]}>
                   <Text style={[s.addrChangeBtnText, { color: colors.accent }]}>{isEn ? 'Change' : 'تغيير'}</Text>
                 </TouchableOpacity>
                 <View style={{ flex: 1 }}>
@@ -452,9 +456,9 @@ export default function CartScreen() {
           </View>
         )}
 
-        {!useSubscription && (
+        {(!useSubscription || (useSubscription && tailorCount > 0)) && (
           <>
-            <Text style={[s.sectionTitle, { color: colors.text }]}>💳 {isEn ? 'Payment Method' : 'طريقة الدفع'}</Text>
+            <Text style={[s.sectionTitle, { color: colors.text }]}>💳 {isEn ? (useSubscription ? `Pay for tailor items (${tailorTotal.toFixed(2)} ${t('currency')})` : 'Payment Method') : (useSubscription ? `دفع مبلغ التفصيل (${tailorTotal.toFixed(2)} ${t('currency')})` : 'طريقة الدفع')}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.paymentChipsRow}>
               {paymentMethods.map(pm => (
                 <TouchableOpacity key={pm.key} onPress={() => setPaymentMethod(pm.key)}
@@ -467,7 +471,7 @@ export default function CartScreen() {
           </>
         )}
 
-        {paymentMethod === 'e_wallet' && !useSubscription && (
+        {paymentMethod === 'e_wallet' && (!useSubscription || tailorCount > 0) && (
           <View style={[s.paymentInfoCard, { backgroundColor: colors.cardBg, borderColor: colors.accent + '30' }]}>
             <Text style={[s.paymentInfoTitle, { color: colors.text }]}>📱 {isEn ? 'Wallet phone number' : 'رقم موبايل المحفظة'}</Text>
             <TextInput
@@ -483,7 +487,7 @@ export default function CartScreen() {
           </View>
         )}
 
-        {paymentMethod === 'instapay' && paymentSettings.instapay && !useSubscription && (
+        {paymentMethod === 'instapay' && paymentSettings.instapay && (!useSubscription || tailorCount > 0) && (
           <View style={[s.paymentInfoCard, { backgroundColor: colors.cardBg, borderColor: colors.accent + '30' }]}>
             <Text style={[s.paymentInfoTitle, { color: colors.text }]}>🏦 {isEn ? 'Transfer to InstaPay number' : 'حوّل على رقم الإنستاباي'}</Text>
             <Text style={[s.paymentInfoNumber, { color: colors.accent }]} selectable>{paymentSettings.instapay}</Text>
@@ -542,10 +546,22 @@ export default function CartScreen() {
 
         <View style={[s.totalCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
           {useSubscription ? (
-            <>
-              <View style={s.totalRow}><Text style={[s.totalLabel, { color: colors.navy[200] }]}>{isEn ? 'Total' : 'الإجمالي'}</Text><Text style={[s.totalValue, { color: colors.success }]}>{isEn ? 'Free (Plan)' : 'مجاناً (باقة)'}</Text></View>
-              <Text style={{ fontSize: 11, color: colors.navy[400], textDecorationLine: 'line-through', textAlign: 'left' }}>{totalPrice.toFixed(2)} {t('currency')}</Text>
-            </>
+            tailorCount > 0 ? (
+              <>
+                <View style={s.totalRow}><Text style={[s.breakdownLabel, { color: colors.success }]}>👑 {isEn ? 'Plan items' : 'قطع الباقة'} ({nonTailorCount})</Text><Text style={[s.breakdownValue, { color: colors.success }]}>{isEn ? 'Free' : 'مجاناً'}</Text></View>
+                <View style={s.totalRow}><Text style={[s.breakdownLabel, { color: colors.navy[400] }]}>✂️ {isEn ? 'Tailor items' : 'قطع التفصيل'} ({tailorCount})</Text><Text style={[s.breakdownValue, { color: colors.navy[200] }]}>{tailorTotal.toFixed(2)} {t('currency')}</Text></View>
+                {fee > 0 && <View style={s.totalRow}><Text style={[s.breakdownLabel, { color: colors.navy[400] }]}>🚚 {isEn ? 'Delivery' : 'التوصيل'}{distanceKm ? ` (${distanceKm} ${isEn ? 'km' : 'كم'})` : ''}</Text><Text style={[s.breakdownValue, { color: colors.navy[200] }]}>{fee.toFixed(2)} {t('currency')}</Text></View>}
+                <View style={[s.totalRow, { borderTopWidth: 1, borderTopColor: colors.navy[700], paddingTop: 8, marginTop: 4 }]}>
+                  <Text style={[s.totalLabel, { color: colors.navy[200] }]}>{isEn ? 'Amount to pay' : 'المبلغ المطلوب'}</Text>
+                  <Text style={[s.totalValue, { color: colors.primary }]}>{orderTotal.toFixed(2)} {t('currency')}</Text>
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={s.totalRow}><Text style={[s.totalLabel, { color: colors.navy[200] }]}>{isEn ? 'Total' : 'الإجمالي'}</Text><Text style={[s.totalValue, { color: colors.success }]}>{isEn ? 'Free (Plan)' : 'مجاناً (باقة)'}</Text></View>
+                <Text style={{ fontSize: 11, color: colors.navy[400], textDecorationLine: 'line-through', textAlign: 'left' }}>{totalPrice.toFixed(2)} {t('currency')}</Text>
+              </>
+            )
           ) : (
             <>
               <View style={s.totalRow}><Text style={[s.breakdownLabel, { color: colors.navy[400] }]}>{isEn ? 'Subtotal' : 'المجموع'}</Text><Text style={[s.breakdownValue, { color: colors.navy[200] }]}>{totalPrice.toFixed(2)} {t('currency')}</Text></View>
@@ -613,8 +629,8 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center',
     borderRadius: 12, padding: 12, borderWidth: 1.5, gap: 12,
   },
-  addrChangeBtn: { borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
-  addrChangeBtnText: { fontSize: 12, fontWeight: '600' },
+  addrChangeBtn: { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1.5 },
+  addrChangeBtnText: { fontSize: 13, fontWeight: '700' },
   addressList: { gap: 8 },
   addressCard: {
     borderRadius: 12, padding: 12,

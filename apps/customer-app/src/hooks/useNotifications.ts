@@ -63,7 +63,7 @@ async function registerForPushNotifications(): Promise<string | null> {
       name: 'تحديثات الطلبات',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 300, 150, 300],
-      lightColor: '#00af5f',
+      lightColor: '#0ea5e9',
       showBadge: true,
       lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
     })
@@ -71,13 +71,13 @@ async function registerForPushNotifications(): Promise<string | null> {
       name: 'تأكيد الطلب',
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 200, 100, 200],
-      lightColor: '#00af5f',
+      lightColor: '#0ea5e9',
     })
     await Notifications.setNotificationChannelAsync('messages', {
       name: 'الرسائل',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 300, 150, 300],
-      lightColor: '#00af5f',
+      lightColor: '#0ea5e9',
       showBadge: true,
       lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
     })
@@ -85,7 +85,7 @@ async function registerForPushNotifications(): Promise<string | null> {
       name: 'CLEANO',
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#00af5f',
+      lightColor: '#0ea5e9',
     })
   }
 

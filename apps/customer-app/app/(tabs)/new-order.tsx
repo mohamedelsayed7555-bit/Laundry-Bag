@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, RefreshControl } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
-import { useRouter } from 'expo-router'
+import { useRouter, useLocalSearchParams } from 'expo-router'
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withSequence, withTiming } from 'react-native-reanimated'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { useCart } from '../../src/contexts/CartContext'
@@ -26,6 +26,7 @@ export default function NewOrderScreen() {
   const { colors } = useTheme()
   const { t, locale } = useLanguage()
   const router = useRouter()
+  const params = useLocalSearchParams<{ service?: string }>()
   const { showAlert, AlertComponent } = useCustomAlert()
 
   const [prices, setPrices] = useState<any[]>([])
@@ -102,7 +103,10 @@ export default function NewOrderScreen() {
   }, [profile])
 
   useEffect(() => {
-    loadData().then(() => setDataLoading(false))
+    loadData().then(() => {
+      setDataLoading(false)
+      if (params.service) setSelectedService(params.service)
+    })
   }, [profile])
 
   const onRefresh = useCallback(async () => {
@@ -171,7 +175,7 @@ export default function NewOrderScreen() {
 
   return (
     <>
-      <ScrollView style={[s.container, { backgroundColor: colors.navy[900] }]} contentContainerStyle={s.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}>
+      <ScrollView style={[s.container, { backgroundColor: colors.navy[900] }]} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}>
         <Text style={[s.title, { color: colors.text }]}>{t('newOrder')}</Text>
 
         {closed && (
@@ -225,7 +229,7 @@ export default function NewOrderScreen() {
               <Text style={[s.addressLabel, { color: colors.text }]}>📍 {selectedAddress.label}</Text>
               {selectedAddress.building && <Text style={[s.addressDetail, { color: colors.navy[300] }]}>{selectedAddress.building}{selectedAddress.floor ? ` - ط${selectedAddress.floor}` : ''}{selectedAddress.apartment ? ` - ش${selectedAddress.apartment}` : ''}</Text>}
             </View>
-            <TouchableOpacity onPress={() => setShowAddressPicker(true)} style={[s.changeBtn, { backgroundColor: colors.primary + '15' }]}>
+            <TouchableOpacity onPress={() => setShowAddressPicker(true)} style={[s.changeBtn, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '40' }]}>
               <Text style={[s.changeBtnText, { color: colors.primary }]}>{locale === 'en' ? 'Change' : 'تغيير'}</Text>
             </TouchableOpacity>
           </View>
@@ -411,8 +415,8 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', borderRadius: 12,
     padding: 12, borderWidth: 1.5,
   },
-  changeBtn: { borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
-  changeBtnText: { fontSize: 12, fontWeight: '700' },
+  changeBtn: { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1.5 },
+  changeBtnText: { fontSize: 13, fontWeight: '700' },
   cartSectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, marginBottom: 12 },
   addressLabel: { fontSize: 14, fontWeight: '600' },
   addressDetail: { fontSize: 11, marginTop: 2 },
