@@ -164,27 +164,6 @@ export default function PlansScreen() {
       showAlert({ title: locale === 'en' ? 'Notice' : 'تنبيه', message: locale === 'en' ? 'You are already subscribed to this plan' : 'أنت مشترك في هذه الباقة بالفعل', type: 'warning' })
       return
     }
-    if (activeSub) {
-      showAlert({
-        title: locale === 'en' ? 'Upgrade plan' : 'ترقية الباقة',
-        message: locale === 'en'
-          ? `You are subscribed to "${planName(activeSub.plan_name ?? '')}". ⚠️ Paid amount (${activeSub.total_paid} EGP) is non-refundable.\n\nUpgrade to "${planName(plan.name)}"?`
-          : `أنت مشترك حالياً في "${activeSub.plan_name}".\n\n⚠️ المبلغ المدفوع للباقة الحالية (${activeSub.total_paid} ج.م) لن يُسترد.\n\nهل تريد الترقية إلى "${plan.name}"؟`,
-        type: 'confirm',
-        buttons: [
-          { text: locale === 'en' ? 'Cancel' : 'تراجع', style: 'cancel' },
-          {
-            text: locale === 'en' ? 'Yes, upgrade' : 'نعم، ترقية',
-            onPress: async () => {
-              await supabase.from('subscriptions').update({ status: 'cancelled', auto_renew: false }).eq('id', activeSub.id)
-              setActiveSub(null)
-              doSubscribe(plan)
-            },
-          },
-        ],
-      })
-      return
-    }
     setSelectedPlanForSubscribe(plan)
     scrollRef.current?.scrollTo({ y: settingsY.current, animated: true })
   }
@@ -280,6 +259,30 @@ export default function PlansScreen() {
           <Text style={s.pendingSubBadge}>⏳ {locale === 'en' ? 'Pending subscription request' : 'طلب اشتراك قيد المراجعة'}</Text>
           <Text style={[s.pendingSubName, { color: colors.text }]}>{planName(pendingSub.plan_name ?? '')}</Text>
           <Text style={[s.pendingSubHint, { color: colors.navy[300] }]}>{locale === 'en' ? 'Will be activated after admin review and payment confirmation' : 'سيتم تفعيل اشتراكك بعد مراجعة الإدارة وتأكيد الدفع'}</Text>
+          <TouchableOpacity
+            style={{ marginTop: 12, alignSelf: 'center', paddingHorizontal: 20, paddingVertical: 8, borderRadius: 12, borderWidth: 1.5, borderColor: colors.danger + '50' }}
+            onPress={() => {
+              showAlert({
+                title: locale === 'en' ? 'Cancel request' : 'إلغاء الطلب',
+                message: locale === 'en' ? 'Cancel your pending subscription request?' : 'هل تريد إلغاء طلب الاشتراك؟',
+                type: 'confirm',
+                buttons: [
+                  { text: locale === 'en' ? 'No' : 'لا', style: 'cancel' },
+                  {
+                    text: locale === 'en' ? 'Yes, cancel' : 'نعم، إلغاء',
+                    style: 'destructive',
+                    onPress: async () => {
+                      await supabase.from('subscriptions').update({ status: 'cancelled' }).eq('id', pendingSub.id)
+                      setPendingSub(null)
+                      showAlert({ title: locale === 'en' ? 'Done' : 'تم', message: locale === 'en' ? 'Request cancelled' : 'تم إلغاء الطلب', type: 'success' })
+                    },
+                  },
+                ],
+              })
+            }}
+          >
+            <Text style={{ color: colors.danger, fontSize: 13, fontWeight: '700' }}>{locale === 'en' ? 'Cancel request' : 'إلغاء الطلب'}</Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -484,7 +487,30 @@ export default function PlansScreen() {
             </Text>
             <TouchableOpacity
               style={[s.subscribeBtn, { backgroundColor: colors.primary, paddingVertical: 16 }]}
-              onPress={() => doSubscribe(selectedPlanForSubscribe)}
+              onPress={() => {
+                if (activeSub && activeSub.plan_id !== selectedPlanForSubscribe.id) {
+                  showAlert({
+                    title: locale === 'en' ? 'Upgrade plan' : 'ترقية الباقة',
+                    message: locale === 'en'
+                      ? `You are subscribed to "${planName(activeSub.plan_name ?? '')}". ⚠️ Paid amount (${activeSub.total_paid} EGP) is non-refundable.\n\nUpgrade to "${planName(selectedPlanForSubscribe.name)}"?`
+                      : `أنت مشترك حالياً في "${activeSub.plan_name}".\n\n⚠️ المبلغ المدفوع للباقة الحالية (${activeSub.total_paid} ج.م) لن يُسترد.\n\nهل تريد الترقية إلى "${selectedPlanForSubscribe.name}"؟`,
+                    type: 'confirm',
+                    buttons: [
+                      { text: locale === 'en' ? 'Cancel' : 'تراجع', style: 'cancel' },
+                      {
+                        text: locale === 'en' ? 'Yes, upgrade' : 'نعم، ترقية',
+                        onPress: async () => {
+                          await supabase.from('subscriptions').update({ status: 'cancelled', auto_renew: false }).eq('id', activeSub.id)
+                          setActiveSub(null)
+                          doSubscribe(selectedPlanForSubscribe)
+                        },
+                      },
+                    ],
+                  })
+                } else {
+                  doSubscribe(selectedPlanForSubscribe)
+                }
+              }}
               disabled={subscribing}
             >
               <Text style={[s.subscribeBtnText, { fontSize: 16 }]}>
