@@ -317,6 +317,11 @@ export default {
   'plan:زوجي': 'Couple',
   'plan:عائلي': 'Family',
   'plan:بريميوم': 'Premium',
+  'plan:باقة التفصيل': 'Tailoring Plan',
+  'plan:باقة السجاد والبطاطين': 'Carpets & Blankets Plan',
+  'plan:الباقة الشاملة': 'All-Inclusive Plan',
+  'plan:شنطة Laundry Bag': 'Laundry Bag',
+  'plan:شنطة 100 قطعة': '100 Pieces Bag',
 
   // Plan tiers
   'tier:individual': 'Individual',
