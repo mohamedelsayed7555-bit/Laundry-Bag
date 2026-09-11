@@ -32,6 +32,7 @@ interface Plan {
   tier: string
   items_per_month: number
   includes_all_services: boolean
+  covered_services: string[]
   monthly_price: number
   quarterly_price: number | null
   biannual_price: number | null
@@ -40,9 +41,13 @@ interface Plan {
   created_at: string
 }
 
+const allServiceKeys = ['wash', 'iron', 'wash_iron', 'dry_clean', 'tailor', 'carpet']
+const serviceLabelsMap: Record<string, string> = { wash: 'غسيل', iron: 'كوي', wash_iron: 'غسيل وكوي', dry_clean: 'تنظيف جاف', tailor: 'تفصيل وتعديلات', carpet: 'سجاد وبطاطين' }
+
 const emptyForm = {
   name: '', description: '', tier: 'individual', items_per_month: 20,
-  includes_all_services: true, monthly_price: 0, quarterly_price: 0,
+  includes_all_services: true, covered_services: ['wash', 'iron', 'wash_iron', 'dry_clean'] as string[],
+  monthly_price: 0, quarterly_price: 0,
   biannual_price: 0, annual_price: 0,
 }
 
@@ -61,7 +66,7 @@ export default function PlansPage() {
 
   async function loadData() {
     const [p, s] = await Promise.all([
-      supabase.from('plans').select('id, name, description, tier, items_per_month, includes_all_services, monthly_price, quarterly_price, biannual_price, annual_price, is_active').order('monthly_price'),
+      supabase.from('plans').select('id, name, description, tier, items_per_month, includes_all_services, covered_services, monthly_price, quarterly_price, biannual_price, annual_price, is_active').order('monthly_price'),
       supabase.from('subscriptions').select('*, user:users!subscriptions_user_id_fkey(name), plan:plans!subscriptions_plan_id_fkey(name)').eq('status', 'active'),
     ])
     setPlans((p.data ?? []) as any)
@@ -73,6 +78,7 @@ export default function PlansPage() {
     setForm({
       name: plan.name, description: plan.description || '', tier: plan.tier,
       items_per_month: plan.items_per_month, includes_all_services: plan.includes_all_services,
+      covered_services: plan.covered_services ?? ['wash', 'iron', 'wash_iron', 'dry_clean'],
       monthly_price: +plan.monthly_price, quarterly_price: +(plan.quarterly_price || 0),
       biannual_price: +(plan.biannual_price || 0), annual_price: +(plan.annual_price || 0),
     })
@@ -154,6 +160,25 @@ export default function PlansPage() {
           </label>
         </div>
       </div>
+
+      {!form.includes_all_services && (
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-2">الخدمات المغطاة</label>
+          <div className="flex flex-wrap gap-2">
+            {allServiceKeys.map(svc => (
+              <label key={svc} className="flex items-center gap-1.5 cursor-pointer bg-gray-50 hover:bg-gray-100 rounded-lg px-3 py-1.5 border border-surface-border/60 transition-all">
+                <input type="checkbox" checked={form.covered_services.includes(svc)}
+                  onChange={e => {
+                    const updated = e.target.checked ? [...form.covered_services, svc] : form.covered_services.filter(s => s !== svc)
+                    setForm({ ...form, covered_services: updated })
+                  }}
+                  className="w-3.5 h-3.5 rounded border-gray-300 text-primary-500 focus:ring-primary-500" />
+                <span className="text-xs text-gray-600">{serviceLabelsMap[svc] ?? svc}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="border-t border-surface-border/60 pt-4">
         <p className="text-xs font-semibold text-gray-500 mb-3">التسعير</p>

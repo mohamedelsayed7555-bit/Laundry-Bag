@@ -14,7 +14,7 @@ export type OrderStatus =
 
 export type PaymentMethod = 'cash' | 'instapay' | 'wallet'
 export type PaymentStatus = 'pending' | 'confirmed' | 'refunded'
-export type ServiceType = 'wash' | 'iron' | 'wash_iron' | 'dry_clean' | 'tailor'
+export type ServiceType = 'wash' | 'iron' | 'wash_iron' | 'dry_clean' | 'tailor' | 'carpet'
 export type UserRole = 'customer' | 'driver' | 'admin'
 export type UserTier = 'bronze' | 'silver' | 'gold' | 'platinum'
 export type ChurnRisk = 'low' | 'medium' | 'high'
@@ -139,6 +139,7 @@ export interface Plan {
   tier: PlanTier
   items_per_month: number
   includes_all_services: boolean
+  covered_services?: ServiceType[]
   monthly_price: number
   quarterly_price?: number
   biannual_price?: number
@@ -246,6 +247,7 @@ export const SERVICE_TYPE_LABELS: Record<ServiceType, string> = {
   wash_iron: 'غسيل وكوي',
   dry_clean: 'تنظيف جاف',
   tailor: 'تفصيل وتعديلات',
+  carpet: 'سجاد وبطاطين',
 }
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {

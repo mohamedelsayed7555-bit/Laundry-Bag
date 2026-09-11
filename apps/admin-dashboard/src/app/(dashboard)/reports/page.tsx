@@ -72,7 +72,7 @@ export default function ReportsPage() {
   }
 
   const statusLabel: Record<string, string> = { pending: 'في الانتظار', assigned: 'تم التعيين', picked_up: 'تم الاستلام', processing: 'جاري المعالجة', ready: 'جاهز', delivering: 'جاري التوصيل', delivered: 'تم التوصيل', cancelled: 'ملغي' }
-  const serviceLabel: Record<string, string> = { wash: 'غسيل', iron: 'كوي', wash_iron: 'غسيل وكوي', dry_clean: 'تنظيف جاف', tailor: 'تفصيل وتعديلات' }
+  const serviceLabel: Record<string, string> = { wash: 'غسيل', iron: 'كوي', wash_iron: 'غسيل وكوي', dry_clean: 'تنظيف جاف', tailor: 'تفصيل وتعديلات', carpet: 'سجاد وبطاطين' }
   const presets: { key: DatePreset; label: string }[] = [
     { key: 'all', label: 'الكل' }, { key: 'today', label: 'اليوم' },
     { key: 'week', label: 'آخر أسبوع' }, { key: 'month', label: 'هذا الشهر' },

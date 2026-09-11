@@ -30,7 +30,7 @@ const nextAction: Record<string, { status: string; label: string }> = {
 }
 
 const serviceLabel: Record<string, string> = {
-  wash: 'غسيل', iron: 'كي', wash_iron: 'غسيل وكي', dry_clean: 'تنظيف جاف', tailor: 'تفصيل وتعديلات',
+  wash: 'غسيل', iron: 'كي', wash_iron: 'غسيل وكي', dry_clean: 'تنظيف جاف', tailor: 'تفصيل وتعديلات', carpet: 'سجاد وبطاطين',
 }
 
 const paymentMethodLabel: Record<string, { label: string; icon: string }> = {

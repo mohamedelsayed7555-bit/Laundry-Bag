@@ -14,6 +14,7 @@ type Plan = {
   tier: string
   items_per_month: number
   includes_all_services: boolean
+  covered_services?: string[]
   monthly_price: number
   quarterly_price: number
   biannual_price: number
@@ -94,7 +95,7 @@ export default function PlansScreen() {
     const results = await Promise.all([
       supabase.from('settings').select('key, value').in('key', ['discount_quarterly', 'discount_biannual', 'discount_annual']),
       supabase.from('plans')
-        .select('id, name, description, tier, items_per_month, includes_all_services, monthly_price, quarterly_price, biannual_price, annual_price, is_active')
+        .select('id, name, description, tier, items_per_month, includes_all_services, covered_services, monthly_price, quarterly_price, biannual_price, annual_price, is_active')
         .eq('is_active', true)
         .order('monthly_price', { ascending: true }),
       profile ? supabase.from('subscriptions').select('*, plans(name)')
@@ -411,7 +412,11 @@ export default function PlansScreen() {
 
             <View style={s.planFeatures}>
               <Text style={[s.featureText, { color: colors.navy[100] }]}>📦 {plan.items_per_month} {locale === 'en' ? 'items/month' : 'قطعة شهرياً'}</Text>
-              {plan.includes_all_services && <Text style={[s.featureText, { color: colors.navy[100] }]}>✨ {locale === 'en' ? 'All services included' : 'جميع الخدمات متاحة'}</Text>}
+              {plan.includes_all_services
+                ? <Text style={[s.featureText, { color: colors.navy[100] }]}>✨ {locale === 'en' ? 'All services included' : 'جميع الخدمات متاحة'}</Text>
+                : plan.covered_services && plan.covered_services.length > 0
+                  ? <Text style={[s.featureText, { color: colors.navy[100] }]}>✅ {plan.covered_services.map((s: string) => ({ wash: 'غسيل', iron: 'كوي', wash_iron: 'غسيل وكوي', dry_clean: 'تنظيف جاف', tailor: 'تفصيل', carpet: 'سجاد' }[s] ?? s)).join(' • ')}</Text>
+                  : null}
               {plan.tier === 'premium' && <Text style={[s.featureText, { color: colors.navy[100] }]}>⚡ {locale === 'en' ? 'Priority delivery' : 'أولوية في التوصيل'}</Text>}
             </View>
 

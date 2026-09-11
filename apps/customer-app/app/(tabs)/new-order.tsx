@@ -16,6 +16,7 @@ const services = [
   { key: 'iron', icon: '👕', label: 'كي فقط', labelEn: 'Iron Only' },
   { key: 'wash_iron', icon: '✨', label: 'غسيل وكي', labelEn: 'Wash & Iron' },
   { key: 'tailor', icon: '✂️', label: 'تفصيل وتعديلات', labelEn: 'Tailoring' },
+  { key: 'carpet', icon: '🧹', label: 'سجاد وبطاطين', labelEn: 'Carpets & Blankets' },
 ]
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!

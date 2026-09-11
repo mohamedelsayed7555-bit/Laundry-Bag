@@ -15,7 +15,7 @@ import PermissionGate from '@/components/ui/PermissionGate'
 import { useAuth } from '@/lib/auth-context'
 
 const serviceVariant: Record<string, 'success' | 'info' | 'purple' | 'warning'> = {
-  wash: 'info', iron: 'warning', wash_iron: 'purple', dry_clean: 'success', tailor: 'purple',
+  wash: 'info', iron: 'warning', wash_iron: 'purple', dry_clean: 'success', tailor: 'purple', carpet: 'warning',
 }
 
 export default function PricesPage() {
@@ -155,6 +155,7 @@ export default function PricesPage() {
           <option value="wash">غسيل</option><option value="iron">كوي</option>
           <option value="wash_iron">غسيل وكوي</option><option value="dry_clean">تنظيف جاف</option>
           <option value="tailor">تفصيل وتعديلات</option>
+          <option value="carpet">سجاد وبطاطين</option>
         </select>
       </div>
       <div>

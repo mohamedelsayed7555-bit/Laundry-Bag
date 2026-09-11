@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Platform, RefreshControl } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter, useFocusEffect } from 'expo-router'
@@ -25,6 +25,7 @@ const services = [
   { key: 'iron', label: 'كي فقط', labelEn: 'Iron Only' },
   { key: 'wash_iron', label: 'غسيل وكي', labelEn: 'Wash & Iron' },
   { key: 'tailor', label: 'تفصيل وتعديلات', labelEn: 'Tailoring' },
+  { key: 'carpet', label: 'سجاد وبطاطين', labelEn: 'Carpets & Blankets' },
 ]
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!
@@ -48,7 +49,7 @@ export default function CartScreen() {
   const [selectedAddress, setSelectedAddress] = useState<any>(null)
   const [deliveryAddress, setDeliveryAddress] = useState<any>(null)
   const [sameAddress, setSameAddress] = useState(true)
-  const [activeSub, setActiveSub] = useState<any>(null)
+  const [activeSubs, setActiveSubs] = useState<any[]>([])
   const [walletPhone, setWalletPhone] = useState('')
   const [paymentSettings, setPaymentSettings] = useState<{ instapay: string; wallet: string }>({ instapay: '', wallet: '' })
   const [deliveryFee, setDeliveryFee] = useState(0)
@@ -85,7 +86,7 @@ export default function CartScreen() {
     const [settingsRes, addrRes, subRes] = await Promise.all([
       supabase.from('settings').select('key, value').in('key', ['delivery_fee', 'max_zone_km', 'price_per_km', 'base_delivery_km', 'laundry_lat', 'laundry_lng', 'min_order_items', 'instapay_number', 'wallet_number']),
       profile ? supabase.from('addresses').select('id, label, lat, lng, is_default, building, floor, apartment, landmark').eq('user_id', profile.id).order('is_default', { ascending: false }) : null,
-      profile ? supabase.from('subscriptions').select('*, plans(name)').eq('user_id', profile.id).eq('status', 'active').single() : null,
+      profile ? supabase.from('subscriptions').select('*, plans(name, covered_services, includes_all_services)').eq('user_id', profile.id).eq('status', 'active') : null,
     ])
     if (settingsRes?.data) {
       const s: any = {}
@@ -113,7 +114,7 @@ export default function CartScreen() {
       const def = addrRes.data.find((a: any) => a.is_default) ?? addrRes.data[0]
       if (def) { setSelectedAddress(def); setDeliveryAddress(def) }
     }
-    if (subRes?.data) setActiveSub(subRes.data)
+    if (subRes?.data) setActiveSubs(Array.isArray(subRes.data) ? subRes.data : [subRes.data])
   }, [profile])
 
   useEffect(() => {
@@ -142,16 +143,32 @@ export default function CartScreen() {
     }
   }, [selectedAddress, zoneSettings, deliveryFeeBase])
 
-  const tailorItems = cart.filter((i: any) => i.service_type === 'tailor')
-  const nonTailorItems = cart.filter((i: any) => i.service_type !== 'tailor')
-  const tailorTotal = tailorItems.reduce((sum: number, i: any) => sum + (i.price * i.quantity), 0)
-  const tailorCount = tailorItems.reduce((sum: number, i: any) => sum + i.quantity, 0)
-  const nonTailorCount = nonTailorItems.reduce((sum: number, i: any) => sum + i.quantity, 0)
-  const subRemaining = activeSub ? Math.max(0, activeSub.items_limit - activeSub.items_used) : null
-  const subExhausted = activeSub && subRemaining === 0
-  const useSubscription = activeSub && subRemaining !== null && subRemaining > 0 && subRemaining >= nonTailorCount && nonTailorCount > 0
-  const fee = useSubscription && tailorCount === 0 ? 0 : deliveryFee
-  const orderTotal = useSubscription ? tailorTotal + fee : totalPrice + fee
+  // Build coverage from all active subscriptions
+  const subCoverage = useMemo(() => {
+    if (!activeSubs.length) return { coveredServices: [] as string[], subs: [] as any[], totalRemaining: 0 }
+    const allCovered: string[] = []
+    for (const sub of activeSubs) {
+      if (sub.plans?.includes_all_services) {
+        cart.forEach((i: any) => { if (!allCovered.includes(i.service_type)) allCovered.push(i.service_type) })
+      } else {
+        const cs = sub.plans?.covered_services ?? ['wash', 'iron', 'wash_iron', 'dry_clean']
+        cs.forEach((s: string) => { if (!allCovered.includes(s)) allCovered.push(s) })
+      }
+    }
+    const totalRemaining = activeSubs.reduce((sum: number, s: any) => sum + Math.max(0, (s.items_limit ?? 0) - (s.items_used ?? 0)), 0)
+    return { coveredServices: allCovered, subs: activeSubs, totalRemaining }
+  }, [activeSubs, cart])
+
+  const uncoveredItems = cart.filter((i: any) => !subCoverage.coveredServices.includes(i.service_type))
+  const coveredItems = cart.filter((i: any) => subCoverage.coveredServices.includes(i.service_type))
+  const uncoveredTotal = uncoveredItems.reduce((sum: number, i: any) => sum + (i.price * i.quantity), 0)
+  const uncoveredCount = uncoveredItems.reduce((sum: number, i: any) => sum + i.quantity, 0)
+  const coveredCount = coveredItems.reduce((sum: number, i: any) => sum + i.quantity, 0)
+  const subRemaining = subCoverage.totalRemaining
+  const subExhausted = activeSubs.length > 0 && subRemaining === 0
+  const useSubscription = activeSubs.length > 0 && subRemaining > 0 && subRemaining >= coveredCount && coveredCount > 0
+  const fee = useSubscription && uncoveredCount === 0 ? 0 : deliveryFee
+  const orderTotal = useSubscription ? uncoveredTotal + fee : totalPrice + fee
 
   const serviceLabel = (key: string) => {
     const svc = services.find(s => s.key === key)
@@ -182,29 +199,32 @@ export default function CartScreen() {
       showAlert({ title: isEn ? 'Out of zone' : 'خارج نطاق التوصيل', message: isEn ? `Address is ${distanceKm} km away — max ${zoneSettings.max_zone_km} km` : `العنوان المختار يبعد ${distanceKm} كم — الحد الأقصى ${zoneSettings.max_zone_km} كم`, type: 'warning' })
       return
     }
-    if (activeSub && subRemaining !== null && subRemaining > 0 && nonTailorCount > subRemaining) {
-      showAlert({ title: isEn ? 'Notice' : 'تنبيه', message: isEn ? `Your plan has ${subRemaining} items left but you need ${nonTailorCount}. Upgrade or reduce items.` : `رصيد باقتك ${subRemaining} قطعة فقط وأنت محتاج ${nonTailorCount} قطعة.\nيمكنك ترقية باقتك أو تقليل عدد القطع.`, type: 'warning' })
+    if (activeSubs.length > 0 && subRemaining > 0 && coveredCount > subRemaining) {
+      showAlert({ title: isEn ? 'Notice' : 'تنبيه', message: isEn ? `Your plans have ${subRemaining} items left but you need ${coveredCount}. Upgrade or reduce items.` : `رصيد باقاتك ${subRemaining} قطعة فقط وأنت محتاج ${coveredCount} قطعة.\nيمكنك ترقية باقتك أو تقليل عدد القطع.`, type: 'warning' })
       return
     }
 
     setSaving(true)
 
-    if (useSubscription && activeSub) {
-      const { data: freshSub } = await supabase.from('subscriptions').select('status, end_date, items_used, items_limit').eq('id', activeSub.id).single()
-      if (!freshSub || freshSub.status !== 'active' || new Date(freshSub.end_date) < new Date()) {
-        setSaving(false)
-        showAlert({ title: isEn ? 'Subscription expired' : 'الاشتراك انتهى', message: isEn ? 'Your subscription has expired. Please renew or pay normally.' : 'اشتراكك انتهى. جدّد الباقة أو ادفع عادي.', type: 'error' })
-        return
+    if (useSubscription) {
+      // Verify all subscriptions are still valid
+      for (const sub of activeSubs) {
+        const { data: freshSub } = await supabase.from('subscriptions').select('status, end_date, items_used, items_limit').eq('id', sub.id).single()
+        if (!freshSub || freshSub.status !== 'active' || new Date(freshSub.end_date) < new Date()) {
+          setSaving(false)
+          showAlert({ title: isEn ? 'Subscription expired' : 'الاشتراك انتهى', message: isEn ? 'One of your subscriptions has expired. Please renew or pay normally.' : 'أحد اشتراكاتك انتهى. جدّد الباقة أو ادفع عادي.', type: 'error' })
+          return
+        }
       }
-      const freshRemaining = (freshSub.items_limit ?? 0) - (freshSub.items_used ?? 0)
-      if (nonTailorCount > freshRemaining) {
+      const freshTotalRemaining = activeSubs.reduce((sum: number, s: any) => sum + Math.max(0, (s.items_limit ?? 0) - (s.items_used ?? 0)), 0)
+      if (coveredCount > freshTotalRemaining) {
         setSaving(false)
-        showAlert({ title: isEn ? 'Notice' : 'تنبيه', message: isEn ? `Only ${freshRemaining} items left in your plan.` : `رصيد باقتك ${freshRemaining} قطعة فقط.`, type: 'warning' })
+        showAlert({ title: isEn ? 'Notice' : 'تنبيه', message: isEn ? `Only ${freshTotalRemaining} items left in your plans.` : `رصيد باقاتك ${freshTotalRemaining} قطعة فقط.`, type: 'warning' })
         return
       }
     }
 
-    const hasPaidAmount = useSubscription ? (tailorTotal + fee) > 0 : true
+    const hasPaidAmount = useSubscription ? (uncoveredTotal + fee) > 0 : true
     const isOnlinePayment = hasPaidAmount && (paymentMethod === 'visa' || paymentMethod === 'e_wallet')
 
     if (isOnlinePayment && paymentMethod === 'e_wallet' && !walletPhone.match(/^01[0-9]{9}$/)) {
@@ -221,12 +241,12 @@ export default function CartScreen() {
       subtotal: totalPrice,
       delivery_fee: fee,
       total: orderTotal,
-      payment_method: useSubscription && tailorCount === 0 ? 'cash' : paymentMethod,
+      payment_method: useSubscription && uncoveredCount === 0 ? 'cash' : paymentMethod,
       notes: notes || null,
       status: isScheduled ? 'scheduled' : 'pending',
-      payment_status: useSubscription && tailorCount === 0 ? 'confirmed' : 'pending',
+      payment_status: useSubscription && uncoveredCount === 0 ? 'confirmed' : 'pending',
       order_type: useSubscription ? 'subscription' : 'regular',
-      subscription_id: useSubscription ? activeSub.id : null,
+      subscription_id: useSubscription ? activeSubs[0].id : null,
       address_id: selectedAddress?.id || null,
       pickup_location: selectedAddress ? { lat: selectedAddress.lat, lng: selectedAddress.lng, label: selectedAddress.label } : null,
       delivery_location: (() => {
@@ -239,7 +259,22 @@ export default function CartScreen() {
     }).select('id').single()
 
     if (!error && useSubscription) {
-      await supabase.rpc('increment_subscription_usage', { p_sub_id: activeSub.id, p_count: nonTailorCount })
+      // Distribute covered items across subscriptions
+      let remaining = coveredCount
+      for (const sub of activeSubs) {
+        if (remaining <= 0) break
+        const subAvail = Math.max(0, (sub.items_limit ?? 0) - (sub.items_used ?? 0))
+        if (subAvail <= 0) continue
+        const subCoveredSvcs: string[] = sub.plans?.includes_all_services
+          ? cart.map((i: any) => i.service_type)
+          : (sub.plans?.covered_services ?? ['wash', 'iron', 'wash_iron', 'dry_clean'])
+        const relevantCount = cart.filter((i: any) => subCoveredSvcs.includes(i.service_type)).reduce((s: number, i: any) => s + i.quantity, 0)
+        const deduct = Math.min(remaining, subAvail, relevantCount)
+        if (deduct > 0) {
+          await supabase.rpc('increment_subscription_usage', { p_sub_id: sub.id, p_count: deduct })
+          remaining -= deduct
+        }
+      }
     }
 
     if (error) {
@@ -282,7 +317,7 @@ export default function CartScreen() {
     clearCart()
     playNotificationSound('order-placed')
     const msg = useSubscription
-      ? (isEn ? `Order created! ${nonTailorCount} items deducted from plan (${subRemaining! - nonTailorCount} remaining)${tailorCount > 0 ? ` + ${tailorCount} tailor items charged separately` : ''}` : `تم إنشاء طلبك بنجاح!\nتم خصم ${nonTailorCount} قطعة من باقتك (متبقي ${subRemaining! - nonTailorCount})${tailorCount > 0 ? `\n+ ${tailorCount} قطعة تفصيل محاسبة بشكل منفصل` : ''}`)
+      ? (isEn ? `Order created! ${coveredCount} items deducted from plans (${subRemaining - coveredCount} remaining)${uncoveredCount > 0 ? ` + ${uncoveredCount} items charged separately` : ''}` : `تم إنشاء طلبك بنجاح!\nتم خصم ${coveredCount} قطعة من باقاتك (متبقي ${subRemaining - coveredCount})${uncoveredCount > 0 ? `\n+ ${uncoveredCount} قطعة خارج الباقة محاسبة بشكل منفصل` : ''}`)
       : (isEn ? 'Order created! A driver will be assigned soon' : 'تم إنشاء طلبك بنجاح! سيتم تعيين سائق قريباً')
     showAlert({ title: isEn ? 'Done' : 'تم', message: msg, type: 'success', buttons: [
       { text: t('ok'), onPress: () => router.replace('/(tabs)/orders') },
@@ -429,7 +464,7 @@ export default function CartScreen() {
           </View>
         )}
 
-        {activeSub && subExhausted && (
+        {activeSubs.length > 0 && subExhausted && (
           <View style={[s.subCoverBanner, { backgroundColor: '#f59e0b18', borderColor: '#f59e0b40' }]}>
             <Text style={s.subCoverIcon}>⚠️</Text>
             <View style={{ flex: 1 }}>
@@ -441,24 +476,26 @@ export default function CartScreen() {
           </View>
         )}
 
-        {useSubscription && activeSub && (
+        {useSubscription && activeSubs.length > 0 && (
           <View style={[s.subCoverBanner, { backgroundColor: '#10b98118', borderColor: '#10b98140' }]}>
             <Text style={s.subCoverIcon}>✅</Text>
             <View style={{ flex: 1 }}>
-              <Text style={[s.subCoverTitle, { color: '#10b981' }]}>{isEn ? 'Covered by your plan' : 'مغطى من باقتك'}</Text>
+              <Text style={[s.subCoverTitle, { color: '#10b981' }]}>{isEn ? 'Covered by your plans' : 'مغطى من باقاتك'}</Text>
               <Text style={[s.subCoverDetail, { color: colors.navy[300] }]}>
                 {isEn
-                  ? `${nonTailorCount} items will be deducted — ${subRemaining! - nonTailorCount} remaining after this order${tailorCount > 0 ? `\n${tailorCount} tailor items charged separately (${tailorTotal.toFixed(2)} ${t('currency')})` : ''}`
-                  : `سيتم خصم ${nonTailorCount} قطعة — متبقي ${subRemaining! - nonTailorCount} قطعة بعد الطلب${tailorCount > 0 ? `\n${tailorCount} قطعة تفصيل محاسبة منفصلة (${tailorTotal.toFixed(2)} ${t('currency')})` : ''}`}
+                  ? `${coveredCount} items will be deducted — ${subRemaining - coveredCount} remaining after this order${uncoveredCount > 0 ? `\n${uncoveredCount} items charged separately (${uncoveredTotal.toFixed(2)} ${t('currency')})` : ''}`
+                  : `سيتم خصم ${coveredCount} قطعة — متبقي ${subRemaining - coveredCount} قطعة بعد الطلب${uncoveredCount > 0 ? `\n${uncoveredCount} قطعة خارج الباقة محاسبة منفصلة (${uncoveredTotal.toFixed(2)} ${t('currency')})` : ''}`}
               </Text>
-              <Text style={[s.subCoverPlan, { color: colors.navy[400] }]}>📦 {isEn && activeSub.plans?.name ? (t(`plan:${activeSub.plans.name}` as any) !== `plan:${activeSub.plans.name}` ? t(`plan:${activeSub.plans.name}` as any) : activeSub.plans.name) : activeSub.plans?.name ?? (isEn ? 'Subscription' : 'الباقة')}</Text>
+              {activeSubs.map((sub: any, idx: number) => (
+                <Text key={idx} style={[s.subCoverPlan, { color: colors.navy[400] }]}>📦 {sub.plans?.name ?? (isEn ? 'Subscription' : 'الباقة')} ({Math.max(0, (sub.items_limit ?? 0) - (sub.items_used ?? 0))} {isEn ? 'remaining' : 'متبقي'})</Text>
+              ))}
             </View>
           </View>
         )}
 
-        {(!useSubscription || (useSubscription && tailorCount > 0)) && (
+        {(!useSubscription || (useSubscription && uncoveredCount > 0)) && (
           <>
-            <Text style={[s.sectionTitle, { color: colors.text }]}>💳 {isEn ? (useSubscription ? `Pay for tailor items (${tailorTotal.toFixed(2)} ${t('currency')})` : 'Payment Method') : (useSubscription ? `دفع مبلغ التفصيل (${tailorTotal.toFixed(2)} ${t('currency')})` : 'طريقة الدفع')}</Text>
+            <Text style={[s.sectionTitle, { color: colors.text }]}>💳 {isEn ? (useSubscription ? `Pay for uncovered items (${uncoveredTotal.toFixed(2)} ${t('currency')})` : 'Payment Method') : (useSubscription ? `دفع القطع خارج الباقة (${uncoveredTotal.toFixed(2)} ${t('currency')})` : 'طريقة الدفع')}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.paymentChipsRow}>
               {paymentMethods.map(pm => (
                 <TouchableOpacity key={pm.key} onPress={() => setPaymentMethod(pm.key)}
@@ -471,7 +508,7 @@ export default function CartScreen() {
           </>
         )}
 
-        {paymentMethod === 'e_wallet' && (!useSubscription || tailorCount > 0) && (
+        {paymentMethod === 'e_wallet' && (!useSubscription || uncoveredCount > 0) && (
           <View style={[s.paymentInfoCard, { backgroundColor: colors.cardBg, borderColor: colors.accent + '30' }]}>
             <Text style={[s.paymentInfoTitle, { color: colors.text }]}>📱 {isEn ? 'Wallet phone number' : 'رقم موبايل المحفظة'}</Text>
             <TextInput
@@ -487,7 +524,7 @@ export default function CartScreen() {
           </View>
         )}
 
-        {paymentMethod === 'instapay' && paymentSettings.instapay && (!useSubscription || tailorCount > 0) && (
+        {paymentMethod === 'instapay' && paymentSettings.instapay && (!useSubscription || uncoveredCount > 0) && (
           <View style={[s.paymentInfoCard, { backgroundColor: colors.cardBg, borderColor: colors.accent + '30' }]}>
             <Text style={[s.paymentInfoTitle, { color: colors.text }]}>🏦 {isEn ? 'Transfer to InstaPay number' : 'حوّل على رقم الإنستاباي'}</Text>
             <Text style={[s.paymentInfoNumber, { color: colors.accent }]} selectable>{paymentSettings.instapay}</Text>
@@ -546,10 +583,10 @@ export default function CartScreen() {
 
         <View style={[s.totalCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
           {useSubscription ? (
-            tailorCount > 0 ? (
+            uncoveredCount > 0 ? (
               <>
-                <View style={s.totalRow}><Text style={[s.breakdownLabel, { color: colors.success }]}>👑 {isEn ? 'Plan items' : 'قطع الباقة'} ({nonTailorCount})</Text><Text style={[s.breakdownValue, { color: colors.success }]}>{isEn ? 'Free' : 'مجاناً'}</Text></View>
-                <View style={s.totalRow}><Text style={[s.breakdownLabel, { color: colors.navy[400] }]}>✂️ {isEn ? 'Tailor items' : 'قطع التفصيل'} ({tailorCount})</Text><Text style={[s.breakdownValue, { color: colors.navy[200] }]}>{tailorTotal.toFixed(2)} {t('currency')}</Text></View>
+                <View style={s.totalRow}><Text style={[s.breakdownLabel, { color: colors.success }]}>👑 {isEn ? 'Plan items' : 'قطع الباقة'} ({coveredCount})</Text><Text style={[s.breakdownValue, { color: colors.success }]}>{isEn ? 'Free' : 'مجاناً'}</Text></View>
+                <View style={s.totalRow}><Text style={[s.breakdownLabel, { color: colors.navy[400] }]}>📋 {isEn ? 'Uncovered items' : 'قطع خارج الباقة'} ({uncoveredCount})</Text><Text style={[s.breakdownValue, { color: colors.navy[200] }]}>{uncoveredTotal.toFixed(2)} {t('currency')}</Text></View>
                 {fee > 0 && <View style={s.totalRow}><Text style={[s.breakdownLabel, { color: colors.navy[400] }]}>🚚 {isEn ? 'Delivery' : 'التوصيل'}{distanceKm ? ` (${distanceKm} ${isEn ? 'km' : 'كم'})` : ''}</Text><Text style={[s.breakdownValue, { color: colors.navy[200] }]}>{fee.toFixed(2)} {t('currency')}</Text></View>}
                 <View style={[s.totalRow, { borderTopWidth: 1, borderTopColor: colors.navy[700], paddingTop: 8, marginTop: 4 }]}>
                   <Text style={[s.totalLabel, { color: colors.navy[200] }]}>{isEn ? 'Amount to pay' : 'المبلغ المطلوب'}</Text>
