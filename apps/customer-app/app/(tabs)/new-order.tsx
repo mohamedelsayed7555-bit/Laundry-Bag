@@ -34,6 +34,8 @@ export default function NewOrderScreen() {
   const [selectedAddress, setSelectedAddress] = useState<any>(null)
   const [selectedService, setSelectedService] = useState('')
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({})
+  const [showAddressPicker, setShowAddressPicker] = useState(false)
+  const [showCartItems, setShowCartItems] = useState(true)
   const [activeSub, setActiveSub] = useState<any>(null)
   const [dataLoading, setDataLoading] = useState(true)
   const [closed, setClosed] = useState(false)
@@ -204,10 +206,10 @@ export default function NewOrderScreen() {
           <TouchableOpacity style={[s.addAddressBtn, { backgroundColor: colors.cardBg, borderColor: colors.primary }]} onPress={() => router.push('/addresses')}>
             <Text style={[s.addAddressText, { color: colors.primary }]}>📍 {locale === 'en' ? 'Add new address' : 'إضافة عنوان جديد'}</Text>
           </TouchableOpacity>
-        ) : (
+        ) : showAddressPicker ? (
           <View style={s.addressList}>
             {addresses.map(addr => (
-              <TouchableOpacity key={addr.id} onPress={() => setSelectedAddress(addr)}
+              <TouchableOpacity key={addr.id} onPress={() => { setSelectedAddress(addr); setShowAddressPicker(false) }}
                 style={[s.addressCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, selectedAddress?.id === addr.id && { borderColor: colors.primary, backgroundColor: colors.primary + '10' }]}>
                 <Text style={[s.addressLabel, { color: colors.text }]}>📍 {addr.label}</Text>
                 {addr.building && <Text style={[s.addressDetail, { color: colors.navy[300] }]}>{addr.building}{addr.floor ? ` - ط${addr.floor}` : ''}{addr.apartment ? ` - ش${addr.apartment}` : ''}</Text>}
@@ -217,7 +219,17 @@ export default function NewOrderScreen() {
               <Text style={[s.manageAddressText, { color: colors.accent }]}>{locale === 'en' ? 'Manage addresses' : 'إدارة العناوين'}</Text>
             </TouchableOpacity>
           </View>
-        )}
+        ) : selectedAddress ? (
+          <View style={[s.compactAddress, { backgroundColor: colors.cardBg, borderColor: colors.primary + '40' }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.addressLabel, { color: colors.text }]}>📍 {selectedAddress.label}</Text>
+              {selectedAddress.building && <Text style={[s.addressDetail, { color: colors.navy[300] }]}>{selectedAddress.building}{selectedAddress.floor ? ` - ط${selectedAddress.floor}` : ''}{selectedAddress.apartment ? ` - ش${selectedAddress.apartment}` : ''}</Text>}
+            </View>
+            <TouchableOpacity onPress={() => setShowAddressPicker(true)} style={[s.changeBtn, { backgroundColor: colors.primary + '15' }]}>
+              <Text style={[s.changeBtnText, { color: colors.primary }]}>{locale === 'en' ? 'Change' : 'تغيير'}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         <Text style={[s.sectionTitle, { color: colors.text }]}>{locale === 'en' ? 'Service type' : 'نوع الخدمة'}</Text>
         <View style={s.serviceGrid}>
@@ -286,8 +298,11 @@ export default function NewOrderScreen() {
 
         {cart.length > 0 && (
           <>
-            <Text style={[s.sectionTitle, { color: colors.text }]}>{locale === 'en' ? `Added items (${totalItems})` : `القطع المضافة (${totalItems})`}</Text>
-            {cart.map((item, i) => (
+            <TouchableOpacity onPress={() => setShowCartItems(!showCartItems)} style={s.cartSectionHeader} activeOpacity={0.7}>
+              <Text style={[s.sectionTitle, { color: colors.text, marginBottom: 0, marginTop: 0 }]}>{locale === 'en' ? `Added items (${totalItems})` : `القطع المضافة (${totalItems})`}</Text>
+              <Text style={[s.accordionArrow, { color: colors.navy[400] }]}>{showCartItems ? '▲' : '▼'}</Text>
+            </TouchableOpacity>
+            {showCartItems && cart.map((item, i) => (
               <View key={i} style={[s.cartItem, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
                 <View style={{ flex: 1 }}>
                   <Text style={[s.cartItemName, { color: colors.text }]}>{itemName(item.name)} — {svcLabel(item.service_type)}</Text>
@@ -392,6 +407,13 @@ const s = StyleSheet.create({
   addressCard: {
     borderRadius: 12, padding: 12, borderWidth: 1.5,
   },
+  compactAddress: {
+    flexDirection: 'row', alignItems: 'center', borderRadius: 12,
+    padding: 12, borderWidth: 1.5,
+  },
+  changeBtn: { borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
+  changeBtnText: { fontSize: 12, fontWeight: '700' },
+  cartSectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, marginBottom: 12 },
   addressLabel: { fontSize: 14, fontWeight: '600' },
   addressDetail: { fontSize: 11, marginTop: 2 },
   manageAddressText: { fontSize: 12, fontWeight: '600', textAlign: 'center', marginTop: 8 },
