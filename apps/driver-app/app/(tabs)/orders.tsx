@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated'
 import { Phone, MessageCircle, Navigation, MapPin, Package, Truck } from 'lucide-react-native'
+import * as Location from 'expo-location'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { supabase } from '../../src/lib/supabase'
 import { useRealtimeDriverOrders } from '../../src/hooks/useRealtimeOrders'
@@ -12,6 +13,15 @@ import { colors } from '../../src/theme'
 import { SkeletonOrderCard } from '../../src/components/Skeleton'
 import { useCustomAlert } from '../../src/components/CustomAlert'
 import { canTransitionTo } from '../../src/shared/utils'
+
+function getDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const toRad = (v: number) => (v * Math.PI) / 180
+  const R = 6371
+  const dLat = toRad(lat2 - lat1)
+  const dLng = toRad(lng2 - lng1)
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
 
 const statusConfig: Record<string, { label: string; color: string; icon: string }> = {
   assigned: { label: 'بانتظار الاستلام', color: '#3b82f6', icon: '📋' },
@@ -62,9 +72,15 @@ export default function DriverOrdersScreen() {
   const [filter, setFilter] = useState<Filter>('pickup')
   const [dateRange, setDateRange] = useState<DateRange>('14')
   const [showDatePicker, setShowDatePicker] = useState(false)
+  const [pickupSub, setPickupSub] = useState<'all' | 'assigned' | 'picked_up'>('all')
+  const driverLocRef = useRef<{ lat: number; lng: number } | null>(null)
 
   const loadOrders = useCallback(async () => {
     if (!profile) return
+    try {
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
+      driverLocRef.current = { lat: loc.coords.latitude, lng: loc.coords.longitude }
+    } catch {}
     const { data } = await supabase
       .from('orders')
       .select('id, order_number, status, service_type, items_count, total, notes, payment_method, payment_status, order_type, pickup_location, delivery_location, created_at, is_scheduled, scheduled_at, rating_driver, rating_note, customer:users!orders_customer_id_fkey(name, phone, customer_code), address:addresses(label, building, floor, apartment, landmark, lat, lng)')
@@ -91,20 +107,29 @@ export default function DriverOrdersScreen() {
 
   const onRefresh = () => { setRefreshing(true); loadOrders() }
 
-  // Pickup: assigned, picked_up (orders to collect from customer → laundry)
+  function distFromDriver(loc: any): number {
+    if (!driverLocRef.current || !loc?.lat || !loc?.lng) return Infinity
+    return getDistanceKm(driverLocRef.current.lat, driverLocRef.current.lng, loc.lat, loc.lng)
+  }
+
+  // Pickup: assigned, picked_up — sorted by status then distance from driver
   const pickupOrders = orders
     .filter(o => ['assigned', 'picked_up'].includes(o.status))
     .sort((a, b) => {
       const p: Record<string, number> = { assigned: 0, picked_up: 1 }
-      return (p[a.status] ?? 9) - (p[b.status] ?? 9)
+      const statusDiff = (p[a.status] ?? 9) - (p[b.status] ?? 9)
+      if (statusDiff !== 0) return statusDiff
+      return distFromDriver(a.pickup_location) - distFromDriver(b.pickup_location)
     })
 
-  // Delivery: ready, delivering (orders to deliver from laundry → customer)
+  // Delivery: ready, delivering — sorted by status then distance from driver
   const deliveryOrders = orders
     .filter(o => ['ready', 'delivering'].includes(o.status))
     .sort((a, b) => {
       const p: Record<string, number> = { ready: 0, delivering: 1 }
-      return (p[a.status] ?? 9) - (p[b.status] ?? 9)
+      const statusDiff = (p[a.status] ?? 9) - (p[b.status] ?? 9)
+      if (statusDiff !== 0) return statusDiff
+      return distFromDriver(a.delivery_location) - distFromDriver(b.delivery_location)
     })
 
   const completedOrders = orders.filter(o => {
@@ -115,7 +140,8 @@ export default function DriverOrdersScreen() {
     return new Date(o.created_at) >= daysAgo
   })
 
-  const filteredOrders = filter === 'pickup' ? pickupOrders : filter === 'delivery' ? deliveryOrders : completedOrders
+  const visiblePickup = pickupSub === 'all' ? pickupOrders : pickupOrders.filter(o => o.status === pickupSub)
+  const filteredOrders = filter === 'pickup' ? visiblePickup : filter === 'delivery' ? deliveryOrders : completedOrders
 
   async function updateStatus(orderId: string, newStatus: string) {
     // Validate transition and ownership
@@ -384,7 +410,7 @@ export default function DriverOrdersScreen() {
       </Animated.View>
 
       <Animated.View entering={FadeInDown.duration(500).delay(100)} style={s.filterRow}>
-        <TouchableOpacity style={[s.filterBtn, filter === 'pickup' && s.filterActive]} onPress={() => setFilter('pickup')}>
+        <TouchableOpacity style={[s.filterBtn, filter === 'pickup' && s.filterActive]} onPress={() => { setFilter('pickup'); setPickupSub('all') }}>
           <View style={s.filterInner}>
             <Package size={14} color={filter === 'pickup' ? colors.primary : colors.navy[300]} />
             <Text style={[s.filterText, filter === 'pickup' && s.filterTextActive]}>استلام</Text>
@@ -402,6 +428,21 @@ export default function DriverOrdersScreen() {
           <Text style={[s.filterText, filter === 'completed' && { color: colors.navy[100] }]}>مكتمل</Text>
         </TouchableOpacity>
       </Animated.View>
+
+      {filter === 'pickup' && pickupOrders.length > 0 && (
+        <View style={s.subFilterRow}>
+          {([
+            { key: 'all' as const, label: 'الكل', count: pickupOrders.length },
+            { key: 'assigned' as const, label: '📋 بانتظار الاستلام', count: pickupOrders.filter(o => o.status === 'assigned').length },
+            { key: 'picked_up' as const, label: '📦 في الطريق للمغسلة', count: pickupOrders.filter(o => o.status === 'picked_up').length },
+          ]).filter(f => f.count > 0 || f.key === 'all').map(f => (
+            <TouchableOpacity key={f.key} onPress={() => setPickupSub(f.key)}
+              style={[s.subFilterBtn, pickupSub === f.key && s.subFilterBtnActive]}>
+              <Text style={[s.subFilterText, pickupSub === f.key && s.subFilterTextActive]}>{f.label} ({f.count})</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
       {filter === 'completed' && (
         <View style={s.dateFilterRow}>
@@ -597,6 +638,15 @@ const s = StyleSheet.create({
   emptyIcon: { fontSize: 40, marginBottom: 12 },
   emptyText: { fontSize: 14, color: colors.navy[300] },
   emptyHint: { fontSize: 12, color: colors.navy[400], marginTop: 8, textAlign: 'center' },
+
+  subFilterRow: { flexDirection: 'row', gap: 6, marginBottom: 12, flexWrap: 'wrap' },
+  subFilterBtn: {
+    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10,
+    backgroundColor: colors.navy[800], borderWidth: 1, borderColor: colors.navy[700],
+  },
+  subFilterBtnActive: { backgroundColor: colors.primary + '20', borderColor: colors.primary },
+  subFilterText: { fontSize: 11, color: colors.navy[300], fontWeight: '600' },
+  subFilterTextActive: { color: colors.primary },
 
   dateFilterRow: { marginBottom: 12, zIndex: 10 },
   dateFilterBtn: {

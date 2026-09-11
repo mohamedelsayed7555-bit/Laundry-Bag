@@ -14,7 +14,6 @@ import {
   TrendingUp,
   ShoppingBag,
   ArrowUpLeft,
-  Sparkles,
   Activity,
 } from 'lucide-react'
 import { ORDER_STATUS_LABELS } from '@cleano/shared-types'
@@ -97,7 +96,7 @@ export default function DashboardPage() {
 
   async function loadDashboard() {
     const [orders, customers, drivers, recent, subs] = await Promise.all([
-      supabase.from('orders').select('id, total, status', { count: 'exact' }),
+      supabase.from('orders').select('id, total, status, payment_status, created_at', { count: 'exact' }),
       supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'customer'),
       supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'driver'),
       supabase.from('orders').select('*, customer:users!orders_customer_id_fkey(name, customer_code)').order('created_at', { ascending: false }).limit(7),
@@ -105,10 +104,12 @@ export default function DashboardPage() {
     ])
 
     const allOrders = orders.data ?? []
-    const activeOrders = allOrders.filter(o => !['cancelled', 'refunded'].includes(o.status))
-    const ordersRevenue = activeOrders.reduce((sum, o) => sum + (o.total ?? 0), 0)
+    const paidOrders = allOrders.filter(o => o.payment_status === 'confirmed' && !['cancelled', 'refunded'].includes(o.status))
+    const ordersRevenue = paidOrders.reduce((sum, o) => sum + (o.total ?? 0), 0)
     const subsRevenue = (subs.data ?? []).reduce((sum: number, s: any) => sum + (Number(s.total_paid) || 0), 0)
     const active = allOrders.filter(o => !['delivered', 'cancelled', 'refunded'].includes(o.status)).length
+    const todayStr = new Date().toISOString().split('T')[0]
+    const deliveredToday = allOrders.filter(o => o.status === 'delivered' && o.created_at?.startsWith(todayStr)).length
 
     setStats({
       totalRevenue: ordersRevenue + subsRevenue,
@@ -116,7 +117,7 @@ export default function DashboardPage() {
       totalCustomers: customers.count ?? 0,
       totalDrivers: drivers.count ?? 0,
       activeOrders: active,
-      deliveredToday: allOrders.filter(o => o.status === 'delivered').length,
+      deliveredToday,
     })
 
     setRecentOrders(recent.data ?? [])
@@ -192,12 +193,12 @@ export default function DashboardPage() {
       </motion.div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <StatCard label="إجمالي الإيرادات" value={`${stats.totalRevenue.toLocaleString()} ج.م`} change="+12.5%" changeType="up" icon={DollarSign} color="green" index={0} />
-        <StatCard label="إجمالي الطلبات" value={stats.totalOrders} change="+8.7%" changeType="up" icon={ClipboardList} color="blue" index={1} />
-        <StatCard label="العملاء" value={stats.totalCustomers} change="-0.4%" changeType="down" icon={Users} color="purple" index={2} />
+        <StatCard label="إجمالي الإيرادات" value={`${stats.totalRevenue.toLocaleString()} ج.م`} icon={DollarSign} color="green" index={0} />
+        <StatCard label="إجمالي الطلبات" value={stats.totalOrders} icon={ClipboardList} color="blue" index={1} />
+        <StatCard label="العملاء" value={stats.totalCustomers} icon={Users} color="purple" index={2} />
         <StatCard label="السائقين" value={stats.totalDrivers} icon={Truck} color="orange" index={3} />
         <StatCard label="طلبات نشطة" value={stats.activeOrders} icon={ShoppingBag} color="cyan" index={4} />
-        <StatCard label="تم التوصيل" value={stats.deliveredToday} change="+18.3%" changeType="up" icon={TrendingUp} color="green" index={5} />
+        <StatCard label="تم التوصيل اليوم" value={stats.deliveredToday} icon={TrendingUp} color="green" index={5} />
       </div>
 
       <motion.div
