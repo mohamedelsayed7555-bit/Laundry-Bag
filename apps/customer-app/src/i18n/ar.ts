@@ -65,6 +65,8 @@ export default {
   washIronDesc: 'باكدج كامل',
   tailor: 'تفصيل وتعديلات',
   tailorDesc: 'تفصيل وتعديل ملابس',
+  carpet: 'سجاد وبطاطين',
+  carpetDesc: 'غسيل سجاد وبطاطين ومفروشات',
   recentOrders: 'آخر الطلبات',
   viewAll: 'عرض الكل ←',
   noOrders: 'لا توجد طلبات حالياً',

@@ -65,6 +65,8 @@ export default {
   washIronDesc: 'Full package',
   tailor: 'Tailoring',
   tailorDesc: 'Tailoring & alterations',
+  carpet: 'Carpets & Blankets',
+  carpetDesc: 'Carpet, blanket & upholstery cleaning',
   recentOrders: 'Recent Orders',
   viewAll: 'View All →',
   noOrders: 'No orders yet',
