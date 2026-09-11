@@ -213,6 +213,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (enable) {
       if (!email || !password) return false
       try {
+        const { error } = await supabase.auth.signInWithPassword({ email, password })
+        if (error) return false
         await SecureStore.setItemAsync(BIO_CREDS_KEY, JSON.stringify({ email, password }))
         setState(s => ({ ...s, biometricEnabled: true }))
         return true

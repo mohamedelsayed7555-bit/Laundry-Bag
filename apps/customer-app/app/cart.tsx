@@ -304,11 +304,11 @@ export default function CartScreen() {
           clearCart()
           router.push({ pathname: '/payment', params: { url: paymentData.iframe_url } })
         } else if (paymentData.error) {
-          showAlert({ title: isEn ? 'Error' : 'خطأ', message: paymentData.error, type: 'error' })
+          showAlert({ title: isEn ? 'Error' : 'خطأ', message: paymentData.error, type: 'error', onConfirm: () => router.replace(`/order/${orderData.id}`) })
         }
       } catch (e) {
         setSaving(false)
-        showAlert({ title: isEn ? 'Error' : 'خطأ', message: isEn ? 'Payment service connection error' : 'حدث خطأ في الاتصال بخدمة الدفع', type: 'error' })
+        showAlert({ title: isEn ? 'Error' : 'خطأ', message: isEn ? 'Payment service connection error' : 'حدث خطأ في الاتصال بخدمة الدفع', type: 'error', onConfirm: () => router.replace(`/order/${orderData.id}`) })
       }
       return
     }

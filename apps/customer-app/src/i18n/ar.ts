@@ -237,6 +237,9 @@ export default {
   theCustomer: 'العميل',
 
   // Bag Order
+  bagTitle: 'شنطة Laundry Bag',
+  bagSubtitle: 'املأ الشنطة غسيل ومكوي بحد أقصى 15 قطعة',
+  bagBadge: 'الحق العرض',
   bagSelectAddress: 'اختار عنوان التوصيل',
   bagWalletPhoneInvalid: 'أدخل رقم موبايل المحفظة بشكل صحيح (01xxxxxxxxx)',
   bagOfferUnavailable: 'العرض غير متاح حالياً',

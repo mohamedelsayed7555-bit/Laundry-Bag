@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Linking, Platform } from 'react-native'
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming } from 'react-native-reanimated'
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, withRepeat, withSequence, withDelay } from 'react-native-reanimated'
 import { useTheme } from '../contexts/ThemeContext'
 import { useLanguage } from '../contexts/LanguageContext'
 import { supabase } from '../lib/supabase'
@@ -22,6 +22,7 @@ export default function ContactFAB() {
   const [visible, setVisible] = useState(false)
   const [contact, setContact] = useState<ContactInfo | null>(null)
   const scale = useSharedValue(1)
+  const bounce = useSharedValue(0)
 
   useEffect(() => {
     supabase
@@ -34,12 +35,26 @@ export default function ContactFAB() {
       })
   }, [])
 
+  useEffect(() => {
+    bounce.value = withDelay(2000, withRepeat(
+      withSequence(
+        withTiming(-6, { duration: 200 }),
+        withTiming(0, { duration: 200 }),
+        withTiming(-4, { duration: 150 }),
+        withTiming(0, { duration: 150 }),
+        withTiming(0, { duration: 3000 }),
+      ), -1
+    ))
+  }, [])
+
   const pulseIn = useCallback(() => {
     scale.value = withSpring(0.9, { damping: 10 })
     setTimeout(() => { scale.value = withSpring(1) }, 100)
   }, [])
 
-  const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }))
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }, { translateY: bounce.value }],
+  }))
 
   const openLink = (url: string) => {
     Linking.openURL(url).catch(() => {})
@@ -104,14 +119,14 @@ export default function ContactFAB() {
 const s = StyleSheet.create({
   fabContainer: {
     position: 'absolute',
-    bottom: 100,
+    bottom: 160,
     left: 20,
     zIndex: 999,
   },
   fab: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
     shadowOffset: { width: 0, height: 4 },

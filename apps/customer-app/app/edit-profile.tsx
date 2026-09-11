@@ -12,7 +12,7 @@ export default function EditProfileScreen() {
   const { colors } = useTheme()
   const { t } = useLanguage()
   const s = getStyles(colors)
-  const { profile, refreshProfile } = useAuth()
+  const { profile, refreshProfile, toggleBiometric, biometricEnabled } = useAuth()
   const router = useRouter()
   const { showAlert, AlertComponent } = useCustomAlert()
   const [name, setName] = useState(profile?.name ?? '')
@@ -124,6 +124,7 @@ export default function EditProfileScreen() {
       setNewPassword('')
       setConfirmPassword('')
       setShowPassword(false)
+      if (biometricEnabled) await toggleBiometric(false)
       showAlert({ title: t('success'), message: t('passwordChanged'), type: 'success' })
     }
   }

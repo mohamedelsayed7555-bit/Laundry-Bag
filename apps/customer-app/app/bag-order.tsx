@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, TextInput, RefreshControl } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, TextInput, RefreshControl, Image } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import Animated, { FadeInDown } from 'react-native-reanimated'
@@ -126,11 +126,11 @@ export default function BagOrderScreen() {
         if (paymentData.iframe_url) {
           router.push({ pathname: '/payment', params: { url: paymentData.iframe_url } })
         } else if (paymentData.error) {
-          showAlert({ title: t('error'), message: paymentData.error, type: 'error' })
+          showAlert({ title: t('error'), message: paymentData.error, type: 'error', onConfirm: () => router.replace(`/order/${data.id}`) })
         }
       } catch (e) {
         setSaving(false)
-        showAlert({ title: t('error'), message: t('connectionError'), type: 'error' })
+        showAlert({ title: t('error'), message: t('connectionError'), type: 'error', onConfirm: () => router.replace(`/order/${data.id}`) })
       }
       return
     }
@@ -175,22 +175,22 @@ export default function BagOrderScreen() {
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}>
         {/* Offer Card */}
         <Animated.View entering={FadeInDown.duration(500)}>
-          <LinearGradient colors={['#059669', '#047857']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.offerCard}>
+          <LinearGradient colors={[colors.navy[700], colors.navy[800]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.offerCard, { borderWidth: 1, borderColor: colors.primary + '40' }]}>
             <View style={s.offerBadges}>
-              <View style={s.badge}><Text style={s.badgeText}>{bagOffer.badge_text}</Text></View>
+              <View style={[s.badge, { backgroundColor: colors.primary }]}><Text style={[s.badgeText, { color: '#fff' }]}>{t('bagBadge')}</Text></View>
               {discount > 0 && <View style={s.discountBadge}><Text style={s.discountText}>-{discount}%</Text></View>}
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <View style={{ flex: 1 }}>
-                <Text style={s.offerTitle}>{bagOffer.title}</Text>
-                <Text style={s.offerSub}>{bagOffer.subtitle}</Text>
+                <Text style={s.offerTitle}>{t('bagTitle')}</Text>
+                <Text style={s.offerSub}>{t('bagSubtitle')}</Text>
                 <View style={s.priceRow}>
                   {discount > 0 && <Text style={s.oldPrice}>{bagOffer.original_price} {t('currency')}</Text>}
                   <Text style={s.price}>{bagOffer.daily_price} {t('currency')}</Text>
                   <Text style={s.perDay}>/ {t('bagPerDay')}</Text>
                 </View>
               </View>
-              <Text style={{ fontSize: 52 }}>👜</Text>
+              <Image source={require('../assets/logo.jpg')} style={{ width: 60, height: 60, borderRadius: 30, borderWidth: 2, borderColor: colors.primary + '60' }} resizeMode="contain" />
             </View>
             <View style={s.infoRow}>
               <Text style={s.infoText}>📦 {t('bagMaxItems')}: {bagOffer.max_items} {t('pieces')}</Text>
@@ -286,9 +286,14 @@ export default function BagOrderScreen() {
       {/* Order Button */}
       <View style={s.bottomBar}>
         <TouchableOpacity onPress={handleOrder} disabled={saving || !selectedAddress} activeOpacity={0.85}>
-          <LinearGradient colors={['#059669', '#047857']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          <LinearGradient colors={[colors.primary, colors.primaryDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={[s.orderBtn, { opacity: saving || !selectedAddress ? 0.5 : 1 }]}>
-            {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.orderBtnText}>{t('bagOrderNow')} 👜</Text>}
+            {saving ? <ActivityIndicator color="#fff" /> : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={s.orderBtnText}>{t('bagOrderNow')}</Text>
+                <Text style={{ fontSize: 20 }}>👜</Text>
+              </View>
+            )}
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -301,8 +306,8 @@ const s = StyleSheet.create({
   content: { padding: 20, paddingTop: 56 },
   offerCard: { borderRadius: 24, padding: 20, marginBottom: 24 },
   offerBadges: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  badge: { backgroundColor: '#fbbf24', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20 },
-  badgeText: { color: '#78350f', fontSize: 11, fontWeight: '800' },
+  badge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20 },
+  badgeText: { fontSize: 11, fontWeight: '800' },
   discountBadge: { backgroundColor: '#ef4444', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
   discountText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   offerTitle: { color: '#fff', fontSize: 22, fontWeight: '800', marginBottom: 4 },

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, RefreshControl } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../src/contexts/AuthContext'
@@ -74,6 +74,8 @@ export default function PlansScreen() {
   const [walletPhone, setWalletPhone] = useState('')
   const [refreshing, setRefreshing] = useState(false)
   const [serviceFilter, setServiceFilter] = useState('all')
+  const scrollRef = useRef<ScrollView>(null)
+  const settingsY = useRef(0)
 
   useEffect(() => {
     loadData()
@@ -182,7 +184,8 @@ export default function PlansScreen() {
       })
       return
     }
-    doSubscribe(plan)
+    scrollRef.current?.scrollTo({ y: settingsY.current, animated: true })
+    setTimeout(() => doSubscribe(plan), 500)
   }
 
   async function doSubscribe(plan: Plan) {
@@ -262,7 +265,7 @@ export default function PlansScreen() {
 
   return (
     <>
-    <ScrollView style={[s.container, { backgroundColor: colors.navy[900] }]} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}>
+    <ScrollView ref={scrollRef} style={[s.container, { backgroundColor: colors.navy[900] }]} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}>
       <View style={s.headerRow}>
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={[s.backText, { color: colors.primary }]}>→ {locale === 'en' ? 'Back' : 'رجوع'}</Text>
@@ -408,7 +411,7 @@ export default function PlansScreen() {
       })}
 
       {/* ── Subscription Settings ── */}
-      <View style={[s.settingsSection, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
+      <View onLayout={e => { settingsY.current = e.nativeEvent.layout.y }} style={[s.settingsSection, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
         <Text style={[s.settingsSectionTitle, { color: colors.text }]}>⚙️ {locale === 'en' ? 'Subscription settings' : 'إعدادات الاشتراك'}</Text>
 
         {/* Duration */}

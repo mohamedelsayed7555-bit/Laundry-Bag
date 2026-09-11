@@ -158,6 +158,9 @@ export default {
   expiresOn: 'Expires on',
 
   // Bag Order
+  bagTitle: 'Laundry Bag',
+  bagSubtitle: 'Fill the bag with wash & iron — up to 15 pieces',
+  bagBadge: 'Limited Offer',
   bagSelectAddress: 'Select delivery address',
   bagWalletPhoneInvalid: 'Enter a valid wallet phone number (01xxxxxxxxx)',
   bagOfferUnavailable: 'This offer is currently unavailable',
