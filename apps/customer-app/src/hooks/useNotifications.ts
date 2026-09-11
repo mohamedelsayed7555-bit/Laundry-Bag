@@ -100,7 +100,7 @@ export async function sendLocalNotification(title: string, body: string, channel
     content: {
       title,
       body,
-      sound: channelId === 'order-placed' ? 'order-placed.wav' : 'order-update.wav',
+      sound: channelId === 'order-placed' ? 'order_placed.wav' : 'order_update.wav',
     },
     trigger: null,
     ...(Platform.OS === 'android' ? { channelId } : {}),
@@ -108,8 +108,8 @@ export async function sendLocalNotification(title: string, body: string, channel
 }
 
 const soundFiles: Record<string, any> = {
-  'order-update': require('../../assets/sounds/order-update.wav'),
-  'order-placed': require('../../assets/sounds/order-placed.wav'),
+  'order-update': require('../../assets/sounds/order_update.wav'),
+  'order-placed': require('../../assets/sounds/order_placed.wav'),
 }
 
 export async function playNotificationSound(type: 'order-update' | 'order-placed' = 'order-update') {

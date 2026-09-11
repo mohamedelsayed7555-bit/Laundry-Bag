@@ -41,7 +41,7 @@
       "@react-native-community/datetimepicker",
       "expo-localization",
       ["expo-notifications", {
-        "sounds": ["./assets/sounds/order-update.wav", "./assets/sounds/order-placed.wav"]
+        "sounds": ["./assets/sounds/order_update.wav", "./assets/sounds/order_placed.wav"]
       }]
     ],
     "extra": {
