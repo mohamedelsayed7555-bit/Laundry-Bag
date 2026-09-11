@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, TextInput } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, TextInput, RefreshControl } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import Animated, { FadeInDown } from 'react-native-reanimated'
@@ -33,6 +33,7 @@ export default function BagOrderScreen() {
   const [paymentSettings, setPaymentSettings] = useState<{ instapay: string; wallet: string }>({ instapay: '', wallet: '' })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
 
   const loadData = useCallback(async () => {
     if (!profile) return
@@ -60,6 +61,12 @@ export default function BagOrderScreen() {
   }, [profile])
 
   useEffect(() => { loadData() }, [loadData])
+
+  async function onRefresh() {
+    setRefreshing(true)
+    await loadData()
+    setRefreshing(false)
+  }
 
   async function handleOrder() {
     if (!profile || !bagOffer) return
@@ -165,7 +172,7 @@ export default function BagOrderScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.navy[900] }}>
       {AlertComponent}
-      <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}>
         {/* Offer Card */}
         <Animated.View entering={FadeInDown.duration(500)}>
           <LinearGradient colors={['#059669', '#047857']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.offerCard}>

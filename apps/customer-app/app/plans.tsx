@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, RefreshControl } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../src/contexts/AuthContext'
 import { useTheme } from '../src/contexts/ThemeContext'
@@ -71,10 +71,17 @@ export default function PlansScreen() {
   const [autoRenew, setAutoRenew] = useState(true)
   const [selectedPayment, setSelectedPayment] = useState('visa')
   const [walletPhone, setWalletPhone] = useState('')
+  const [refreshing, setRefreshing] = useState(false)
 
   useEffect(() => {
     loadData()
   }, [profile])
+
+  async function onRefresh() {
+    setRefreshing(true)
+    await loadData()
+    setRefreshing(false)
+  }
 
   function calcPrice(monthlyPrice: number, durationKey: string) {
     const dur = durationsMeta.find(d => d.key === durationKey)!
@@ -253,7 +260,7 @@ export default function PlansScreen() {
 
   return (
     <>
-    <ScrollView style={[s.container, { backgroundColor: colors.navy[900] }]} contentContainerStyle={s.content}>
+    <ScrollView style={[s.container, { backgroundColor: colors.navy[900] }]} contentContainerStyle={s.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}>
       <View style={s.headerRow}>
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={[s.backText, { color: colors.primary }]}>→ {locale === 'en' ? 'Back' : 'رجوع'}</Text>
