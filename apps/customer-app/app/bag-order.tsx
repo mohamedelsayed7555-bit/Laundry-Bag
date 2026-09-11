@@ -34,6 +34,7 @@ export default function BagOrderScreen() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [showAddressPicker, setShowAddressPicker] = useState(false)
 
   const loadData = useCallback(async () => {
     if (!profile) return
@@ -206,17 +207,30 @@ export default function BagOrderScreen() {
             <TouchableOpacity style={[s.addAddressBtn, { borderColor: colors.navy[600] }]} onPress={() => router.push('/addresses')}>
               <Text style={{ color: colors.primary, fontWeight: '700' }}>+ {t('selectAddress')}</Text>
             </TouchableOpacity>
+          ) : selectedAddress && !showAddressPicker ? (
+            <View style={[s.compactAddrCard, { backgroundColor: colors.cardBg, borderColor: colors.primary }]}>
+              <TouchableOpacity onPress={() => setShowAddressPicker(true)} style={[s.addrChangeBtn, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '40' }]}>
+                <Text style={[s.addrChangeBtnText, { color: colors.primary }]}>{locale === 'en' ? 'Change' : 'تغيير'}</Text>
+              </TouchableOpacity>
+              <View style={{ flex: 1 }}>
+                <Text style={[s.addressLabel, { color: colors.text }]}>{selectedAddress.label}</Text>
+                {(selectedAddress.building || selectedAddress.floor) && (
+                  <Text style={{ color: colors.navy[300], fontSize: 12, marginTop: 4 }}>{[selectedAddress.building && `${t('bagBuilding')} ${selectedAddress.building}`, selectedAddress.floor && `${t('bagFloor')}${selectedAddress.floor}`].filter(Boolean).join(' — ')}</Text>
+                )}
+              </View>
+            </View>
           ) : (
             <View style={{ gap: 8 }}>
               {addresses.map(addr => (
-                <TouchableOpacity key={addr.id} onPress={() => setSelectedAddress(addr)}
-                  style={[s.addressCard, { backgroundColor: colors.cardBg, borderColor: selectedAddress?.id === addr.id ? colors.primary : colors.navy[700] }]}>
-                  <Text style={[s.addressLabel, { color: selectedAddress?.id === addr.id ? colors.primary : colors.text }]}>
-                    {selectedAddress?.id === addr.id ? '✅ ' : ''}{addr.label}
-                  </Text>
-                  {addr.building && <Text style={{ color: colors.navy[400], fontSize: 11 }}>{t('bagBuilding')} {addr.building}{addr.floor ? ` — ${t('bagFloor')}${addr.floor}` : ''}</Text>}
+                <TouchableOpacity key={addr.id} onPress={() => { setSelectedAddress(addr); setShowAddressPicker(false) }}
+                  style={[s.addressCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, selectedAddress?.id === addr.id && { borderColor: colors.primary, backgroundColor: colors.primary + '10' }]}>
+                  <Text style={[s.addressLabel, { color: colors.text }]}>{selectedAddress?.id === addr.id ? '✅' : '📍'} {addr.label}</Text>
+                  {addr.building && <Text style={{ color: colors.navy[400], fontSize: 11, marginTop: 4 }}>{t('bagBuilding')} {addr.building}{addr.floor ? ` — ${t('bagFloor')}${addr.floor}` : ''}</Text>}
                 </TouchableOpacity>
               ))}
+              <TouchableOpacity style={[s.addAddressBtn, { borderColor: colors.primary }]} onPress={() => router.push('/addresses')}>
+                <Text style={{ color: colors.primary, fontWeight: '700' }}>+ {locale === 'en' ? 'Add new address' : 'إضافة عنوان جديد'}</Text>
+              </TouchableOpacity>
             </View>
           )}
         </Animated.View>
@@ -224,18 +238,16 @@ export default function BagOrderScreen() {
         {/* Payment */}
         <Animated.View entering={FadeInDown.duration(500).delay(200)}>
           <Text style={[s.sectionTitle, { color: colors.text }]}>💳 {t('paymentMethod')}</Text>
-          <View style={{ gap: 8 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.paymentChipsRow}>
             {PAYMENT_METHODS.map(pm => (
               <TouchableOpacity key={pm.key} onPress={() => setPaymentMethod(pm.key)}
-                style={[s.paymentCard, { backgroundColor: colors.cardBg, borderColor: paymentMethod === pm.key ? colors.primary : colors.navy[700] }]}>
-                <Text style={{ fontSize: 22 }}>{pm.icon}</Text>
-                <Text style={[s.paymentLabel, { color: paymentMethod === pm.key ? colors.primary : colors.text }]}>{t(pm.labelKey)}</Text>
-                {paymentMethod === pm.key && <Text style={{ color: colors.primary, marginLeft: 'auto' }}>✓</Text>}
+                style={[s.paymentChip, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, paymentMethod === pm.key && { borderColor: colors.primary, backgroundColor: colors.primary + '10' }]}>
+                <Text style={{ fontSize: 18 }}>{pm.icon}</Text>
+                <Text style={[s.paymentChipLabel, { color: colors.navy[300] }, paymentMethod === pm.key && { color: colors.primary }]}>{t(pm.labelKey)}</Text>
               </TouchableOpacity>
             ))}
-          </View>
+          </ScrollView>
 
-          {/* E-Wallet phone input */}
           {paymentMethod === 'e_wallet' && (
             <View style={[s.paymentInfoCard, { backgroundColor: colors.cardBg, borderColor: colors.primary + '30' }]}>
               <Text style={[s.paymentInfoTitle, { color: colors.text }]}>📱 {t('enterWalletPhone')}</Text>
@@ -251,7 +263,6 @@ export default function BagOrderScreen() {
             </View>
           )}
 
-          {/* InstaPay info */}
           {paymentMethod === 'instapay' && paymentSettings.instapay && (
             <View style={[s.paymentInfoCard, { backgroundColor: colors.cardBg, borderColor: colors.primary + '30' }]}>
               <Text style={[s.paymentInfoTitle, { color: colors.text }]}>🏦 {t('bagInstapayTitle')}</Text>
@@ -261,7 +272,7 @@ export default function BagOrderScreen() {
           )}
         </Animated.View>
 
-        {/* Summary */}
+        {/* Summary + Order Button */}
         <Animated.View entering={FadeInDown.duration(500).delay(300)}>
           <View style={[s.summaryCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
             <View style={s.summaryRow}>
@@ -278,25 +289,22 @@ export default function BagOrderScreen() {
               <Text style={{ color: colors.primary, fontSize: 20, fontWeight: '900' }}>{bagOffer.daily_price} {t('currency')}</Text>
             </View>
           </View>
+
+          <TouchableOpacity onPress={handleOrder} disabled={saving || !selectedAddress} activeOpacity={0.85} style={{ marginTop: 16 }}>
+            <LinearGradient colors={[colors.primary, colors.primaryDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={[s.orderBtn, { opacity: saving || !selectedAddress ? 0.5 : 1 }]}>
+              {saving ? <ActivityIndicator color="#fff" /> : (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={s.orderBtnText}>{t('bagOrderNow')}</Text>
+                  <Text style={{ fontSize: 20 }}>👜</Text>
+                </View>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
         </Animated.View>
 
-        <View style={{ height: 100 }} />
+        <View style={{ height: 40 }} />
       </ScrollView>
-
-      {/* Order Button */}
-      <View style={s.bottomBar}>
-        <TouchableOpacity onPress={handleOrder} disabled={saving || !selectedAddress} activeOpacity={0.85}>
-          <LinearGradient colors={[colors.primary, colors.primaryDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={[s.orderBtn, { opacity: saving || !selectedAddress ? 0.5 : 1 }]}>
-            {saving ? <ActivityIndicator color="#fff" /> : (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text style={s.orderBtnText}>{t('bagOrderNow')}</Text>
-                <Text style={{ fontSize: 20 }}>👜</Text>
-              </View>
-            )}
-          </LinearGradient>
-        </TouchableOpacity>
-      </View>
     </View>
   )
 }
@@ -318,12 +326,16 @@ const s = StyleSheet.create({
   perDay: { color: 'rgba(255,255,255,0.6)', fontSize: 12 },
   infoRow: { flexDirection: 'row', gap: 16, marginTop: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.15)' },
   infoText: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '600' },
-  sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 12, marginTop: 8 },
-  addAddressBtn: { borderWidth: 1.5, borderStyle: 'dashed', borderRadius: 16, padding: 20, alignItems: 'center' },
-  addressCard: { borderRadius: 14, padding: 14, borderWidth: 1.5 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 12, marginTop: 24 },
+  addAddressBtn: { borderWidth: 1.5, borderStyle: 'dashed', borderRadius: 16, padding: 16, alignItems: 'center' },
+  compactAddrCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, padding: 12, borderWidth: 1.5, gap: 12 },
+  addrChangeBtn: { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1.5 },
+  addrChangeBtnText: { fontSize: 13, fontWeight: '700' },
+  addressCard: { borderRadius: 12, padding: 12, borderWidth: 1.5 },
   addressLabel: { fontSize: 14, fontWeight: '600' },
-  paymentCard: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, padding: 14, borderWidth: 1.5 },
-  paymentLabel: { fontSize: 14, fontWeight: '600' },
+  paymentChipsRow: { gap: 8, paddingVertical: 4 },
+  paymentChip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1.5 },
+  paymentChipLabel: { fontSize: 12, fontWeight: '600' },
   paymentInfoCard: { borderRadius: 16, padding: 16, marginTop: 12, borderWidth: 1 },
   paymentInfoTitle: { fontSize: 14, fontWeight: '700', marginBottom: 8 },
   paymentInfoNumber: { fontSize: 22, fontWeight: 'bold', textAlign: 'center', marginBottom: 8, letterSpacing: 2 },
@@ -332,7 +344,6 @@ const s = StyleSheet.create({
   summaryCard: { borderRadius: 18, padding: 18, marginTop: 16, borderWidth: 1 },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6 },
   summaryDivider: { height: 1, marginVertical: 8 },
-  bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20, paddingBottom: 36 },
   orderBtn: { borderRadius: 18, padding: 18, alignItems: 'center' },
   orderBtnText: { color: '#fff', fontSize: 17, fontWeight: '800' },
 })

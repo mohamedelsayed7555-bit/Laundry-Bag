@@ -36,22 +36,22 @@ function BannersCarousel({ bagOffer, activeSub, colors, t, locale, onBagPress, o
         <TouchableOpacity activeOpacity={0.9} onPress={onBagPress} style={{ width: BANNER_WIDTH }}>
           <LinearGradient colors={colors.gradientAccent as unknown as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={cr.bannerGradient}>
             <View style={cr.badgeWrap}>
-              <View style={cr.badge}><Text style={cr.badgeText}>{bagOffer.badge_text}</Text></View>
+              <View style={cr.badge}><Text style={cr.badgeText}>{t('bagBadge')}</Text></View>
               {bagOffer.original_price > bagOffer.daily_price && (
                 <View style={cr.discountBadge}><Text style={cr.discountText}>-{Math.round((1 - bagOffer.daily_price / bagOffer.original_price) * 100)}%</Text></View>
               )}
             </View>
             <View style={cr.row}>
               <View style={{ flex: 1 }}>
-                <Text style={cr.title}>{bagOffer.title}</Text>
-                <Text style={cr.subtitle}>{bagOffer.subtitle}</Text>
+                <Text style={cr.title}>{t('bagTitle')}</Text>
+                <Text style={cr.subtitle}>{t('bagSubtitle')}</Text>
                 <View style={cr.priceRow}>
                   {bagOffer.original_price > bagOffer.daily_price && <Text style={cr.oldPrice}>{bagOffer.original_price} {t('currency')}</Text>}
                   <Text style={cr.price}>{bagOffer.daily_price} {t('currency')}</Text>
                   <Text style={cr.perDay}>/ {t('bagPerDay')}</Text>
                 </View>
               </View>
-              <Text style={{ fontSize: 48 }}>👜</Text>
+              <Image source={require('../../assets/logo.jpg')} style={{ width: 56, height: 56, borderRadius: 28 }} resizeMode="contain" />
             </View>
           </LinearGradient>
         </TouchableOpacity>

@@ -74,6 +74,7 @@ export default function PlansScreen() {
   const [walletPhone, setWalletPhone] = useState('')
   const [refreshing, setRefreshing] = useState(false)
   const [serviceFilter, setServiceFilter] = useState('all')
+  const [selectedPlanForSubscribe, setSelectedPlanForSubscribe] = useState<Plan | null>(null)
   const scrollRef = useRef<ScrollView>(null)
   const settingsY = useRef(0)
 
@@ -184,8 +185,8 @@ export default function PlansScreen() {
       })
       return
     }
+    setSelectedPlanForSubscribe(plan)
     scrollRef.current?.scrollTo({ y: settingsY.current, animated: true })
-    setTimeout(() => doSubscribe(plan), 500)
   }
 
   async function doSubscribe(plan: Plan) {
@@ -475,6 +476,23 @@ export default function PlansScreen() {
             <View style={[s.toggleThumb, autoRenew && s.toggleThumbActive]} />
           </View>
         </TouchableOpacity>
+
+        {selectedPlanForSubscribe && (
+          <View style={{ marginTop: 16 }}>
+            <Text style={{ color: colors.navy[300], fontSize: 12, textAlign: 'center', marginBottom: 8 }}>
+              {locale === 'en' ? `Selected plan: ${planName(selectedPlanForSubscribe.name)}` : `الباقة المختارة: ${selectedPlanForSubscribe.name}`}
+            </Text>
+            <TouchableOpacity
+              style={[s.subscribeBtn, { backgroundColor: colors.primary, paddingVertical: 16 }]}
+              onPress={() => doSubscribe(selectedPlanForSubscribe)}
+              disabled={subscribing}
+            >
+              <Text style={[s.subscribeBtnText, { fontSize: 16 }]}>
+                {subscribing ? (locale === 'en' ? 'Loading...' : 'جاري...') : (locale === 'en' ? 'Confirm subscription' : 'تأكيد الاشتراك')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       <View style={{ height: 40 }} />
