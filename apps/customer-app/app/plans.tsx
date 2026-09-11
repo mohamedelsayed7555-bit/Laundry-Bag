@@ -384,7 +384,7 @@ export default function PlansScreen() {
             )}
             <View style={[s.planTierDot, { backgroundColor: tierColor }]} />
             <Text style={[s.planName, { color: colors.text }]}>{planName(plan.name)}</Text>
-            <Text style={[s.planDesc, { color: colors.navy[300] }]}>{plan.description}</Text>
+            <Text style={[s.planDesc, { color: colors.navy[300] }]}>{locale === 'en' ? (t(`desc:${plan.description}` as any) !== `desc:${plan.description}` ? t(`desc:${plan.description}` as any) : plan.description) : plan.description}</Text>
 
             <View style={s.planPriceRow}>
               <Text style={[s.planPrice, { color: colors.primary }]}>{price}</Text>

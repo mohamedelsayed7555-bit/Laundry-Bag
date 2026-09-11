@@ -36,7 +36,6 @@ function BannersCarousel({ bagOffer, activeSub, colors, t, locale, onBagPress, o
       node: (
         <TouchableOpacity activeOpacity={0.9} onPress={onBagPress} style={{ width: BANNER_WIDTH }}>
           <LinearGradient colors={colors.gradientAccent as unknown as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={cr.bannerGradient}>
-            <Image source={require('../../assets/logo.jpg')} style={{ width: 100, height: 100, borderRadius: 50, position: 'absolute', top: 10, left: 12, opacity: 0.9 }} resizeMode="contain" />
             <View style={cr.badgeWrap}>
               <View style={cr.badge}><Text style={cr.badgeText}>{t('bagBadge')}</Text></View>
               {bagOffer.original_price > bagOffer.daily_price && (
@@ -45,7 +44,7 @@ function BannersCarousel({ bagOffer, activeSub, colors, t, locale, onBagPress, o
             </View>
             <View style={cr.row}>
               <View style={{ flex: 1 }}>
-                <Text style={cr.title}>{t('bagTitle')}</Text>
+                <Text style={cr.title}>{locale === 'en' ? '' : 'شنطة '}<Text style={{ color: colors.navy[900] }}>Laundry Bag</Text></Text>
                 <Text style={cr.subtitle}>{t('bagSubtitle')}</Text>
                 <View style={cr.priceRow}>
                   {bagOffer.original_price > bagOffer.daily_price && <Text style={cr.oldPrice}>{bagOffer.original_price} {t('currency')}</Text>}
@@ -53,6 +52,7 @@ function BannersCarousel({ bagOffer, activeSub, colors, t, locale, onBagPress, o
                   <Text style={cr.perDay}>/ {t('bagPerDay')}</Text>
                 </View>
               </View>
+              <Image source={require('../../assets/logo.jpg')} style={{ width: 90, height: 90, borderRadius: 45, marginTop: -10 }} resizeMode="contain" />
             </View>
           </LinearGradient>
         </TouchableOpacity>
@@ -560,7 +560,7 @@ const cr = StyleSheet.create({
   badgeText: { color: '#78350f', fontSize: 11, fontWeight: '800' },
   discountBadge: { backgroundColor: '#ef4444', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
   discountText: { color: '#fff', fontSize: 11, fontWeight: '800' },
-  row: { flexDirection: 'row', alignItems: 'center' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   title: { color: '#fff', fontSize: 22, fontWeight: '900', marginBottom: 4, textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
   subtitle: { color: 'rgba(255,255,255,0.85)', fontSize: 13, marginBottom: 12, lineHeight: 19 },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
