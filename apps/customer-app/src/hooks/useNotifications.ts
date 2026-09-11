@@ -24,6 +24,7 @@ export function useNotifications(userId?: string) {
         setExpoPushToken(token)
         if (userId) {
           supabase.from('users').update({ fcm_token: token }).eq('id', userId)
+            .then(({ error }) => { if (error) console.warn('Token save failed:', error.message) })
         }
       }
     })
@@ -89,14 +90,18 @@ async function registerForPushNotifications(): Promise<string | null> {
   }
 
   const tokenData = await Notifications.getExpoPushTokenAsync({
-    projectId: '178256af-c74c-4880-9722-8d30ba1e3e8b',
+    projectId: '278296f6-7a0c-4237-97ae-326fab30b0c6',
   })
   return tokenData.data
 }
 
 export async function sendLocalNotification(title: string, body: string, channelId = 'order-updates') {
   await Notifications.scheduleNotificationAsync({
-    content: { title, body, sound: true },
+    content: {
+      title,
+      body,
+      sound: channelId === 'order-placed' ? 'order-placed.wav' : 'order-update.wav',
+    },
     trigger: null,
     ...(Platform.OS === 'android' ? { channelId } : {}),
   })
@@ -112,7 +117,7 @@ export async function playNotificationSound(type: 'order-update' | 'order-placed
     await Audio.setAudioModeAsync({
       allowsRecordingIOS: false,
       playsInSilentModeIOS: true,
-      staysActiveInBackground: false,
+      staysActiveInBackground: true,
       shouldDuckAndroid: true,
     })
     const { sound } = await Audio.Sound.createAsync(soundFiles[type], { volume: 1.0 })

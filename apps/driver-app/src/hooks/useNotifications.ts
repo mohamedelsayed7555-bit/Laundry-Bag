@@ -24,6 +24,7 @@ export function useNotifications(userId?: string) {
         setExpoPushToken(token)
         if (userId) {
           supabase.from('users').update({ fcm_token: token }).eq('id', userId)
+            .then(({ error }) => { if (error) console.warn('Token save failed:', error.message) })
         }
       }
     })
@@ -118,7 +119,7 @@ export async function playNotificationSound(type: 'new-order' | 'order-update' =
     await Audio.setAudioModeAsync({
       allowsRecordingIOS: false,
       playsInSilentModeIOS: true,
-      staysActiveInBackground: false,
+      staysActiveInBackground: true,
       shouldDuckAndroid: true,
     })
     const { sound } = await Audio.Sound.createAsync(soundFiles[type], { volume: 1.0 })

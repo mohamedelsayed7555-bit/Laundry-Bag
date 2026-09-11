@@ -39,7 +39,10 @@
       "expo-location",
       "expo-image-picker",
       "@react-native-community/datetimepicker",
-      "expo-localization"
+      "expo-localization",
+      ["expo-notifications", {
+        "sounds": ["./assets/sounds/order-update.wav", "./assets/sounds/order-placed.wav"]
+      }]
     ],
     "extra": {
       "router": {
