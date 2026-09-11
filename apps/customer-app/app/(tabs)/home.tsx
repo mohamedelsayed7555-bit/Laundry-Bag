@@ -9,6 +9,7 @@ import { useLanguage } from '../../src/contexts/LanguageContext'
 import { supabase } from '../../src/lib/supabase'
 import { SkeletonOrderCard } from '../../src/components/Skeleton'
 import { useRealtimeOrders } from '../../src/hooks/useRealtimeOrders'
+import { useCart } from '../../src/contexts/CartContext'
 
 const statusIcons: Record<string, string> = {
   pending: '⏳', assigned: '🚗', picked_up: '📦', processing: '🔄',
@@ -35,6 +36,7 @@ function BannersCarousel({ bagOffer, activeSub, colors, t, locale, onBagPress, o
       node: (
         <TouchableOpacity activeOpacity={0.9} onPress={onBagPress} style={{ width: BANNER_WIDTH }}>
           <LinearGradient colors={colors.gradientAccent as unknown as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={cr.bannerGradient}>
+            <Image source={require('../../assets/logo.jpg')} style={{ width: 100, height: 100, borderRadius: 50, position: 'absolute', top: 10, left: 12, opacity: 0.9 }} resizeMode="contain" />
             <View style={cr.badgeWrap}>
               <View style={cr.badge}><Text style={cr.badgeText}>{t('bagBadge')}</Text></View>
               {bagOffer.original_price > bagOffer.daily_price && (
@@ -51,7 +53,6 @@ function BannersCarousel({ bagOffer, activeSub, colors, t, locale, onBagPress, o
                   <Text style={cr.perDay}>/ {t('bagPerDay')}</Text>
                 </View>
               </View>
-              <Image source={require('../../assets/logo.jpg')} style={{ width: 80, height: 80, borderRadius: 40 }} resizeMode="contain" />
             </View>
           </LinearGradient>
         </TouchableOpacity>
@@ -168,6 +169,7 @@ export default function HomeScreen() {
   const { profile } = useAuth()
   const { colors } = useTheme()
   const { t, locale } = useLanguage()
+  const { totalItems: cartCount } = useCart()
   const router = useRouter()
   const [recentOrders, setRecentOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -323,6 +325,14 @@ export default function HomeScreen() {
           <Text style={[s.greetName, { color: colors.text }]}>{profile?.name ?? ''}</Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <TouchableOpacity onPress={() => router.push('/cart')} style={s.bellBtn}>
+            <Text style={{ fontSize: 22, opacity: cartCount > 0 ? 1 : 0.35 }}>🛒</Text>
+            {cartCount > 0 && (
+              <View style={[s.badge, { backgroundColor: colors.primary }]}>
+                <Text style={s.badgeText}>{cartCount > 9 ? '9+' : cartCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => router.push('/notifications')} style={s.bellBtn}>
             <Text style={{ fontSize: 22 }}>🔔</Text>
             {unreadCount > 0 && (
@@ -551,12 +561,12 @@ const cr = StyleSheet.create({
   discountBadge: { backgroundColor: '#ef4444', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
   discountText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   row: { flexDirection: 'row', alignItems: 'center' },
-  title: { color: '#fff', fontSize: 20, fontWeight: '800', marginBottom: 4 },
-  subtitle: { color: 'rgba(255,255,255,0.75)', fontSize: 12, marginBottom: 12, lineHeight: 18 },
+  title: { color: '#fff', fontSize: 22, fontWeight: '900', marginBottom: 4, textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  subtitle: { color: 'rgba(255,255,255,0.85)', fontSize: 13, marginBottom: 12, lineHeight: 19 },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   oldPrice: { color: 'rgba(255,255,255,0.45)', fontSize: 14, textDecorationLine: 'line-through' },
-  price: { color: '#fff', fontSize: 24, fontWeight: '900' },
-  perDay: { color: 'rgba(255,255,255,0.6)', fontSize: 12 },
+  price: { color: '#fbbf24', fontSize: 26, fontWeight: '900', textShadowColor: 'rgba(0,0,0,0.25)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  perDay: { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
   ctaWrap: { backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'flex-start', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, marginTop: 12 },
   ctaText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   plansBanner: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 24, padding: 20, borderWidth: 1, minHeight: 80 },

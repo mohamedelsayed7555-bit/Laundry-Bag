@@ -104,7 +104,7 @@ export default function EditOrderScreen() {
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0)
 
   async function handleSave() {
-    if (cart.length === 0) { showAlert({ title: 'تنبيه', message: 'أضف قطعة واحدة على الأقل', type: 'warning' }); return }
+    if (cart.length === 0) { showAlert({ title: isEn ? 'Notice' : 'تنبيه', message: isEn ? 'Add at least one item' : 'أضف قطعة واحدة على الأقل', type: 'warning' }); return }
 
     const fee = order.delivery_fee ?? 0
     const isSubOrder = !!order.subscription_id
@@ -117,7 +117,7 @@ export default function EditOrderScreen() {
         const oldItems = order.items_count ?? 0
         const available = sub.items_limit - sub.items_used + oldItems
         if (totalItems > available) {
-          showAlert({ title: 'تنبيه', message: `رصيد باقتك ${available} قطعة فقط وأنت محتاج ${totalItems}`, type: 'warning' })
+          showAlert({ title: isEn ? 'Notice' : 'تنبيه', message: isEn ? `Your plan has only ${available} items left but you need ${totalItems}` : `رصيد باقتك ${available} قطعة فقط وأنت محتاج ${totalItems}`, type: 'warning' })
           return
         }
       }
@@ -147,10 +147,10 @@ export default function EditOrderScreen() {
 
     setSaving(false)
     if (error) {
-      showAlert({ title: 'خطأ', message: 'حدث خطأ أثناء تعديل الطلب', type: 'error' })
+      showAlert({ title: isEn ? 'Error' : 'خطأ', message: isEn ? 'Failed to update order' : 'حدث خطأ أثناء تعديل الطلب', type: 'error' })
     } else {
-      showAlert({ title: 'تم', message: 'تم تعديل الطلب بنجاح', type: 'success', buttons: [
-        { text: 'حسناً', onPress: () => router.back() },
+      showAlert({ title: isEn ? 'Done' : 'تم', message: isEn ? 'Order updated successfully' : 'تم تعديل الطلب بنجاح', type: 'success', buttons: [
+        { text: isEn ? 'OK' : 'حسناً', onPress: () => router.back() },
       ] })
     }
   }
@@ -166,10 +166,10 @@ export default function EditOrderScreen() {
       <View style={[s.container, { justifyContent: 'center', alignItems: 'center', padding: 40 }]}>
         <Text style={{ fontSize: 40, marginBottom: 16 }}>⚠️</Text>
         <Text style={{ color: '#fff', fontSize: 16, textAlign: 'center' }}>
-          {isPaidOnline ? 'لا يمكن تعديل طلب مدفوع إلكترونياً — تواصل مع الدعم' : 'لا يمكن تعديل هذا الطلب'}
+          {isPaidOnline ? (isEn ? 'Cannot edit a paid order — contact support' : 'لا يمكن تعديل طلب مدفوع إلكترونياً — تواصل مع الدعم') : (isEn ? 'This order cannot be edited' : 'لا يمكن تعديل هذا الطلب')}
         </Text>
         <TouchableOpacity style={s.backBtnAlt} onPress={() => router.back()}>
-          <Text style={{ color: colors.primary, fontSize: 15, fontWeight: '600' }}>رجوع</Text>
+          <Text style={{ color: colors.primary, fontSize: 15, fontWeight: '600' }}>{isEn ? 'Back' : 'رجوع'}</Text>
         </TouchableOpacity>
       </View>
     )
@@ -180,9 +180,9 @@ export default function EditOrderScreen() {
     <ScrollView style={s.container} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
       <View style={s.headerRow}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={s.backText}>→ رجوع</Text>
+          <Text style={s.backText}>{isEn ? '→ Back' : '→ رجوع'}</Text>
         </TouchableOpacity>
-        <Text style={s.title}>تعديل الطلب</Text>
+        <Text style={s.title}>{isEn ? 'Edit Order' : 'تعديل الطلب'}</Text>
         <View style={{ width: 60 }} />
       </View>
 
@@ -191,12 +191,12 @@ export default function EditOrderScreen() {
       </View>
 
       {/* Current items */}
-      <Text style={s.sectionTitle}>القطع ({totalItems})</Text>
+      <Text style={s.sectionTitle}>{isEn ? `Items (${totalItems})` : `القطع (${totalItems})`}</Text>
       {cart.map((item, i) => (
         <View key={i} style={s.cartItem}>
           <View style={{ flex: 1 }}>
             <Text style={s.cartItemName}>{itemName(item.name)} — {serviceLabel(item.service_type)}</Text>
-            <Text style={s.cartItemDetail}>{item.quantity} × {item.price} = {item.quantity * item.price} ج.م</Text>
+            <Text style={s.cartItemDetail}>{item.quantity} × {item.price} = {item.quantity * item.price} {isEn ? 'EGP' : 'ج.م'}</Text>
           </View>
           <View style={s.qtyActions}>
             <TouchableOpacity style={s.qtyBtn} onPress={() => updateQty(i, -1)}>
@@ -214,8 +214,8 @@ export default function EditOrderScreen() {
       ))}
 
       {/* Add new item */}
-      <Text style={s.sectionTitle}>إضافة قطعة جديدة</Text>
-      <Text style={s.stepLabel}>نوع القطعة</Text>
+      <Text style={s.sectionTitle}>{isEn ? 'Add New Item' : 'إضافة قطعة جديدة'}</Text>
+      <Text style={s.stepLabel}>{isEn ? 'Item Type' : 'نوع القطعة'}</Text>
       <View style={s.grid}>
         {itemTypes.map(type => (
           <TouchableOpacity key={type} onPress={() => { setSelectedItemType(type); setSelectedService('') }}
@@ -227,14 +227,14 @@ export default function EditOrderScreen() {
 
       {selectedItemType ? (
         <>
-          <Text style={s.stepLabel}>نوع الخدمة</Text>
+          <Text style={s.stepLabel}>{isEn ? 'Service Type' : 'نوع الخدمة'}</Text>
           <View style={s.grid}>
             {availableServices().map(svc => (
               <TouchableOpacity key={svc.key} onPress={() => setSelectedService(svc.key)}
                 style={[s.optionCard, selectedService === svc.key && s.optionSelected]}>
                 <Text style={s.optionIcon}>{svc.icon}</Text>
                 <Text style={[s.optionLabel, selectedService === svc.key && s.optionLabelSelected]}>{isEn ? svc.labelEn : svc.label}</Text>
-                <Text style={s.priceHint}>{getPrice(selectedItemType, svc.key)} ج.م</Text>
+                <Text style={s.priceHint}>{getPrice(selectedItemType, svc.key)} {isEn ? 'EGP' : 'ج.م'}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -253,16 +253,16 @@ export default function EditOrderScreen() {
             </TouchableOpacity>
           </View>
           <TouchableOpacity style={s.addBtn} onPress={addToCart}>
-            <Text style={s.addBtnText}>+ أضف</Text>
+            <Text style={s.addBtnText}>{isEn ? '+ Add' : '+ أضف'}</Text>
           </TouchableOpacity>
         </View>
       ) : null}
 
       {/* Total */}
       <View style={s.totalCard}>
-        <Text style={s.totalLabel}>الإجمالي</Text>
+        <Text style={s.totalLabel}>{isEn ? 'Total' : 'الإجمالي'}</Text>
         <Text style={s.totalValue}>
-          {order.subscription_id ? 'مجاناً (باقة)' : `${(totalPrice + (order.delivery_fee ?? 0)).toFixed(2)} ج.م`}
+          {order.subscription_id ? (isEn ? 'Free (Plan)' : 'مجاناً (باقة)') : `${(totalPrice + (order.delivery_fee ?? 0)).toFixed(2)} ${isEn ? 'EGP' : 'ج.م'}`}
         </Text>
       </View>
 
@@ -271,7 +271,7 @@ export default function EditOrderScreen() {
         onPress={handleSave}
         disabled={saving || cart.length === 0}
       >
-        <Text style={s.saveBtnText}>{saving ? 'جاري الحفظ...' : 'حفظ التعديلات'}</Text>
+        <Text style={s.saveBtnText}>{saving ? (isEn ? 'Saving...' : 'جاري الحفظ...') : (isEn ? 'Save Changes' : 'حفظ التعديلات')}</Text>
       </TouchableOpacity>
     </ScrollView>
     {AlertComponent}

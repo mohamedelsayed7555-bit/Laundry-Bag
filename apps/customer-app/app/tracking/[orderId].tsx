@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { WebView } from 'react-native-webview'
 import { supabase } from '../../src/lib/supabase'
 import { useTheme } from '../../src/contexts/ThemeContext'
+import { useLanguage } from '../../src/contexts/LanguageContext'
 
 function buildFullTrackingMapHTML(driverLat: number, driverLng: number, customerLat?: number, customerLng?: number, driverName?: string) {
   const centerLat = customerLat ? (driverLat + customerLat) / 2 : driverLat
@@ -37,14 +38,16 @@ function buildFullTrackingMapHTML(driverLat: number, driverLng: number, customer
 </body></html>`
 }
 
-const statusLabels: Record<string, string> = {
-  assigned: 'في الطريق للاستلام',
-  picked_up: 'تم استلام الطلب',
-  delivering: 'في الطريق إليك',
+const statusLabels: Record<string, { ar: string; en: string }> = {
+  assigned: { ar: 'في الطريق للاستلام', en: 'On the way to pick up' },
+  picked_up: { ar: 'تم استلام الطلب', en: 'Order picked up' },
+  delivering: { ar: 'في الطريق إليك', en: 'On the way to you' },
 }
 
 export default function TrackingScreen() {
   const { colors } = useTheme()
+  const { locale } = useLanguage()
+  const isEn = locale === 'en'
   const s = getStyles(colors)
   const { orderId } = useLocalSearchParams<{ orderId: string }>()
   const router = useRouter()
@@ -131,9 +134,9 @@ export default function TrackingScreen() {
       {/* Header */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Text style={s.backText}>→ رجوع</Text>
+          <Text style={s.backText}>{isEn ? '→ Back' : '→ رجوع'}</Text>
         </TouchableOpacity>
-        <Text style={s.title}>تتبع السائق</Text>
+        <Text style={s.title}>{isEn ? 'Track Driver' : 'تتبع السائق'}</Text>
         <View style={{ width: 60 }} />
       </View>
 
@@ -152,7 +155,7 @@ export default function TrackingScreen() {
         ) : (
           <View style={s.noMap}>
             <Text style={s.noMapIcon}>📍</Text>
-            <Text style={s.noMapText}>موقع السائق غير متاح حالياً</Text>
+            <Text style={s.noMapText}>{isEn ? 'Driver location unavailable' : 'موقع السائق غير متاح حالياً'}</Text>
           </View>
         )}
       </View>
@@ -166,7 +169,7 @@ export default function TrackingScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={s.driverName}>{order.driver.name}</Text>
-              <Text style={s.statusText}>{statusLabels[order?.status] ?? order?.status}</Text>
+              <Text style={s.statusText}>{statusLabels[order?.status] ? (isEn ? statusLabels[order.status].en : statusLabels[order.status].ar) : order?.status}</Text>
             </View>
             {order.driver.phone && (
               <TouchableOpacity style={s.callBtn} onPress={() => Linking.openURL(`tel:${order.driver.phone}`)}>
@@ -182,19 +185,19 @@ export default function TrackingScreen() {
         <View style={s.etaRow}>
           {distanceKm !== null && (
             <View style={s.etaItem}>
-              <Text style={s.etaValue}>{distanceKm < 1 ? `${Math.round(distanceKm * 1000)} م` : `${distanceKm.toFixed(1)} كم`}</Text>
-              <Text style={s.etaLabel}>المسافة</Text>
+              <Text style={s.etaValue}>{distanceKm < 1 ? `${Math.round(distanceKm * 1000)} ${isEn ? 'm' : 'م'}` : `${distanceKm.toFixed(1)} ${isEn ? 'km' : 'كم'}`}</Text>
+              <Text style={s.etaLabel}>{isEn ? 'Distance' : 'المسافة'}</Text>
             </View>
           )}
           {etaMinutes !== null && (
             <View style={s.etaItem}>
-              <Text style={[s.etaValue, { color: colors.primary }]}>{etaMinutes} دقيقة</Text>
-              <Text style={s.etaLabel}>الوقت المتوقع</Text>
+              <Text style={[s.etaValue, { color: colors.primary }]}>{etaMinutes} {isEn ? 'min' : 'دقيقة'}</Text>
+              <Text style={s.etaLabel}>{isEn ? 'ETA' : 'الوقت المتوقع'}</Text>
             </View>
           )}
           <View style={s.etaItem}>
             <Text style={s.etaValue}>{order?.order_number}</Text>
-            <Text style={s.etaLabel}>رقم الطلب</Text>
+            <Text style={s.etaLabel}>{isEn ? 'Order #' : 'رقم الطلب'}</Text>
           </View>
         </View>
       </View>

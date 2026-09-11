@@ -4,11 +4,14 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { useCustomAlert } from '../../src/components/CustomAlert'
 import { useTheme } from '../../src/contexts/ThemeContext'
+import { useLanguage } from '../../src/contexts/LanguageContext'
 
 const OTP_LENGTH = 6
 
 export default function VerifyScreen() {
   const { colors } = useTheme()
+  const { locale } = useLanguage()
+  const isEn = locale === 'en'
   const s = getStyles(colors)
   const { email } = useLocalSearchParams<{ email: string }>()
   const [otp, setOtp] = useState(Array(OTP_LENGTH).fill(''))
@@ -36,7 +39,7 @@ export default function VerifyScreen() {
     const { error } = await verifyOtp(email, token)
     setLoading(false)
     if (error) {
-      showAlert({ title: 'خطأ', message: 'كود التفعيل غير صحيح', type: 'error' })
+      showAlert({ title: isEn ? 'Error' : 'خطأ', message: isEn ? 'Invalid verification code' : 'كود التفعيل غير صحيح', type: 'error' })
       setOtp(Array(OTP_LENGTH).fill(''))
       inputs.current[0]?.focus()
     }
@@ -45,7 +48,7 @@ export default function VerifyScreen() {
   const handleResend = async () => {
     if (!email) return
     const { error } = await signInWithOtp(email)
-    showAlert({ title: error ? 'خطأ' : 'تم', message: error ?? 'تم إرسال كود جديد', type: error ? 'error' : 'success' })
+    showAlert({ title: error ? (isEn ? 'Error' : 'خطأ') : (isEn ? 'Done' : 'تم'), message: error ?? (isEn ? 'New code sent' : 'تم إرسال كود جديد'), type: error ? 'error' : 'success' })
   }
 
   return (
@@ -53,11 +56,11 @@ export default function VerifyScreen() {
     <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={s.content}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Text style={s.backText}>← رجوع</Text>
+          <Text style={s.backText}>{isEn ? '← Back' : '← رجوع'}</Text>
         </TouchableOpacity>
 
-        <Text style={s.title}>تأكيد البريد الإلكتروني</Text>
-        <Text style={s.subtitle}>أدخل الكود المرسل إلى {email}</Text>
+        <Text style={s.title}>{isEn ? 'Verify Email' : 'تأكيد البريد الإلكتروني'}</Text>
+        <Text style={s.subtitle}>{isEn ? `Enter the code sent to ${email}` : `أدخل الكود المرسل إلى ${email}`}</Text>
 
         <View style={s.otpRow}>
           {otp.map((digit, i) => (
@@ -76,10 +79,10 @@ export default function VerifyScreen() {
           ))}
         </View>
 
-        {loading && <Text style={s.loadingText}>جاري التحقق...</Text>}
+        {loading && <Text style={s.loadingText}>{isEn ? 'Verifying...' : 'جاري التحقق...'}</Text>}
 
         <TouchableOpacity onPress={handleResend} style={s.resendBtn}>
-          <Text style={s.resendText}>إعادة إرسال الكود</Text>
+          <Text style={s.resendText}>{isEn ? 'Resend code' : 'إعادة إرسال الكود'}</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>

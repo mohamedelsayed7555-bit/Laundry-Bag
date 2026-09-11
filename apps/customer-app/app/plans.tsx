@@ -393,7 +393,7 @@ export default function PlansScreen() {
               {plan.includes_all_services
                 ? <Text style={[s.featureText, { color: colors.navy[100] }]}>✨ {locale === 'en' ? 'All services included' : 'جميع الخدمات متاحة'}</Text>
                 : plan.covered_services && plan.covered_services.length > 0
-                  ? <Text style={[s.featureText, { color: colors.navy[100] }]}>✅ {plan.covered_services.map((s: string) => ({ wash: 'غسيل', iron: 'كوي', wash_iron: 'غسيل وكوي', dry_clean: 'تنظيف جاف', tailor: 'تفصيل', carpet: 'سجاد' }[s] ?? s)).join(' • ')}</Text>
+                  ? <Text style={[s.featureText, { color: colors.navy[100] }]}>✅ {plan.covered_services.map((s: string) => (locale === 'en' ? { wash: 'Wash', iron: 'Iron', wash_iron: 'Wash & Iron', dry_clean: 'Dry Clean', tailor: 'Tailoring', carpet: 'Carpets' } : { wash: 'غسيل', iron: 'كوي', wash_iron: 'غسيل وكوي', dry_clean: 'تنظيف جاف', tailor: 'تفصيل', carpet: 'سجاد' })[s] ?? s).join(' • ')}</Text>
                   : null}
               {plan.tier === 'premium' && <Text style={[s.featureText, { color: colors.navy[100] }]}>⚡ {locale === 'en' ? 'Priority delivery' : 'أولوية في التوصيل'}</Text>}
             </View>
