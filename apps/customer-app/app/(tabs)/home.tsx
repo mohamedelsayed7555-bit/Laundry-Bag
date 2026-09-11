@@ -358,9 +358,9 @@ export default function HomeScreen() {
       <Animated.View entering={FadeInDown.duration(400).delay(120)}>
         <Text style={[s.sectionTitle, { color: colors.text }]}>{t('services')}</Text>
       </Animated.View>
-      <View style={s.servicesGrid}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.servicesScroll} style={{ marginBottom: 24 }}>
         {services.map((svc, i) => (
-          <Animated.View key={svc.key} entering={FadeInDown.duration(300).delay(150 + i * 40)} style={{ width: '47%' }}>
+          <Animated.View key={svc.key} entering={FadeInDown.duration(300).delay(150 + i * 40)}>
             <TouchableOpacity style={[s.serviceCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]} activeOpacity={0.7}
               onPress={() => router.push('/(tabs)/new-order')}>
               <View style={[s.serviceIconWrap, { backgroundColor: colors.navy[700] }]}>
@@ -371,7 +371,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </Animated.View>
         ))}
-      </View>
+      </ScrollView>
 
       {/* Recent Orders */}
       <Animated.View entering={FadeInDown.duration(400).delay(250)}>
@@ -413,7 +413,7 @@ export default function HomeScreen() {
                 <View style={[s.orderDivider, { backgroundColor: colors.navy[700] }]} />
                 <View style={s.orderRow}>
                   <Text style={[s.orderDate, { color: colors.navy[400] }]}>{new Date(order.created_at).toLocaleDateString('ar-EG')}</Text>
-                  <Text style={[s.orderTotal, { color: colors.primary }]}>{order.total?.toFixed(2)} {t('currency')}</Text>
+                  <Text style={[s.orderTotal, { color: colors.primary }]}>{order.total > 0 ? `${order.total?.toFixed(2)} ${t('currency')}` : (locale === 'en' ? 'Plan' : 'باقة')}</Text>
                 </View>
               </TouchableOpacity>
             </Animated.View>
@@ -507,19 +507,19 @@ const s = StyleSheet.create({
   sectionTitle: { fontSize: 18, fontWeight: '700', marginBottom: 2 },
   seeAll: { fontSize: 13, fontWeight: '600' },
 
-  servicesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 28 },
+  servicesScroll: { gap: 10, paddingHorizontal: 4 },
   serviceCard: {
-    borderRadius: 20,
-    padding: 20, alignItems: 'center', gap: 6,
-    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14, alignItems: 'center', gap: 4,
+    borderWidth: 1, width: 110,
   },
   serviceIconWrap: {
-    width: 52, height: 52, borderRadius: 16,
+    width: 44, height: 44, borderRadius: 14,
     justifyContent: 'center', alignItems: 'center', marginBottom: 4,
   },
-  serviceIcon: { fontSize: 26 },
-  serviceLabel: { fontSize: 14, fontWeight: '700' },
-  serviceDesc: { fontSize: 11 },
+  serviceIcon: { fontSize: 22 },
+  serviceLabel: { fontSize: 12, fontWeight: '700', textAlign: 'center' },
+  serviceDesc: { fontSize: 10, textAlign: 'center' },
 
   emptyCard: {
     borderRadius: 20, padding: 32,

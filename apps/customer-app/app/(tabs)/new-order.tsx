@@ -30,12 +30,10 @@ export default function NewOrderScreen() {
 
   const [prices, setPrices] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [addresses, setAddresses] = useState<any[]>([])
   const [selectedAddress, setSelectedAddress] = useState<any>(null)
-  const [selectedItemType, setSelectedItemType] = useState('')
   const [selectedService, setSelectedService] = useState('')
-  const [itemQty, setItemQty] = useState(1)
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({})
   const [activeSub, setActiveSub] = useState<any>(null)
   const [dataLoading, setDataLoading] = useState(true)
   const [closed, setClosed] = useState(false)
@@ -65,7 +63,6 @@ export default function NewOrderScreen() {
     setPrices(pricesRes.data ?? [])
     const cats = catsRes.data ?? []
     setCategories(cats)
-    if (cats.length > 0 && !selectedCategory) setSelectedCategory(cats[0].id)
     const sMap: Record<string, string> = {}
     settingsRes.data?.forEach((s: any) => { sMap[s.key] = String(s.value) })
     const enabled = sMap['working_hours_enabled'] !== 'false'
@@ -118,24 +115,38 @@ export default function NewOrderScreen() {
     return prices.find(p => p.item_type === itemType && p.service_type === serviceType)?.price ?? 0
   }, [prices])
 
-  const filteredItemTypes = useMemo(() => {
-    if (!selectedCategory) return []
-    return [...new Set(prices.filter(p => p.category_id === selectedCategory).map(p => p.item_type))] as string[]
-  }, [selectedCategory, prices])
+  const availableServicesForScreen = useMemo(() => {
+    const activeServiceKeys = [...new Set(prices.map(p => p.service_type))]
+    return services.filter(s => activeServiceKeys.includes(s.key))
+  }, [prices])
 
-  const availableServices = useMemo(() => {
-    if (!selectedItemType) return []
-    return services.filter(s => prices.some(p => p.item_type === selectedItemType && p.service_type === s.key))
-  }, [selectedItemType, prices])
+  const categoriesWithItems = useMemo(() => {
+    if (!selectedService) return []
+    return categories.map(cat => {
+      const itemTypes = [...new Set(prices.filter(p => p.category_id === cat.id && p.service_type === selectedService).map(p => p.item_type))] as string[]
+      return { ...cat, itemTypes }
+    }).filter(cat => cat.itemTypes.length > 0)
+  }, [selectedService, categories, prices])
 
-  const handleAddToCart = () => {
-    if (!selectedItemType || !selectedService) return
-    const unitPrice = getPrice(selectedItemType, selectedService)
+  const toggleCategory = useCallback((catId: string) => {
+    setExpandedCategories(prev => ({ ...prev, [catId]: !prev[catId] }))
+  }, [])
+
+  useEffect(() => {
+    if (categoriesWithItems.length > 0) {
+      const first = categoriesWithItems[0]
+      setExpandedCategories(prev => {
+        if (prev[first.id] !== undefined) return prev
+        return { ...prev, [first.id]: true }
+      })
+    }
+  }, [categoriesWithItems])
+
+  const handleAddItem = (itemType: string) => {
+    if (!selectedService) return
+    const unitPrice = getPrice(itemType, selectedService)
     if (unitPrice === 0) return
-    addItem({ name: selectedItemType, service_type: selectedService, quantity: itemQty, price: unitPrice })
-    setSelectedItemType('')
-    setSelectedService('')
-    setItemQty(1)
+    addItem({ name: itemType, service_type: selectedService, quantity: 1, price: unitPrice })
   }
 
   const svcLabel = (key: string) => {
@@ -208,60 +219,70 @@ export default function NewOrderScreen() {
           </View>
         )}
 
-        <Text style={[s.sectionTitle, { color: colors.text }]}>{locale === 'en' ? 'Add item' : 'إضافة قطعة'}</Text>
-
-        <ScrollView key={`cat-${locale}`} horizontal showsHorizontalScrollIndicator={false} style={s.categoryScroll} contentContainerStyle={s.categoryScrollContent}>
-          {categories.map(cat => (
-            <TouchableOpacity key={cat.id} onPress={() => { setSelectedCategory(cat.id); setSelectedItemType(''); setSelectedService('') }}
-              style={[s.categoryChip, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, selectedCategory === cat.id && { borderColor: colors.primary, backgroundColor: colors.primary + '15' }]}>
-              <Text style={s.categoryChipIcon}>{cat.icon}</Text>
-              <Text style={[s.categoryChipLabel, { color: colors.navy[200] }, selectedCategory === cat.id && { color: colors.primary }]}>{catName(cat.name)}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        <Text style={[s.stepLabel, { color: colors.navy[200] }]}>{locale === 'en' ? 'Item type' : 'نوع القطعة'}</Text>
-        <View style={s.grid}>
-          {filteredItemTypes.map(type => (
-            <TouchableOpacity key={type} onPress={() => { setSelectedItemType(type); setSelectedService('') }}
-              style={[s.optionCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, selectedItemType === type && { borderColor: colors.primary, backgroundColor: colors.primary + '15' }]}>
-              <Text style={[s.optionLabel, { color: colors.navy[200] }, selectedItemType === type && { color: colors.primary }]}>{itemName(type)}</Text>
+        <Text style={[s.sectionTitle, { color: colors.text }]}>{locale === 'en' ? 'Service type' : 'نوع الخدمة'}</Text>
+        <View style={s.serviceGrid}>
+          {availableServicesForScreen.map(svc => (
+            <TouchableOpacity key={svc.key} onPress={() => { setSelectedService(svc.key); setExpandedCategories({}) }}
+              style={[s.serviceCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, selectedService === svc.key && { borderColor: colors.primary, backgroundColor: colors.primary + '15' }]}>
+              <Text style={s.serviceCardIcon}>{svc.icon}</Text>
+              <Text style={[s.serviceCardLabel, { color: colors.navy[200] }, selectedService === svc.key && { color: colors.primary }]}>{locale === 'en' ? svc.labelEn : svc.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {selectedItemType ? (
+        {selectedService && categoriesWithItems.length > 0 && (
           <>
-            <Text style={[s.stepLabel, { color: colors.navy[200] }]}>{locale === 'en' ? 'Service type' : 'نوع الخدمة'}</Text>
-            <View style={s.grid}>
-              {availableServices.map(svc => (
-                <TouchableOpacity key={svc.key} onPress={() => setSelectedService(svc.key)}
-                  style={[s.optionCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, selectedService === svc.key && { borderColor: colors.primary, backgroundColor: colors.primary + '15' }]}>
-                  <Text style={s.optionIcon}>{svc.icon}</Text>
-                  <Text style={[s.optionLabel, { color: colors.navy[200] }, selectedService === svc.key && { color: colors.primary }]}>{locale === 'en' ? svc.labelEn : svc.label}</Text>
-                  <Text style={[s.priceHint, { color: colors.navy[300] }]}>{getPrice(selectedItemType, svc.key)} {t('currency')}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            <Text style={[s.sectionTitle, { color: colors.text }]}>{locale === 'en' ? 'Choose item' : 'اختر القطعة'}</Text>
+            {categoriesWithItems.map(cat => {
+              const isExpanded = expandedCategories[cat.id] ?? false
+              return (
+                <View key={cat.id} style={[s.accordionSection, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
+                  <TouchableOpacity style={s.accordionHeader} onPress={() => toggleCategory(cat.id)} activeOpacity={0.7}>
+                    <View style={s.accordionHeaderLeft}>
+                      <Text style={s.accordionCatIcon}>{cat.icon}</Text>
+                      <Text style={[s.accordionCatName, { color: colors.text }]}>{catName(cat.name)}</Text>
+                      <View style={[s.accordionBadge, { backgroundColor: colors.primary + '20' }]}>
+                        <Text style={[s.accordionBadgeText, { color: colors.primary }]}>{cat.itemTypes.length}</Text>
+                      </View>
+                    </View>
+                    <Text style={[s.accordionArrow, { color: colors.navy[400] }]}>{isExpanded ? '▲' : '▼'}</Text>
+                  </TouchableOpacity>
+                  {isExpanded && (
+                    <View style={[s.accordionBody, { borderTopColor: colors.navy[700] }]}>
+                      {cat.itemTypes.map((itemType, idx) => {
+                        const price = getPrice(itemType, selectedService)
+                        const inCart = cart.find(c => c.name === itemType && c.service_type === selectedService)
+                        return (
+                          <View key={itemType} style={[s.accordionItem, idx < cat.itemTypes.length - 1 && { borderBottomColor: colors.navy[700], borderBottomWidth: 0.5 }]}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={[s.accordionItemName, { color: colors.text }]}>{itemName(itemType)}</Text>
+                              <Text style={[s.accordionItemPrice, { color: colors.navy[300] }]}>{price} {t('currency')}</Text>
+                            </View>
+                            {inCart ? (
+                              <View style={s.inCartCounter}>
+                                <TouchableOpacity onPress={() => { const i = cart.indexOf(inCart); updateQuantity(i, inCart.quantity - 1) }} style={[s.inCartBtn, { backgroundColor: colors.navy[700] }]}>
+                                  <Text style={s.inCartBtnText}>−</Text>
+                                </TouchableOpacity>
+                                <Text style={[s.inCartQty, { color: colors.text }]}>{inCart.quantity}</Text>
+                                <TouchableOpacity onPress={() => { const i = cart.indexOf(inCart); updateQuantity(i, inCart.quantity + 1) }} style={[s.inCartBtn, { backgroundColor: colors.primary }]}>
+                                  <Text style={s.inCartBtnText}>+</Text>
+                                </TouchableOpacity>
+                              </View>
+                            ) : (
+                              <TouchableOpacity onPress={() => !closed && handleAddItem(itemType)} style={[s.addItemBtn, { backgroundColor: closed ? colors.navy[600] : colors.primary }]} disabled={closed}>
+                                <Text style={s.addItemBtnText}>+</Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        )
+                      })}
+                    </View>
+                  )}
+                </View>
+              )
+            })}
           </>
-        ) : null}
-
-        {selectedService ? (
-          <View style={s.addRow}>
-            <View style={s.counterRow}>
-              <TouchableOpacity style={[s.counterBtn, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]} onPress={() => setItemQty(Math.max(1, itemQty - 1))}>
-                <Text style={[s.counterText, { color: colors.text }]}>−</Text>
-              </TouchableOpacity>
-              <Text style={[s.counterValue, { color: colors.text }]}>{itemQty}</Text>
-              <TouchableOpacity style={[s.counterBtn, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]} onPress={() => setItemQty(itemQty + 1)}>
-                <Text style={[s.counterText, { color: colors.text }]}>+</Text>
-              </TouchableOpacity>
-            </View>
-            <TouchableOpacity style={[s.addBtn, { backgroundColor: closed ? colors.navy[600] : colors.primary }]} onPress={handleAddToCart} disabled={closed}>
-              <Text style={s.addBtnText}>{locale === 'en' ? '+ Add to cart' : '+ أضف للسلة'}</Text>
-            </TouchableOpacity>
-          </View>
-        ) : null}
+        )}
 
         {cart.length > 0 && (
           <>
@@ -322,27 +343,31 @@ const s = StyleSheet.create({
   content: { padding: 20, paddingTop: 56, paddingBottom: 100 },
   title: { fontSize: 24, fontWeight: '800', marginBottom: 24 },
   sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 12, marginTop: 20 },
-  stepLabel: { fontSize: 13, fontWeight: '600', marginBottom: 8, marginTop: 12 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  optionCard: {
-    minWidth: '30%', borderRadius: 16, padding: 14,
-    alignItems: 'center', gap: 4, borderWidth: 1.5,
+  serviceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  serviceCard: {
+    width: '47%', borderRadius: 16, padding: 14,
+    alignItems: 'center', gap: 6, borderWidth: 1.5,
   },
-  optionIcon: { fontSize: 24 },
-  optionLabel: { fontSize: 13, fontWeight: '600', textAlign: 'center' },
-  priceHint: { fontSize: 11, marginTop: 2 },
-  addRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, gap: 12 },
-  counterRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  counterBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    justifyContent: 'center', alignItems: 'center', borderWidth: 1,
-  },
-  counterText: { fontSize: 20, fontWeight: '600' },
-  counterValue: { fontSize: 24, fontWeight: 'bold', minWidth: 32, textAlign: 'center' },
-  addBtn: {
-    flex: 1, borderRadius: 12, paddingVertical: 12, alignItems: 'center',
-  },
-  addBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  serviceCardIcon: { fontSize: 28 },
+  serviceCardLabel: { fontSize: 13, fontWeight: '600', textAlign: 'center' },
+  accordionSection: { borderRadius: 12, borderWidth: 1, marginBottom: 10, overflow: 'hidden' },
+  accordionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 },
+  accordionHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  accordionCatIcon: { fontSize: 18 },
+  accordionCatName: { fontSize: 14, fontWeight: '700' },
+  accordionBadge: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
+  accordionBadgeText: { fontSize: 11, fontWeight: '700' },
+  accordionArrow: { fontSize: 12 },
+  accordionBody: { borderTopWidth: 0.5 },
+  accordionItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12 },
+  accordionItemName: { fontSize: 14, fontWeight: '600' },
+  accordionItemPrice: { fontSize: 12, marginTop: 2 },
+  addItemBtn: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
+  addItemBtnText: { color: '#fff', fontSize: 20, fontWeight: '600' },
+  inCartCounter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  inCartBtn: { width: 30, height: 30, borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
+  inCartBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  inCartQty: { fontSize: 16, fontWeight: '700', minWidth: 20, textAlign: 'center' },
   cartItem: {
     flexDirection: 'row', alignItems: 'center',
     borderRadius: 12, padding: 14, marginBottom: 8, borderWidth: 1,
@@ -379,14 +404,6 @@ const s = StyleSheet.create({
   subProgressBar: { height: 6, borderRadius: 3, overflow: 'hidden', marginBottom: 8 },
   subProgressFill: { height: '100%', borderRadius: 3 },
   subBannerHint: { fontSize: 11 },
-  categoryScroll: { marginBottom: 12 },
-  categoryScrollContent: { gap: 8, paddingVertical: 4 },
-  categoryChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1.5,
-  },
-  categoryChipIcon: { fontSize: 16 },
-  categoryChipLabel: { fontSize: 13, fontWeight: '600' },
   floatingBar: {
     position: 'absolute', bottom: 90, left: 16, right: 16,
   },
