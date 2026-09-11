@@ -34,7 +34,7 @@ function BannersCarousel({ bagOffer, activeSub, colors, t, locale, onBagPress, o
       key: 'bag',
       node: (
         <TouchableOpacity activeOpacity={0.9} onPress={onBagPress} style={{ width: BANNER_WIDTH }}>
-          <LinearGradient colors={['#059669', '#047857']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={cr.bannerGradient}>
+          <LinearGradient colors={colors.gradientAccent as unknown as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={cr.bannerGradient}>
             <View style={cr.badgeWrap}>
               <View style={cr.badge}><Text style={cr.badgeText}>{bagOffer.badge_text}</Text></View>
               {bagOffer.original_price > bagOffer.daily_price && (
