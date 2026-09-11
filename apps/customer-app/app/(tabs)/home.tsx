@@ -304,6 +304,7 @@ export default function HomeScreen() {
     { icon: '🧹', label: t('dryClean'), key: 'dry_clean', desc: t('dryCleanDesc') },
     { icon: '👕', label: t('ironOnly'), key: 'iron', desc: t('ironDesc') },
     { icon: '✨', label: t('washIron'), key: 'wash_iron', desc: t('washIronDesc') },
+    { icon: '✂️', label: t('tailor'), key: 'tailor', desc: t('tailorDesc') },
   ]
 
   const getStatusLabel = (status: string) => {

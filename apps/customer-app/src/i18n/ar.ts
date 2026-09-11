@@ -63,6 +63,8 @@ export default {
   ironDesc: 'كي مكوجي',
   washIron: 'غسيل وكي',
   washIronDesc: 'باكدج كامل',
+  tailor: 'تفصيل وتعديلات',
+  tailorDesc: 'تفصيل وتعديل ملابس',
   recentOrders: 'آخر الطلبات',
   viewAll: 'عرض الكل ←',
   noOrders: 'لا توجد طلبات حالياً',

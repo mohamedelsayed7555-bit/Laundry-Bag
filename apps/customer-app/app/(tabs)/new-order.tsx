@@ -15,6 +15,7 @@ const services = [
   { key: 'dry_clean', icon: '🧹', label: 'تنظيف جاف', labelEn: 'Dry Clean' },
   { key: 'iron', icon: '👕', label: 'كي فقط', labelEn: 'Iron Only' },
   { key: 'wash_iron', icon: '✨', label: 'غسيل وكي', labelEn: 'Wash & Iron' },
+  { key: 'tailor', icon: '✂️', label: 'تفصيل وتعديلات', labelEn: 'Tailoring' },
 ]
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!

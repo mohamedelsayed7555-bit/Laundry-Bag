@@ -68,7 +68,7 @@ export default function OrderDetailsScreen() {
   }
 
   const serviceLabel: Record<string, string> = {
-    wash: t('wash'), iron: t('ironOnly'), wash_iron: t('washIron'), dry_clean: t('dryClean'),
+    wash: t('wash'), iron: t('ironOnly'), wash_iron: t('washIron'), dry_clean: t('dryClean'), tailor: t('tailor'),
   }
   const [order, setOrder] = useState<any>(null)
   const [loading, setLoading] = useState(true)

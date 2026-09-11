@@ -63,6 +63,8 @@ export default {
   ironDesc: 'Ironing service',
   washIron: 'Wash & Iron',
   washIronDesc: 'Full package',
+  tailor: 'Tailoring',
+  tailorDesc: 'Tailoring & alterations',
   recentOrders: 'Recent Orders',
   viewAll: 'View All →',
   noOrders: 'No orders yet',

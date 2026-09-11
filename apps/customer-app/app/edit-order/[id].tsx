@@ -12,6 +12,7 @@ const servicesMap = [
   { key: 'dry_clean', icon: '🧹', label: 'تنظيف جاف', labelEn: 'Dry Clean' },
   { key: 'iron', icon: '👕', label: 'كي فقط', labelEn: 'Iron Only' },
   { key: 'wash_iron', icon: '✨', label: 'غسيل وكي', labelEn: 'Wash & Iron' },
+  { key: 'tailor', icon: '✂️', label: 'تفصيل وتعديلات', labelEn: 'Tailoring' },
 ]
 
 type OrderItem = { name: string; service_type: string; quantity: number; price: number }
