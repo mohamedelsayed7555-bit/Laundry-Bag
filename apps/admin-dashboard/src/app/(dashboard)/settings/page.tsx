@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Settings, Save, Plus, Trash2, UserCircle, Mail, Lock, Camera, Eye, EyeOff, Check, Users, CreditCard, Clock, ShoppingBag } from 'lucide-react'
+import { Settings, Save, Plus, Trash2, UserCircle, Mail, Lock, Camera, Eye, EyeOff, Check, Users, CreditCard, Clock, ShoppingBag, Palette } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Modal from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/Toast'
@@ -13,6 +13,7 @@ const tabs = [
   { key: 'general', label: 'عام', icon: Settings },
   { key: 'bag_offer', label: 'عرض الشنطة', icon: ShoppingBag },
   { key: 'subscriptions', label: 'الاشتراكات', icon: CreditCard },
+  { key: 'brand', label: 'الألوان', icon: Palette },
   { key: 'users', label: 'المستخدمين', icon: Users },
   { key: 'profile', label: 'الملف الشخصي', icon: UserCircle },
   { key: 'security', label: 'الأمان', icon: Lock },
@@ -34,7 +35,24 @@ export default function SettingsPage() {
   const [savingHours, setSavingHours] = useState(false)
   const [bagOffer, setBagOffer] = useState({ enabled: true, daily_price: 500, original_price: 700, max_items: 15, title: 'شنطة Laundry Bag', subtitle: 'املأ الشنطة غسيل ومكوي بحد أقصى 15 قطعة', badge_text: 'الحق العرض' })
   const [savingBag, setSavingBag] = useState(false)
+  const [brandColor, setBrandColor] = useState('#00c966')
+  const [savingBrand, setSavingBrand] = useState(false)
   const { toast } = useToast()
+
+  const brandColors = [
+    { hex: '#00c966', name: 'أخضر (افتراضي)' },
+    { hex: '#0ea5e9', name: 'أزرق سماوي' },
+    { hex: '#6366f1', name: 'بنفسجي' },
+    { hex: '#8b5cf6', name: 'أرجواني' },
+    { hex: '#ec4899', name: 'وردي' },
+    { hex: '#f43f5e', name: 'أحمر وردي' },
+    { hex: '#f97316', name: 'برتقالي' },
+    { hex: '#eab308', name: 'ذهبي' },
+    { hex: '#14b8a6', name: 'تركوازي' },
+    { hex: '#10b981', name: 'أخضر زمردي' },
+    { hex: '#3b82f6', name: 'أزرق' },
+    { hex: '#1e3a5f', name: 'كحلي' },
+  ]
 
   // Profile states
   const [profile, setProfile] = useState<any>(null)
@@ -76,6 +94,9 @@ export default function SettingsPage() {
       biannual: db ? String(db.value) : '15',
       annual: da ? String(da.value) : '20',
     })
+    const brandS = data?.find(s => s.key === 'brand_color')
+    if (brandS && typeof brandS.value === 'object' && brandS.value?.selected) setBrandColor(brandS.value.selected)
+    else if (brandS && typeof brandS.value === 'string' && brandS.value.startsWith('#')) setBrandColor(brandS.value)
     const bagS = data?.find(s => s.key === 'bag_offer')
     if (bagS && typeof bagS.value === 'object') setBagOffer({ ...bagOffer, ...bagS.value })
     const oh = data?.find(s => s.key === 'open_hour')
@@ -185,6 +206,20 @@ export default function SettingsPage() {
     setSavingBag(false)
     loadSettings()
     toast('تم حفظ إعدادات عرض الشنطة')
+  }
+
+  async function handleSaveBrandColor() {
+    setSavingBrand(true)
+    const value = { selected: brandColor }
+    const existing = settings.find(s => s.key === 'brand_color')
+    if (existing) {
+      await supabase.from('settings').update({ value }).eq('id', existing.id)
+    } else {
+      await supabase.from('settings').insert({ key: 'brand_color', value, description: 'لون العلامة التجارية للتطبيق' })
+    }
+    setSavingBrand(false)
+    loadSettings()
+    toast('تم حفظ لون العلامة التجارية — سيتم تحديث التطبيق تلقائياً')
   }
 
   async function deleteSetting(id: string) {
@@ -441,6 +476,61 @@ export default function SettingsPage() {
               <button onClick={handleSaveBagOffer} disabled={savingBag}
                 className="flex items-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:shadow-glow-green disabled:opacity-50 transition-all">
                 <Save size={14} /> {savingBag ? 'جاري الحفظ...' : 'حفظ إعدادات العرض'}
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Brand Color Tab */}
+      {activeTab === 'brand' && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 max-w-3xl">
+          <div className={sectionClass + ' p-6'}>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-violet-50 rounded-xl"><Palette size={20} className="text-violet-600" /></div>
+              <div>
+                <h3 className="font-semibold text-gray-800">لون العلامة التجارية</h3>
+                <p className="text-xs text-gray-400 mt-0.5">اللون الأساسي اللي هيظهر في تطبيق العميل — الأزرار والعناصر الرئيسية</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+              {brandColors.map(c => (
+                <button key={c.hex} onClick={() => setBrandColor(c.hex)}
+                  className={`relative flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${brandColor === c.hex ? 'border-gray-800 shadow-lg scale-105' : 'border-transparent hover:border-gray-200'}`}>
+                  <div className="w-10 h-10 rounded-full shadow-md" style={{ backgroundColor: c.hex }} />
+                  {brandColor === c.hex && (
+                    <div className="absolute top-1.5 right-1.5 w-5 h-5 bg-gray-800 rounded-full flex items-center justify-center">
+                      <Check size={12} className="text-white" />
+                    </div>
+                  )}
+                  <span className="text-[11px] text-gray-600 font-medium text-center leading-tight">{c.name}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Preview */}
+            <div className="mt-8 p-5 bg-gray-50 rounded-2xl">
+              <p className="text-[10px] text-gray-400 mb-4 uppercase tracking-wider font-medium">معاينة اللون</p>
+              <div className="flex flex-wrap items-center gap-3">
+                <button className="px-6 py-2.5 rounded-xl text-white text-sm font-medium shadow-md" style={{ backgroundColor: brandColor }}>
+                  زر رئيسي
+                </button>
+                <button className="px-6 py-2.5 rounded-xl text-sm font-medium border-2" style={{ borderColor: brandColor, color: brandColor }}>
+                  زر ثانوي
+                </button>
+                <div className="flex items-center gap-2 px-4 py-2 rounded-lg" style={{ backgroundColor: brandColor + '15' }}>
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: brandColor }} />
+                  <span className="text-sm font-medium" style={{ color: brandColor }}>حالة نشطة</span>
+                </div>
+                <div className="h-8 w-32 rounded-lg" style={{ background: `linear-gradient(135deg, ${brandColor}, ${brandColor}cc)` }} />
+              </div>
+            </div>
+
+            <div className="flex justify-end mt-6">
+              <button onClick={handleSaveBrandColor} disabled={savingBrand}
+                className="flex items-center gap-2 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:shadow-lg disabled:opacity-50 transition-all"
+                style={{ background: `linear-gradient(to left, ${brandColor}, ${brandColor}dd)` }}>
+                <Save size={14} /> {savingBrand ? 'جاري الحفظ...' : 'حفظ اللون'}
               </button>
             </div>
           </div>
