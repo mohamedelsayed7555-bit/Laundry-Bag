@@ -28,6 +28,8 @@ export default function LoginScreen() {
   const [bioLoading, setBioLoading] = useState(false)
 
   const glowAnim = useRef(new Animated.Value(0)).current
+  const brandScale = useRef(new Animated.Value(0.8)).current
+  const brandOpacity = useRef(new Animated.Value(0)).current
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
@@ -35,6 +37,10 @@ export default function LoginScreen() {
         Animated.timing(glowAnim, { toValue: 0, duration: 1500, useNativeDriver: false }),
       ])
     ).start()
+    Animated.parallel([
+      Animated.spring(brandScale, { toValue: 1, friction: 6, tension: 80, useNativeDriver: true }),
+      Animated.timing(brandOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
+    ]).start()
   }, [])
 
   function clearError(field: string) {
@@ -109,7 +115,12 @@ export default function LoginScreen() {
             }]} />
             <Image source={require('../../assets/logo.jpg')} style={[s.logoImage, { borderColor: colors.primary }]} resizeMode="contain" />
           </View>
-          <Text style={[s.brandName, { color: colors.text }]}>Laundry Bag</Text>
+          <Animated.View style={{ transform: [{ scale: brandScale }], opacity: brandOpacity }}>
+            <Text style={s.brandName}>
+              <Text style={{ color: colors.text }}>Laundry </Text>
+              <Text style={{ color: colors.primary }}>Bag</Text>
+            </Text>
+          </Animated.View>
           <Text style={[s.tagline, { color: colors.primary }]}>{t('tagline')}</Text>
           <View style={s.divider}>
             <View style={[s.dividerLine, { backgroundColor: colors.navy[600] }]} />
@@ -120,11 +131,23 @@ export default function LoginScreen() {
 
         {/* Tabs */}
         <View style={[s.tabs, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
-          <TouchableOpacity style={[s.tab, !isSignUp && [s.tabActive, { backgroundColor: colors.primary }]]} onPress={() => { setIsSignUp(false); setErrors({}); setServerError('') }}>
-            <Text style={[s.tabText, { color: colors.navy[400] }, !isSignUp && s.tabTextActive]}>{t('login')}</Text>
+          <TouchableOpacity style={[s.tab, !isSignUp && s.tabActive]} onPress={() => { setIsSignUp(false); setErrors({}); setServerError('') }}>
+            {!isSignUp ? (
+              <LinearGradient colors={[colors.primary, colors.primaryDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.tabGradient}>
+                <Text style={s.tabTextActive}>🔑 {t('login')}</Text>
+              </LinearGradient>
+            ) : (
+              <Text style={[s.tabText, { color: colors.navy[400] }]}>{t('login')}</Text>
+            )}
           </TouchableOpacity>
-          <TouchableOpacity style={[s.tab, isSignUp && [s.tabActive, { backgroundColor: colors.primary }]]} onPress={() => { setIsSignUp(true); setErrors({}); setServerError('') }}>
-            <Text style={[s.tabText, { color: colors.navy[400] }, isSignUp && s.tabTextActive]}>{t('signup')}</Text>
+          <TouchableOpacity style={[s.tab, isSignUp && s.tabActive]} onPress={() => { setIsSignUp(true); setErrors({}); setServerError('') }}>
+            {isSignUp ? (
+              <LinearGradient colors={[colors.primary, colors.primaryDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.tabGradient}>
+                <Text style={s.tabTextActive}>✨ {t('signup')}</Text>
+              </LinearGradient>
+            ) : (
+              <Text style={[s.tabText, { color: colors.navy[400] }]}>{t('signup')}</Text>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -207,9 +230,12 @@ export default function LoginScreen() {
               end={{ x: 1, y: 1 }}
               style={s.buttonGradient}
             >
-              <Text style={s.buttonText}>
-                {loading ? t('loading') : isSignUp ? t('creatingAccount') : t('login')}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={s.buttonText}>
+                  {loading ? t('loading') : isSignUp ? t('creatingAccount') : t('login')}
+                </Text>
+                {!loading && <Text style={{ color: '#fff', fontSize: 18 }}>→</Text>}
+              </View>
             </LinearGradient>
           </TouchableOpacity>
 
@@ -294,10 +320,11 @@ const s = StyleSheet.create({
     flexDirection: 'row', borderRadius: 16,
     padding: 4, marginBottom: 24, borderWidth: 1,
   },
-  tab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 14 },
+  tab: { flex: 1, alignItems: 'center', borderRadius: 14, overflow: 'hidden' },
   tabActive: {},
-  tabText: { fontSize: 15, fontWeight: '600' },
-  tabTextActive: { color: '#fff' },
+  tabGradient: { width: '100%', paddingVertical: 12, alignItems: 'center', borderRadius: 14 },
+  tabText: { fontSize: 15, fontWeight: '600', paddingVertical: 12 },
+  tabTextActive: { color: '#fff', fontSize: 15, fontWeight: '700' },
 
   form: { gap: 16 },
   label: { fontSize: 13, fontWeight: '600', textAlign: 'right', marginBottom: 6 },
@@ -333,10 +360,10 @@ const s = StyleSheet.create({
     shadowOpacity: 0.35, shadowRadius: 14, elevation: 10,
   },
   buttonGradient: {
-    padding: 16, alignItems: 'center',
+    padding: 18, alignItems: 'center',
   },
   buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  buttonText: { color: '#fff', fontSize: 19, fontWeight: '800', letterSpacing: 0.5 },
   switchText: {
     fontSize: 14, textAlign: 'center', marginTop: 4,
     fontWeight: '600',

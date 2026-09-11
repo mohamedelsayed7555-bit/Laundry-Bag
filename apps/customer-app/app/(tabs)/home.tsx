@@ -51,7 +51,7 @@ function BannersCarousel({ bagOffer, activeSub, colors, t, locale, onBagPress, o
                   <Text style={cr.perDay}>/ {t('bagPerDay')}</Text>
                 </View>
               </View>
-              <Image source={require('../../assets/logo.jpg')} style={{ width: 56, height: 56, borderRadius: 28 }} resizeMode="contain" />
+              <Image source={require('../../assets/logo.jpg')} style={{ width: 80, height: 80, borderRadius: 40 }} resizeMode="contain" />
             </View>
           </LinearGradient>
         </TouchableOpacity>
