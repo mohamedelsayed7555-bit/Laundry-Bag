@@ -127,7 +127,7 @@ export default function OrderDetailsScreen() {
     if (!profile?.id) return
     const { data } = await supabase
       .from('orders')
-      .select('id, order_number, status, service_type, items_count, total, delivery_fee, cancellation_fee, notes, payment_method, payment_status, driver_id, rated_at, rating_service, rating_driver, rating_note, created_at, delivery_location, driver:users!orders_driver_id_fkey(name, phone)')
+      .select('id, order_number, status, service_type, items_count, total, delivery_fee, cancellation_fee, notes, payment_method, payment_status, driver_id, rated_at, rating_service, rating_driver, rating_note, created_at, delivery_location, subscription_id, order_type, driver:users!orders_driver_id_fkey(name, phone)')
       .eq('id', id)
       .eq('customer_id', profile.id)
       .single()
@@ -158,6 +158,14 @@ export default function OrderDetailsScreen() {
           if (error) {
             showAlert({ title: t('error'), message: t('connectionError'), type: 'error' })
           } else {
+            if (order.subscription_id && order.items_count > 0) {
+              const { data: sub } = await supabase.from('subscriptions').select('items_used').eq('id', order.subscription_id).single()
+              if (sub) {
+                const currentUsed = sub.items_used ?? 0
+                const newUsed = Math.max(0, currentUsed - order.items_count)
+                await supabase.from('subscriptions').update({ items_used: newUsed }).eq('id', order.subscription_id).eq('items_used', currentUsed)
+              }
+            }
             if (driverArrived) {
               showAlert({
                 title: t('cancelledDone'),
