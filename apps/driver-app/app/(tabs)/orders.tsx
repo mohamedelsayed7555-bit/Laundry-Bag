@@ -25,6 +25,7 @@ function getDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number): 
 
 const statusConfig: Record<string, { label: string; color: string; icon: string }> = {
   assigned: { label: 'بانتظار الاستلام', color: '#3b82f6', icon: '📋' },
+  arrived: { label: 'وصل لموقع العميل', color: '#6366f1', icon: '📍' },
   picked_up: { label: 'تم الاستلام', color: '#8b5cf6', icon: '📦' },
   processing: { label: 'جاري المعالجة', color: '#06b6d4', icon: '🔄' },
   ready: { label: 'جاهز للتوصيل', color: '#10b981', icon: '✅' },
@@ -33,7 +34,8 @@ const statusConfig: Record<string, { label: string; color: string; icon: string 
 }
 
 const nextAction: Record<string, { status: string; label: string }> = {
-  assigned: { status: 'picked_up', label: 'تأكيد الاستلام من العميل' },
+  assigned: { status: 'arrived', label: 'وصلت لموقع العميل' },
+  arrived: { status: 'picked_up', label: 'تأكيد الاستلام من العميل' },
   picked_up: { status: 'processing', label: 'وصلت للمغسلة' },
   ready: { status: 'delivering', label: 'بدأت التوصيل' },
   delivering: { status: 'delivered', label: 'تم التسليم للعميل' },
@@ -72,7 +74,7 @@ export default function DriverOrdersScreen() {
   const [filter, setFilter] = useState<Filter>('pickup')
   const [dateRange, setDateRange] = useState<DateRange>('14')
   const [showDatePicker, setShowDatePicker] = useState(false)
-  const [pickupSub, setPickupSub] = useState<'all' | 'assigned' | 'picked_up'>('all')
+  const [pickupSub, setPickupSub] = useState<'all' | 'assigned' | 'arrived' | 'picked_up'>('all')
   const driverLocRef = useRef<{ lat: number; lng: number } | null>(null)
   const lastLoadRef = useRef(0)
 
@@ -127,9 +129,9 @@ export default function DriverOrdersScreen() {
 
   // Pickup: assigned, picked_up — sorted by status then distance from driver
   const pickupOrders = orders
-    .filter(o => ['assigned', 'picked_up'].includes(o.status))
+    .filter(o => ['assigned', 'arrived', 'picked_up'].includes(o.status))
     .sort((a, b) => {
-      const p: Record<string, number> = { assigned: 0, picked_up: 1 }
+      const p: Record<string, number> = { assigned: 0, arrived: 1, picked_up: 2 }
       const statusDiff = (p[a.status] ?? 9) - (p[b.status] ?? 9)
       if (statusDiff !== 0) return statusDiff
       return distFromDriver(a.pickup_location) - distFromDriver(b.pickup_location)
@@ -191,6 +193,7 @@ export default function DriverOrdersScreen() {
       if (!customer?.fcm_token) return
       const statusMessages: Record<string, string> = {
         assigned: 'تم تعيين سائق لطلبك',
+        arrived: 'السائق وصل موقعك',
         picked_up: 'تم استلام ملابسك من السائق',
         processing: 'ملابسك قيد المعالجة الآن',
         ready: 'ملابسك جاهزة للتوصيل!',
@@ -223,7 +226,7 @@ export default function DriverOrdersScreen() {
   }
 
   function getRelevantLocation(item: any) {
-    const isPickupPhase = ['assigned', 'picked_up'].includes(item.status)
+    const isPickupPhase = ['assigned', 'arrived', 'picked_up'].includes(item.status)
     if (isPickupPhase) {
       return { loc: item.pickup_location ?? item.address ?? item.delivery_location, label: '📦 عنوان الاستلام', phase: 'pickup' }
     }
@@ -294,7 +297,7 @@ export default function DriverOrdersScreen() {
                   <Text style={s.navBtnText}>اتجاهات</Text>
                 </TouchableOpacity>
               </View>
-              {addr && ['assigned', 'picked_up'].includes(item.status) && (
+              {addr && ['assigned', 'arrived', 'picked_up'].includes(item.status) && (
                 <>
                   <Text style={s.addressDetail}>
                     {[addr.building && `مبنى ${addr.building}`, addr.floor && `ط${addr.floor}`, addr.apartment && `ش${addr.apartment}`].filter(Boolean).join(' - ')}
@@ -447,6 +450,7 @@ export default function DriverOrdersScreen() {
           {([
             { key: 'all' as const, label: 'الكل', count: pickupOrders.length },
             { key: 'assigned' as const, label: 'بانتظار', count: pickupOrders.filter(o => o.status === 'assigned').length },
+            { key: 'arrived' as const, label: 'وصل', count: pickupOrders.filter(o => o.status === 'arrived').length },
             { key: 'picked_up' as const, label: 'للمغسلة', count: pickupOrders.filter(o => o.status === 'picked_up').length },
           ]).filter(f => f.count > 0 || f.key === 'all').map(f => (
             <TouchableOpacity key={f.key} onPress={() => setPickupSub(f.key)}

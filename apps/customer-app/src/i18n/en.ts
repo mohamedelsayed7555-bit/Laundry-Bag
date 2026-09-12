@@ -91,6 +91,7 @@ export default {
   statusScheduled: 'Scheduled',
   statusPending: 'Pending',
   statusAssigned: 'Driver Assigned',
+  statusArrived: 'Driver Arrived',
   statusPickedUp: 'Picked Up',
   statusProcessing: 'Processing',
   statusReady: 'Ready',

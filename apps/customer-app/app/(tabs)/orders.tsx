@@ -10,7 +10,7 @@ import { useRealtimeOrders } from '../../src/hooks/useRealtimeOrders'
 import { SkeletonOrderCard } from '../../src/components/Skeleton'
 import { Phone, MessageCircle } from 'lucide-react-native'
 
-const statusFlow = ['pending', 'assigned', 'picked_up', 'processing', 'ready', 'delivering', 'delivered']
+const statusFlow = ['pending', 'assigned', 'arrived', 'picked_up', 'processing', 'ready', 'delivering', 'delivered']
 
 const statusColors: Record<string, string> = {
   scheduled: '#a855f7', pending: '#f59e0b', assigned: '#3b82f6', picked_up: '#8b5cf6', processing: '#06b6d4',
@@ -87,7 +87,7 @@ export default function OrdersScreen() {
 
   const onRefresh = () => { setRefreshing(true); loadOrders() }
 
-  const activeStatuses = ['scheduled', 'pending', 'assigned', 'picked_up', 'processing', 'ready', 'delivering']
+  const activeStatuses = ['scheduled', 'pending', 'assigned', 'arrived', 'picked_up', 'processing', 'ready', 'delivering']
   const filteredOrders = orders.filter(o => {
     if (tab === 'active') return activeStatuses.includes(o.status)
     if (!['delivered', 'cancelled'].includes(o.status)) return false

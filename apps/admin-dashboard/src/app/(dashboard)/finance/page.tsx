@@ -237,7 +237,7 @@ export default function FinancePage() {
       if (item._source !== 'order') return null
       const isCancelled = ['cancelled', 'refunded'].includes(item.status)
       const canConfirm = item.payment_status === 'pending' && !isCancelled
-      const canRefund = item.payment_status === 'confirmed' && ['visa', 'e_wallet', 'wallet', 'instapay'].includes(item.payment_method) && ['pending', 'assigned', 'picked_up', 'cancelled'].includes(item.status)
+      const canRefund = item.payment_status === 'confirmed' && ['visa', 'e_wallet', 'wallet', 'instapay'].includes(item.payment_method) && ['pending', 'assigned', 'arrived', 'picked_up', 'cancelled'].includes(item.status)
       return (
         <div className="flex gap-1.5">
           {canConfirm && (

@@ -44,7 +44,7 @@ function buildTrackingMapHTML(driverLat: number, driverLng: number, customerLat?
 </body></html>`
 }
 
-const steps = ['pending', 'assigned', 'picked_up', 'processing', 'ready', 'delivering', 'delivered']
+const steps = ['pending', 'assigned', 'arrived', 'picked_up', 'processing', 'ready', 'delivering', 'delivered']
 
 export default function OrderDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -59,11 +59,12 @@ export default function OrderDetailsScreen() {
     pending:    { label: t('statusPending'),    color: '#f59e0b', icon: '⏳', step: 0 },
     scheduled:  { label: t('statusScheduled'),  color: '#a855f7', icon: '📅', step: 0 },
     assigned:   { label: t('statusAssigned'),   color: '#3b82f6', icon: '🚗', step: 1 },
-    picked_up:  { label: t('statusPickedUp'),   color: '#8b5cf6', icon: '📦', step: 2 },
-    processing: { label: t('statusProcessing'), color: '#06b6d4', icon: '🔄', step: 3 },
-    ready:      { label: t('statusReady'),      color: '#10b981', icon: '✅', step: 4 },
-    delivering: { label: t('statusDelivering'), color: '#8b5cf6', icon: '🛵', step: 5 },
-    delivered:  { label: t('statusDelivered'),  color: '#10b981', icon: '🎉', step: 6 },
+    arrived:    { label: t('statusArrived') || 'وصل السائق', color: '#6366f1', icon: '📍', step: 2 },
+    picked_up:  { label: t('statusPickedUp'),   color: '#8b5cf6', icon: '📦', step: 3 },
+    processing: { label: t('statusProcessing'), color: '#06b6d4', icon: '🔄', step: 4 },
+    ready:      { label: t('statusReady'),      color: '#10b981', icon: '✅', step: 5 },
+    delivering: { label: t('statusDelivering'), color: '#8b5cf6', icon: '🛵', step: 6 },
+    delivered:  { label: t('statusDelivered'),  color: '#10b981', icon: '🎉', step: 7 },
     cancelled:  { label: t('statusCancelled'),  color: '#ef4444', icon: '❌', step: -1 },
   }
 
@@ -95,7 +96,7 @@ export default function OrderDetailsScreen() {
   }, [id])
 
   useEffect(() => {
-    if (!order?.driver_id || !['assigned', 'picked_up', 'delivering'].includes(order?.status)) {
+    if (!order?.driver_id || !['assigned', 'arrived', 'picked_up', 'delivering'].includes(order?.status)) {
       setDriverLoc(null)
       return
     }
@@ -302,7 +303,7 @@ export default function OrderDetailsScreen() {
         </View>
       )}
 
-      {driverLoc && ['assigned', 'picked_up', 'delivering'].includes(order.status) && (
+      {driverLoc && ['assigned', 'arrived', 'picked_up', 'delivering'].includes(order.status) && (
         <TouchableOpacity
           style={s.trackingCard}
           activeOpacity={0.8}

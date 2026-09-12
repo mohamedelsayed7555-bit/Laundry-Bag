@@ -4,6 +4,7 @@ export type OrderStatus =
   | 'pending'
   | 'scheduled'
   | 'assigned'
+  | 'arrived'
   | 'picked_up'
   | 'processing'
   | 'ready'
@@ -229,7 +230,8 @@ export interface PaginatedResponse<T> {
 export const ORDER_STATUS_FLOW: Record<OrderStatus, OrderStatus[]> = {
   pending: ['assigned', 'cancelled'],
   scheduled: ['pending', 'cancelled'],
-  assigned: ['picked_up', 'cancelled'],
+  assigned: ['arrived', 'cancelled'],
+  arrived: ['picked_up', 'cancelled'],
   picked_up: ['processing', 'cancelled'],
   processing: ['ready'],
   ready: ['delivering'],
@@ -239,7 +241,7 @@ export const ORDER_STATUS_FLOW: Record<OrderStatus, OrderStatus[]> = {
   refunded: [],
 }
 
-export const CANCELLABLE_STATUSES: OrderStatus[] = ['pending', 'assigned', 'picked_up', 'scheduled']
+export const CANCELLABLE_STATUSES: OrderStatus[] = ['pending', 'assigned', 'arrived', 'picked_up', 'scheduled']
 
 export const SERVICE_TYPE_LABELS: Record<ServiceType, string> = {
   wash: 'غسيل',
@@ -252,6 +254,7 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   pending: 'في الانتظار',
   scheduled: 'مجدول',
   assigned: 'تم التعيين',
+  arrived: 'وصل السائق',
   picked_up: 'تم الاستلام',
   processing: 'جاري المعالجة',
   ready: 'جاهز',

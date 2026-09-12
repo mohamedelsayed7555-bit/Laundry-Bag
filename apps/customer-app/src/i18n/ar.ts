@@ -90,6 +90,7 @@ export default {
   statusScheduled: 'مجدول',
   statusPending: 'في الانتظار',
   statusAssigned: 'تم تعيين سائق',
+  statusArrived: 'وصل السائق',
   statusPickedUp: 'تم الاستلام',
   statusProcessing: 'جاري المعالجة',
   statusReady: 'جاهز',

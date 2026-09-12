@@ -26,17 +26,17 @@ import { ORDER_STATUS_LABELS, SERVICE_TYPE_LABELS } from '@cleano/shared-types'
 import type { OrderStatus, ServiceType } from '@cleano/shared-types'
 
 const statusVariant: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'purple'> = {
-  scheduled: 'purple', pending: 'warning', assigned: 'info', picked_up: 'purple', processing: 'info',
+  scheduled: 'purple', pending: 'warning', assigned: 'info', arrived: 'info', picked_up: 'purple', processing: 'info',
   ready: 'success', delivering: 'purple', delivered: 'success', cancelled: 'danger', refunded: 'neutral',
 }
 
 const statusFlow: Record<string, string> = {
-  scheduled: 'pending', pending: 'assigned', assigned: 'picked_up', picked_up: 'processing',
+  scheduled: 'pending', pending: 'assigned', assigned: 'arrived', arrived: 'picked_up', picked_up: 'processing',
   processing: 'ready', ready: 'delivering', delivering: 'delivered',
 }
 
 const walkinStatusFlow: Record<string, string> = {
-  pending: 'processing', assigned: 'processing', picked_up: 'processing',
+  pending: 'processing', assigned: 'processing', arrived: 'processing', picked_up: 'processing',
   processing: 'ready', ready: 'delivered',
 }
 
@@ -161,7 +161,7 @@ export default function OrdersPage() {
       const { data: order } = await supabase.from('orders').select('customer_id, order_number').eq('id', orderId).single()
       if (!order) return
       const msgs: Record<string, string> = {
-        assigned: 'تم تعيين سائق لطلبك', picked_up: 'تم استلام ملابسك', processing: 'ملابسك قيد المعالجة',
+        assigned: 'تم تعيين سائق لطلبك', arrived: 'السائق وصل موقعك', picked_up: 'تم استلام ملابسك', processing: 'ملابسك قيد المعالجة',
         ready: 'ملابسك جاهزة للتوصيل!', delivering: 'السائق في طريقه إليك', delivered: 'تم توصيل طلبك بنجاح!', cancelled: 'تم إلغاء طلبك',
       }
       if (!msgs[newStatus]) return
@@ -190,7 +190,7 @@ export default function OrdersPage() {
     const flow = isWalkin ? walkinStatusFlow : statusFlow
     const next = flow[order.status]
     if (!next) return
-    const needsDriver = ['assigned', 'picked_up', 'processing', 'ready', 'delivering', 'delivered']
+    const needsDriver = ['assigned', 'arrived', 'picked_up', 'processing', 'ready', 'delivering', 'delivered']
     if (!isWalkin && needsDriver.includes(next) && !order.driver_id) {
       toast('لا يمكن تقديم الحالة — الطلب بدون سائق معين', 'error'); return
     }
@@ -320,7 +320,7 @@ export default function OrdersPage() {
     } else { console.error('Order insert error:', error); toast('حدث خطأ', 'error') }
   }
 
-  const allStatuses = ['all', 'scheduled', 'pending', 'assigned', 'picked_up', 'processing', 'ready', 'delivering', 'delivered', 'cancelled']
+  const allStatuses = ['all', 'scheduled', 'pending', 'assigned', 'arrived', 'picked_up', 'processing', 'ready', 'delivering', 'delivered', 'cancelled']
   const totalPages = Math.ceil(totalCount / PAGE_SIZE)
   const filtered = useMemo(() => orders.filter(o => {
     if (!search) return true

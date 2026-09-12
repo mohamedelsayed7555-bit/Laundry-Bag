@@ -40,6 +40,7 @@ function buildFullTrackingMapHTML(driverLat: number, driverLng: number, customer
 
 const statusLabels: Record<string, { ar: string; en: string }> = {
   assigned: { ar: 'في الطريق للاستلام', en: 'On the way to pick up' },
+  arrived: { ar: 'السائق وصل موقعك', en: 'Driver arrived at your location' },
   picked_up: { ar: 'تم استلام الطلب', en: 'Order picked up' },
   delivering: { ar: 'في الطريق إليك', en: 'On the way to you' },
 }
@@ -67,7 +68,7 @@ export default function TrackingScreen() {
   }, [orderId])
 
   useEffect(() => {
-    if (!order?.driver_id || !['assigned', 'picked_up', 'delivering'].includes(order?.status)) {
+    if (!order?.driver_id || !['assigned', 'arrived', 'picked_up', 'delivering'].includes(order?.status)) {
       setDriverLoc(null)
       return
     }
@@ -127,7 +128,7 @@ export default function TrackingScreen() {
     : null
   const etaMinutes = distanceKm !== null ? Math.max(1, Math.round(distanceKm / 0.5)) : null
 
-  const showMap = driverLoc && ['assigned', 'picked_up', 'delivering'].includes(order?.status)
+  const showMap = driverLoc && ['assigned', 'arrived', 'picked_up', 'delivering'].includes(order?.status)
 
   return (
     <View style={s.container}>
