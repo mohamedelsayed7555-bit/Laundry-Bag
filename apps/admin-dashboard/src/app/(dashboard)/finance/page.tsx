@@ -169,11 +169,12 @@ export default function FinancePage() {
 
   async function markPaid(id: string) {
     const row = rows.find(r => r.id === id)
+    const total = row?._amount ?? 0
     const deliveryFee = Number(row?.delivery_fee) || 0
-    const paidAmount = (row?._amount ?? 0) - deliveryFee
+    const paidAmount = total - deliveryFee
     setConfirmModal(null)
     setRows(prev => prev.map(r => r.id === id ? { ...r, payment_status: 'confirmed' } : r))
-    setStats(prev => ({ ...prev, paid: prev.paid + paidAmount, unpaid: Math.max(0, prev.unpaid - paidAmount) }))
+    setStats(prev => ({ ...prev, paid: prev.paid + paidAmount, unpaid: Math.max(0, prev.unpaid - total), deliveryFees: prev.deliveryFees + deliveryFee }))
     toast('تم تأكيد الدفع بنجاح')
     const { error } = await supabase.from('orders').update({ payment_status: 'confirmed' }).eq('id', id)
     if (error) { toast('حدث خطأ — جاري التحديث', 'error'); load() }
