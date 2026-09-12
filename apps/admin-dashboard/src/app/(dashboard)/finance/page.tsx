@@ -180,11 +180,12 @@ export default function FinancePage() {
 
   async function markRefunded(id: string) {
     const row = rows.find(r => r.id === id)
-    const amount = row?._amount ?? 0
+    const deliveryFee = Number(row?.delivery_fee) || 0
+    const refundAmount = (row?._amount ?? 0) - deliveryFee
     setConfirmModal(null)
     setRows(prev => prev.map(r => r.id === id ? { ...r, payment_status: 'refunded', status: 'refunded' } : r))
-    setStats(prev => ({ ...prev, revenue: prev.revenue - amount, paid: prev.paid - amount }))
-    toast('تم استرداد المبلغ بنجاح')
+    setStats(prev => ({ ...prev, revenue: prev.revenue - refundAmount, paid: prev.paid - refundAmount }))
+    toast(`تم استرداد ${refundAmount.toFixed(2)} ج.م (بدون رسوم التوصيل)`)
     const { error } = await supabase.from('orders').update({ payment_status: 'refunded', status: 'refunded' }).eq('id', id)
     if (error) { toast('حدث خطأ — جاري التحديث', 'error'); load() }
   }
@@ -234,7 +235,7 @@ export default function FinancePage() {
       if (item._source !== 'order') return null
       const isCancelled = ['cancelled', 'refunded'].includes(item.status)
       const canConfirm = item.payment_status === 'pending' && !isCancelled
-      const canRefund = item.payment_status === 'confirmed' && ['visa', 'e_wallet', 'wallet'].includes(item.payment_method) && ['pending', 'assigned', 'picked_up', 'cancelled'].includes(item.status)
+      const canRefund = item.payment_status === 'confirmed' && ['visa', 'e_wallet', 'wallet', 'instapay'].includes(item.payment_method) && ['pending', 'assigned', 'picked_up', 'cancelled'].includes(item.status)
       return (
         <div className="flex gap-1.5">
           {canConfirm && (
@@ -246,7 +247,7 @@ export default function FinancePage() {
           )}
           {canRefund && (
             <Tooltip content="استرداد المبلغ">
-              <button onClick={() => setConfirmModal({ type: 'refund', id: item.id, amount: item._amount, orderNumber: item.order_number })} className="text-[11px] bg-red-50 text-red-600 px-3 py-1.5 rounded-lg font-medium hover:bg-red-100 transition-colors">
+              <button onClick={() => setConfirmModal({ type: 'refund', id: item.id, amount: item._amount - (Number(item.delivery_fee) || 0), orderNumber: item.order_number })} className="text-[11px] bg-red-50 text-red-600 px-3 py-1.5 rounded-lg font-medium hover:bg-red-100 transition-colors">
                 استرداد
               </button>
             </Tooltip>
