@@ -137,7 +137,7 @@ export default function OrderDetailsScreen() {
   }
 
   async function handleCancel() {
-    const driverArrived = ['picked_up'].includes(order.status)
+    const driverArrived = ['arrived', 'picked_up'].includes(order.status)
     const fee = driverArrived ? Number(order.delivery_fee ?? 0) : 0
 
     const message = driverArrived
