@@ -77,6 +77,7 @@ export default function PlansScreen() {
   const [walletPhone, setWalletPhone] = useState('')
   const [refreshing, setRefreshing] = useState(false)
   const [serviceFilter, setServiceFilter] = useState('all')
+  const [instapayNumber, setInstapayNumber] = useState('')
   const [selectedPlanForSubscribe, setSelectedPlanForSubscribe] = useState<Plan | null>(null)
   const scrollRef = useRef<ScrollView>(null)
   const settingsY = useRef(0)
@@ -113,7 +114,7 @@ export default function PlansScreen() {
 
   async function loadData() {
     const results = await Promise.all([
-      supabase.from('settings').select('key, value').in('key', ['discount_quarterly', 'discount_biannual', 'discount_annual']),
+      supabase.from('settings').select('key, value').in('key', ['discount_quarterly', 'discount_biannual', 'discount_annual', 'instapay_number']),
       supabase.from('plans')
         .select('id, name, description, tier, items_per_month, includes_all_services, covered_services, monthly_price, quarterly_price, biannual_price, annual_price, is_active')
         .eq('is_active', true)
@@ -130,6 +131,7 @@ export default function PlansScreen() {
         if (s.key === 'discount_quarterly') rates.quarterly = Number(s.value) || 10
         if (s.key === 'discount_biannual') rates.biannual = Number(s.value) || 15
         if (s.key === 'discount_annual') rates.annual = Number(s.value) || 20
+        if (s.key === 'instapay_number') setInstapayNumber(String(s.value))
       })
       setDiscountRates(rates)
     }
@@ -196,8 +198,8 @@ export default function PlansScreen() {
     showAlert({
       title: `${locale === 'en' ? 'Subscribe' : 'اشتراك'} ${planName(plan.name)}`,
       message: locale === 'en'
-        ? `Duration: ${durLabel}\nPrice: ${price} EGP\n${plan.items_per_month} items/month\nPayment: ${paymentMethods.find(p => p.key === selectedPayment)?.labelEn}\nAuto-renew: ${autoRenew ? 'Yes' : 'No'}\n\n${selectedPayment === 'instapay' ? 'Your request will be reviewed after payment confirmation' : 'Your subscription will be activated automatically after payment'}`
-        : `المدة: ${durLabel}\nالسعر: ${price} ج.م\n${plan.items_per_month} قطعة/شهر\nطريقة الدفع: ${paymentMethods.find(p => p.key === selectedPayment)?.label}\nتجديد تلقائي: ${autoRenew ? 'نعم' : 'لا'}\n\n${selectedPayment === 'instapay' ? 'سيتم مراجعة طلبك وتفعيله من الإدارة بعد تأكيد الدفع' : 'سيتم تفعيل اشتراكك تلقائياً بعد نجاح الدفع'}`,
+        ? `Duration: ${durLabel}\nPrice: ${price} EGP\n${plan.items_per_month} items/month\nPayment: ${paymentMethods.find(p => p.key === selectedPayment)?.labelEn}\nAuto-renew: ${autoRenew ? 'Yes' : 'No'}\n\n${selectedPayment === 'instapay' ? `Send ${price} EGP to InstaPay number:\n${instapayNumber}\n\nYour subscription will be activated after admin confirms payment.` : 'Your subscription will be activated automatically after payment'}`
+        : `المدة: ${durLabel}\nالسعر: ${price} ج.م\n${plan.items_per_month} قطعة/شهر\nطريقة الدفع: ${paymentMethods.find(p => p.key === selectedPayment)?.label}\nتجديد تلقائي: ${autoRenew ? 'نعم' : 'لا'}\n\n${selectedPayment === 'instapay' ? `حوّل ${price} ج.م على رقم إنستاباي:\n${instapayNumber}\n\nسيتم تفعيل اشتراكك بعد تأكيد الدفع من الإدارة.` : 'سيتم تفعيل اشتراكك تلقائياً بعد نجاح الدفع'}`,
       type: 'confirm',
       buttons: [
         { text: locale === 'en' ? 'Cancel' : 'إلغاء', style: 'cancel' },
@@ -240,7 +242,7 @@ export default function PlansScreen() {
               }
             } else {
               setSubscribing(false)
-              showAlert({ title: locale === 'en' ? 'Done' : 'تم', message: locale === 'en' ? 'Subscription request sent! It will be activated after admin confirms your payment.' : 'تم إرسال طلب الاشتراك! سيتم تفعيله بعد تأكيد الدفع من الإدارة.', type: 'success', buttons: [{ text: t('ok'), onPress: () => loadData() }] })
+              showAlert({ title: locale === 'en' ? 'Done' : 'تم', message: selectedPayment === 'instapay' ? (locale === 'en' ? `Subscription request sent!\n\nPlease send ${price} EGP to InstaPay number:\n${instapayNumber}\n\nYour subscription will be activated after payment confirmation.` : `تم إرسال طلب الاشتراك!\n\nحوّل ${price} ج.م على رقم إنستاباي:\n${instapayNumber}\n\nسيتم تفعيل اشتراكك بعد تأكيد الدفع من الإدارة.`) : (locale === 'en' ? 'Subscription request sent! It will be activated after admin confirms your payment.' : 'تم إرسال طلب الاشتراك! سيتم تفعيله بعد تأكيد الدفع من الإدارة.'), type: 'success', buttons: [{ text: t('ok'), onPress: () => loadData() }] })
             }
           },
         },
