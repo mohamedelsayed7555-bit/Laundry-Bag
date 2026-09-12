@@ -72,7 +72,7 @@ export default function FinancePage() {
       setStats({
         revenue: (Number(s.order_revenue) || 0) + (Number(s.subs_revenue) || 0),
         paid: Number(s.order_paid) || 0,
-        unpaid: Math.max(0, (Number(s.order_revenue) || 0) - (Number(s.order_paid) || 0)),
+        unpaid: Math.max(0, (Number(s.order_revenue) || 0) - (Number(s.delivery_fees) || 0) - (Number(s.order_paid) || 0)),
         ordersCount: Number(s.orders_count) || 0,
         subsRevenue: Number(s.subs_revenue) || 0,
         subsCount: Number(s.subs_count) || 0,
