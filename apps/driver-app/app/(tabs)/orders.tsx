@@ -443,18 +443,18 @@ export default function DriverOrdersScreen() {
       </Animated.View>
 
       {filter === 'pickup' && pickupOrders.length > 0 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }} contentContainerStyle={s.subFilterRow}>
+        <View style={s.subFilterRow}>
           {([
             { key: 'all' as const, label: 'الكل', count: pickupOrders.length },
-            { key: 'assigned' as const, label: '📋 بانتظار', count: pickupOrders.filter(o => o.status === 'assigned').length },
-            { key: 'picked_up' as const, label: '📦 للمغسلة', count: pickupOrders.filter(o => o.status === 'picked_up').length },
+            { key: 'assigned' as const, label: 'بانتظار', count: pickupOrders.filter(o => o.status === 'assigned').length },
+            { key: 'picked_up' as const, label: 'للمغسلة', count: pickupOrders.filter(o => o.status === 'picked_up').length },
           ]).filter(f => f.count > 0 || f.key === 'all').map(f => (
             <TouchableOpacity key={f.key} onPress={() => setPickupSub(f.key)}
-              style={[s.subFilterBtn, pickupSub === f.key && s.subFilterBtnActive]}>
+              style={[s.subFilterBtn, { flex: 1 }, pickupSub === f.key && s.subFilterBtnActive]}>
               <Text style={[s.subFilterText, pickupSub === f.key && s.subFilterTextActive]}>{f.label} ({f.count})</Text>
             </TouchableOpacity>
           ))}
-        </ScrollView>
+        </View>
       )}
 
       {filter === 'completed' && (
@@ -631,9 +631,9 @@ const s = StyleSheet.create({
   emptyText: { fontSize: 14, color: colors.navy[300] },
   emptyHint: { fontSize: 12, color: colors.navy[400], marginTop: 8, textAlign: 'center' },
 
-  subFilterRow: { flexDirection: 'row', gap: 6 },
+  subFilterRow: { flexDirection: 'row', gap: 6, marginBottom: 10 },
   subFilterBtn: {
-    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10,
+    paddingHorizontal: 8, paddingVertical: 7, borderRadius: 10, alignItems: 'center',
     backgroundColor: colors.navy[800], borderWidth: 1, borderColor: colors.navy[700],
   },
   subFilterBtnActive: { backgroundColor: colors.primary + '20', borderColor: colors.primary },
