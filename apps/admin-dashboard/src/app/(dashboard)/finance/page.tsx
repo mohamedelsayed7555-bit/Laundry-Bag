@@ -72,7 +72,7 @@ export default function FinancePage() {
       setStats({
         revenue: (Number(s.order_revenue) || 0) + (Number(s.subs_revenue) || 0),
         paid: Number(s.order_paid) || 0,
-        unpaid: Math.max(0, (Number(s.order_revenue) || 0) - (Number(s.delivery_fees) || 0) - (Number(s.order_paid) || 0)),
+        unpaid: Number(s.order_unpaid) || 0,
         ordersCount: Number(s.orders_count) || 0,
         subsRevenue: Number(s.subs_revenue) || 0,
         subsCount: Number(s.subs_count) || 0,
@@ -169,10 +169,11 @@ export default function FinancePage() {
 
   async function markPaid(id: string) {
     const row = rows.find(r => r.id === id)
-    const amount = row?._amount ?? 0
+    const deliveryFee = Number(row?.delivery_fee) || 0
+    const paidAmount = (row?._amount ?? 0) - deliveryFee
     setConfirmModal(null)
     setRows(prev => prev.map(r => r.id === id ? { ...r, payment_status: 'confirmed' } : r))
-    setStats(prev => ({ ...prev, paid: prev.paid + amount, unpaid: Math.max(0, prev.unpaid - amount) }))
+    setStats(prev => ({ ...prev, paid: prev.paid + paidAmount, unpaid: Math.max(0, prev.unpaid - paidAmount) }))
     toast('تم تأكيد الدفع بنجاح')
     const { error } = await supabase.from('orders').update({ payment_status: 'confirmed' }).eq('id', id)
     if (error) { toast('حدث خطأ — جاري التحديث', 'error'); load() }
