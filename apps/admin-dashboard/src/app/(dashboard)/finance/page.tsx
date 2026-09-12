@@ -91,7 +91,8 @@ export default function FinancePage() {
 
     let sQuery = supabase.from('subscriptions')
       .select('id, status, total_paid, created_at, user:users!subscriptions_user_id_fkey(name, customer_code), plan:plans(name)')
-      .not('status', 'eq', 'pending')
+      .in('status', ['active', 'expired', 'upgraded', 'cancelled'])
+      .not('start_date', 'is', null)
       .order('created_at', { ascending: false })
       .limit(200)
     if (from) sQuery = sQuery.gte('created_at', from)

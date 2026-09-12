@@ -12,6 +12,7 @@ export default {
   back: 'Back',
   retry: 'Retry',
   close: 'Close',
+  order: 'Order',
 
   // Auth
   login: 'Sign In',
@@ -297,6 +298,9 @@ export default {
   'cat:مفروشات': 'Bedding & Linen',
   'cat:بطاطين': 'Blankets',
   'cat:أخرى': 'Other',
+  'cat:تفصيل وتعديلات': 'Tailoring & Alterations',
+  'cat:سجاد وبطاطين': 'Carpets & Blankets',
+  'cat:ملابس ': 'Clothes',
 
   // Item types (DB names → English)
   'item:تيشيرت': 'T-Shirt',

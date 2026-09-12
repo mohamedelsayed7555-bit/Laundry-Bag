@@ -25,6 +25,7 @@ export default function ChatScreen() {
   const [sending, setSending] = useState(false)
   const [otherName, setOtherName] = useState('العميل')
   const [orderStatus, setOrderStatus] = useState<string | null>(null)
+  const [orderNumber, setOrderNumber] = useState<string | null>(null)
   const flatListRef = useRef<FlatList>(null)
 
   const chatClosed = orderStatus !== null && closedStatuses.includes(orderStatus)
@@ -41,13 +42,13 @@ export default function ChatScreen() {
         .limit(200),
       supabase
         .from('orders')
-        .select('status')
+        .select('status, order_number')
         .eq('id', orderId)
         .single(),
     ])
 
     setMessages(data ?? [])
-    if (orderData) setOrderStatus(orderData.status)
+    if (orderData) { setOrderStatus(orderData.status); setOrderNumber(orderData.order_number) }
 
     const unread = (data ?? []).filter(m => m.receiver_id === profile.id && !m.read_at)
     if (unread.length > 0) {
@@ -148,7 +149,7 @@ export default function ChatScreen() {
         </TouchableOpacity>
         <View style={s.headerInfo}>
           <Text style={s.headerName}>{otherName}</Text>
-          <Text style={s.headerSub}>طلب #{orderId?.slice(0, 8)}</Text>
+          <Text style={s.headerSub}>طلب #{orderNumber ?? orderId?.slice(0, 8)}</Text>
         </View>
         {chatClosed && (
           <View style={s.closedBadge}>

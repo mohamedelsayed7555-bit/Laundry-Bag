@@ -13,6 +13,7 @@ type Conversation = {
   last_message: string
   last_time: string
   unread: number
+  order_number: string
 }
 
 export default function MessagesScreen() {
@@ -118,7 +119,7 @@ export default function MessagesScreen() {
                   <Text style={[s.convoName, item.unread > 0 && { color: '#fff' }]}>{item.other_name}</Text>
                   <Text style={s.convoTime}>{timeAgo(item.last_time)}</Text>
                 </View>
-                <Text style={s.convoOrderId} numberOfLines={1}>طلب #{item.order_id.slice(0, 8)}</Text>
+                <Text style={s.convoOrderId} numberOfLines={1}>طلب #{item.order_number || item.order_id.slice(0, 8)}</Text>
                 <Text style={[s.convoLastMsg, item.unread > 0 && { color: colors.navy[100] }]} numberOfLines={1}>{item.last_message}</Text>
               </View>
               {item.unread > 0 && (

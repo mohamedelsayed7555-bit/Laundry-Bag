@@ -18,6 +18,7 @@ const statusVariant: Record<string, 'success' | 'warning' | 'danger' | 'info' | 
   cancelled: 'danger',
   expired: 'neutral',
   paused: 'info',
+  upgraded: 'info',
 }
 
 const statusLabels: Record<string, string> = {
@@ -26,6 +27,7 @@ const statusLabels: Record<string, string> = {
   cancelled: 'ملغي',
   expired: 'منتهي',
   paused: 'متوقف',
+  upgraded: 'تمت الترقية',
 }
 
 const durationLabels: Record<string, string> = {

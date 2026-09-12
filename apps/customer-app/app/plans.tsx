@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, RefreshControl } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, RefreshControl, Dimensions, FlatList, Animated } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../src/contexts/AuthContext'
 import { useTheme } from '../src/contexts/ThemeContext'
@@ -65,6 +65,8 @@ export default function PlansScreen() {
   const [plans, setPlans] = useState<Plan[]>([])
   const [activeSubs, setActiveSubs] = useState<(Subscription & { plan_name?: string })[]>([])
   const [pendingSubs, setPendingSubs] = useState<(Subscription & { plan_name?: string })[]>([])
+  const [activeSubIdx, setActiveSubIdx] = useState(0)
+  const scrollArrowAnim = useRef(new Animated.Value(0)).current
   const [loading, setLoading] = useState(true)
   const [selectedDuration, setSelectedDuration] = useState('monthly')
   const [subscribing, setSubscribing] = useState(false)
@@ -81,6 +83,19 @@ export default function PlansScreen() {
   useEffect(() => {
     loadData()
   }, [profile])
+
+  useEffect(() => {
+    if (activeSubs.length > 1) {
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(scrollArrowAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+          Animated.timing(scrollArrowAnim, { toValue: 0, duration: 800, useNativeDriver: true }),
+        ])
+      )
+      loop.start()
+      return () => loop.stop()
+    }
+  }, [activeSubs.length])
 
   async function onRefresh() {
     setRefreshing(true)
@@ -286,59 +301,98 @@ export default function PlansScreen() {
         </View>
       ))}
 
-      {activeSubs.map(sub => {
-        const remaining = Math.max(0, sub.items_limit - sub.items_used)
-        const exhausted = sub.items_used >= sub.items_limit
-        const usagePercent = Math.min(100, (sub.items_used / sub.items_limit) * 100)
-        return (
-        <View key={sub.id} style={[s.activeSubCard, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '40' }]}>
-          <View style={s.activeSubHeader}>
-            <Text style={[s.activeSubBadge, { color: colors.primary }]}>{locale === 'en' ? 'Active subscription ✓' : 'اشتراك نشط ✓'}</Text>
-          </View>
-          <Text style={[s.activeSubName, { color: colors.text }]}>{planName(sub.plan_name ?? '')}</Text>
-
-          {exhausted && (
-            <View style={[s.exhaustedBanner, { backgroundColor: colors.danger + '15', borderColor: colors.danger + '30' }]}>
-              <Text style={[s.exhaustedText, { color: colors.danger }]}>
-                {locale === 'en' ? '⚠️ Your plan items are used up! New orders will be at regular prices.' : '⚠️ رصيد باقتك خلص! الطلبات الجديدة هتكون بأسعار عادية.'}
-              </Text>
+      {activeSubs.length > 0 && (() => {
+        const cardWidth = Dimensions.get('window').width - 40
+        const renderSubCard = (sub: typeof activeSubs[0]) => {
+          const remaining = Math.max(0, sub.items_limit - sub.items_used)
+          const exhausted = sub.items_used >= sub.items_limit
+          const usagePercent = Math.min(100, (sub.items_used / sub.items_limit) * 100)
+          return (
+          <View style={[s.activeSubCard, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '40', width: cardWidth }]}>
+            <View style={s.activeSubHeader}>
+              <Text style={[s.activeSubBadge, { color: colors.primary }]}>{locale === 'en' ? 'Active subscription ✓' : 'اشتراك نشط ✓'}</Text>
             </View>
-          )}
+            <Text style={[s.activeSubName, { color: colors.text }]}>{planName(sub.plan_name ?? '')}</Text>
 
-          <View style={s.progressRow}>
-            <Text style={[s.progressLabel, { color: colors.navy[200] }]}>{locale === 'en' ? 'Items used' : 'القطع المستخدمة'}</Text>
-            <Text style={[s.progressValue, { color: exhausted ? colors.danger : colors.text }]}>{sub.items_used} / {sub.items_limit}</Text>
-          </View>
-          <View style={s.progressRow}>
-            <Text style={[s.progressLabel, { color: colors.navy[200] }]}>{locale === 'en' ? 'Remaining' : 'المتبقي'}</Text>
-            <Text style={[s.progressValue, { color: exhausted ? colors.danger : colors.success }]}>{remaining} {locale === 'en' ? 'items' : 'قطعة'}</Text>
-          </View>
-          <View style={[s.progressBar, { backgroundColor: colors.navy[700] }]}>
-            <View style={[s.progressFill, { backgroundColor: exhausted ? colors.danger : colors.primary, width: `${usagePercent}%` }]} />
-          </View>
-          <View style={s.subDetailRow}>
-            <Text style={[s.subDetailLabel, { color: colors.navy[300] }]}>{locale === 'en' ? 'Expires' : 'ينتهي في'}</Text>
-            <Text style={[s.subDetailValue, { color: colors.text }]}>{sub.end_date}</Text>
-          </View>
-          <TouchableOpacity style={s.subDetailRow} onPress={async () => {
-            const newVal = !sub.auto_renew
-            await supabase.from('subscriptions').update({ auto_renew: newVal }).eq('id', sub.id)
-            setActiveSubs(prev => prev.map(s => s.id === sub.id ? { ...s, auto_renew: newVal } : s))
-          }}>
-            <Text style={[s.subDetailLabel, { color: colors.navy[300] }]}>{locale === 'en' ? 'Auto-renew' : 'تجديد تلقائي'}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Text style={[s.subDetailValue, { color: colors.text }]}>{sub.auto_renew ? (locale === 'en' ? 'On' : 'مفعّل') : (locale === 'en' ? 'Off' : 'متوقف')}</Text>
-              <View style={[s.toggleTrackSmall, { backgroundColor: colors.navy[600] }, sub.auto_renew && { backgroundColor: colors.primary }]}>
-                <View style={[s.toggleThumbSmall, sub.auto_renew && s.toggleThumbActiveSmall]} />
+            {exhausted && (
+              <View style={[s.exhaustedBanner, { backgroundColor: colors.danger + '15', borderColor: colors.danger + '30' }]}>
+                <Text style={[s.exhaustedText, { color: colors.danger }]}>
+                  {locale === 'en' ? '⚠️ Your plan items are used up! New orders will be at regular prices.' : '⚠️ رصيد باقتك خلص! الطلبات الجديدة هتكون بأسعار عادية.'}
+                </Text>
               </View>
+            )}
+
+            <View style={s.progressRow}>
+              <Text style={[s.progressLabel, { color: colors.navy[200] }]}>{locale === 'en' ? 'Items used' : 'القطع المستخدمة'}</Text>
+              <Text style={[s.progressValue, { color: exhausted ? colors.danger : colors.text }]}>{sub.items_used} / {sub.items_limit}</Text>
             </View>
-          </TouchableOpacity>
-          <TouchableOpacity style={[s.cancelSubBtn, { backgroundColor: colors.dangerGlow, borderColor: colors.danger + '30' }]} onPress={() => handleCancelSub(sub)}>
-            <Text style={[s.cancelSubBtnText, { color: colors.danger }]}>{locale === 'en' ? 'Cancel subscription' : 'إلغاء الاشتراك'}</Text>
-          </TouchableOpacity>
-        </View>
+            <View style={s.progressRow}>
+              <Text style={[s.progressLabel, { color: colors.navy[200] }]}>{locale === 'en' ? 'Remaining' : 'المتبقي'}</Text>
+              <Text style={[s.progressValue, { color: exhausted ? colors.danger : colors.success }]}>{remaining} {locale === 'en' ? 'items' : 'قطعة'}</Text>
+            </View>
+            <View style={[s.progressBar, { backgroundColor: colors.navy[700] }]}>
+              <View style={[s.progressFill, { backgroundColor: exhausted ? colors.danger : colors.primary, width: `${usagePercent}%` }]} />
+            </View>
+            <View style={s.subDetailRow}>
+              <Text style={[s.subDetailLabel, { color: colors.navy[300] }]}>{locale === 'en' ? 'Expires' : 'ينتهي في'}</Text>
+              <Text style={[s.subDetailValue, { color: colors.text }]}>{sub.end_date}</Text>
+            </View>
+            <TouchableOpacity style={s.subDetailRow} onPress={async () => {
+              const newVal = !sub.auto_renew
+              await supabase.from('subscriptions').update({ auto_renew: newVal }).eq('id', sub.id)
+              setActiveSubs(prev => prev.map(s => s.id === sub.id ? { ...s, auto_renew: newVal } : s))
+            }}>
+              <Text style={[s.subDetailLabel, { color: colors.navy[300] }]}>{locale === 'en' ? 'Auto-renew' : 'تجديد تلقائي'}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={[s.subDetailValue, { color: colors.text }]}>{sub.auto_renew ? (locale === 'en' ? 'On' : 'مفعّل') : (locale === 'en' ? 'Off' : 'متوقف')}</Text>
+                <View style={[s.toggleTrackSmall, { backgroundColor: colors.navy[600] }, sub.auto_renew && { backgroundColor: colors.primary }]}>
+                  <View style={[s.toggleThumbSmall, sub.auto_renew && s.toggleThumbActiveSmall]} />
+                </View>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.cancelSubBtn, { backgroundColor: colors.dangerGlow, borderColor: colors.danger + '30' }]} onPress={() => handleCancelSub(sub)}>
+              <Text style={[s.cancelSubBtnText, { color: colors.danger }]}>{locale === 'en' ? 'Cancel subscription' : 'إلغاء الاشتراك'}</Text>
+            </TouchableOpacity>
+          </View>
+          )
+        }
+
+        if (activeSubs.length === 1) return <View style={{ marginBottom: 24 }}>{renderSubCard(activeSubs[0])}</View>
+
+        return (
+          <View style={{ marginBottom: 24 }}>
+            <FlatList
+              data={activeSubs}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={item => item.id}
+              snapToInterval={cardWidth + 12}
+              decelerationRate="fast"
+              contentContainerStyle={{ gap: 12 }}
+              renderItem={({ item }) => renderSubCard(item)}
+              onScroll={(e) => {
+                const idx = Math.round(e.nativeEvent.contentOffset.x / (cardWidth + 12))
+                setActiveSubIdx(idx)
+              }}
+              scrollEventThrottle={16}
+            />
+            {activeSubIdx < activeSubs.length - 1 && (
+              <Animated.View style={[s.scrollArrow, locale === 'en' ? { right: 2 } : { left: 2 }, {
+                opacity: scrollArrowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }),
+                transform: [{ translateX: scrollArrowAnim.interpolate({ inputRange: [0, 1], outputRange: locale === 'en' ? [0, 6] : [0, -6] }) }],
+              }]}>
+                <Text style={[s.scrollArrowText, { color: colors.primary }]}>{locale === 'en' ? '›' : '‹'}</Text>
+              </Animated.View>
+            )}
+            <View style={s.dotsRow}>
+              {activeSubs.map((_, i) => (
+                <View key={i} style={[s.dot, { backgroundColor: i === activeSubIdx ? colors.primary : colors.navy[600] }]} />
+              ))}
+            </View>
+          </View>
         )
-      })}
+      })()}
 
       {/* ── Service Filter ── */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }} contentContainerStyle={s.filterRow}>
@@ -516,7 +570,7 @@ export default function PlansScreen() {
                       {
                         text: locale === 'en' ? 'Yes, upgrade' : 'نعم، ترقية',
                         onPress: async () => {
-                          await supabase.from('subscriptions').update({ status: 'cancelled', auto_renew: false }).eq('id', overlappingSub.id)
+                          await supabase.from('subscriptions').update({ status: 'upgraded', auto_renew: false }).eq('id', overlappingSub.id)
                           setActiveSubs(prev => prev.filter(s => s.id !== overlappingSub.id))
                           doSubscribe(selectedPlanForSubscribe)
                         },
@@ -561,7 +615,7 @@ const s = StyleSheet.create({
   pendingSubHint: { fontSize: 12 },
 
   activeSubCard: {
-    borderRadius: 20, padding: 20, marginBottom: 24, borderWidth: 1.5,
+    borderRadius: 20, padding: 20, borderWidth: 1.5,
   },
   activeSubHeader: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 8 },
   activeSubBadge: { fontSize: 12, fontWeight: '700' },
@@ -671,4 +725,8 @@ const s = StyleSheet.create({
     borderWidth: 1, borderRadius: 14, padding: 12, alignItems: 'center', marginTop: 10,
   },
   cancelSubBtnText: { fontSize: 14, fontWeight: '700' },
+  dotsRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 10 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  scrollArrow: { position: 'absolute', top: 80, zIndex: 10 },
+  scrollArrowText: { fontSize: 28, fontWeight: '900' },
 })
