@@ -32,6 +32,7 @@ type Subscription = {
   end_date: string
   auto_renew: boolean
   total_paid: number
+  payment_method?: string
   plan_name?: string
 }
 
@@ -274,30 +275,56 @@ export default function PlansScreen() {
           <Text style={s.pendingSubBadge}>⏳ {locale === 'en' ? 'Pending subscription request' : 'طلب اشتراك قيد المراجعة'}</Text>
           <Text style={[s.pendingSubName, { color: colors.text }]}>{planName(ps.plan_name ?? '')}</Text>
           <Text style={[s.pendingSubHint, { color: colors.navy[300] }]}>{locale === 'en' ? 'Will be activated after admin review and payment confirmation' : 'سيتم تفعيل اشتراكك بعد مراجعة الإدارة وتأكيد الدفع'}</Text>
-          <TouchableOpacity
-            style={{ marginTop: 12, alignSelf: 'center', paddingHorizontal: 20, paddingVertical: 8, borderRadius: 12, borderWidth: 1.5, borderColor: colors.danger + '50' }}
-            onPress={() => {
-              showAlert({
-                title: locale === 'en' ? 'Cancel request' : 'إلغاء الطلب',
-                message: locale === 'en' ? `Cancel your pending request for "${planName(ps.plan_name ?? '')}"?` : `هل تريد إلغاء طلب الاشتراك في "${ps.plan_name}"؟`,
-                type: 'confirm',
-                buttons: [
-                  { text: locale === 'en' ? 'No' : 'لا', style: 'cancel' },
-                  {
-                    text: locale === 'en' ? 'Yes, cancel' : 'نعم، إلغاء',
-                    style: 'destructive',
-                    onPress: async () => {
-                      await supabase.from('subscriptions').update({ status: 'cancelled' }).eq('id', ps.id)
-                      setPendingSubs(prev => prev.filter(p => p.id !== ps.id))
-                      showAlert({ title: locale === 'en' ? 'Done' : 'تم', message: locale === 'en' ? 'Request cancelled' : 'تم إلغاء الطلب', type: 'success' })
+          <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 12, marginTop: 12 }}>
+            {(ps.payment_method === 'visa' || ps.payment_method === 'wallet') && (
+              <TouchableOpacity
+                style={{ paddingHorizontal: 20, paddingVertical: 8, borderRadius: 12, borderWidth: 1.5, borderColor: colors.primary + '50', backgroundColor: colors.primary + '15' }}
+                disabled={subscribing}
+                onPress={async () => {
+                  setSubscribing(true)
+                  const { data: payData, error: payError } = await supabase.functions.invoke('paymob-pay', {
+                    body: {
+                      subscription_id: ps.id,
+                      payment_method: ps.payment_method === 'visa' ? 'card' : 'wallet',
+                      wallet_phone: ps.payment_method === 'wallet' ? profile!.phone : profile!.phone,
                     },
-                  },
-                ],
-              })
-            }}
-          >
-            <Text style={{ color: colors.danger, fontSize: 13, fontWeight: '700' }}>{locale === 'en' ? 'Cancel request' : 'إلغاء الطلب'}</Text>
-          </TouchableOpacity>
+                  })
+                  setSubscribing(false)
+                  if (payError || payData?.error) {
+                    showAlert({ title: locale === 'en' ? 'Error' : 'خطأ', message: payData?.error || (locale === 'en' ? 'Payment failed' : 'فشل في بدء الدفع'), type: 'error' })
+                  } else if (payData?.iframe_url) {
+                    router.push({ pathname: '/payment', params: { url: payData.iframe_url } })
+                  }
+                }}
+              >
+                <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '700' }}>{locale === 'en' ? 'Retry payment' : 'إعادة الدفع'}</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={{ paddingHorizontal: 20, paddingVertical: 8, borderRadius: 12, borderWidth: 1.5, borderColor: colors.danger + '50' }}
+              onPress={() => {
+                showAlert({
+                  title: locale === 'en' ? 'Cancel request' : 'إلغاء الطلب',
+                  message: locale === 'en' ? `Cancel your pending request for "${planName(ps.plan_name ?? '')}"?` : `هل تريد إلغاء طلب الاشتراك في "${ps.plan_name}"؟`,
+                  type: 'confirm',
+                  buttons: [
+                    { text: locale === 'en' ? 'No' : 'لا', style: 'cancel' },
+                    {
+                      text: locale === 'en' ? 'Yes, cancel' : 'نعم، إلغاء',
+                      style: 'destructive',
+                      onPress: async () => {
+                        await supabase.from('subscriptions').update({ status: 'cancelled' }).eq('id', ps.id)
+                        setPendingSubs(prev => prev.filter(p => p.id !== ps.id))
+                        showAlert({ title: locale === 'en' ? 'Done' : 'تم', message: locale === 'en' ? 'Request cancelled' : 'تم إلغاء الطلب', type: 'success' })
+                      },
+                    },
+                  ],
+                })
+              }}
+            >
+              <Text style={{ color: colors.danger, fontSize: 13, fontWeight: '700' }}>{locale === 'en' ? 'Cancel request' : 'إلغاء الطلب'}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       ))}
 

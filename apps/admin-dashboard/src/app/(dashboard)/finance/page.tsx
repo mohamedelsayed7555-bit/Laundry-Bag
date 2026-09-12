@@ -119,7 +119,7 @@ export default function FinancePage() {
       _customerName: s.user?.name ?? '—',
       _customerCode: s.user?.customer_code,
       _date: s.created_at,
-      payment_status: s.status === 'active' ? 'confirmed' : 'pending',
+      payment_status: 'confirmed',
       payment_method: 'subscription',
     }))
 
