@@ -74,6 +74,7 @@ export default function DriverOrdersScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [pickupSub, setPickupSub] = useState<'all' | 'assigned' | 'picked_up'>('all')
   const driverLocRef = useRef<{ lat: number; lng: number } | null>(null)
+  const lastLoadRef = useRef(0)
 
   useEffect(() => {
     if (!profile) return
@@ -82,8 +83,10 @@ export default function DriverOrdersScreen() {
       .catch(() => {})
   }, [profile])
 
-  const loadOrders = useCallback(async () => {
+  const loadOrders = useCallback(async (force = false) => {
     if (!profile) return
+    if (!force && Date.now() - lastLoadRef.current < 10000) return
+    lastLoadRef.current = Date.now()
     if (!driverLocRef.current) {
       try {
         const { data: dl } = await supabase.from('driver_locations').select('lat, lng').eq('driver_id', profile.id).single()
@@ -103,7 +106,8 @@ export default function DriverOrdersScreen() {
   }, [profile])
 
   useEffect(() => { loadOrders() }, [loadOrders])
-  useRealtimeDriverOrders(profile?.id, loadOrders)
+  const forceLoad = useCallback(() => loadOrders(true), [loadOrders])
+  useRealtimeDriverOrders(profile?.id, forceLoad)
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
@@ -114,7 +118,7 @@ export default function DriverOrdersScreen() {
   const hasActive = orders.some(o => !['delivered'].includes(o.status))
   useDriverLocation(profile?.id, hasActive)
 
-  const onRefresh = () => { setRefreshing(true); loadOrders() }
+  const onRefresh = () => { setRefreshing(true); loadOrders(true) }
 
   function distFromDriver(loc: any): number {
     if (!driverLocRef.current || !loc?.lat || !loc?.lng) return Infinity
@@ -318,7 +322,7 @@ export default function DriverOrdersScreen() {
 
           <View style={s.orderDetails}>
             <View style={s.detailChip}>
-              <Text style={s.detailChipLabel}>{serviceLabel[item.service_type] ?? item.service_type}</Text>
+              <Text style={s.detailChipLabel}>{item.service_type?.includes('+') ? item.service_type.split('+').map((s: string) => serviceLabel[s.trim()] ?? s.trim()).join(' + ') : (serviceLabel[item.service_type] ?? item.service_type)}</Text>
             </View>
             <View style={s.detailChip}>
               <Text style={s.detailChipLabel}>{item.items_count} قطعة</Text>
@@ -439,18 +443,18 @@ export default function DriverOrdersScreen() {
       </Animated.View>
 
       {filter === 'pickup' && pickupOrders.length > 0 && (
-        <View style={s.subFilterRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }} contentContainerStyle={s.subFilterRow}>
           {([
             { key: 'all' as const, label: 'الكل', count: pickupOrders.length },
-            { key: 'assigned' as const, label: '📋 بانتظار الاستلام', count: pickupOrders.filter(o => o.status === 'assigned').length },
-            { key: 'picked_up' as const, label: '📦 في الطريق للمغسلة', count: pickupOrders.filter(o => o.status === 'picked_up').length },
+            { key: 'assigned' as const, label: '📋 بانتظار', count: pickupOrders.filter(o => o.status === 'assigned').length },
+            { key: 'picked_up' as const, label: '📦 للمغسلة', count: pickupOrders.filter(o => o.status === 'picked_up').length },
           ]).filter(f => f.count > 0 || f.key === 'all').map(f => (
             <TouchableOpacity key={f.key} onPress={() => setPickupSub(f.key)}
               style={[s.subFilterBtn, pickupSub === f.key && s.subFilterBtnActive]}>
               <Text style={[s.subFilterText, pickupSub === f.key && s.subFilterTextActive]}>{f.label} ({f.count})</Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
       )}
 
       {filter === 'completed' && (
@@ -627,7 +631,7 @@ const s = StyleSheet.create({
   emptyText: { fontSize: 14, color: colors.navy[300] },
   emptyHint: { fontSize: 12, color: colors.navy[400], marginTop: 8, textAlign: 'center' },
 
-  subFilterRow: { flexDirection: 'row', gap: 6, marginBottom: 10, flexWrap: 'wrap' },
+  subFilterRow: { flexDirection: 'row', gap: 6 },
   subFilterBtn: {
     paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10,
     backgroundColor: colors.navy[800], borderWidth: 1, borderColor: colors.navy[700],

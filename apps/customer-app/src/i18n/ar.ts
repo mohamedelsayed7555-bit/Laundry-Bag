@@ -227,6 +227,7 @@ export default {
 
   // Chat
   newMessage: 'رسالة جديدة',
+  order: 'طلب',
   orderHash: 'طلب #',
   chatCompleted: '✅ مكتمل',
   chatCancelled: '❌ ملغي',

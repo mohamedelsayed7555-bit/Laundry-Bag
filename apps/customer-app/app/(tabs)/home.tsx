@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, RefreshControl, Modal, TextInput, Dimensions, NativeScrollEvent, NativeSyntheticEvent } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, RefreshControl, Modal, TextInput, Dimensions, NativeScrollEvent, NativeSyntheticEvent, Animated as RNAnimated } from 'react-native'
 import { useRouter } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated'
@@ -174,6 +174,7 @@ export default function HomeScreen() {
   const [recentOrders, setRecentOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [activeSub, setActiveSub] = useState<any>(null)
+  const scrollHintAnim = useRef(new RNAnimated.Value(0)).current
   const [unreadCount, setUnreadCount] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
   const [bagOffer, setBagOffer] = useState<any>(null)
@@ -264,6 +265,17 @@ export default function HomeScreen() {
   }, [loadRecentOrders, checkUnratedOrder])
 
   useRealtimeOrders(profile?.id, handleOrderUpdate)
+
+  useEffect(() => {
+    const loop = RNAnimated.loop(
+      RNAnimated.sequence([
+        RNAnimated.timing(scrollHintAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+        RNAnimated.timing(scrollHintAnim, { toValue: 0, duration: 800, useNativeDriver: true }),
+      ])
+    )
+    loop.start()
+    return () => loop.stop()
+  }, [])
 
   useEffect(() => {
     if (!profile) { setLoading(false); return }
@@ -369,20 +381,28 @@ export default function HomeScreen() {
       <Animated.View entering={FadeInDown.duration(400).delay(120)}>
         <Text style={[s.sectionTitle, { color: colors.text }]}>{t('services')}</Text>
       </Animated.View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.servicesScroll} style={{ marginBottom: 24 }}>
-        {services.map((svc, i) => (
-          <Animated.View key={svc.key} entering={FadeInDown.duration(300).delay(150 + i * 40)}>
-            <TouchableOpacity style={[s.serviceCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]} activeOpacity={0.7}
-              onPress={() => router.push({ pathname: '/(tabs)/new-order', params: { service: svc.key } })}>
-              <View style={[s.serviceIconWrap, { backgroundColor: colors.navy[700] }]}>
-                <Text style={s.serviceIcon}>{svc.icon}</Text>
-              </View>
-              <Text style={[s.serviceLabel, { color: colors.text }]}>{svc.label}</Text>
-              <Text style={[s.serviceDesc, { color: colors.navy[300] }]}>{svc.desc}</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        ))}
-      </ScrollView>
+      <View style={{ position: 'relative' }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.servicesScroll} style={{ marginBottom: 24 }}>
+          {services.map((svc, i) => (
+            <Animated.View key={svc.key} entering={FadeInDown.duration(300).delay(150 + i * 40)}>
+              <TouchableOpacity style={[s.serviceCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]} activeOpacity={0.7}
+                onPress={() => router.push({ pathname: '/(tabs)/new-order', params: { service: svc.key } })}>
+                <View style={[s.serviceIconWrap, { backgroundColor: colors.navy[700] }]}>
+                  <Text style={s.serviceIcon}>{svc.icon}</Text>
+                </View>
+                <Text style={[s.serviceLabel, { color: colors.text }]}>{svc.label}</Text>
+                <Text style={[s.serviceDesc, { color: colors.navy[300] }]}>{svc.desc}</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          ))}
+        </ScrollView>
+        <RNAnimated.View style={[s.scrollHint, locale === 'en' ? { right: 0 } : { left: 0 }, {
+          opacity: scrollHintAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.9] }),
+          transform: [{ translateX: scrollHintAnim.interpolate({ inputRange: [0, 1], outputRange: locale === 'en' ? [0, 5] : [0, -5] }) }],
+        }]}>
+          <Text style={[s.scrollHintText, { color: colors.primary }]}>{locale === 'en' ? '›' : '‹'}</Text>
+        </RNAnimated.View>
+      </View>
 
       {/* Recent Orders */}
       <Animated.View entering={FadeInDown.duration(400).delay(250)}>
@@ -519,6 +539,8 @@ const s = StyleSheet.create({
   seeAll: { fontSize: 13, fontWeight: '600' },
 
   servicesScroll: { gap: 10, paddingHorizontal: 4 },
+  scrollHint: { position: 'absolute', top: 40, zIndex: 10 },
+  scrollHintText: { fontSize: 26, fontWeight: '900' },
   serviceCard: {
     borderRadius: 16,
     padding: 14, alignItems: 'center', gap: 4,
