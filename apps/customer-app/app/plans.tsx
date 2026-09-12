@@ -63,8 +63,8 @@ export default function PlansScreen() {
   const router = useRouter()
   const { showAlert, AlertComponent } = useCustomAlert()
   const [plans, setPlans] = useState<Plan[]>([])
-  const [activeSub, setActiveSub] = useState<Subscription | null>(null)
-  const [pendingSub, setPendingSub] = useState<Subscription | null>(null)
+  const [activeSubs, setActiveSubs] = useState<(Subscription & { plan_name?: string })[]>([])
+  const [pendingSubs, setPendingSubs] = useState<(Subscription & { plan_name?: string })[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedDuration, setSelectedDuration] = useState('monthly')
   const [subscribing, setSubscribing] = useState(false)
@@ -102,7 +102,7 @@ export default function PlansScreen() {
         .select('id, name, description, tier, items_per_month, includes_all_services, covered_services, monthly_price, quarterly_price, biannual_price, annual_price, is_active')
         .eq('is_active', true)
         .order('monthly_price', { ascending: true }),
-      profile ? supabase.from('subscriptions').select('*, plans(name)')
+      profile ? supabase.from('subscriptions').select('*, plans(name, covered_services, includes_all_services)')
         .eq('user_id', profile.id).in('status', ['active', 'pending'])
         .order('created_at', { ascending: false }) : null,
     ])
@@ -122,23 +122,21 @@ export default function PlansScreen() {
 
     const subData = results[2]?.data
     if (subData) {
-      const active = subData.find((s: any) => s.status === 'active')
-      const pending = subData.find((s: any) => s.status === 'pending')
-      if (active) setActiveSub({ ...active, plan_name: (active as any).plans?.name } as any)
-      else setActiveSub(null)
-      if (pending) setPendingSub({ ...pending, plan_name: (pending as any).plans?.name } as any)
-      else setPendingSub(null)
+      setActiveSubs(subData.filter((s: any) => s.status === 'active').map((s: any) => ({ ...s, plan_name: s.plans?.name })))
+      setPendingSubs(subData.filter((s: any) => s.status === 'pending').map((s: any) => ({ ...s, plan_name: s.plans?.name })))
+    } else {
+      setActiveSubs([])
+      setPendingSubs([])
     }
     setLoading(false)
   }
 
-  async function handleCancelSub() {
-    if (!activeSub) return
+  async function handleCancelSub(sub: Subscription & { plan_name?: string }) {
     showAlert({
       title: t('cancelSubscription') || 'إلغاء الاشتراك',
       message: locale === 'en'
-        ? `Are you sure you want to cancel "${planName(activeSub.plan_name ?? '')}"?\n\n⚠️ Paid amount (${activeSub.total_paid} EGP) is non-refundable.`
-        : `هل أنت متأكد من إلغاء اشتراك "${activeSub.plan_name}"?\n\n⚠️ لن يتم استرداد المبلغ المدفوع (${activeSub.total_paid} ج.م)`,
+        ? `Are you sure you want to cancel "${planName(sub.plan_name ?? '')}"?\n\n⚠️ Paid amount (${sub.total_paid} EGP) is non-refundable.`
+        : `هل أنت متأكد من إلغاء اشتراك "${sub.plan_name}"?\n\n⚠️ لن يتم استرداد المبلغ المدفوع (${sub.total_paid} ج.م)`,
       type: 'confirm',
       buttons: [
         { text: locale === 'en' ? 'Cancel' : 'تراجع', style: 'cancel' },
@@ -146,7 +144,7 @@ export default function PlansScreen() {
           text: locale === 'en' ? 'Yes, cancel subscription' : 'نعم، إلغاء الاشتراك',
           style: 'destructive',
           onPress: async () => {
-            await supabase.from('subscriptions').update({ status: 'cancelled', auto_renew: false }).eq('id', activeSub.id)
+            await supabase.from('subscriptions').update({ status: 'cancelled', auto_renew: false }).eq('id', sub.id)
             showAlert({ title: locale === 'en' ? 'Done' : 'تم', message: locale === 'en' ? 'Subscription cancelled. No refund.' : 'تم إلغاء اشتراكك. لن يتم استرداد المبلغ المدفوع.', type: 'info', buttons: [{ text: t('ok'), onPress: () => loadData() }] })
           },
         },
@@ -156,11 +154,13 @@ export default function PlansScreen() {
 
   async function handleSubscribe(plan: Plan) {
     if (!profile) return
-    if (pendingSub) {
-      showAlert({ title: locale === 'en' ? 'Notice' : 'تنبيه', message: locale === 'en' ? 'You already have a pending subscription' : 'لديك طلب اشتراك قيد المراجعة بالفعل', type: 'warning' })
+    const pendingForPlan = pendingSubs.find(s => s.plan_id === plan.id)
+    if (pendingForPlan) {
+      showAlert({ title: locale === 'en' ? 'Notice' : 'تنبيه', message: locale === 'en' ? 'You already have a pending request for this plan' : 'لديك طلب اشتراك قيد المراجعة لهذه الباقة بالفعل', type: 'warning' })
       return
     }
-    if (activeSub && activeSub.plan_id === plan.id) {
+    const activeForPlan = activeSubs.find(s => s.plan_id === plan.id)
+    if (activeForPlan) {
       showAlert({ title: locale === 'en' ? 'Notice' : 'تنبيه', message: locale === 'en' ? 'You are already subscribed to this plan' : 'أنت مشترك في هذه الباقة بالفعل', type: 'warning' })
       return
     }
@@ -254,17 +254,17 @@ export default function PlansScreen() {
         <View style={{ width: 60 }} />
       </View>
 
-      {pendingSub && (
-        <View style={[s.pendingSubCard, { borderColor: '#f59e0b40' }]}>
+      {pendingSubs.map(ps => (
+        <View key={ps.id} style={[s.pendingSubCard, { borderColor: '#f59e0b40' }]}>
           <Text style={s.pendingSubBadge}>⏳ {locale === 'en' ? 'Pending subscription request' : 'طلب اشتراك قيد المراجعة'}</Text>
-          <Text style={[s.pendingSubName, { color: colors.text }]}>{planName(pendingSub.plan_name ?? '')}</Text>
+          <Text style={[s.pendingSubName, { color: colors.text }]}>{planName(ps.plan_name ?? '')}</Text>
           <Text style={[s.pendingSubHint, { color: colors.navy[300] }]}>{locale === 'en' ? 'Will be activated after admin review and payment confirmation' : 'سيتم تفعيل اشتراكك بعد مراجعة الإدارة وتأكيد الدفع'}</Text>
           <TouchableOpacity
             style={{ marginTop: 12, alignSelf: 'center', paddingHorizontal: 20, paddingVertical: 8, borderRadius: 12, borderWidth: 1.5, borderColor: colors.danger + '50' }}
             onPress={() => {
               showAlert({
                 title: locale === 'en' ? 'Cancel request' : 'إلغاء الطلب',
-                message: locale === 'en' ? 'Cancel your pending subscription request?' : 'هل تريد إلغاء طلب الاشتراك؟',
+                message: locale === 'en' ? `Cancel your pending request for "${planName(ps.plan_name ?? '')}"?` : `هل تريد إلغاء طلب الاشتراك في "${ps.plan_name}"؟`,
                 type: 'confirm',
                 buttons: [
                   { text: locale === 'en' ? 'No' : 'لا', style: 'cancel' },
@@ -272,8 +272,8 @@ export default function PlansScreen() {
                     text: locale === 'en' ? 'Yes, cancel' : 'نعم، إلغاء',
                     style: 'destructive',
                     onPress: async () => {
-                      await supabase.from('subscriptions').update({ status: 'cancelled' }).eq('id', pendingSub.id)
-                      setPendingSub(null)
+                      await supabase.from('subscriptions').update({ status: 'cancelled' }).eq('id', ps.id)
+                      setPendingSubs(prev => prev.filter(p => p.id !== ps.id))
                       showAlert({ title: locale === 'en' ? 'Done' : 'تم', message: locale === 'en' ? 'Request cancelled' : 'تم إلغاء الطلب', type: 'success' })
                     },
                   },
@@ -284,18 +284,18 @@ export default function PlansScreen() {
             <Text style={{ color: colors.danger, fontSize: 13, fontWeight: '700' }}>{locale === 'en' ? 'Cancel request' : 'إلغاء الطلب'}</Text>
           </TouchableOpacity>
         </View>
-      )}
+      ))}
 
-      {activeSub && (() => {
-        const remaining = Math.max(0, activeSub.items_limit - activeSub.items_used)
-        const exhausted = activeSub.items_used >= activeSub.items_limit
-        const usagePercent = Math.min(100, (activeSub.items_used / activeSub.items_limit) * 100)
+      {activeSubs.map(sub => {
+        const remaining = Math.max(0, sub.items_limit - sub.items_used)
+        const exhausted = sub.items_used >= sub.items_limit
+        const usagePercent = Math.min(100, (sub.items_used / sub.items_limit) * 100)
         return (
-        <View style={[s.activeSubCard, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '40' }]}>
+        <View key={sub.id} style={[s.activeSubCard, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '40' }]}>
           <View style={s.activeSubHeader}>
             <Text style={[s.activeSubBadge, { color: colors.primary }]}>{locale === 'en' ? 'Active subscription ✓' : 'اشتراك نشط ✓'}</Text>
           </View>
-          <Text style={[s.activeSubName, { color: colors.text }]}>{planName(activeSub.plan_name ?? '')}</Text>
+          <Text style={[s.activeSubName, { color: colors.text }]}>{planName(sub.plan_name ?? '')}</Text>
 
           {exhausted && (
             <View style={[s.exhaustedBanner, { backgroundColor: colors.danger + '15', borderColor: colors.danger + '30' }]}>
@@ -307,7 +307,7 @@ export default function PlansScreen() {
 
           <View style={s.progressRow}>
             <Text style={[s.progressLabel, { color: colors.navy[200] }]}>{locale === 'en' ? 'Items used' : 'القطع المستخدمة'}</Text>
-            <Text style={[s.progressValue, { color: exhausted ? colors.danger : colors.text }]}>{activeSub.items_used} / {activeSub.items_limit}</Text>
+            <Text style={[s.progressValue, { color: exhausted ? colors.danger : colors.text }]}>{sub.items_used} / {sub.items_limit}</Text>
           </View>
           <View style={s.progressRow}>
             <Text style={[s.progressLabel, { color: colors.navy[200] }]}>{locale === 'en' ? 'Remaining' : 'المتبقي'}</Text>
@@ -318,27 +318,27 @@ export default function PlansScreen() {
           </View>
           <View style={s.subDetailRow}>
             <Text style={[s.subDetailLabel, { color: colors.navy[300] }]}>{locale === 'en' ? 'Expires' : 'ينتهي في'}</Text>
-            <Text style={[s.subDetailValue, { color: colors.text }]}>{activeSub.end_date}</Text>
+            <Text style={[s.subDetailValue, { color: colors.text }]}>{sub.end_date}</Text>
           </View>
           <TouchableOpacity style={s.subDetailRow} onPress={async () => {
-            const newVal = !activeSub.auto_renew
-            await supabase.from('subscriptions').update({ auto_renew: newVal }).eq('id', activeSub.id)
-            setActiveSub({ ...activeSub, auto_renew: newVal })
+            const newVal = !sub.auto_renew
+            await supabase.from('subscriptions').update({ auto_renew: newVal }).eq('id', sub.id)
+            setActiveSubs(prev => prev.map(s => s.id === sub.id ? { ...s, auto_renew: newVal } : s))
           }}>
             <Text style={[s.subDetailLabel, { color: colors.navy[300] }]}>{locale === 'en' ? 'Auto-renew' : 'تجديد تلقائي'}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Text style={[s.subDetailValue, { color: colors.text }]}>{activeSub.auto_renew ? (locale === 'en' ? 'On' : 'مفعّل') : (locale === 'en' ? 'Off' : 'متوقف')}</Text>
-              <View style={[s.toggleTrackSmall, { backgroundColor: colors.navy[600] }, activeSub.auto_renew && { backgroundColor: colors.primary }]}>
-                <View style={[s.toggleThumbSmall, activeSub.auto_renew && s.toggleThumbActiveSmall]} />
+              <Text style={[s.subDetailValue, { color: colors.text }]}>{sub.auto_renew ? (locale === 'en' ? 'On' : 'مفعّل') : (locale === 'en' ? 'Off' : 'متوقف')}</Text>
+              <View style={[s.toggleTrackSmall, { backgroundColor: colors.navy[600] }, sub.auto_renew && { backgroundColor: colors.primary }]}>
+                <View style={[s.toggleThumbSmall, sub.auto_renew && s.toggleThumbActiveSmall]} />
               </View>
             </View>
           </TouchableOpacity>
-          <TouchableOpacity style={[s.cancelSubBtn, { backgroundColor: colors.dangerGlow, borderColor: colors.danger + '30' }]} onPress={handleCancelSub}>
+          <TouchableOpacity style={[s.cancelSubBtn, { backgroundColor: colors.dangerGlow, borderColor: colors.danger + '30' }]} onPress={() => handleCancelSub(sub)}>
             <Text style={[s.cancelSubBtnText, { color: colors.danger }]}>{locale === 'en' ? 'Cancel subscription' : 'إلغاء الاشتراك'}</Text>
           </TouchableOpacity>
         </View>
         )
-      })()}
+      })}
 
       {/* ── Service Filter ── */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }} contentContainerStyle={s.filterRow}>
@@ -362,7 +362,7 @@ export default function PlansScreen() {
       </ScrollView>
 
       {/* ── Plans List ── */}
-      <Text style={[s.sectionTitle, { color: colors.text }]}>{activeSub ? (locale === 'en' ? 'Upgrade or add plan' : 'ترقية أو إضافة باقة') : (locale === 'en' ? 'Available plans' : 'الباقات المتاحة')}</Text>
+      <Text style={[s.sectionTitle, { color: colors.text }]}>{activeSubs.length > 0 ? (locale === 'en' ? 'Upgrade or add plan' : 'ترقية أو إضافة باقة') : (locale === 'en' ? 'Available plans' : 'الباقات المتاحة')}</Text>
 
       {plans.filter(plan => {
         if (serviceFilter === 'all') return true
@@ -375,7 +375,15 @@ export default function PlansScreen() {
       }).map(plan => {
         const price = calcPrice(plan.monthly_price, selectedDuration)
         const tierColor = tierColors[plan.tier] ?? colors.primary
-        const isCurrentPlan = activeSub?.plan_id === plan.id
+        const isCurrentPlan = activeSubs.some(s => s.plan_id === plan.id)
+        const pCovered = plan.covered_services ?? []
+        const sameTypeSub = activeSubs.find(s => {
+          if (s.plan_id === plan.id) return false
+          const sPlan = (s as any).plans ?? {}
+          if (sPlan.includes_all_services || plan.includes_all_services) return true
+          const sCovered = sPlan.covered_services ?? []
+          return pCovered.length > 0 && sCovered.some((sv: string) => pCovered.includes(sv))
+        })
 
         return (
           <View key={plan.id} style={[s.planCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, isCurrentPlan && { borderColor: colors.primary }]}>
@@ -407,7 +415,7 @@ export default function PlansScreen() {
               disabled={isCurrentPlan || subscribing}
             >
               <Text style={s.subscribeBtnText}>
-                {isCurrentPlan ? (locale === 'en' ? 'Subscribed ✓' : 'مشترك ✓') : subscribing ? (locale === 'en' ? 'Loading...' : 'جاري...') : activeSub ? (locale === 'en' ? 'Upgrade' : 'ترقية') : (locale === 'en' ? 'Subscribe now' : 'اشترك الآن')}
+                {isCurrentPlan ? (locale === 'en' ? 'Subscribed ✓' : 'مشترك ✓') : subscribing ? (locale === 'en' ? 'Loading...' : 'جاري...') : sameTypeSub ? (locale === 'en' ? 'Upgrade' : 'ترقية') : (locale === 'en' ? 'Subscribe now' : 'اشترك الآن')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -488,20 +496,28 @@ export default function PlansScreen() {
             <TouchableOpacity
               style={[s.subscribeBtn, { backgroundColor: colors.primary, paddingVertical: 16 }]}
               onPress={() => {
-                if (activeSub && activeSub.plan_id !== selectedPlanForSubscribe.id) {
+                const pCovered = selectedPlanForSubscribe.covered_services ?? []
+                const overlappingSub = activeSubs.find(s => {
+                  if (s.plan_id === selectedPlanForSubscribe.id) return false
+                  const sPlan = (s as any).plans ?? {}
+                  if (sPlan.includes_all_services || selectedPlanForSubscribe.includes_all_services) return true
+                  const sCovered = sPlan.covered_services ?? []
+                  return pCovered.length > 0 && sCovered.some((sv: string) => pCovered.includes(sv))
+                })
+                if (overlappingSub) {
                   showAlert({
                     title: locale === 'en' ? 'Upgrade plan' : 'ترقية الباقة',
                     message: locale === 'en'
-                      ? `You are subscribed to "${planName(activeSub.plan_name ?? '')}". ⚠️ Paid amount (${activeSub.total_paid} EGP) is non-refundable.\n\nUpgrade to "${planName(selectedPlanForSubscribe.name)}"?`
-                      : `أنت مشترك حالياً في "${activeSub.plan_name}".\n\n⚠️ المبلغ المدفوع للباقة الحالية (${activeSub.total_paid} ج.م) لن يُسترد.\n\nهل تريد الترقية إلى "${selectedPlanForSubscribe.name}"؟`,
+                      ? `You are subscribed to "${planName(overlappingSub.plan_name ?? '')}". ⚠️ Paid amount (${overlappingSub.total_paid} EGP) is non-refundable.\n\nUpgrade to "${planName(selectedPlanForSubscribe.name)}"?`
+                      : `أنت مشترك حالياً في "${overlappingSub.plan_name}".\n\n⚠️ المبلغ المدفوع للباقة الحالية (${overlappingSub.total_paid} ج.م) لن يُسترد.\n\nهل تريد الترقية إلى "${selectedPlanForSubscribe.name}"؟`,
                     type: 'confirm',
                     buttons: [
                       { text: locale === 'en' ? 'Cancel' : 'تراجع', style: 'cancel' },
                       {
                         text: locale === 'en' ? 'Yes, upgrade' : 'نعم، ترقية',
                         onPress: async () => {
-                          await supabase.from('subscriptions').update({ status: 'cancelled', auto_renew: false }).eq('id', activeSub.id)
-                          setActiveSub(null)
+                          await supabase.from('subscriptions').update({ status: 'cancelled', auto_renew: false }).eq('id', overlappingSub.id)
+                          setActiveSubs(prev => prev.filter(s => s.id !== overlappingSub.id))
                           doSubscribe(selectedPlanForSubscribe)
                         },
                       },

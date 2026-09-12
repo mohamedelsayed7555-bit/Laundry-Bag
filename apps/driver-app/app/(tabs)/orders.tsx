@@ -411,7 +411,7 @@ export default function DriverOrdersScreen() {
       <Animated.View entering={FadeInDown.duration(500)} style={s.header}>
         <View>
           <Text style={s.title}>الطلبات</Text>
-          <Text style={s.subtitle}>{pickupOrders.length} استلام · {deliveryOrders.length} توصيل · {completedOrders.length} مكتمل</Text>
+          <Text style={s.subtitle}>{pickupOrders.length} استلام · {orders.filter(o => o.status === 'processing').length} مغسلة · {deliveryOrders.length} توصيل · {completedOrders.length} مكتمل</Text>
         </View>
         <View style={s.headerAvatar}>
           <Text style={s.headerAvatarText}>{profile?.name?.[0] ?? '؟'}</Text>
@@ -472,19 +472,6 @@ export default function DriverOrdersScreen() {
         </View>
       )}
 
-      <Animated.View entering={FadeInDown.duration(500).delay(200)} style={s.statsRow}>
-        {[
-          { value: pickupOrders.length, label: 'استلام', color: colors.primary },
-          { value: deliveryOrders.length, label: 'توصيل', color: '#10b981' },
-          { value: orders.filter(o => o.status === 'processing').length, label: 'في المغسلة', color: '#06b6d4' },
-        ].map((stat, i) => (
-          <View key={i} style={s.statCard}>
-            <Text style={[s.statValue, { color: stat.color }]}>{stat.value}</Text>
-            <Text style={s.statLabel}>{stat.label}</Text>
-          </View>
-        ))}
-      </Animated.View>
-
       {loading ? (
         <Animated.View entering={FadeInDown.duration(400).delay(300)} style={{ gap: 12 }}>
           <SkeletonOrderCard />
@@ -526,7 +513,7 @@ const s = StyleSheet.create({
   },
   headerAvatarText: { fontSize: 18, color: '#fff', fontWeight: '800' },
 
-  filterRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  filterRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
   filterBtn: { flex: 1, paddingVertical: 10, borderRadius: 14, alignItems: 'center', backgroundColor: colors.navy[800], borderWidth: 1, borderColor: colors.navy[700] },
   filterActive: { backgroundColor: colors.primary + '20', borderColor: colors.primary },
   filterInner: { flexDirection: 'row', alignItems: 'center', gap: 5 },
@@ -534,14 +521,6 @@ const s = StyleSheet.create({
   filterTextActive: { color: colors.primary },
   filterBadge: { backgroundColor: colors.primary, borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
   filterBadgeText: { fontSize: 10, color: '#fff', fontWeight: '800' },
-
-  statsRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
-  statCard: {
-    flex: 1, backgroundColor: colors.navy[800], borderRadius: 18, padding: 16,
-    alignItems: 'center', borderWidth: 1, borderColor: colors.navy[700],
-  },
-  statValue: { fontSize: 24, fontWeight: '800' },
-  statLabel: { fontSize: 11, color: colors.navy[300], marginTop: 4 },
 
   orderCard: {
     backgroundColor: colors.navy[800], borderRadius: 22, padding: 20,
@@ -648,7 +627,7 @@ const s = StyleSheet.create({
   emptyText: { fontSize: 14, color: colors.navy[300] },
   emptyHint: { fontSize: 12, color: colors.navy[400], marginTop: 8, textAlign: 'center' },
 
-  subFilterRow: { flexDirection: 'row', gap: 6, marginBottom: 12, flexWrap: 'wrap' },
+  subFilterRow: { flexDirection: 'row', gap: 6, marginBottom: 10, flexWrap: 'wrap' },
   subFilterBtn: {
     paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10,
     backgroundColor: colors.navy[800], borderWidth: 1, borderColor: colors.navy[700],

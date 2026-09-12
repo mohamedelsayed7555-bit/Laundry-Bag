@@ -84,6 +84,7 @@ export default function MessagesScreen() {
                   <Text style={[s.convoName, { color: colors.navy[100] }, item.unread > 0 && { color: colors.text }]}>{item.other_name}</Text>
                   <Text style={[s.convoTime, { color: colors.navy[400] }]}>{timeAgo(item.last_time)}</Text>
                 </View>
+                <Text style={[s.convoOrderId, { color: colors.navy[400] }]}>{t('order') || 'طلب'} #{item.order_id.slice(0, 8)}</Text>
                 <Text style={[s.convoLastMsg, { color: colors.navy[300] }, item.unread > 0 && { color: colors.navy[100] }]} numberOfLines={1}>{item.last_message}</Text>
               </View>
               {item.unread > 0 && (
@@ -98,14 +99,17 @@ export default function MessagesScreen() {
 }
 
 function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime()
+  const d = new Date(dateStr)
+  const diff = Date.now() - d.getTime()
   const mins = Math.floor(diff / 60000)
   if (mins < 1) return 'now'
   if (mins < 60) return `${mins}m`
   const hours = Math.floor(mins / 60)
   if (hours < 24) return `${hours}h`
+  const time = d.toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit', hour12: true })
   const days = Math.floor(hours / 24)
-  return `${days}d`
+  if (days < 7) return `${days}d · ${time}`
+  return d.toLocaleDateString('en', { month: 'short', day: 'numeric' }) + ` · ${time}`
 }
 
 const s = StyleSheet.create({
@@ -130,6 +134,7 @@ const s = StyleSheet.create({
   convoHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   convoName: { fontSize: 15, fontWeight: '700' },
   convoTime: { fontSize: 10 },
+  convoOrderId: { fontSize: 11, marginTop: 2 },
   convoLastMsg: { fontSize: 13, marginTop: 2 },
   badge: {
     borderRadius: 10, minWidth: 20, height: 20,

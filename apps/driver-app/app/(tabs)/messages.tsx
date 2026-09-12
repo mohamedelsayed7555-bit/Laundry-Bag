@@ -133,14 +133,17 @@ export default function MessagesScreen() {
 }
 
 function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime()
+  const d = new Date(dateStr)
+  const diff = Date.now() - d.getTime()
   const mins = Math.floor(diff / 60000)
   if (mins < 1) return 'الآن'
   if (mins < 60) return `${mins} د`
   const hours = Math.floor(mins / 60)
   if (hours < 24) return `${hours} س`
+  const time = d.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', hour12: true })
   const days = Math.floor(hours / 24)
-  return `${days} ي`
+  if (days < 7) return `${days} ي · ${time}`
+  return d.toLocaleDateString('ar-EG', { month: 'short', day: 'numeric' }) + ` · ${time}`
 }
 
 const s = StyleSheet.create({
