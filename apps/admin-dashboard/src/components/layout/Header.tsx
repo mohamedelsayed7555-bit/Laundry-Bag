@@ -62,14 +62,6 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
         <span className="text-xs text-gray-400 hidden lg:block">{date}</span>
 
         <button
-          onClick={toggleLang}
-          className="p-2 rounded-xl hover:bg-surface-muted transition-colors text-gray-500 hover:text-primary-500"
-          title={lang === 'ar' ? 'English' : 'عربي'}
-        >
-          <Globe size={18} />
-        </button>
-
-        <button
           onClick={toggleTheme}
           className="p-2 rounded-xl hover:bg-surface-muted transition-colors text-gray-500 hover:text-primary-500"
           title={theme === 'light' ? t.theme.dark : t.theme.light}

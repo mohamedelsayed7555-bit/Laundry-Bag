@@ -63,6 +63,23 @@ html.dark .bg-orange-50 { background-color: rgba(245,158,11,0.1) !important; }
 
 html.dark .hover\:bg-surface-muted:hover { background-color: #1e293b !important; }
 
+html.dark .text-navy-900\/70 { color: rgba(226, 232, 240, 0.7) !important; }
+html.dark .text-navy-800 { color: #e2e8f0 !important; }
+html.dark .text-navy-600 { color: #94a3b8 !important; }
+html.dark .text-navy-400 { color: #64748b !important; }
+html.dark .text-navy-300 { color: #94a3b8 !important; }
+html.dark .text-navy-500 { color: #94a3b8 !important; }
+html.dark .bg-navy-900\/\[0\.04\] { background-color: rgba(226, 232, 240, 0.04) !important; }
+html.dark .border-navy-900\/10 { border-color: rgba(226, 232, 240, 0.1) !important; }
+html.dark .border-navy-100 { border-color: rgba(255,255,255,0.1) !important; }
+html.dark .bg-navy-50 { background-color: rgba(100,116,139,0.1) !important; }
+html.dark .bg-navy-100 { background-color: rgba(100,116,139,0.15) !important; }
+html.dark .bg-navy-800 { background-color: #1e293b !important; }
+html.dark .border-navy-600 { border-color: rgba(255,255,255,0.15) !important; }
+html.dark .bg-navy-950 { background-color: #070b14 !important; }
+html.dark .bg-navy-900 { background-color: #334155 !important; }
+html.dark .text-navy-900 { color: #e2e8f0 !important; }
+
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;
