@@ -398,7 +398,6 @@ export default function HomeScreen() {
       </Animated.View>
       <View style={{ position: 'relative' }}>
         <ScrollView horizontal nestedScrollEnabled={true} showsHorizontalScrollIndicator={false} contentContainerStyle={s.servicesScroll} style={{ marginBottom: 24 }}
-          onContentSizeChange={(w, h) => { if (I18nManager.isRTL) servicesScrollRef.current?.scrollToEnd({ animated: false }) }}
           ref={servicesScrollRef}
         >
           {services.map((svc, i) => (

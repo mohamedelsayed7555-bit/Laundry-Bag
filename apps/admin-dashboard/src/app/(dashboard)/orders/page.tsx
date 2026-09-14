@@ -55,6 +55,9 @@ export default function OrdersPage() {
   const [form, setForm] = useState({ customer_id: '', service_type: 'wash', items_count: 1, notes: '', total: '' as any, order_type: 'delivery' as 'delivery' | 'walkin', walkin_name: '', walkin_phone: '' })
   const [messages, setMessages] = useState<any[]>([])
   const [msgsLoading, setMsgsLoading] = useState(false)
+  const [cancelModal, setCancelModal] = useState<{ id: string; orderNumber: string } | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
+  const [cancelledByFilter, setCancelledByFilter] = useState<'all' | 'admin' | 'customer'>('all')
   const [deliveryFeeSetting, setDeliveryFeeSetting] = useState(0)
   const [avgPrices, setAvgPrices] = useState<Record<string, number>>({})
   const [page, setPage] = useState(0)
@@ -113,7 +116,7 @@ export default function OrdersPage() {
 
   async function loadOrders() {
     let query = supabase.from('orders')
-      .select('id, order_number, status, service_type, items, items_count, total, delivery_fee, cancellation_fee, cancellation_reason, notes, payment_status, payment_method, subscription_id, customer_id, driver_id, order_type, created_at, is_scheduled, scheduled_at, cancelled_at, customer:users!orders_customer_id_fkey(name, phone, customer_code), driver:users!orders_driver_id_fkey(name, phone), subscription:subscriptions(items_used, items_limit)', { count: 'exact' })
+      .select('id, order_number, status, service_type, items, items_count, total, delivery_fee, cancellation_fee, cancellation_reason, cancelled_by, refund_amount, notes, payment_status, payment_method, subscription_id, customer_id, driver_id, order_type, created_at, is_scheduled, scheduled_at, cancelled_at, customer:users!orders_customer_id_fkey(name, phone, customer_code), driver:users!orders_driver_id_fkey(name, phone), subscription:subscriptions(items_used, items_limit)', { count: 'exact' })
       .order('created_at', { ascending: false })
 
     if (statusFilter !== 'all') query = query.eq('status', statusFilter)
@@ -264,17 +267,53 @@ export default function OrdersPage() {
     loadMessages(order.id)
   }
 
-  async function cancelOrder(id: string) {
+  function openCancelModal(id: string) {
     const order = orders.find(o => o.id === id)
-    const confirmed = window.confirm(`هل أنت متأكد من إلغاء الطلب ${order?.order_number ?? ''}؟\n\nهذا الإجراء لا يمكن التراجع عنه.`)
-    if (!confirmed) return
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'cancelled' } : o))
+    setCancelReason('')
+    setCancelModal({ id, orderNumber: order?.order_number ?? '' })
+  }
+
+  async function cancelOrder() {
+    if (!cancelModal) return
+    const { id } = cancelModal
+    const order = orders.find(o => o.id === id)
+    const reason = cancelReason.trim()
+    if (!reason) { toast('يرجى كتابة سبب الإلغاء', 'error'); return }
+
+    const isPaid = order?.payment_status === 'confirmed'
+    const driverArrived = ['arrived', 'picked_up'].includes(order?.status ?? '') || Number(order?.cancellation_fee) > 0
+    const total = Number(order?.total) || 0
+    const deliveryFee = Number(order?.delivery_fee) || 0
+    const refundAmount = isPaid ? (driverArrived ? (total - deliveryFee) : total) : 0
+
+    setCancelModal(null)
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: isPaid ? 'refunded' : 'cancelled', payment_status: isPaid ? 'refunded' : o.payment_status } : o))
     setDetail(null)
-    toast('تم إلغاء الطلب', 'warning')
-    const { error } = await supabase.from('orders').update({ status: 'cancelled' }).eq('id', id)
+
+    const updateData: any = {
+      status: isPaid ? 'refunded' : 'cancelled',
+      cancellation_reason: reason,
+      cancelled_by: 'admin',
+      cancelled_at: new Date().toISOString(),
+      driver_id: null,
+    }
+    if (isPaid) {
+      updateData.payment_status = 'refunded'
+      updateData.refund_amount = refundAmount
+    }
+
+    const { error } = await supabase.from('orders').update(updateData).eq('id', id)
     if (error) { toast('حدث خطأ — جاري التحديث', 'error'); loadOrders(); return }
-    await supabase.from('order_status_history').insert({ order_id: id, status: 'cancelled' })
-    logAuditClient('cancel_order', 'order', id, { order_number: order?.order_number })
+
+    await supabase.from('order_status_history').insert({ order_id: id, status: updateData.status, changed_by: 'admin' })
+    logAuditClient('cancel_order', 'order', id, { order_number: order?.order_number, reason, cancelled_by: 'admin', refund_amount: refundAmount })
+
+    if (isPaid && refundAmount > 0) {
+      toast(`تم إلغاء واسترداد ${refundAmount.toFixed(2)} ج.م${driverArrived ? ' (بدون رسوم التوصيل)' : ''}`, 'warning')
+    } else {
+      toast('تم إلغاء الطلب', 'warning')
+    }
+
     if (order?.subscription_id && order.items_count) {
       const { data: sub } = await supabase.from('subscriptions').select('items_used').eq('id', order.subscription_id).single()
       if (sub) {
@@ -320,13 +359,19 @@ export default function OrdersPage() {
     } else { console.error('Order insert error:', error); toast('حدث خطأ', 'error') }
   }
 
-  const allStatuses = ['all', 'scheduled', 'pending', 'assigned', 'arrived', 'picked_up', 'processing', 'ready', 'delivering', 'delivered', 'cancelled']
+  const allStatuses = ['all', 'scheduled', 'pending', 'assigned', 'arrived', 'picked_up', 'processing', 'ready', 'delivering', 'delivered', 'cancelled', 'refunded']
   const totalPages = Math.ceil(totalCount / PAGE_SIZE)
   const filtered = useMemo(() => orders.filter(o => {
-    if (!search) return true
-    const s = search.toLowerCase()
-    return o.order_number?.toLowerCase().includes(s) || o.customer?.name?.toLowerCase().includes(s)
-  }), [orders, search])
+    if (search) {
+      const s = search.toLowerCase()
+      if (!o.order_number?.toLowerCase().includes(s) && !o.customer?.name?.toLowerCase().includes(s)) return false
+    }
+    if (cancelledByFilter !== 'all' && ['cancelled', 'refunded'].includes(o.status)) {
+      if (cancelledByFilter === 'admin' && o.cancelled_by !== 'admin') return false
+      if (cancelledByFilter === 'customer' && o.cancelled_by === 'admin') return false
+    }
+    return true
+  }), [orders, search, cancelledByFilter])
 
   const columns = [
     { key: 'select', label: '', render: (item: any) => (
@@ -417,11 +462,25 @@ export default function OrdersPage() {
         </div>
         <div className="flex gap-1.5 overflow-x-auto pb-1">
           {allStatuses.map(s => (
-            <button key={s} onClick={() => { setStatusFilter(s); setPage(0) }}
+            <button key={s} onClick={() => { setStatusFilter(s); setPage(0); setCancelledByFilter('all') }}
               className={`px-3 py-2 rounded-lg text-[11px] font-medium transition-all whitespace-nowrap ${statusFilter === s ? 'bg-navy-900 text-white shadow-premium-md' : 'bg-white text-gray-500 hover:bg-surface-muted border border-surface-border/60'}`}>
               {s === 'all' ? 'الكل' : ORDER_STATUS_LABELS[s as OrderStatus] ?? s}
             </button>
           ))}
+          {['cancelled', 'refunded'].includes(statusFilter) && (
+            <div className="flex gap-1 mr-2 border-r border-surface-border pr-2">
+              {([
+                { key: 'all' as const, label: 'الكل' },
+                { key: 'admin' as const, label: 'من الأدمن' },
+                { key: 'customer' as const, label: 'من العميل' },
+              ]).map(f => (
+                <button key={f.key} onClick={() => setCancelledByFilter(f.key)}
+                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-medium transition-all ${cancelledByFilter === f.key ? 'bg-red-500 text-white' : 'bg-red-50 text-red-500 border border-red-200'}`}>
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
@@ -565,10 +624,18 @@ export default function OrdersPage() {
               </div>
             )}
 
-            {detail.status === 'cancelled' && (
+            {['cancelled', 'refunded'].includes(detail.status) && detail.cancellation_reason && (
               <div className="bg-red-50/50 rounded-xl p-3 border border-red-100">
-                <p className="text-[10px] text-red-600 mb-0.5">الإلغاء</p>
-                <p className="text-sm text-red-800">{detail.cancellation_reason ?? 'بدون سبب'}</p>
+                <div className="flex items-center gap-2 mb-1">
+                  <p className="text-[10px] text-red-600">الإلغاء</p>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${detail.cancelled_by === 'admin' ? 'bg-orange-100 text-orange-600' : 'bg-red-100 text-red-600'}`}>
+                    {detail.cancelled_by === 'admin' ? 'بواسطة الأدمن' : 'بواسطة العميل'}
+                  </span>
+                </div>
+                <p className="text-sm text-red-800">{detail.cancellation_reason}</p>
+                {detail.refund_amount > 0 && (
+                  <p className="text-sm font-semibold text-red-700 mt-1">💰 مبلغ مسترد: {Number(detail.refund_amount).toFixed(2)} ج.م</p>
+                )}
                 {detail.cancellation_fee > 0 && (
                   <p className="text-sm font-semibold text-red-700 mt-1">💰 رسوم إلغاء: {Number(detail.cancellation_fee).toFixed(2)} ج.م</p>
                 )}
@@ -654,7 +721,7 @@ export default function OrdersPage() {
                 ) : null
               })()}
               {!['delivered', 'cancelled', 'refunded'].includes(detail.status) && hasPermission('orders.delete') && (
-                <button onClick={() => cancelOrder(detail.id)}
+                <button onClick={() => openCancelModal(detail.id)}
                   className="px-4 py-3 border border-red-200 text-red-500 rounded-xl text-sm font-medium hover:bg-red-50 transition-colors">
                   إلغاء
                 </button>
@@ -734,6 +801,45 @@ export default function OrdersPage() {
             {saving ? 'جاري الحفظ...' : 'إضافة الطلب'}
           </button>
         </form>
+      </Modal>
+
+      <Modal open={!!cancelModal} onClose={() => setCancelModal(null)} title={`إلغاء الطلب ${cancelModal?.orderNumber ?? ''}`}>
+        <div className="space-y-4">
+          {(() => {
+            const order = orders.find(o => o.id === cancelModal?.id)
+            const isPaid = order?.payment_status === 'confirmed'
+            const driverArrived = ['arrived', 'picked_up'].includes(order?.status ?? '') || Number(order?.cancellation_fee) > 0
+            const total = Number(order?.total) || 0
+            const deliveryFee = Number(order?.delivery_fee) || 0
+            const refundAmount = isPaid ? (driverArrived ? (total - deliveryFee) : total) : 0
+            return isPaid ? (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                <p className="text-sm font-semibold text-red-700">⚠️ هذا الطلب مدفوع — سيتم استرداد {refundAmount.toFixed(2)} ج.م</p>
+                {driverArrived && <p className="text-xs text-red-500 mt-1">السائق وصل — رسوم التوصيل ({deliveryFee.toFixed(2)} ج.م) لن تُسترد</p>}
+              </div>
+            ) : null
+          })()}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">سبب الإلغاء <span className="text-red-400">*</span></label>
+            <textarea
+              value={cancelReason}
+              onChange={e => setCancelReason(e.target.value)}
+              placeholder="اكتب سبب الإلغاء..."
+              rows={3}
+              className="w-full px-4 py-3 rounded-xl border border-surface-border text-sm focus:ring-2 focus:ring-red-300 focus:border-red-400 outline-none resize-none"
+            />
+          </div>
+          <div className="flex gap-2">
+            <button onClick={cancelOrder}
+              className="flex-1 bg-red-500 text-white p-3 rounded-xl font-semibold text-sm hover:bg-red-600 transition-colors">
+              تأكيد الإلغاء
+            </button>
+            <button onClick={() => setCancelModal(null)}
+              className="px-6 py-3 border border-surface-border rounded-xl text-sm font-medium text-gray-500 hover:bg-gray-50 transition-colors">
+              تراجع
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
     </PermissionGate>

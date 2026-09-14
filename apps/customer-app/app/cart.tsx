@@ -358,17 +358,17 @@ export default function CartScreen() {
               <Text style={[s.cartItemPrice, { color: colors.navy[300] }]}>{item.price} {t('currency')} / {isEn ? 'item' : 'قطعة'}</Text>
             </View>
             <View style={s.cartItemActions}>
-              <TouchableOpacity onPress={() => removeItem(i)} style={[s.removeBtn, { backgroundColor: colors.danger + '20' }]}>
-                <Text style={[s.removeBtnText, { color: colors.danger }]}>✕</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => updateQuantity(i, item.quantity + 1)} style={[s.qtyBtn, { backgroundColor: colors.navy[700] }]}>
-                <Text style={s.qtyBtnText}>+</Text>
-              </TouchableOpacity>
-              <Text style={[s.qtyDisplay, { color: colors.text }]}>{item.quantity}</Text>
               <TouchableOpacity onPress={() => updateQuantity(i, item.quantity - 1)} style={[s.qtyBtn, { backgroundColor: colors.navy[700] }]}>
                 <Text style={s.qtyBtnText}>−</Text>
               </TouchableOpacity>
+              <Text style={[s.qtyDisplay, { color: colors.text }]}>{item.quantity}</Text>
+              <TouchableOpacity onPress={() => updateQuantity(i, item.quantity + 1)} style={[s.qtyBtn, { backgroundColor: colors.navy[700] }]}>
+                <Text style={s.qtyBtnText}>+</Text>
+              </TouchableOpacity>
             </View>
+            <TouchableOpacity onPress={() => removeItem(i)} style={[s.removeBtn, { backgroundColor: colors.danger + '20', marginStart: 10 }]}>
+              <Text style={[s.removeBtnText, { color: colors.danger }]}>✕</Text>
+            </TouchableOpacity>
           </View>
         ))}
 
@@ -498,7 +498,6 @@ export default function CartScreen() {
           <>
             <Text style={[s.sectionTitle, { color: colors.text }]}>💳 {isEn ? (useSubscription ? `Pay for uncovered items (${uncoveredTotal.toFixed(2)} ${t('currency')})` : 'Payment Method') : (useSubscription ? `دفع القطع خارج الباقة (${uncoveredTotal.toFixed(2)} ${t('currency')})` : 'طريقة الدفع')}</Text>
             <ScrollView horizontal nestedScrollEnabled={true} showsHorizontalScrollIndicator={false} contentContainerStyle={s.paymentChipsRow}
-              onContentSizeChange={() => { if (I18nManager.isRTL) paymentScrollRef.current?.scrollToEnd({ animated: false }) }}
               ref={paymentScrollRef}
             >
               {paymentMethods.map(pm => (
@@ -657,7 +656,7 @@ const s = StyleSheet.create({
   },
   qtyBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   qtyDisplay: { fontSize: 15, fontWeight: '700', minWidth: 22, textAlign: 'center' },
-  removeBtn: { width: 30, height: 30, borderRadius: 15, justifyContent: 'center', alignItems: 'center', marginLeft: 4 },
+  removeBtn: { width: 30, height: 30, borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
   removeBtnText: { fontSize: 12, fontWeight: '700' },
   addMoreBtn: { alignItems: 'center', paddingVertical: 12, marginTop: 4 },
   addMoreText: { fontSize: 14, fontWeight: '600' },

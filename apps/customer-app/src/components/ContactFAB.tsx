@@ -119,7 +119,7 @@ export default function ContactFAB() {
 const s = StyleSheet.create({
   fabContainer: {
     position: 'absolute',
-    bottom: 100,
+    bottom: 160,
     left: 16,
     zIndex: 999,
   },

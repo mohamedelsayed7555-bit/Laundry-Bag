@@ -160,12 +160,14 @@ export default function AddressesScreen() {
     if (!form.label.trim()) e.label = t('addressNameRequired')
     setFormErrors(e)
     if (Object.keys(e).length > 0) return
-    setShowConfirm(true)
+    setShowModal(false)
+    setTimeout(() => setShowConfirm(true), 300)
   }
 
   async function confirmSave() {
     if (!profile) return
     setShowConfirm(false)
+    setShowModal(false)
 
     const payload = {
       user_id: profile.id,
@@ -336,7 +338,7 @@ export default function AddressesScreen() {
               {form.notes ? <ConfirmRow label={t('theNotes')} value={form.notes} colors={colors} /> : null}
             </View>
             <View style={s.modalActions}>
-              <TouchableOpacity style={s.modalCancel} onPress={() => setShowConfirm(false)}>
+              <TouchableOpacity style={s.modalCancel} onPress={() => { setShowConfirm(false); setTimeout(() => setShowModal(true), 300) }}>
                 <Text style={s.modalCancelText}>{t('edit')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={s.modalSave} onPress={confirmSave}>

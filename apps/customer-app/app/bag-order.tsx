@@ -240,7 +240,6 @@ export default function BagOrderScreen() {
         <Animated.View entering={FadeInDown.duration(500).delay(200)}>
           <Text style={[s.sectionTitle, { color: colors.text }]}>💳 {t('paymentMethod')}</Text>
           <ScrollView horizontal nestedScrollEnabled={true} showsHorizontalScrollIndicator={false} contentContainerStyle={s.paymentChipsRow}
-            onContentSizeChange={() => { if (I18nManager.isRTL) bagPayScrollRef.current?.scrollToEnd({ animated: false }) }}
             ref={bagPayScrollRef}
           >
             {PAYMENT_METHODS.map(pm => (

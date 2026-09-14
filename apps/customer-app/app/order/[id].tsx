@@ -154,6 +154,7 @@ export default function OrderDetailsScreen() {
             status: 'cancelled',
             cancellation_reason: driverArrived ? 'إلغاء بعد الاستلام — رسوم توصيل' : 'إلغاء بواسطة العميل',
             cancellation_fee: fee,
+            cancelled_by: 'customer',
             cancelled_at: new Date().toISOString(),
           }).eq('id', id).eq('customer_id', profile!.id)
           if (error) {

@@ -428,7 +428,6 @@ export default function PlansScreen() {
 
       {/* ── Service Filter ── */}
       <ScrollView horizontal nestedScrollEnabled={true} showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }} contentContainerStyle={s.filterRow}
-        onContentSizeChange={() => { if (I18nManager.isRTL) filterScrollRef.current?.scrollToEnd({ animated: false }) }}
         ref={filterScrollRef}
       >
         {[
@@ -518,7 +517,6 @@ export default function PlansScreen() {
         {/* Duration */}
         <Text style={[s.settingsLabel, { color: colors.navy[300] }]}>{locale === 'en' ? 'Duration' : 'مدة الاشتراك'}</Text>
         <ScrollView horizontal nestedScrollEnabled={true} showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }} contentContainerStyle={s.durRow}
-          onContentSizeChange={() => { if (I18nManager.isRTL) durScrollRef.current?.scrollToEnd({ animated: false }) }}
           ref={durScrollRef}
         >
           {durationsMeta.map(d => {
