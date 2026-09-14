@@ -164,7 +164,7 @@ export default function EditProfileScreen() {
     <ScrollView style={s.container} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
       <View style={s.headerRow}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={s.backText}>→ {t('back')}</Text>
+          <Text style={s.backText}>{t('back')} ←</Text>
         </TouchableOpacity>
         <Text style={s.title}>{t('editProfileTitle')}</Text>
         <View style={{ width: 60 }} />

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, RefreshControl, Modal, TextInput, Dimensions, NativeScrollEvent, NativeSyntheticEvent, Animated as RNAnimated } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, RefreshControl, Modal, TextInput, Dimensions, NativeScrollEvent, NativeSyntheticEvent, Animated as RNAnimated, I18nManager } from 'react-native'
 import { useRouter } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated'
@@ -23,6 +23,7 @@ const statusColors: Record<string, string> = {
 
 const SCREEN_WIDTH = Dimensions.get('window').width
 const BANNER_WIDTH = SCREEN_WIDTH - 40
+const SERVICE_CARD_WIDTH = (SCREEN_WIDTH - 40 - 20) / 3
 
 function BannersCarousel({ bagOffer, activeSub, colors, t, locale, onBagPress, onNewOrderPress, onPlansPress }: any) {
   const [activeIndex, setActiveIndex] = useState(0)
@@ -81,26 +82,30 @@ function BannersCarousel({ bagOffer, activeSub, colors, t, locale, onBagPress, o
   banners.push({
     key: 'plans',
     node: activeSub ? (
-      <TouchableOpacity activeOpacity={0.8} onPress={onPlansPress} style={{ width: BANNER_WIDTH }}>
-        <View style={[cr.plansBanner, { backgroundColor: colors.goldGlow, borderColor: '#fbbf2430' }]}>
-          <View style={cr.plansIcon}><Text style={{ fontSize: 22 }}>👑</Text></View>
-          <View style={{ flex: 1 }}>
-            <Text style={[cr.plansTitle, { color: colors.gold }]}>{t('packagePrefix')} {locale === 'en' && activeSub.plans?.name ? (t(`plan:${activeSub.plans.name}` as any) !== `plan:${activeSub.plans.name}` ? t(`plan:${activeSub.plans.name}` as any) : activeSub.plans.name) : activeSub.plans?.name}</Text>
-            <Text style={[cr.plansSub, { color: colors.navy[200] }]}>{t('remaining')} {(activeSub.plans?.items_per_month ?? 0) - (activeSub.items_used ?? 0)} {t('pieces')}</Text>
+      <TouchableOpacity activeOpacity={0.85} onPress={onPlansPress} style={{ width: BANNER_WIDTH }}>
+        <LinearGradient colors={colors.gradientAccent as unknown as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={cr.bannerGradient}>
+          <View style={cr.row}>
+            <View style={{ flex: 1 }}>
+              <Text style={cr.title}>{t('packagePrefix')} {locale === 'en' && activeSub.plans?.name ? (t(`plan:${activeSub.plans.name}` as any) !== `plan:${activeSub.plans.name}` ? t(`plan:${activeSub.plans.name}` as any) : activeSub.plans.name) : activeSub.plans?.name}</Text>
+              <Text style={cr.subtitle}>{t('remaining')} {(activeSub.plans?.items_per_month ?? 0) - (activeSub.items_used ?? 0)} {t('pieces')}</Text>
+              <View style={cr.ctaWrap}><Text style={cr.ctaText}>{t('viewPlan')}</Text></View>
+            </View>
+            <Text style={{ fontSize: 48 }}>👑</Text>
           </View>
-          <Text style={{ fontSize: 20, color: colors.gold }}>←</Text>
-        </View>
+        </LinearGradient>
       </TouchableOpacity>
     ) : (
       <TouchableOpacity activeOpacity={0.85} onPress={onPlansPress} style={{ width: BANNER_WIDTH }}>
-        <View style={[cr.plansBanner, { backgroundColor: colors.warningGlow, borderColor: '#f59e0b30' }]}>
-          <View style={[cr.plansIcon, { backgroundColor: '#f59e0b20' }]}><Text style={{ fontSize: 22 }}>👑</Text></View>
-          <View style={{ flex: 1 }}>
-            <Text style={[cr.plansTitle, { color: '#f59e0b' }]}>{t('subscriptionPlans')}</Text>
-            <Text style={[cr.plansSub, { color: colors.navy[200] }]}>{t('saveMore')}</Text>
+        <LinearGradient colors={colors.gradientAccent as unknown as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={cr.bannerGradient}>
+          <View style={cr.row}>
+            <View style={{ flex: 1 }}>
+              <Text style={cr.title}>{t('subscriptionPlans')}</Text>
+              <Text style={cr.subtitle}>{t('saveMore')}</Text>
+              <View style={cr.ctaWrap}><Text style={cr.ctaText}>{t('viewPlans')}</Text></View>
+            </View>
+            <Text style={{ fontSize: 48 }}>👑</Text>
           </View>
-          <Text style={{ fontSize: 20, color: '#f59e0b' }}>←</Text>
-        </View>
+        </LinearGradient>
       </TouchableOpacity>
     ),
   })
@@ -109,6 +114,8 @@ function BannersCarousel({ bagOffer, activeSub, colors, t, locale, onBagPress, o
   const bannerCountRef = useRef(bannerCount)
   bannerCountRef.current = bannerCount
   const SNAP = BANNER_WIDTH + 12
+  const isRTL = I18nManager.isRTL
+  const initRef = useRef(false)
 
   const startAutoScroll = useCallback(() => {
     if (autoScrollTimer.current) clearInterval(autoScrollTimer.current)
@@ -116,17 +123,23 @@ function BannersCarousel({ bagOffer, activeSub, colors, t, locale, onBagPress, o
     autoScrollTimer.current = setInterval(() => {
       setActiveIndex(prev => {
         const count = bannerCountRef.current
-        const next = (prev + 1) % count
+        const next = isRTL ? (prev - 1 + count) % count : (prev + 1) % count
         scrollRef.current?.scrollTo({ x: next * SNAP, animated: true })
         return next
       })
     }, 4000)
-  }, [])
+  }, [isRTL])
 
   useEffect(() => {
+    if (isRTL && bannerCount > 1 && !initRef.current) {
+      initRef.current = true
+      const lastIdx = bannerCount - 1
+      setActiveIndex(lastIdx)
+      setTimeout(() => scrollRef.current?.scrollTo({ x: lastIdx * SNAP, animated: false }), 50)
+    }
     startAutoScroll()
     return () => { if (autoScrollTimer.current) clearInterval(autoScrollTimer.current) }
-  }, [startAutoScroll])
+  }, [startAutoScroll, bannerCount, isRTL])
 
   const handleScrollBegin = () => {
     if (autoScrollTimer.current) clearInterval(autoScrollTimer.current)
@@ -145,6 +158,7 @@ function BannersCarousel({ bagOffer, activeSub, colors, t, locale, onBagPress, o
       <ScrollView
         ref={scrollRef}
         horizontal
+        nestedScrollEnabled={true}
         showsHorizontalScrollIndicator={false}
         onScrollBeginDrag={handleScrollBegin}
         onMomentumScrollEnd={handleScrollEnd}
@@ -155,7 +169,7 @@ function BannersCarousel({ bagOffer, activeSub, colors, t, locale, onBagPress, o
         {banners.map((b, i) => <View key={b.key} style={{ width: BANNER_WIDTH, marginRight: i < bannerCount - 1 ? 12 : 0 }}>{b.node}</View>)}
       </ScrollView>
       {banners.length > 1 && (
-        <View style={cr.dots}>
+        <View style={[cr.dots, { flexDirection: I18nManager.isRTL ? 'row-reverse' : 'row' }]}>
           {banners.map((b, i) => (
             <View key={b.key} style={[cr.dot, { backgroundColor: i === activeIndex ? colors.primary : colors.navy[600] }]} />
           ))}
@@ -175,6 +189,7 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true)
   const [activeSub, setActiveSub] = useState<any>(null)
   const scrollHintAnim = useRef(new RNAnimated.Value(0)).current
+  const servicesScrollRef = useRef<ScrollView>(null)
   const [unreadCount, setUnreadCount] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
   const [bagOffer, setBagOffer] = useState<any>(null)
@@ -382,7 +397,10 @@ export default function HomeScreen() {
         <Text style={[s.sectionTitle, { color: colors.text }]}>{t('services')}</Text>
       </Animated.View>
       <View style={{ position: 'relative' }}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.servicesScroll} style={{ marginBottom: 24 }}>
+        <ScrollView horizontal nestedScrollEnabled={true} showsHorizontalScrollIndicator={false} contentContainerStyle={s.servicesScroll} style={{ marginBottom: 24 }}
+          onContentSizeChange={(w, h) => { if (I18nManager.isRTL) servicesScrollRef.current?.scrollToEnd({ animated: false }) }}
+          ref={servicesScrollRef}
+        >
           {services.map((svc, i) => (
             <Animated.View key={svc.key} entering={FadeInDown.duration(300).delay(150 + i * 40)}>
               <TouchableOpacity style={[s.serviceCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]} activeOpacity={0.7}
@@ -544,7 +562,7 @@ const s = StyleSheet.create({
   serviceCard: {
     borderRadius: 16,
     padding: 14, alignItems: 'center', gap: 4,
-    borderWidth: 1, width: 110,
+    borderWidth: 1, width: SERVICE_CARD_WIDTH, minHeight: 120,
   },
   serviceIconWrap: {
     width: 44, height: 44, borderRadius: 14,
@@ -563,16 +581,16 @@ const s = StyleSheet.create({
   emptySubText: { fontSize: 12, marginTop: 4 },
 
   orderCard: {
-    borderRadius: 18, padding: 16, marginBottom: 10,
+    borderRadius: 18, padding: 18, marginBottom: 12,
     borderWidth: 1,
   },
   orderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  orderDivider: { height: 1, marginVertical: 10 },
-  orderNumber: { fontSize: 14, fontWeight: '700' },
-  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  statusText: { fontSize: 10, fontWeight: '700' },
-  orderDate: { fontSize: 11 },
-  orderTotal: { fontSize: 15, fontWeight: '800' },
+  orderDivider: { height: 1, marginVertical: 12 },
+  orderNumber: { fontSize: 16, fontWeight: '800' },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 12 },
+  statusText: { fontSize: 11, fontWeight: '700' },
+  orderDate: { fontSize: 12 },
+  orderTotal: { fontSize: 16, fontWeight: '800' },
 })
 
 const cr = StyleSheet.create({
@@ -591,10 +609,6 @@ const cr = StyleSheet.create({
   perDay: { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
   ctaWrap: { backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'flex-start', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, marginTop: 12 },
   ctaText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  plansBanner: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 24, padding: 20, borderWidth: 1, minHeight: 80 },
-  plansIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#fbbf2420', justifyContent: 'center', alignItems: 'center' },
-  plansTitle: { fontSize: 15, fontWeight: '700' },
-  plansSub: { fontSize: 12, marginTop: 2 },
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 10 },
   dot: { width: 8, height: 8, borderRadius: 4 },
 })

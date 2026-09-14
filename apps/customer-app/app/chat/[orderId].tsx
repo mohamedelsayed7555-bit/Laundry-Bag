@@ -127,7 +127,7 @@ export default function ChatScreen() {
       {/* Header */}
       <View style={[s.header, { backgroundColor: colors.navy[800], borderBottomColor: colors.navy[700] }]}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={[s.backText, { color: colors.primary }]}>→</Text>
+          <Text style={[s.backText, { color: colors.primary }]}>←</Text>
         </TouchableOpacity>
         <View style={s.headerInfo}>
           <Text style={[s.headerName, { color: colors.text }]}>{otherName}</Text>

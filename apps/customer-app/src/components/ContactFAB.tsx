@@ -119,14 +119,14 @@ export default function ContactFAB() {
 const s = StyleSheet.create({
   fabContainer: {
     position: 'absolute',
-    bottom: 160,
-    left: 20,
+    bottom: 100,
+    left: 16,
     zIndex: 999,
   },
   fab: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
     shadowOffset: { width: 0, height: 4 },

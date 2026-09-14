@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Modal, ActivityIndicator, Platform, ScrollView } from 'react-native'
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Modal, ActivityIndicator, Platform, ScrollView, KeyboardAvoidingView } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../src/contexts/AuthContext'
 import { useCustomAlert } from '../src/components/CustomAlert'
@@ -71,6 +71,8 @@ export default function AddressesScreen() {
   const [geocoding, setGeocoding] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const webviewRef = useRef<WebView>(null)
+  const formScrollRef = useRef<ScrollView>(null)
+  const mapExpanded = useRef(false)
 
   async function reverseGeocode(lat: number, lng: number) {
     setGeocoding(true)
@@ -146,6 +148,7 @@ export default function AddressesScreen() {
       if (msg.type === 'pin') {
         setPin({ latitude: msg.lat, longitude: msg.lng })
         reverseGeocode(msg.lat, msg.lng)
+        setTimeout(() => formScrollRef.current?.scrollTo({ y: 280, animated: true }), 500)
       }
     } catch {}
   }
@@ -210,7 +213,7 @@ export default function AddressesScreen() {
     <View style={s.container}>
       <View style={s.headerRow}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={s.backText}>→ {t('back')}</Text>
+          <Text style={s.backText}>{t('back')} ←</Text>
         </TouchableOpacity>
         <Text style={s.title}>{t('myAddressesTitle')}</Text>
         <TouchableOpacity onPress={openAdd}>
@@ -264,49 +267,51 @@ export default function AddressesScreen() {
       )}
 
       <Modal visible={showModal} animationType="slide" transparent>
-        <View style={s.modalOverlay}>
-          <ScrollView style={s.modalContent} contentContainerStyle={{ paddingBottom: 40 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            <Text style={s.modalTitle}>{editing ? t('editAddress') : t('addNewAddress')}</Text>
+        <KeyboardAvoidingView style={s.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={s.modalContent}>
+            <ScrollView ref={formScrollRef} contentContainerStyle={{ paddingBottom: 20 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} nestedScrollEnabled>
+              <Text style={s.modalTitle}>{editing ? t('editAddress') : t('addNewAddress')}</Text>
 
-            <Text style={s.fieldLabel}>{t('selectMapLocation')}</Text>
-            <View style={s.mapContainer}>
-              <WebView
-                ref={webviewRef}
-                source={{ html: buildPickerMapHTML(pin.latitude, pin.longitude) }}
-                style={s.map}
-                onMessage={handleMapMessage}
-                javaScriptEnabled
-                domStorageEnabled
-                startInLoadingState
-                originWhitelist={['*']}
-                scrollEnabled={false}
-                nestedScrollEnabled
-              />
-              <TouchableOpacity style={s.myLocBtn} onPress={useMyLocation} disabled={locatingMe}>
-                {locatingMe
-                  ? <ActivityIndicator size="small" color={colors.primary} />
-                  : <Text style={s.myLocText}>{t('myCurrentLocation')}</Text>
-                }
-              </TouchableOpacity>
-            </View>
-
-            {geocoding && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <ActivityIndicator size="small" color={colors.primary} />
-                <Text style={{ color: colors.navy[300], fontSize: 12 }}>{t('locatingAddress')}</Text>
+              <Text style={s.fieldLabel}>{t('selectMapLocation')}</Text>
+              <View style={s.mapContainer}>
+                <WebView
+                  ref={webviewRef}
+                  source={{ html: buildPickerMapHTML(pin.latitude, pin.longitude) }}
+                  style={s.map}
+                  onMessage={handleMapMessage}
+                  javaScriptEnabled
+                  domStorageEnabled
+                  startInLoadingState
+                  originWhitelist={['*']}
+                  scrollEnabled={false}
+                  nestedScrollEnabled
+                />
+                <TouchableOpacity style={s.myLocBtn} onPress={useMyLocation} disabled={locatingMe}>
+                  {locatingMe
+                    ? <ActivityIndicator size="small" color={colors.primary} />
+                    : <Text style={s.myLocText}>{t('myCurrentLocation')}</Text>
+                  }
+                </TouchableOpacity>
               </View>
-            )}
 
-            <FormField label={t('addressName')} value={form.label} onChange={v => { setForm(f => ({ ...f, label: v })); setFormErrors(p => { const n = {...p}; delete n.label; return n }) }} placeholder={t('addressNamePlaceholder')} error={formErrors.label} />
-            <FormField label={t('theBuilding')} value={form.building} onChange={v => setForm(f => ({ ...f, building: v }))} placeholder={t('buildingPlaceholder')} />
-            <View style={s.row}>
-              <View style={{ flex: 1 }}><FormField label={t('theFloor')} value={form.floor} onChange={v => setForm(f => ({ ...f, floor: v }))} placeholder="3" /></View>
-              <View style={{ flex: 1 }}><FormField label={t('theApartment')} value={form.apartment} onChange={v => setForm(f => ({ ...f, apartment: v }))} placeholder="12" /></View>
-            </View>
-            <FormField label={t('theLandmark')} value={form.landmark} onChange={v => setForm(f => ({ ...f, landmark: v }))} placeholder={t('landmarkPlaceholder')} />
-            <FormField label={t('theNotes')} value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} placeholder={t('notesFieldPlaceholder')} />
+              {geocoding && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={{ color: colors.navy[300], fontSize: 12 }}>{t('locatingAddress')}</Text>
+                </View>
+              )}
 
-            <View style={s.modalActions}>
+              <FormField label={t('addressName')} value={form.label} onChange={v => { setForm(f => ({ ...f, label: v })); setFormErrors(p => { const n = {...p}; delete n.label; return n }) }} placeholder={t('addressNamePlaceholder')} error={formErrors.label} />
+              <FormField label={t('theBuilding')} value={form.building} onChange={v => setForm(f => ({ ...f, building: v }))} placeholder={t('buildingPlaceholder')} />
+              <View style={s.row}>
+                <View style={{ flex: 1 }}><FormField label={t('theFloor')} value={form.floor} onChange={v => setForm(f => ({ ...f, floor: v }))} placeholder="3" /></View>
+                <View style={{ flex: 1 }}><FormField label={t('theApartment')} value={form.apartment} onChange={v => setForm(f => ({ ...f, apartment: v }))} placeholder="12" /></View>
+              </View>
+              <FormField label={t('theLandmark')} value={form.landmark} onChange={v => setForm(f => ({ ...f, landmark: v }))} placeholder={t('landmarkPlaceholder')} />
+              <FormField label={t('theNotes')} value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} placeholder={t('notesFieldPlaceholder')} />
+            </ScrollView>
+
+            <View style={s.stickyActions}>
               <TouchableOpacity style={s.modalCancel} onPress={() => setShowModal(false)}>
                 <Text style={s.modalCancelText}>{t('cancel')}</Text>
               </TouchableOpacity>
@@ -314,8 +319,8 @@ export default function AddressesScreen() {
                 <Text style={s.modalSaveText}>{t('save')}</Text>
               </TouchableOpacity>
             </View>
-          </ScrollView>
-        </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal visible={showConfirm} animationType="fade" transparent>
@@ -381,20 +386,21 @@ function getStyles(colors: any) { return StyleSheet.create({
   actionText: { color: colors.primary, fontSize: 12, fontWeight: '600' },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: colors.navy[800], borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '90%' },
+  modalContent: { backgroundColor: colors.navy[800], borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 24, paddingTop: 24, maxHeight: '92%', flex: 0, flexShrink: 1 },
   modalTitle: { fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: 16, textAlign: 'center' },
   row: { flexDirection: 'row', gap: 12 },
   fieldLabel: { fontSize: 12, color: colors.navy[200], marginBottom: 4, textAlign: 'right' },
   fieldInput: { backgroundColor: colors.navy[700], borderRadius: 10, padding: 12, color: colors.text, fontSize: 14, borderWidth: 1.5, borderColor: 'transparent' },
   fieldInputError: { borderColor: '#ef4444', backgroundColor: '#ef444410' },
   fieldError: { fontSize: 11, color: '#ef4444', textAlign: 'right', marginTop: 3, fontWeight: '500' },
+  stickyActions: { flexDirection: 'row', gap: 12, paddingVertical: 16, borderTopWidth: 1, borderTopColor: colors.navy[700] },
   modalActions: { flexDirection: 'row', gap: 12, marginTop: 20 },
   modalCancel: { flex: 1, borderWidth: 1, borderColor: colors.navy[500], borderRadius: 12, padding: 14, alignItems: 'center' },
   modalCancelText: { color: colors.navy[200], fontWeight: '600' },
   modalSave: { flex: 2, backgroundColor: colors.primary, borderRadius: 12, padding: 14, alignItems: 'center' },
   modalSaveText: { color: '#fff', fontWeight: '700' },
 
-  mapContainer: { height: 160, borderRadius: 16, overflow: 'hidden', marginBottom: 16, position: 'relative' },
+  mapContainer: { height: 240, borderRadius: 16, overflow: 'hidden', marginBottom: 16, position: 'relative' },
   map: { flex: 1 },
   myLocBtn: {
     position: 'absolute', bottom: 10, left: 10,

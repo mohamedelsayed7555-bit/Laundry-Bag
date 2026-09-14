@@ -29,43 +29,45 @@ import { useRouter } from 'next/navigation'
 import Tooltip from '@/components/ui/Tooltip'
 import { useAuth, ROUTE_PERMISSIONS } from '@/lib/auth-context'
 import { useLang } from '@/lib/language-context'
+import { useActions } from '@/lib/actions-context'
 
-function useNavGroups() {
+function useNavGroups(badges: Record<string, number>) {
   const { t } = useLang()
   return [
     {
       label: t.sidebar.mainMenu,
       items: [
-        { label: t.sidebar.home, href: '/', icon: LayoutDashboard },
-        { label: t.sidebar.orders, href: '/orders', icon: ClipboardList },
+        { label: t.sidebar.home, href: '/', icon: LayoutDashboard, badge: 0 },
+        { label: 'مركز المهام', href: '/actions', icon: Bell, badge: badges.actions || 0 },
+        { label: t.sidebar.orders, href: '/orders', icon: ClipboardList, badge: badges.orders || 0 },
       ],
     },
     {
       label: t.sidebar.resourceManagement,
       items: [
-        { label: t.sidebar.customers, href: '/customers', icon: Users },
-        { label: t.sidebar.drivers, href: '/drivers', icon: Truck },
-        { label: t.sidebar.branches, href: '/branches', icon: MapPin },
+        { label: t.sidebar.customers, href: '/customers', icon: Users, badge: 0 },
+        { label: t.sidebar.drivers, href: '/drivers', icon: Truck, badge: 0 },
+        { label: t.sidebar.branches, href: '/branches', icon: MapPin, badge: 0 },
       ],
     },
     {
       label: t.sidebar.financialOps,
       items: [
-        { label: t.sidebar.prices, href: '/prices', icon: Tag },
-        { label: t.sidebar.plans, href: '/plans', icon: Crown },
-        { label: 'الاشتراكات', href: '/subscriptions', icon: Crown },
-        { label: t.sidebar.finance, href: '/finance', icon: DollarSign },
-        { label: t.sidebar.inventory, href: '/inventory', icon: Package },
+        { label: t.sidebar.prices, href: '/prices', icon: Tag, badge: 0 },
+        { label: t.sidebar.plans, href: '/plans', icon: Crown, badge: 0 },
+        { label: 'الاشتراكات', href: '/subscriptions', icon: Crown, badge: badges.subs || 0 },
+        { label: t.sidebar.finance, href: '/finance', icon: DollarSign, badge: badges.finance || 0 },
+        { label: t.sidebar.inventory, href: '/inventory', icon: Package, badge: 0 },
       ],
     },
     {
       label: t.sidebar.analytics,
       items: [
-        { label: t.sidebar.reports, href: '/reports', icon: BarChart3 },
-        { label: 'التقييمات', href: '/ratings', icon: Star },
-        { label: t.sidebar.auditLog, href: '/audit', icon: ScrollText },
-        { label: 'الإشعارات', href: '/notifications', icon: Bell },
-        { label: t.sidebar.settings, href: '/settings', icon: Settings },
+        { label: t.sidebar.reports, href: '/reports', icon: BarChart3, badge: 0 },
+        { label: 'التقييمات', href: '/ratings', icon: Star, badge: 0 },
+        { label: t.sidebar.auditLog, href: '/audit', icon: ScrollText, badge: 0 },
+        { label: 'الإشعارات', href: '/notifications', icon: Bell, badge: 0 },
+        { label: t.sidebar.settings, href: '/settings', icon: Settings, badge: 0 },
       ],
     },
   ]
@@ -76,7 +78,13 @@ export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onMob
   const router = useRouter()
   const { hasPermission } = useAuth()
   const { t } = useLang()
-  const navGroups = useNavGroups()
+  const { counts } = useActions()
+  const navGroups = useNavGroups({
+    actions: counts.total,
+    orders: counts.unassignedOrders,
+    finance: counts.pendingPayments + counts.pendingRefunds,
+    subs: counts.pendingSubPayments,
+  })
   const [internalCollapsed, setInternalCollapsed] = useState(false)
   const isCollapsed = collapsed ?? internalCollapsed
   const toggleCollapse = onToggleCollapse ?? (() => setInternalCollapsed(c => !c))
@@ -212,6 +220,14 @@ export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onMob
                         </motion.span>
                       )}
                     </AnimatePresence>
+                    {!isCollapsed && item.badge > 0 && (
+                      <span className="relative z-10 mr-auto flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+                        {item.badge > 99 ? '99+' : item.badge}
+                      </span>
+                    )}
+                    {isCollapsed && item.badge > 0 && (
+                      <span className="absolute top-0.5 right-0.5 w-2.5 h-2.5 rounded-full bg-red-500 z-20 border border-navy-900" />
+                    )}
                     {isActive && !isCollapsed && (
                       <div className="absolute left-3 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-primary-400 z-10" />
                     )}

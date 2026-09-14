@@ -7,6 +7,7 @@ import { ToastProvider } from '@/components/ui/Toast'
 import { AuthProvider } from '@/lib/auth-context'
 import { ThemeProvider } from '@/lib/theme-context'
 import { LanguageProvider } from '@/lib/language-context'
+import { ActionsProvider } from '@/lib/actions-context'
 import { motion } from 'framer-motion'
 import RealtimeNotifier from '@/components/layout/RealtimeNotifier'
 
@@ -46,6 +47,7 @@ export default function DashboardLayout({
       <LanguageProvider>
         <AuthProvider>
           <ToastProvider>
+            <ActionsProvider>
             <RealtimeNotifier />
             <div className="min-h-screen bg-surface">
               <Sidebar
@@ -74,6 +76,7 @@ export default function DashboardLayout({
                 </motion.main>
               </div>
             </div>
+          </ActionsProvider>
           </ToastProvider>
         </AuthProvider>
       </LanguageProvider>

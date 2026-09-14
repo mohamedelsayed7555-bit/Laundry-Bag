@@ -120,7 +120,7 @@ export default function NotificationsScreen() {
     <View style={[s.container, { backgroundColor: colors.navy[900] }]}>
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={[s.backBtn, { color: colors.primary }]}>→ {isEn ? 'Back' : 'رجوع'}</Text>
+          <Text style={[s.backBtn, { color: colors.primary }]}>{isEn ? '← Back' : 'رجوع ←'}</Text>
         </TouchableOpacity>
         <Text style={[s.title, { color: colors.text }]}>🔔 {isEn ? 'Notifications' : 'الإشعارات'}</Text>
         <View style={{ width: 60 }} />

@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, TextInput, RefreshControl, Image } from 'react-native'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, TextInput, RefreshControl, Image, I18nManager } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import Animated, { FadeInDown } from 'react-native-reanimated'
@@ -29,6 +29,7 @@ export default function BagOrderScreen() {
   const [addresses, setAddresses] = useState<any[]>([])
   const [selectedAddress, setSelectedAddress] = useState<any>(null)
   const [paymentMethod, setPaymentMethod] = useState('cash')
+  const bagPayScrollRef = useRef<ScrollView>(null)
   const [walletPhone, setWalletPhone] = useState('')
   const [paymentSettings, setPaymentSettings] = useState<{ instapay: string; wallet: string }>({ instapay: '', wallet: '' })
   const [loading, setLoading] = useState(true)
@@ -176,7 +177,7 @@ export default function BagOrderScreen() {
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}>
         {/* Offer Card */}
         <Animated.View entering={FadeInDown.duration(500)}>
-          <LinearGradient colors={[colors.navy[700], colors.navy[800]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.offerCard, { borderWidth: 1, borderColor: colors.primary + '40' }]}>
+          <LinearGradient colors={['#1a2138', '#121829']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.offerCard, { borderWidth: 1, borderColor: colors.primary + '40' }]}>
             <View style={s.offerBadges}>
               <View style={[s.badge, { backgroundColor: colors.primary }]}><Text style={[s.badgeText, { color: '#fff' }]}>{t('bagBadge')}</Text></View>
               {discount > 0 && <View style={s.discountBadge}><Text style={s.discountText}>-{discount}%</Text></View>}
@@ -238,7 +239,10 @@ export default function BagOrderScreen() {
         {/* Payment */}
         <Animated.View entering={FadeInDown.duration(500).delay(200)}>
           <Text style={[s.sectionTitle, { color: colors.text }]}>💳 {t('paymentMethod')}</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.paymentChipsRow}>
+          <ScrollView horizontal nestedScrollEnabled={true} showsHorizontalScrollIndicator={false} contentContainerStyle={s.paymentChipsRow}
+            onContentSizeChange={() => { if (I18nManager.isRTL) bagPayScrollRef.current?.scrollToEnd({ animated: false }) }}
+            ref={bagPayScrollRef}
+          >
             {PAYMENT_METHODS.map(pm => (
               <TouchableOpacity key={pm.key} onPress={() => setPaymentMethod(pm.key)}
                 style={[s.paymentChip, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, paymentMethod === pm.key && { borderColor: colors.primary, backgroundColor: colors.primary + '10' }]}>

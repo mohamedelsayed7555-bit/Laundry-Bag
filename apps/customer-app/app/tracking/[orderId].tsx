@@ -135,7 +135,7 @@ export default function TrackingScreen() {
       {/* Header */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Text style={s.backText}>{isEn ? '→ Back' : '→ رجوع'}</Text>
+          <Text style={s.backText}>{isEn ? '← Back' : 'رجوع ←'}</Text>
         </TouchableOpacity>
         <Text style={s.title}>{isEn ? 'Track Driver' : 'تتبع السائق'}</Text>
         <View style={{ width: 60 }} />

@@ -180,7 +180,7 @@ export default function EditOrderScreen() {
     <ScrollView style={s.container} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
       <View style={s.headerRow}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={s.backText}>{isEn ? '→ Back' : '→ رجوع'}</Text>
+          <Text style={s.backText}>{isEn ? '← Back' : 'رجوع ←'}</Text>
         </TouchableOpacity>
         <Text style={s.title}>{isEn ? 'Edit Order' : 'تعديل الطلب'}</Text>
         <View style={{ width: 60 }} />
@@ -244,12 +244,12 @@ export default function EditOrderScreen() {
       {selectedService ? (
         <View style={s.addRow}>
           <View style={s.counterRow}>
-            <TouchableOpacity style={s.counterBtn} onPress={() => setItemQty(Math.max(1, itemQty - 1))}>
-              <Text style={s.counterText}>−</Text>
-            </TouchableOpacity>
-            <Text style={s.counterValue}>{itemQty}</Text>
             <TouchableOpacity style={s.counterBtn} onPress={() => setItemQty(itemQty + 1)}>
               <Text style={s.counterText}>+</Text>
+            </TouchableOpacity>
+            <Text style={s.counterValue}>{itemQty}</Text>
+            <TouchableOpacity style={s.counterBtn} onPress={() => setItemQty(Math.max(1, itemQty - 1))}>
+              <Text style={s.counterText}>−</Text>
             </TouchableOpacity>
           </View>
           <TouchableOpacity style={s.addBtn} onPress={addToCart}>

@@ -190,12 +190,11 @@ export default function FinancePage() {
     setRows(prev => prev.map(r => r.id === id ? { ...r, payment_status: 'refunded', status: 'refunded' } : r))
     setStats(prev => ({
       ...prev,
-      revenue: prev.revenue - total,
-      paid: prev.paid - (total - deliveryFee),
-      deliveryFees: driverArrived ? prev.deliveryFees : prev.deliveryFees - deliveryFee,
+      revenue: prev.revenue - refundAmount,
+      paid: prev.paid - refundAmount,
     }))
     toast(`تم استرداد ${refundAmount.toFixed(2)} ج.م${driverArrived ? ' (بدون رسوم التوصيل)' : ' (شامل التوصيل)'}`)
-    const { error } = await supabase.from('orders').update({ payment_status: 'refunded', status: 'refunded' }).eq('id', id)
+    const { error } = await supabase.from('orders').update({ payment_status: 'refunded', status: 'refunded', refund_amount: refundAmount }).eq('id', id)
     if (error) { toast('حدث خطأ — جاري التحديث', 'error'); load() }
   }
 
@@ -244,7 +243,7 @@ export default function FinancePage() {
       if (item._source !== 'order') return null
       const isCancelled = ['cancelled', 'refunded'].includes(item.status)
       const canConfirm = item.payment_status === 'pending' && !isCancelled
-      const canRefund = item.payment_status === 'confirmed' && ['visa', 'e_wallet', 'wallet', 'instapay'].includes(item.payment_method) && ['pending', 'assigned', 'arrived', 'picked_up', 'cancelled'].includes(item.status)
+      const canRefund = item.payment_status === 'confirmed' && ['visa', 'e_wallet', 'wallet', 'instapay', 'cash'].includes(item.payment_method) && ['pending', 'assigned', 'arrived', 'picked_up', 'cancelled'].includes(item.status)
       return (
         <div className="flex gap-1.5">
           {canConfirm && (

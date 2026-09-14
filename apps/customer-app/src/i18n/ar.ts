@@ -76,6 +76,8 @@ export default {
   packagePrefix: 'باقة',
   remaining: 'متبقي',
   pieces: 'قطعة',
+  viewPlan: 'عرض الباقة ←',
+  viewPlans: 'اشترك الآن ←',
 
   // Orders
   myOrders: 'طلباتي',

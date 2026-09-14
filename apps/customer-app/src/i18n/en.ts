@@ -77,6 +77,8 @@ export default {
   packagePrefix: 'Plan',
   remaining: 'Remaining',
   pieces: 'pieces',
+  viewPlan: 'View Plan →',
+  viewPlans: 'Subscribe Now →',
 
   // Orders
   myOrders: 'My Orders',

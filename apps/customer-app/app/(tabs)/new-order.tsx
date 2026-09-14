@@ -109,6 +109,10 @@ export default function NewOrderScreen() {
     })
   }, [profile])
 
+  useEffect(() => {
+    if (params.service) setSelectedService(params.service)
+  }, [params.service])
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
     await loadData()
@@ -148,11 +152,15 @@ export default function NewOrderScreen() {
     }
   }, [categoriesWithItems])
 
+  const [justAdded, setJustAdded] = useState<string | null>(null)
+
   const handleAddItem = (itemType: string) => {
     if (!selectedService) return
     const unitPrice = getPrice(itemType, selectedService)
     if (unitPrice === 0) return
     addItem({ name: itemType, service_type: selectedService, quantity: 1, price: unitPrice })
+    setJustAdded(itemType)
+    setTimeout(() => setJustAdded(null), 800)
   }
 
   const catName = (name: string) => locale === 'en' ? (t(`cat:${name}`) !== `cat:${name}` ? t(`cat:${name}`) : name) : name
@@ -263,22 +271,22 @@ export default function NewOrderScreen() {
                         const price = getPrice(itemType, selectedService)
                         const inCart = cart.find(c => c.name === itemType && c.service_type === selectedService)
                         return (
-                          <View key={itemType} style={[s.accordionItem, idx < cat.itemTypes.length - 1 && { borderBottomColor: colors.navy[700], borderBottomWidth: 0.5 }]}>
+                          <View key={itemType} style={[s.accordionItem, idx < cat.itemTypes.length - 1 && { borderBottomColor: colors.navy[700], borderBottomWidth: 0.5 }, justAdded === itemType && { backgroundColor: colors.primary + '15' }]}>
                             <View style={{ flex: 1 }}>
                               <Text style={[s.accordionItemName, { color: colors.text }]}>{itemName(itemType)}</Text>
                               <Text style={[s.accordionItemPrice, { color: colors.navy[300] }]}>{price} {t('currency')}</Text>
                             </View>
                             {inCart ? (
                               <View style={s.inCartCounter}>
-                                <TouchableOpacity onPress={() => { const i = cart.indexOf(inCart); removeItem(i) }} style={[s.inCartRemoveBtn, { backgroundColor: colors.danger + '20' }]}>
-                                  <Text style={[s.inCartRemoveBtnText, { color: colors.danger }]}>✕</Text>
+                                <TouchableOpacity onPress={() => { const i = cart.indexOf(inCart); updateQuantity(i, inCart.quantity + 1) }} style={[s.inCartBtn, { backgroundColor: colors.primary }]}>
+                                  <Text style={s.inCartBtnText}>+</Text>
                                 </TouchableOpacity>
+                                <Text style={[s.inCartQty, { color: colors.text }]}>{inCart.quantity}</Text>
                                 <TouchableOpacity onPress={() => { const i = cart.indexOf(inCart); updateQuantity(i, inCart.quantity - 1) }} style={[s.inCartBtn, { backgroundColor: colors.navy[700] }]}>
                                   <Text style={s.inCartBtnText}>−</Text>
                                 </TouchableOpacity>
-                                <Text style={[s.inCartQty, { color: colors.text }]}>{inCart.quantity}</Text>
-                                <TouchableOpacity onPress={() => { const i = cart.indexOf(inCart); updateQuantity(i, inCart.quantity + 1) }} style={[s.inCartBtn, { backgroundColor: colors.primary }]}>
-                                  <Text style={s.inCartBtnText}>+</Text>
+                                <TouchableOpacity onPress={() => { const i = cart.indexOf(inCart); removeItem(i) }} style={[s.inCartRemoveBtn, { backgroundColor: colors.danger + '20' }]}>
+                                  <Text style={[s.inCartRemoveBtnText, { color: colors.danger }]}>✕</Text>
                                 </TouchableOpacity>
                               </View>
                             ) : (
@@ -304,7 +312,7 @@ export default function NewOrderScreen() {
       {cart.length > 0 && (
         <Animated.View style={[s.floatingBar, barAnimStyle]}>
           <TouchableOpacity
-            style={[s.floatingBarInner, { backgroundColor: colors.primary, shadowColor: colors.primary }]}
+            style={[s.floatingBarInner, { backgroundColor: colors.primary, shadowColor: '#000' }]}
             activeOpacity={0.85}
             onPress={() => router.push('/cart')}
           >
@@ -316,11 +324,9 @@ export default function NewOrderScreen() {
             </View>
             <View style={s.floatingBarCenter}>
               <Text style={s.floatingBarLabel}>{locale === 'en' ? 'Complete order' : 'إتمام الطلب'}</Text>
-              <Text style={s.floatingBarHint}>{locale === 'en' ? 'Tap to review & confirm' : 'اضغط لمراجعة وتأكيد'}</Text>
             </View>
             <View style={s.floatingBarRight}>
               <Text style={s.floatingBarPrice}>{totalPrice.toFixed(2)} {t('currency')}</Text>
-              <Text style={s.floatingBarArrow}>←</Text>
             </View>
           </TouchableOpacity>
         </Animated.View>
@@ -396,22 +402,21 @@ const s = StyleSheet.create({
   },
   floatingBarInner: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14,
-    shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 14, elevation: 10,
+    borderRadius: 18, paddingHorizontal: 16, paddingVertical: 12,
+    shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.5, shadowRadius: 20, elevation: 14,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
   },
   floatingBarLeft: { flexDirection: 'row', alignItems: 'center' },
-  floatingBarIcon: { fontSize: 20 },
+  floatingBarIcon: { fontSize: 22 },
   floatingBadge: {
-    backgroundColor: '#fff', borderRadius: 12, minWidth: 24, height: 24,
+    backgroundColor: '#FFD600', borderRadius: 12, minWidth: 26, height: 26,
     justifyContent: 'center', alignItems: 'center', paddingHorizontal: 6, marginLeft: 6,
   },
-  floatingBadgeText: { fontSize: 13, fontWeight: '800' },
+  floatingBadgeText: { fontSize: 14, fontWeight: '900', color: '#000' },
   floatingBarCenter: { alignItems: 'center', flex: 1 },
-  floatingBarLabel: { fontSize: 16, fontWeight: '800', color: '#fff' },
-  floatingBarHint: { fontSize: 10, color: 'rgba(255,255,255,0.7)', fontWeight: '600', marginTop: 1 },
+  floatingBarLabel: { fontSize: 15, fontWeight: '800', color: '#fff' },
   floatingBarRight: { alignItems: 'flex-end' },
-  floatingBarPrice: { fontSize: 15, fontWeight: '700', color: '#fff' },
-  floatingBarArrow: { fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 1 },
+  floatingBarPrice: { fontSize: 16, fontWeight: '900', color: '#FFD600' },
   closedBanner: {
     borderRadius: 16, padding: 20, marginBottom: 16, borderWidth: 1,
     alignItems: 'center', gap: 6,

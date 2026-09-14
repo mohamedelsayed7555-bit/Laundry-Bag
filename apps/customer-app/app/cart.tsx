@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Platform, RefreshControl } from 'react-native'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Platform, RefreshControl, I18nManager } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter, useFocusEffect } from 'expo-router'
 import DateTimePicker from '@react-native-community/datetimepicker'
@@ -60,6 +60,7 @@ export default function CartScreen() {
   const [outOfZone, setOutOfZone] = useState(false)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const paymentScrollRef = useRef<ScrollView>(null)
   const [showPickupPicker, setShowPickupPicker] = useState(false)
   const [showDeliveryPicker, setShowDeliveryPicker] = useState(false)
   const [showNotes, setShowNotes] = useState(false)
@@ -357,15 +358,15 @@ export default function CartScreen() {
               <Text style={[s.cartItemPrice, { color: colors.navy[300] }]}>{item.price} {t('currency')} / {isEn ? 'item' : 'قطعة'}</Text>
             </View>
             <View style={s.cartItemActions}>
-              <TouchableOpacity onPress={() => updateQuantity(i, item.quantity - 1)} style={[s.qtyBtn, { backgroundColor: colors.navy[700] }]}>
-                <Text style={s.qtyBtnText}>−</Text>
+              <TouchableOpacity onPress={() => removeItem(i)} style={[s.removeBtn, { backgroundColor: colors.danger + '20' }]}>
+                <Text style={[s.removeBtnText, { color: colors.danger }]}>✕</Text>
               </TouchableOpacity>
-              <Text style={[s.qtyDisplay, { color: colors.text }]}>{item.quantity}</Text>
               <TouchableOpacity onPress={() => updateQuantity(i, item.quantity + 1)} style={[s.qtyBtn, { backgroundColor: colors.navy[700] }]}>
                 <Text style={s.qtyBtnText}>+</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => removeItem(i)} style={[s.removeBtn, { backgroundColor: colors.danger + '20' }]}>
-                <Text style={[s.removeBtnText, { color: colors.danger }]}>✕</Text>
+              <Text style={[s.qtyDisplay, { color: colors.text }]}>{item.quantity}</Text>
+              <TouchableOpacity onPress={() => updateQuantity(i, item.quantity - 1)} style={[s.qtyBtn, { backgroundColor: colors.navy[700] }]}>
+                <Text style={s.qtyBtnText}>−</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -496,7 +497,10 @@ export default function CartScreen() {
         {(!useSubscription || (useSubscription && uncoveredCount > 0)) && (
           <>
             <Text style={[s.sectionTitle, { color: colors.text }]}>💳 {isEn ? (useSubscription ? `Pay for uncovered items (${uncoveredTotal.toFixed(2)} ${t('currency')})` : 'Payment Method') : (useSubscription ? `دفع القطع خارج الباقة (${uncoveredTotal.toFixed(2)} ${t('currency')})` : 'طريقة الدفع')}</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.paymentChipsRow}>
+            <ScrollView horizontal nestedScrollEnabled={true} showsHorizontalScrollIndicator={false} contentContainerStyle={s.paymentChipsRow}
+              onContentSizeChange={() => { if (I18nManager.isRTL) paymentScrollRef.current?.scrollToEnd({ animated: false }) }}
+              ref={paymentScrollRef}
+            >
               {paymentMethods.map(pm => (
                 <TouchableOpacity key={pm.key} onPress={() => setPaymentMethod(pm.key)}
                   style={[s.paymentChip, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, paymentMethod === pm.key && { borderColor: colors.primary, backgroundColor: colors.primary + '10' }]}>

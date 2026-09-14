@@ -411,7 +411,7 @@ export default function OrderDetailsScreen() {
         </TouchableOpacity>
       )}
 
-      {['pending', 'assigned'].includes(order.status) && (
+      {['pending', 'assigned', 'arrived'].includes(order.status) && (
         <TouchableOpacity style={s.editBtn} onPress={() => router.push(`/edit-order/${order.id}`)}>
           <Text style={s.editBtnText}>{t('editOrder')}</Text>
         </TouchableOpacity>

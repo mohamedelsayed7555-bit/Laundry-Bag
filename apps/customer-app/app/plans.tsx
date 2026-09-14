@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, RefreshControl, Dimensions, FlatList, Animated } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, RefreshControl, Dimensions, FlatList, Animated, I18nManager } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../src/contexts/AuthContext'
 import { useTheme } from '../src/contexts/ThemeContext'
@@ -69,6 +69,8 @@ export default function PlansScreen() {
   const [activeSubIdx, setActiveSubIdx] = useState(0)
   const scrollArrowAnim = useRef(new Animated.Value(0)).current
   const [loading, setLoading] = useState(true)
+  const filterScrollRef = useRef<ScrollView>(null)
+  const durScrollRef = useRef<ScrollView>(null)
   const [selectedDuration, setSelectedDuration] = useState('monthly')
   const [subscribing, setSubscribing] = useState(false)
   const [discountRates, setDiscountRates] = useState({ quarterly: 10, biannual: 15, annual: 20 })
@@ -266,7 +268,7 @@ export default function PlansScreen() {
     <ScrollView ref={scrollRef} style={[s.container, { backgroundColor: colors.navy[900] }]} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}>
       <View style={s.headerRow}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={[s.backText, { color: colors.primary }]}>→ {locale === 'en' ? 'Back' : 'رجوع'}</Text>
+          <Text style={[s.backText, { color: colors.primary }]}>{locale === 'en' ? '← Back' : 'رجوع ←'}</Text>
         </TouchableOpacity>
         <Text style={[s.title, { color: colors.text }]}>{t('subscriptionPlans')}</Text>
         <View style={{ width: 60 }} />
@@ -393,6 +395,7 @@ export default function PlansScreen() {
             <FlatList
               data={activeSubs}
               horizontal
+              nestedScrollEnabled={true}
               pagingEnabled
               showsHorizontalScrollIndicator={false}
               keyExtractor={item => item.id}
@@ -424,7 +427,10 @@ export default function PlansScreen() {
       })()}
 
       {/* ── Service Filter ── */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }} contentContainerStyle={s.filterRow}>
+      <ScrollView horizontal nestedScrollEnabled={true} showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }} contentContainerStyle={s.filterRow}
+        onContentSizeChange={() => { if (I18nManager.isRTL) filterScrollRef.current?.scrollToEnd({ animated: false }) }}
+        ref={filterScrollRef}
+      >
         {[
           { key: 'all', icon: '📋', label: 'الكل', labelEn: 'All' },
           { key: 'clothes', icon: '👔', label: 'ملابس', labelEn: 'Clothes' },
@@ -511,7 +517,10 @@ export default function PlansScreen() {
 
         {/* Duration */}
         <Text style={[s.settingsLabel, { color: colors.navy[300] }]}>{locale === 'en' ? 'Duration' : 'مدة الاشتراك'}</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }} contentContainerStyle={s.durRow}>
+        <ScrollView horizontal nestedScrollEnabled={true} showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }} contentContainerStyle={s.durRow}
+          onContentSizeChange={() => { if (I18nManager.isRTL) durScrollRef.current?.scrollToEnd({ animated: false }) }}
+          ref={durScrollRef}
+        >
           {durationsMeta.map(d => {
             const rate = d.key !== 'monthly' ? discountRates[d.key as keyof typeof discountRates] : 0
             return (
