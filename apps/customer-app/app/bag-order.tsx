@@ -239,17 +239,22 @@ export default function BagOrderScreen() {
         {/* Payment */}
         <Animated.View entering={FadeInDown.duration(500).delay(200)}>
           <Text style={[s.sectionTitle, { color: colors.text }]}>💳 {t('paymentMethod')}</Text>
-          <ScrollView horizontal nestedScrollEnabled={true} showsHorizontalScrollIndicator={false} contentContainerStyle={s.paymentChipsRow}
-            ref={bagPayScrollRef}
-          >
-            {PAYMENT_METHODS.map(pm => (
-              <TouchableOpacity key={pm.key} onPress={() => setPaymentMethod(pm.key)}
-                style={[s.paymentChip, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, paymentMethod === pm.key && { borderColor: colors.primary, backgroundColor: colors.primary + '10' }]}>
-                <Text style={{ fontSize: 18 }}>{pm.icon}</Text>
-                <Text style={[s.paymentChipLabel, { color: colors.navy[300] }, paymentMethod === pm.key && { color: colors.primary }]}>{t(pm.labelKey)}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          <View style={s.paymentScrollWrap}>
+            <ScrollView horizontal nestedScrollEnabled={true} showsHorizontalScrollIndicator={false} contentContainerStyle={s.paymentChipsRow}
+              ref={bagPayScrollRef}
+            >
+              {PAYMENT_METHODS.map(pm => (
+                <TouchableOpacity key={pm.key} onPress={() => setPaymentMethod(pm.key)}
+                  style={[s.paymentChip, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, paymentMethod === pm.key && { borderColor: colors.primary, backgroundColor: colors.primary + '10' }]}>
+                  <Text style={{ fontSize: 18 }}>{pm.icon}</Text>
+                  <Text style={[s.paymentChipLabel, { color: colors.navy[300] }, paymentMethod === pm.key && { color: colors.primary }]}>{t(pm.labelKey)}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <View style={[s.scrollArrow, I18nManager.isRTL ? { left: 0 } : { right: 0 }]}>
+              <Text style={[s.scrollArrowText, { color: colors.primary }]}>{I18nManager.isRTL ? '‹' : '›'}</Text>
+            </View>
+          </View>
 
           {paymentMethod === 'e_wallet' && (
             <View style={[s.paymentInfoCard, { backgroundColor: colors.cardBg, borderColor: colors.primary + '30' }]}>
@@ -336,7 +341,10 @@ const s = StyleSheet.create({
   addrChangeBtnText: { fontSize: 13, fontWeight: '700' },
   addressCard: { borderRadius: 12, padding: 12, borderWidth: 1.5 },
   addressLabel: { fontSize: 14, fontWeight: '600' },
-  paymentChipsRow: { gap: 8, paddingVertical: 4 },
+  paymentScrollWrap: { position: 'relative' },
+  paymentChipsRow: { gap: 8, paddingVertical: 4, paddingEnd: 24 },
+  scrollArrow: { position: 'absolute', top: 0, bottom: 0, justifyContent: 'center', zIndex: 10 },
+  scrollArrowText: { fontSize: 24, fontWeight: '900' },
   paymentChip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1.5 },
   paymentChipLabel: { fontSize: 12, fontWeight: '600' },
   paymentInfoCard: { borderRadius: 16, padding: 16, marginTop: 12, borderWidth: 1 },

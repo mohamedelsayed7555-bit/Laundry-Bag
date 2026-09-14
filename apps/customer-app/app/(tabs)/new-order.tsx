@@ -278,15 +278,15 @@ export default function NewOrderScreen() {
                             </View>
                             {inCart ? (
                               <View style={s.inCartCounter}>
-                                <TouchableOpacity onPress={() => { const i = cart.indexOf(inCart); updateQuantity(i, inCart.quantity + 1) }} style={[s.inCartBtn, { backgroundColor: colors.primary }]}>
-                                  <Text style={s.inCartBtnText}>+</Text>
+                                <TouchableOpacity onPress={() => { const i = cart.indexOf(inCart); removeItem(i) }} style={[s.inCartRemoveBtn, { backgroundColor: colors.danger + '20' }]}>
+                                  <Text style={[s.inCartRemoveBtnText, { color: colors.danger }]}>✕</Text>
                                 </TouchableOpacity>
-                                <Text style={[s.inCartQty, { color: colors.text }]}>{inCart.quantity}</Text>
                                 <TouchableOpacity onPress={() => { const i = cart.indexOf(inCart); updateQuantity(i, inCart.quantity - 1) }} style={[s.inCartBtn, { backgroundColor: colors.navy[700] }]}>
                                   <Text style={s.inCartBtnText}>−</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity onPress={() => { const i = cart.indexOf(inCart); removeItem(i) }} style={[s.inCartRemoveBtn, { backgroundColor: colors.danger + '20' }]}>
-                                  <Text style={[s.inCartRemoveBtnText, { color: colors.danger }]}>✕</Text>
+                                <Text style={[s.inCartQty, { color: colors.text }]}>{inCart.quantity}</Text>
+                                <TouchableOpacity onPress={() => { const i = cart.indexOf(inCart); updateQuantity(i, inCart.quantity + 1) }} style={[s.inCartBtn, { backgroundColor: colors.primary }]}>
+                                  <Text style={s.inCartBtnText}>+</Text>
                                 </TouchableOpacity>
                               </View>
                             ) : (
@@ -364,12 +364,12 @@ const s = StyleSheet.create({
   accordionItemPrice: { fontSize: 12, marginTop: 2 },
   addItemBtn: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
   addItemBtnText: { color: '#fff', fontSize: 20, fontWeight: '600' },
-  inCartCounter: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  inCartBtn: { width: 30, height: 30, borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
-  inCartBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  inCartRemoveBtn: { width: 26, height: 26, borderRadius: 13, justifyContent: 'center', alignItems: 'center', marginRight: 2 },
-  inCartRemoveBtnText: { fontSize: 11, fontWeight: '700' },
-  inCartQty: { fontSize: 16, fontWeight: '700', minWidth: 20, textAlign: 'center' },
+  inCartCounter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  inCartBtn: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
+  inCartBtnText: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  inCartRemoveBtn: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  inCartRemoveBtnText: { fontSize: 13, fontWeight: '700' },
+  inCartQty: { fontSize: 17, fontWeight: '800', minWidth: 22, textAlign: 'center' },
   addAddressBtn: {
     borderRadius: 16, padding: 16, alignItems: 'center',
     borderWidth: 1.5, borderStyle: 'dashed',

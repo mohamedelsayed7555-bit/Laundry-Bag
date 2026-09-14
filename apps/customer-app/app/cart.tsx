@@ -497,17 +497,22 @@ export default function CartScreen() {
         {(!useSubscription || (useSubscription && uncoveredCount > 0)) && (
           <>
             <Text style={[s.sectionTitle, { color: colors.text }]}>💳 {isEn ? (useSubscription ? `Pay for uncovered items (${uncoveredTotal.toFixed(2)} ${t('currency')})` : 'Payment Method') : (useSubscription ? `دفع القطع خارج الباقة (${uncoveredTotal.toFixed(2)} ${t('currency')})` : 'طريقة الدفع')}</Text>
-            <ScrollView horizontal nestedScrollEnabled={true} showsHorizontalScrollIndicator={false} contentContainerStyle={s.paymentChipsRow}
-              ref={paymentScrollRef}
-            >
-              {paymentMethods.map(pm => (
-                <TouchableOpacity key={pm.key} onPress={() => setPaymentMethod(pm.key)}
-                  style={[s.paymentChip, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, paymentMethod === pm.key && { borderColor: colors.primary, backgroundColor: colors.primary + '10' }]}>
-                  <Text style={s.paymentChipIcon}>{pm.icon}</Text>
-                  <Text style={[s.paymentChipLabel, { color: colors.navy[300] }, paymentMethod === pm.key && { color: colors.primary }]}>{isEn ? pm.labelEn : pm.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            <View style={s.paymentScrollWrap}>
+              <ScrollView horizontal nestedScrollEnabled={true} showsHorizontalScrollIndicator={false} contentContainerStyle={s.paymentChipsRow}
+                ref={paymentScrollRef}
+              >
+                {paymentMethods.map(pm => (
+                  <TouchableOpacity key={pm.key} onPress={() => setPaymentMethod(pm.key)}
+                    style={[s.paymentChip, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, paymentMethod === pm.key && { borderColor: colors.primary, backgroundColor: colors.primary + '10' }]}>
+                    <Text style={s.paymentChipIcon}>{pm.icon}</Text>
+                    <Text style={[s.paymentChipLabel, { color: colors.navy[300] }, paymentMethod === pm.key && { color: colors.primary }]}>{isEn ? pm.labelEn : pm.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <View style={[s.scrollArrow, I18nManager.isRTL ? { left: 0 } : { right: 0 }]}>
+                <Text style={[s.scrollArrowText, { color: colors.primary }]}>{I18nManager.isRTL ? '‹' : '›'}</Text>
+              </View>
+            </View>
           </>
         )}
 
@@ -688,7 +693,10 @@ const s = StyleSheet.create({
   toggleThumbOn: { alignSelf: 'flex-end' },
   toggleThumbOff: { alignSelf: 'flex-start' },
   toggleLabel: { fontSize: 13, fontWeight: '600', flex: 1 },
-  paymentChipsRow: { gap: 8, paddingVertical: 4 },
+  paymentScrollWrap: { position: 'relative' },
+  paymentChipsRow: { gap: 8, paddingVertical: 4, paddingEnd: 24 },
+  scrollArrow: { position: 'absolute', top: 0, bottom: 0, justifyContent: 'center', zIndex: 10 },
+  scrollArrowText: { fontSize: 24, fontWeight: '900' },
   paymentChip: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1.5,
