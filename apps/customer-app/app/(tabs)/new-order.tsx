@@ -36,6 +36,7 @@ export default function NewOrderScreen() {
   const [selectedAddress, setSelectedAddress] = useState<any>(null)
   const [selectedService, setSelectedService] = useState('')
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({})
+  const [activeCatId, setActiveCatId] = useState<string | null>(null)
   const [showAddressPicker, setShowAddressPicker] = useState(false)
   const [activeSub, setActiveSub] = useState<any>(null)
   const [dataLoading, setDataLoading] = useState(true)
@@ -149,6 +150,10 @@ export default function NewOrderScreen() {
         if (prev[first.id] !== undefined) return prev
         return { ...prev, [first.id]: true }
       })
+      setActiveCatId(prev => {
+        if (prev && categoriesWithItems.some(c => c.id === prev)) return prev
+        return first.id
+      })
     }
   }, [categoriesWithItems])
 
@@ -251,36 +256,44 @@ export default function NewOrderScreen() {
         {selectedService && categoriesWithItems.length > 0 && (
           <>
             <Text style={[s.sectionTitle, { color: colors.text }]}>{locale === 'en' ? 'Choose item' : 'اختر القطعة'}</Text>
-            {categoriesWithItems.map(cat => {
-              const isExpanded = expandedCategories[cat.id] ?? false
-              return (
-                <View key={cat.id} style={[s.accordionSection, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
-                  <TouchableOpacity style={s.accordionHeader} onPress={() => toggleCategory(cat.id)} activeOpacity={0.7}>
-                    <View style={s.accordionHeaderLeft}>
-                      <Text style={s.accordionCatIcon}>{cat.icon}</Text>
-                      <Text style={[s.accordionCatName, { color: colors.text }]}>{catName(cat.name)}</Text>
-                      <View style={[s.accordionBadge, { backgroundColor: colors.primary + '20' }]}>
-                        <Text style={[s.accordionBadgeText, { color: colors.primary }]}>{cat.itemTypes.length}</Text>
-                      </View>
-                    </View>
-                    <Text style={[s.accordionArrow, { color: colors.navy[400] }]}>{isExpanded ? '▲' : '▼'}</Text>
-                  </TouchableOpacity>
-                  {isExpanded && (
-                    <View style={[s.accordionBody, { borderTopColor: colors.navy[700] }]}>
-                      {cat.itemTypes.map((itemType, idx) => {
-                        const price = getPrice(itemType, selectedService)
-                        const inCart = cart.find(c => c.name === itemType && c.service_type === selectedService)
-                        return (
-                          <View key={itemType} style={[s.accordionItem, idx < cat.itemTypes.length - 1 && { borderBottomColor: colors.navy[700], borderBottomWidth: 0.5 }, justAdded === itemType && { backgroundColor: colors.primary + '15' }]}>
-                            <View style={{ flex: 1 }}>
-                              <Text style={[s.accordionItemName, { color: colors.text }]}>{itemName(itemType)}</Text>
-                              <Text style={[s.accordionItemPrice, { color: colors.navy[300] }]}>{price} {t('currency')}</Text>
-                            </View>
-                            {inCart ? (
-                              <View style={s.inCartCounter}>
-                                <TouchableOpacity onPress={() => { const i = cart.indexOf(inCart); removeItem(i) }} style={[s.inCartRemoveBtn, { backgroundColor: colors.danger + '20' }]}>
-                                  <Text style={[s.inCartRemoveBtnText, { color: colors.danger }]}>✕</Text>
-                                </TouchableOpacity>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.catTabsRow} contentContainerStyle={s.catTabsContent}>
+              {categoriesWithItems.map(cat => (
+                <TouchableOpacity key={cat.id} onPress={() => setActiveCatId(cat.id)}
+                  style={[s.catTab, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, activeCatId === cat.id && { borderColor: colors.primary, backgroundColor: colors.primary + '15' }]}>
+                  <Text style={s.catTabIcon}>{cat.icon}</Text>
+                  <Text style={[s.catTabLabel, { color: colors.navy[200] }, activeCatId === cat.id && { color: colors.primary }]}>{catName(cat.name)}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            {categoriesWithItems.filter(cat => cat.id === activeCatId).map(cat => (
+              <View key={cat.id} style={s.itemsList}>
+                {cat.itemTypes.map((itemType: string, idx: number) => {
+                  const price = getPrice(itemType, selectedService)
+                  const inCart = cart.find(c => c.name === itemType && c.service_type === selectedService)
+                  const isFirst = idx === 0
+                  return (
+                    <View key={itemType} style={[s.itemCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, justAdded === itemType && { borderColor: colors.primary, backgroundColor: colors.primary + '10' }]}>
+                      {isFirst && (
+                        <View style={[s.popularBadge, { backgroundColor: colors.primary }]}>
+                          <Text style={s.popularBadgeText}>{locale === 'en' ? '🔥 Most ordered' : '🔥 الأكثر طلباً'}</Text>
+                        </View>
+                      )}
+                      <View style={s.itemCardContent}>
+                        <View style={s.itemCardRight}>
+                          <Text style={[s.itemCardName, { color: colors.text }]}>{itemName(itemType)}</Text>
+                          <Text style={[s.itemCardPrice, { color: colors.navy[300] }]}>
+                            {price.toFixed(2)} {t('currency')}
+                            {'\n'}
+                            <Text style={{ fontSize: 10 }}>{locale === 'en' ? 'per piece' : 'لكل قطعة'}</Text>
+                          </Text>
+                        </View>
+                        <View style={s.itemCardLeft}>
+                          {inCart ? (
+                            <View style={s.itemCardControls}>
+                              <TouchableOpacity onPress={() => { const i = cart.indexOf(inCart); removeItem(i) }} style={[s.inCartRemoveBtn, { backgroundColor: colors.danger + '20' }]}>
+                                <Text style={[s.inCartRemoveBtnText, { color: colors.danger }]}>✕</Text>
+                              </TouchableOpacity>
+                              <View style={s.itemCardQtyRow}>
                                 <TouchableOpacity onPress={() => { const i = cart.indexOf(inCart); updateQuantity(i, inCart.quantity - 1) }} style={[s.inCartBtn, { backgroundColor: colors.navy[700] }]}>
                                   <Text style={s.inCartBtnText}>−</Text>
                                 </TouchableOpacity>
@@ -289,19 +302,19 @@ export default function NewOrderScreen() {
                                   <Text style={s.inCartBtnText}>+</Text>
                                 </TouchableOpacity>
                               </View>
-                            ) : (
-                              <TouchableOpacity onPress={() => !closed && handleAddItem(itemType)} style={[s.addItemBtn, { backgroundColor: closed ? colors.navy[600] : colors.primary }]} disabled={closed}>
-                                <Text style={s.addItemBtnText}>+</Text>
-                              </TouchableOpacity>
-                            )}
-                          </View>
-                        )
-                      })}
+                            </View>
+                          ) : (
+                            <TouchableOpacity onPress={() => !closed && handleAddItem(itemType)} style={[s.addItemBtn, { backgroundColor: closed ? colors.navy[600] : colors.primary }]} disabled={closed}>
+                              <Text style={s.addItemBtnText}>+</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      </View>
                     </View>
-                  )}
-                </View>
-              )
-            })}
+                  )
+                })}
+              </View>
+            ))}
           </>
         )}
 
@@ -350,18 +363,22 @@ const s = StyleSheet.create({
   },
   serviceCardIcon: { fontSize: 24 },
   serviceCardLabel: { fontSize: 11, fontWeight: '600', textAlign: 'center' },
-  accordionSection: { borderRadius: 12, borderWidth: 1, marginBottom: 10, overflow: 'hidden' },
-  accordionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 },
-  accordionHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  accordionCatIcon: { fontSize: 18 },
-  accordionCatName: { fontSize: 14, fontWeight: '700' },
-  accordionBadge: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
-  accordionBadgeText: { fontSize: 11, fontWeight: '700' },
-  accordionArrow: { fontSize: 12 },
-  accordionBody: { borderTopWidth: 0.5 },
-  accordionItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12 },
-  accordionItemName: { fontSize: 14, fontWeight: '600' },
-  accordionItemPrice: { fontSize: 12, marginTop: 2 },
+  catTabsRow: { marginBottom: 14 },
+  catTabsContent: { gap: 8, paddingHorizontal: 2 },
+  catTab: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1.5 },
+  catTabIcon: { fontSize: 16 },
+  catTabLabel: { fontSize: 12, fontWeight: '700' },
+  itemsList: { gap: 10 },
+  itemCard: { borderRadius: 14, borderWidth: 1, padding: 14, overflow: 'hidden' },
+  popularBadge: { alignSelf: 'flex-start', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, marginBottom: 10 },
+  popularBadgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  itemCardContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  itemCardRight: { flex: 1 },
+  itemCardName: { fontSize: 15, fontWeight: '700', marginBottom: 4 },
+  itemCardPrice: { fontSize: 13, lineHeight: 20 },
+  itemCardLeft: { alignItems: 'center' },
+  itemCardControls: { alignItems: 'center', gap: 8 },
+  itemCardQtyRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   addItemBtn: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
   addItemBtnText: { color: '#fff', fontSize: 20, fontWeight: '600' },
   inCartCounter: { flexDirection: 'row', alignItems: 'center', gap: 8 },

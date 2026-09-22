@@ -392,7 +392,7 @@ export default function HomeScreen() {
                 <Text style={s.serviceIcon}>{svc.icon}</Text>
               </View>
               <Text style={[s.serviceLabel, { color: colors.text }]}>{svc.label}</Text>
-              <Text style={[s.serviceDesc, { color: colors.navy[300] }]}>{svc.desc}</Text>
+              <Text numberOfLines={2} style={[s.serviceDesc, { color: colors.navy[300] }]}>{svc.desc}</Text>
             </TouchableOpacity>
           </Animated.View>
         ))}
@@ -537,7 +537,7 @@ const s = StyleSheet.create({
   serviceCard: {
     borderRadius: 16,
     padding: 14, alignItems: 'center', gap: 4,
-    borderWidth: 1, minHeight: 120,
+    borderWidth: 1, height: 130,
   },
   serviceIconWrap: {
     width: 44, height: 44, borderRadius: 14,
