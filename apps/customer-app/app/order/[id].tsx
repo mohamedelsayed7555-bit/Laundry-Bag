@@ -139,10 +139,20 @@ export default function OrderDetailsScreen() {
   async function handleCancel() {
     const driverArrived = ['arrived', 'picked_up'].includes(order.status)
     const fee = driverArrived ? Number(order.delivery_fee ?? 0) : 0
+    const isPaid = order.payment_status === 'confirmed'
+    const total = Number(order.total ?? 0)
+    const refund = isPaid ? (driverArrived ? total - fee : total) : 0
 
-    const message = driverArrived
-      ? `${t('driverPickedUp')} ${fee.toFixed(2)} ${t('currency')}`
-      : t('cancelFree')
+    let message = ''
+    if (isPaid && refund > 0) {
+      message = driverArrived
+        ? (isEn ? `Driver already picked up. Delivery fee ${fee.toFixed(2)} EGP deducted.\nRefund: ${refund.toFixed(2)} EGP` : `السائق استلم بالفعل. رسوم التوصيل ${fee.toFixed(2)} ج.م.\nمبلغ الاسترداد: ${refund.toFixed(2)} ج.م`)
+        : (isEn ? `Full refund: ${refund.toFixed(2)} EGP` : `استرداد كامل: ${refund.toFixed(2)} ج.م`)
+    } else {
+      message = driverArrived
+        ? `${t('driverPickedUp')} ${fee.toFixed(2)} ${t('currency')}`
+        : t('cancelFree')
+    }
 
     showAlert({ title: t('cancelOrderTitle'), message, type: 'confirm', buttons: [
       { text: t('noGoBack'), style: 'cancel' },
@@ -150,15 +160,23 @@ export default function OrderDetailsScreen() {
         text: driverArrived ? `${t('yesCancelPay')} ${fee.toFixed(2)} ${t('currency')}` : t('yesCancel'),
         style: 'destructive',
         onPress: async () => {
-          const { error } = await supabase.from('orders').update({
-            status: 'cancelled',
+          const updateData: Record<string, any> = {
+            status: isPaid ? 'refunded' : 'cancelled',
             cancellation_reason: driverArrived ? 'إلغاء بعد الاستلام — رسوم توصيل' : 'إلغاء بواسطة العميل',
             cancellation_fee: fee,
             cancelled_by: 'customer',
             cancelled_at: new Date().toISOString(),
-          }).eq('id', id).eq('customer_id', profile!.id)
+          }
+          if (isPaid && refund > 0) {
+            updateData.payment_status = 'refunded'
+            updateData.refund_amount = refund
+          }
+          const { error, data, count } = await supabase.from('orders').update(updateData).eq('id', id).eq('customer_id', profile!.id).select()
+          console.log('Cancel result:', JSON.stringify({ error, data, count, orderId: id, profileId: profile!.id, updateData }))
           if (error) {
-            showAlert({ title: t('error'), message: t('connectionError'), type: 'error' })
+            showAlert({ title: t('error'), message: `${t('connectionError')}\n${error.message}`, type: 'error' })
+          } else if (!data || data.length === 0) {
+            showAlert({ title: t('error'), message: isEn ? `Cancel failed — no rows updated.\nOrder ID: ${id}\nProfile: ${profile!.id}` : `فشل الإلغاء — لم يتم تحديث أي صف.\nOrder: ${id}\nProfile: ${profile!.id}`, type: 'error' })
           } else {
             if (order.subscription_id && order.items_count > 0) {
               const { data: sub } = await supabase.from('subscriptions').select('items_used').eq('id', order.subscription_id).single()
@@ -168,7 +186,14 @@ export default function OrderDetailsScreen() {
                 await supabase.from('subscriptions').update({ items_used: newUsed }).eq('id', order.subscription_id).eq('items_used', currentUsed)
               }
             }
-            if (driverArrived) {
+            if (isPaid && refund > 0) {
+              showAlert({
+                title: isEn ? 'Cancelled & Refund' : 'تم الإلغاء والاسترداد',
+                message: isEn ? `Refund of ${refund.toFixed(2)} EGP will be processed${driverArrived ? ` (delivery fee ${fee.toFixed(2)} EGP deducted)` : ''}` : `سيتم استرداد ${refund.toFixed(2)} ج.م${driverArrived ? ` (تم خصم رسوم التوصيل ${fee.toFixed(2)} ج.م)` : ''}`,
+                type: 'success',
+                buttons: [{ text: t('ok'), onPress: () => loadOrder() }],
+              })
+            } else if (driverArrived) {
               showAlert({
                 title: t('cancelledDone'),
                 message: `${t('cancelledWithFee')} ${fee.toFixed(2)} ${t('currency')}`,

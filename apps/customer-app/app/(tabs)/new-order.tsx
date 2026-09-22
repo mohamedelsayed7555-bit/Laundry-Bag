@@ -192,7 +192,7 @@ export default function NewOrderScreen() {
           <View style={[s.subBanner, { backgroundColor: colors.primary + '12', borderColor: colors.primary + '30' }]}>
             <View style={s.subBannerRow}>
               <Text style={[s.subBannerName, { color: colors.text }]}>👑 {pName(activeSub.plans?.name ?? '') || t('subscriptionPlans')}</Text>
-              <Text style={[s.subBannerRemaining, { color: colors.primary }]}>{subRemaining - totalItems} {t('remaining')}</Text>
+              <Text style={[s.subBannerRemaining, { color: colors.primary }]}>{Math.max(0, subRemaining - totalItems)} {t('remaining')}</Text>
             </View>
             <View style={[s.subProgressBar, { backgroundColor: colors.navy[700] }]}>
               <View style={[s.subProgressFill, { backgroundColor: colors.primary, width: `${Math.min(100, ((activeSub.items_used + totalItems) / activeSub.items_limit) * 100)}%` }]} />
@@ -200,8 +200,8 @@ export default function NewOrderScreen() {
             <Text style={[s.subBannerHint, { color: colors.navy[300] }]}>
               {totalItems > 0
                 ? locale === 'en'
-                  ? `${totalItems} pieces from your plan (${subRemaining - totalItems >= 0 ? 'free' : 'exceeded!'})`
-                  : `سيتم خصم ${totalItems} قطعة من باقتك (${subRemaining - totalItems >= 0 ? 'مجاناً' : 'تجاوزت الرصيد!'})`
+                  ? `${Math.min(totalItems, subRemaining)} pieces from your plan (free)${totalItems > subRemaining ? ` + ${totalItems - subRemaining} charged separately` : ''}`
+                  : `سيتم خصم ${Math.min(totalItems, subRemaining)} قطعة من باقتك (مجاناً)${totalItems > subRemaining ? ` + ${totalItems - subRemaining} قطعة محاسبة منفصلة` : ''}`
                 : `${activeSub.items_used} / ${activeSub.items_limit} ${locale === 'en' ? 'used' : 'قطعة مستخدمة'}`}
             </Text>
           </View>

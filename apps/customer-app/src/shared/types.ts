@@ -241,7 +241,7 @@ export const ORDER_STATUS_FLOW: Record<OrderStatus, OrderStatus[]> = {
   refunded: [],
 }
 
-export const CANCELLABLE_STATUSES: OrderStatus[] = ['pending', 'assigned', 'arrived', 'picked_up', 'scheduled']
+export const CANCELLABLE_STATUSES: OrderStatus[] = ['pending', 'assigned', 'arrived', 'scheduled']
 
 export const SERVICE_TYPE_LABELS: Record<ServiceType, string> = {
   wash: 'غسيل',

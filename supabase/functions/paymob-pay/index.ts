@@ -26,7 +26,7 @@ Deno.serve(async (req: Request) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Unauthorized");
 
-    const { order_id, subscription_id, payment_method, wallet_phone } = await req.json();
+    const { order_id, subscription_id, payment_method, wallet_phone, amount_override } = await req.json();
     if (!order_id && !subscription_id) throw new Error("order_id or subscription_id required");
 
     let payAmount: number;
@@ -56,6 +56,10 @@ Deno.serve(async (req: Request) => {
       if (!order || order.customer_id !== user.id) throw new Error("Order not found");
       payAmount = order.total;
       merchantOrderId = `${order.order_number || order.id}-${Date.now()}`;
+    }
+
+    if (typeof amount_override === "number" && amount_override > 0) {
+      payAmount = amount_override;
     }
 
     const { data: profile } = await supabase

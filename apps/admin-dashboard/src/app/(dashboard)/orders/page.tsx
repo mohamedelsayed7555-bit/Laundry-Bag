@@ -116,7 +116,7 @@ export default function OrdersPage() {
 
   async function loadOrders() {
     let query = supabase.from('orders')
-      .select('id, order_number, status, service_type, items, items_count, total, delivery_fee, cancellation_fee, cancellation_reason, cancelled_by, refund_amount, notes, payment_status, payment_method, subscription_id, customer_id, driver_id, order_type, created_at, is_scheduled, scheduled_at, cancelled_at, customer:users!orders_customer_id_fkey(name, phone, customer_code), driver:users!orders_driver_id_fkey(name, phone), subscription:subscriptions(items_used, items_limit)', { count: 'exact' })
+      .select('id, order_number, status, service_type, items, items_count, total, delivery_fee, cancellation_fee, cancellation_reason, cancelled_by, refund_amount, price_difference, notes, payment_status, payment_method, subscription_id, customer_id, driver_id, order_type, created_at, is_scheduled, scheduled_at, cancelled_at, customer:users!orders_customer_id_fkey(name, phone, customer_code), driver:users!orders_driver_id_fkey(name, phone), subscription:subscriptions(items_used, items_limit)', { count: 'exact' })
       .order('created_at', { ascending: false })
 
     if (statusFilter !== 'all') query = query.eq('status', statusFilter)
@@ -400,7 +400,13 @@ export default function OrdersPage() {
         )}
       </div>
     )},
-    { key: 'total', label: 'المبلغ', render: (item: any) => <span className="font-semibold text-gray-800">{item.total ? `${item.total.toFixed(2)} ج.م` : '—'}</span> },
+    { key: 'total', label: 'المبلغ', render: (item: any) => (
+      <div className="text-center">
+        <span className="font-semibold text-gray-800">{item.total ? `${item.total.toFixed(2)} ج.م` : '—'}</span>
+        {item.price_difference > 0 && <p className="text-[10px] text-red-500 font-medium">+{item.price_difference.toFixed(2)} فرق</p>}
+        {item.price_difference < 0 && <p className="text-[10px] text-emerald-500 font-medium">{item.price_difference.toFixed(2)} استرداد</p>}
+      </div>
+    )},
     { key: 'payment', label: 'الدفع', render: (item: any) => {
       const pmLabels: Record<string, string> = { cash: 'كاش', visa: 'فيزا', e_wallet: 'محفظة', instapay: 'إنستاباي' }
       const psVariant: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> = { confirmed: 'success', pending: 'warning', failed: 'danger' }

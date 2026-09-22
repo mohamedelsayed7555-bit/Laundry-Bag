@@ -167,9 +167,23 @@ export default function CartScreen() {
   const coveredCount = coveredItems.reduce((sum: number, i: any) => sum + i.quantity, 0)
   const subRemaining = subCoverage.totalRemaining
   const subExhausted = activeSubs.length > 0 && subRemaining === 0
-  const useSubscription = activeSubs.length > 0 && subRemaining > 0 && subRemaining >= coveredCount && coveredCount > 0
-  const fee = useSubscription && uncoveredCount === 0 ? 0 : deliveryFee
-  const orderTotal = useSubscription ? uncoveredTotal + fee : totalPrice + fee
+  const useSubscription = activeSubs.length > 0 && subRemaining > 0 && coveredCount > 0
+  const actualCovered = useSubscription ? Math.min(coveredCount, subRemaining) : 0
+  const overflowCount = useSubscription ? Math.max(0, coveredCount - subRemaining) : 0
+  const overflowTotal = useMemo(() => {
+    if (overflowCount <= 0) return 0
+    let remaining = overflowCount
+    let total = 0
+    for (let i = coveredItems.length - 1; i >= 0 && remaining > 0; i--) {
+      const item = coveredItems[i]
+      const take = Math.min(item.quantity, remaining)
+      total += take * item.price
+      remaining -= take
+    }
+    return total
+  }, [coveredItems, overflowCount])
+  const fee = useSubscription && uncoveredCount === 0 && overflowCount === 0 ? 0 : deliveryFee
+  const orderTotal = useSubscription ? uncoveredTotal + overflowTotal + fee : totalPrice + fee
 
   const serviceLabel = (key: string) => {
     const svc = services.find(s => s.key === key)
@@ -200,10 +214,6 @@ export default function CartScreen() {
       showAlert({ title: isEn ? 'Out of zone' : 'خارج نطاق التوصيل', message: isEn ? `Address is ${distanceKm} km away — max ${zoneSettings.max_zone_km} km` : `العنوان المختار يبعد ${distanceKm} كم — الحد الأقصى ${zoneSettings.max_zone_km} كم`, type: 'warning' })
       return
     }
-    if (activeSubs.length > 0 && subRemaining > 0 && coveredCount > subRemaining) {
-      showAlert({ title: isEn ? 'Notice' : 'تنبيه', message: isEn ? `Your plans have ${subRemaining} items left but you need ${coveredCount}. Upgrade or reduce items.` : `رصيد باقاتك ${subRemaining} قطعة فقط وأنت محتاج ${coveredCount} قطعة.\nيمكنك ترقية باقتك أو تقليل عدد القطع.`, type: 'warning' })
-      return
-    }
 
     setSaving(true)
 
@@ -218,14 +228,14 @@ export default function CartScreen() {
         }
       }
       const freshTotalRemaining = activeSubs.reduce((sum: number, s: any) => sum + Math.max(0, (s.items_limit ?? 0) - (s.items_used ?? 0)), 0)
-      if (coveredCount > freshTotalRemaining) {
+      if (freshTotalRemaining <= 0) {
         setSaving(false)
-        showAlert({ title: isEn ? 'Notice' : 'تنبيه', message: isEn ? `Only ${freshTotalRemaining} items left in your plans.` : `رصيد باقاتك ${freshTotalRemaining} قطعة فقط.`, type: 'warning' })
+        showAlert({ title: isEn ? 'Notice' : 'تنبيه', message: isEn ? 'Your plan items have been used up since you opened this page. Order will proceed at regular prices.' : 'رصيد باقتك خلص من وقت ما فتحت الصفحة. الطلب هيكمل بأسعار عادية.', type: 'warning' })
         return
       }
     }
 
-    const hasPaidAmount = useSubscription ? (uncoveredTotal + fee) > 0 : true
+    const hasPaidAmount = useSubscription ? (uncoveredTotal + overflowTotal + fee) > 0 : true
     const isOnlinePayment = hasPaidAmount && (paymentMethod === 'visa' || paymentMethod === 'e_wallet')
 
     if (isOnlinePayment && paymentMethod === 'e_wallet' && !walletPhone.match(/^01[0-9]{9}$/)) {
@@ -242,10 +252,10 @@ export default function CartScreen() {
       subtotal: totalPrice,
       delivery_fee: fee,
       total: orderTotal,
-      payment_method: useSubscription && uncoveredCount === 0 ? 'cash' : paymentMethod,
+      payment_method: useSubscription && uncoveredCount === 0 && overflowCount === 0 ? 'cash' : paymentMethod,
       notes: notes || null,
       status: isScheduled ? 'scheduled' : 'pending',
-      payment_status: useSubscription && uncoveredCount === 0 ? 'confirmed' : 'pending',
+      payment_status: useSubscription && uncoveredCount === 0 && overflowCount === 0 ? 'confirmed' : 'pending',
       order_type: useSubscription ? 'subscription' : 'regular',
       subscription_id: useSubscription ? activeSubs[0].id : null,
       address_id: selectedAddress?.id || null,
@@ -260,8 +270,8 @@ export default function CartScreen() {
     }).select('id').single()
 
     if (!error && useSubscription) {
-      // Distribute covered items across subscriptions
-      let remaining = coveredCount
+      // Distribute covered items across subscriptions (only deduct what the plan covers)
+      let remaining = actualCovered
       for (const sub of activeSubs) {
         if (remaining <= 0) break
         const subAvail = Math.max(0, (sub.items_limit ?? 0) - (sub.items_used ?? 0))
@@ -317,8 +327,9 @@ export default function CartScreen() {
     setSaving(false)
     clearCart()
     playNotificationSound('order-placed')
+    const chargedSeparately = uncoveredCount + overflowCount
     const msg = useSubscription
-      ? (isEn ? `Order created! ${coveredCount} items deducted from plans (${subRemaining - coveredCount} remaining)${uncoveredCount > 0 ? ` + ${uncoveredCount} items charged separately` : ''}` : `تم إنشاء طلبك بنجاح!\nتم خصم ${coveredCount} قطعة من باقاتك (متبقي ${subRemaining - coveredCount})${uncoveredCount > 0 ? `\n+ ${uncoveredCount} قطعة خارج الباقة محاسبة بشكل منفصل` : ''}`)
+      ? (isEn ? `Order created! ${actualCovered} items deducted from plans (${subRemaining - actualCovered} remaining)${chargedSeparately > 0 ? ` + ${chargedSeparately} items charged separately` : ''}` : `تم إنشاء طلبك بنجاح!\nتم خصم ${actualCovered} قطعة من باقاتك (متبقي ${subRemaining - actualCovered})${chargedSeparately > 0 ? `\n+ ${chargedSeparately} قطعة محاسبة بشكل منفصل` : ''}`)
       : (isEn ? 'Order created! A driver will be assigned soon' : 'تم إنشاء طلبك بنجاح! سيتم تعيين سائق قريباً')
     showAlert({ title: isEn ? 'Done' : 'تم', message: msg, type: 'success', buttons: [
       { text: t('ok'), onPress: () => router.replace('/(tabs)/orders') },
@@ -484,8 +495,8 @@ export default function CartScreen() {
               <Text style={[s.subCoverTitle, { color: '#10b981' }]}>{isEn ? 'Covered by your plans' : 'مغطى من باقاتك'}</Text>
               <Text style={[s.subCoverDetail, { color: colors.navy[300] }]}>
                 {isEn
-                  ? `${coveredCount} items will be deducted — ${subRemaining - coveredCount} remaining after this order${uncoveredCount > 0 ? `\n${uncoveredCount} items charged separately (${uncoveredTotal.toFixed(2)} ${t('currency')})` : ''}`
-                  : `سيتم خصم ${coveredCount} قطعة — متبقي ${subRemaining - coveredCount} قطعة بعد الطلب${uncoveredCount > 0 ? `\n${uncoveredCount} قطعة خارج الباقة محاسبة منفصلة (${uncoveredTotal.toFixed(2)} ${t('currency')})` : ''}`}
+                  ? `${actualCovered} items will be deducted — ${subRemaining - actualCovered} remaining after this order${(uncoveredCount + overflowCount) > 0 ? `\n${uncoveredCount + overflowCount} items charged separately (${(uncoveredTotal + overflowTotal).toFixed(2)} ${t('currency')})` : ''}`
+                  : `سيتم خصم ${actualCovered} قطعة — متبقي ${subRemaining - actualCovered} قطعة بعد الطلب${(uncoveredCount + overflowCount) > 0 ? `\n${uncoveredCount + overflowCount} قطعة محاسبة منفصلة (${(uncoveredTotal + overflowTotal).toFixed(2)} ${t('currency')})` : ''}`}
               </Text>
               {activeSubs.map((sub: any, idx: number) => (
                 <Text key={idx} style={[s.subCoverPlan, { color: colors.navy[400] }]}>📦 {sub.plans?.name ?? (isEn ? 'Subscription' : 'الباقة')} ({Math.max(0, (sub.items_limit ?? 0) - (sub.items_used ?? 0))} {isEn ? 'remaining' : 'متبقي'})</Text>

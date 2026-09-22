@@ -7,6 +7,8 @@ import { supabase } from '../../src/lib/supabase'
 import { useTheme } from '../../src/contexts/ThemeContext'
 import { useLanguage } from '../../src/contexts/LanguageContext'
 
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!
+
 const servicesMap = [
   { key: 'wash', icon: '👔', label: 'غسيل', labelEn: 'Wash' },
   { key: 'dry_clean', icon: '🧹', label: 'تنظيف جاف', labelEn: 'Dry Clean' },
@@ -103,39 +105,97 @@ export default function EditOrderScreen() {
   const totalPrice = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0)
 
+  const fee = order ? (order.delivery_fee ?? 0) : 0
+  const isSubOrder = !!order?.subscription_id
+  const oldTotal = order?.total ?? 0
+  const newTotal = isSubOrder ? 0 : totalPrice + fee
+  const priceDiff = newTotal - oldTotal
+
   async function handleSave() {
     if (cart.length === 0) { showAlert({ title: isEn ? 'Notice' : 'تنبيه', message: isEn ? 'Add at least one item' : 'أضف قطعة واحدة على الأقل', type: 'warning' }); return }
 
-    const fee = order.delivery_fee ?? 0
-    const isSubOrder = !!order.subscription_id
-    const newTotal = isSubOrder ? 0 : totalPrice + fee
-
-    // If subscription order, check quota
+    // If subscription order, check quota — allow partial overflow
     if (isSubOrder) {
       const { data: sub } = await supabase.from('subscriptions').select('items_used, items_limit').eq('id', order.subscription_id).single()
       if (sub) {
         const oldItems = order.items_count ?? 0
         const available = sub.items_limit - sub.items_used + oldItems
         if (totalItems > available) {
-          showAlert({ title: isEn ? 'Notice' : 'تنبيه', message: isEn ? `Your plan has only ${available} items left but you need ${totalItems}` : `رصيد باقتك ${available} قطعة فقط وأنت محتاج ${totalItems}`, type: 'warning' })
+          const overflow = totalItems - available
+          const overflowPrice = cart.slice().reverse().reduce((acc: { remaining: number; total: number }, item) => {
+            if (acc.remaining <= 0) return acc
+            const take = Math.min(item.quantity, acc.remaining)
+            return { remaining: acc.remaining - take, total: acc.total + take * item.price }
+          }, { remaining: overflow, total: 0 }).total
+          showAlert({
+            title: isEn ? 'Plan limit exceeded' : 'تجاوز رصيد الباقة',
+            message: isEn
+              ? `Your plan covers ${available} items. The extra ${overflow} items (${overflowPrice.toFixed(2)} EGP) will be charged separately. Continue?`
+              : `باقتك تغطي ${available} قطعة. الزيادة ${overflow} قطعة (${overflowPrice.toFixed(2)} ج.م) هتتحاسب منفصلة. متأكد؟`,
+            type: 'warning',
+            buttons: [
+              { text: isEn ? 'Cancel' : 'إلغاء', style: 'cancel' },
+              { text: isEn ? 'Continue' : 'متابعة', onPress: () => doSave(available, overflow, overflowPrice) },
+            ],
+          })
           return
         }
       }
     }
 
+    // For regular orders with price increase, confirm the difference
+    if (!isSubOrder && priceDiff > 0 && order.payment_status === 'confirmed') {
+      showAlert({
+        title: isEn ? 'Additional payment required' : 'مطلوب دفع إضافي',
+        message: isEn
+          ? `The new total is ${newTotal.toFixed(2)} EGP (was ${oldTotal.toFixed(2)} EGP). You'll need to pay the difference of ${priceDiff.toFixed(2)} EGP. Continue?`
+          : `الإجمالي الجديد ${newTotal.toFixed(2)} ج.م (كان ${oldTotal.toFixed(2)} ج.م). محتاج تدفع الفرق ${priceDiff.toFixed(2)} ج.م. متأكد؟`,
+        type: 'warning',
+        buttons: [
+          { text: isEn ? 'Cancel' : 'إلغاء', style: 'cancel' },
+          { text: isEn ? 'Continue' : 'متابعة', onPress: () => doSave() },
+        ],
+      })
+      return
+    }
+
+    doSave()
+  }
+
+  async function doSave(subAvailable?: number, overflow?: number, overflowPrice?: number) {
     setSaving(true)
-    const { error } = await supabase.from('orders').update({
+
+    const hasOverflow = overflow && overflow > 0
+    const finalTotal = isSubOrder ? (hasOverflow ? (overflowPrice ?? 0) + fee : 0) : totalPrice + fee
+    const needsPayment = !isSubOrder && finalTotal > oldTotal && order.payment_status === 'confirmed'
+    const subOverflowNeedsPayment = isSubOrder && hasOverflow
+
+    const updateData: any = {
       items: cart,
       items_count: totalItems,
       subtotal: totalPrice,
-      total: newTotal,
-      service_type: cart[0].service_type,
-    }).eq('id', id).eq('customer_id', profile!.id)
+      total: finalTotal,
+      service_type: [...new Set(cart.map(i => i.service_type))].join('+'),
+    }
 
-    // Update subscription items_used if subscription order
+    if (needsPayment) {
+      updateData.payment_status = 'pending'
+      updateData.price_difference = priceDiff
+    }
+
+    if (subOverflowNeedsPayment) {
+      updateData.payment_status = 'pending'
+      updateData.price_difference = overflowPrice
+      updateData.order_type = 'mixed'
+    }
+
+    const { error } = await supabase.from('orders').update(updateData).eq('id', id).eq('customer_id', profile!.id)
+
+    // Update subscription items_used
     if (!error && isSubOrder) {
       const oldItems = order.items_count ?? 0
-      const diff = totalItems - oldItems
+      const actualDeduct = hasOverflow ? (subAvailable ?? totalItems) : totalItems
+      const diff = actualDeduct - oldItems
       if (diff !== 0) {
         const { data: subData } = await supabase.from('subscriptions').select('items_used').eq('id', order.subscription_id).single()
         if (subData) {
@@ -145,14 +205,53 @@ export default function EditOrderScreen() {
       }
     }
 
-    setSaving(false)
     if (error) {
+      setSaving(false)
       showAlert({ title: isEn ? 'Error' : 'خطأ', message: isEn ? 'Failed to update order' : 'حدث خطأ أثناء تعديل الطلب', type: 'error' })
-    } else {
-      showAlert({ title: isEn ? 'Done' : 'تم', message: isEn ? 'Order updated successfully' : 'تم تعديل الطلب بنجاح', type: 'success', buttons: [
-        { text: isEn ? 'OK' : 'حسناً', onPress: () => router.back() },
-      ] })
+      return
     }
+
+    const amountToPay = needsPayment ? priceDiff : subOverflowNeedsPayment ? (overflowPrice ?? 0) : 0
+    const isOnlineMethod = ['visa', 'e_wallet', 'wallet'].includes(order.payment_method)
+
+    // If online payment and there's a difference to pay, open payment gateway
+    if (amountToPay > 0 && isOnlineMethod) {
+      try {
+        const session = (await supabase.auth.getSession()).data.session
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/paymob-pay`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({
+            order_id: id,
+            amount_override: amountToPay,
+            payment_method: order.payment_method === 'visa' ? 'card' : 'wallet',
+            ...(order.payment_method === 'e_wallet' ? { wallet_phone: order.wallet_phone } : {}),
+          }),
+        })
+        const paymentData = await res.json()
+        setSaving(false)
+        if (paymentData.iframe_url) {
+          router.push({ pathname: '/payment', params: { url: paymentData.iframe_url } })
+        } else if (paymentData.error) {
+          showAlert({ title: isEn ? 'Error' : 'خطأ', message: paymentData.error, type: 'error', onConfirm: () => router.back() })
+        }
+      } catch (e) {
+        setSaving(false)
+        showAlert({ title: isEn ? 'Error' : 'خطأ', message: isEn ? 'Payment service error' : 'خطأ في خدمة الدفع', type: 'error', onConfirm: () => router.back() })
+      }
+      return
+    }
+
+    setSaving(false)
+    const diffMsg = amountToPay > 0
+      ? (isEn ? `\nAdditional ${amountToPay.toFixed(2)} EGP will be collected on delivery` : `\nسيتم تحصيل ${amountToPay.toFixed(2)} ج.م إضافي عند الاستلام`)
+      : ''
+    showAlert({ title: isEn ? 'Done' : 'تم', message: (isEn ? 'Order updated successfully' : 'تم تعديل الطلب بنجاح') + diffMsg, type: 'success', buttons: [
+      { text: isEn ? 'OK' : 'حسناً', onPress: () => router.back() },
+    ] })
   }
 
   if (loading) {
@@ -260,10 +359,29 @@ export default function EditOrderScreen() {
 
       {/* Total */}
       <View style={s.totalCard}>
-        <Text style={s.totalLabel}>{isEn ? 'Total' : 'الإجمالي'}</Text>
-        <Text style={s.totalValue}>
-          {order.subscription_id ? (isEn ? 'Free (Plan)' : 'مجاناً (باقة)') : `${(totalPrice + (order.delivery_fee ?? 0)).toFixed(2)} ${isEn ? 'EGP' : 'ج.م'}`}
-        </Text>
+        <View>
+          <Text style={s.totalLabel}>{isEn ? 'Total' : 'الإجمالي'}</Text>
+          {!isSubOrder && priceDiff !== 0 && (
+            <Text style={[s.totalLabel, { fontSize: 12, marginTop: 4 }]}>
+              {isEn ? `Was: ${oldTotal.toFixed(2)} EGP` : `كان: ${oldTotal.toFixed(2)} ج.م`}
+            </Text>
+          )}
+        </View>
+        <View style={{ alignItems: 'flex-end' }}>
+          <Text style={s.totalValue}>
+            {isSubOrder ? (isEn ? 'Free (Plan)' : 'مجاناً (باقة)') : `${newTotal.toFixed(2)} ${isEn ? 'EGP' : 'ج.م'}`}
+          </Text>
+          {!isSubOrder && priceDiff > 0 && (
+            <Text style={{ fontSize: 13, fontWeight: '700', color: '#ef4444', marginTop: 2 }}>
+              {isEn ? `+${priceDiff.toFixed(2)} EGP difference` : `+${priceDiff.toFixed(2)} ج.م فرق`}
+            </Text>
+          )}
+          {!isSubOrder && priceDiff < 0 && (
+            <Text style={{ fontSize: 13, fontWeight: '700', color: '#10b981', marginTop: 2 }}>
+              {isEn ? `${priceDiff.toFixed(2)} EGP refund` : `${priceDiff.toFixed(2)} ج.م استرداد`}
+            </Text>
+          )}
+        </View>
       </View>
 
       <TouchableOpacity

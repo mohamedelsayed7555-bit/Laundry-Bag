@@ -74,7 +74,7 @@ export default function DriverOrdersScreen() {
   const [filter, setFilter] = useState<Filter>('pickup')
   const [dateRange, setDateRange] = useState<DateRange>('14')
   const [showDatePicker, setShowDatePicker] = useState(false)
-  const [pickupSub, setPickupSub] = useState<'all' | 'assigned' | 'arrived' | 'picked_up'>('all')
+  const [pickupSub, setPickupSub] = useState<'all' | 'waiting' | 'picked_up'>('all')
   const driverLocRef = useRef<{ lat: number; lng: number } | null>(null)
   const lastLoadRef = useRef(0)
 
@@ -155,7 +155,7 @@ export default function DriverOrdersScreen() {
     return new Date(o.created_at) >= daysAgo
   })
 
-  const visiblePickup = pickupSub === 'all' ? pickupOrders : pickupOrders.filter(o => o.status === pickupSub)
+  const visiblePickup = pickupSub === 'all' ? pickupOrders : pickupSub === 'waiting' ? pickupOrders.filter(o => ['assigned', 'arrived'].includes(o.status)) : pickupOrders.filter(o => o.status === 'picked_up')
   const filteredOrders = filter === 'pickup' ? visiblePickup : filter === 'delivery' ? deliveryOrders : completedOrders
 
   async function updateStatus(orderId: string, newStatus: string) {
@@ -449,8 +449,7 @@ export default function DriverOrdersScreen() {
         <View style={s.subFilterRow}>
           {([
             { key: 'all' as const, label: 'الكل', count: pickupOrders.length },
-            { key: 'assigned' as const, label: 'بانتظار', count: pickupOrders.filter(o => o.status === 'assigned').length },
-            { key: 'arrived' as const, label: 'وصل', count: pickupOrders.filter(o => o.status === 'arrived').length },
+            { key: 'waiting' as const, label: 'بانتظار الاستلام', count: pickupOrders.filter(o => ['assigned', 'arrived'].includes(o.status)).length },
             { key: 'picked_up' as const, label: 'للمغسلة', count: pickupOrders.filter(o => o.status === 'picked_up').length },
           ]).filter(f => f.count > 0 || f.key === 'all').map(f => (
             <TouchableOpacity key={f.key} onPress={() => setPickupSub(f.key)}
