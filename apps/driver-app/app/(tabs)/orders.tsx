@@ -131,7 +131,7 @@ export default function DriverOrdersScreen() {
   const pickupOrders = orders
     .filter(o => ['assigned', 'arrived', 'picked_up'].includes(o.status))
     .sort((a, b) => {
-      const p: Record<string, number> = { assigned: 0, arrived: 1, picked_up: 2 }
+      const p: Record<string, number> = { arrived: 0, assigned: 1, picked_up: 2 }
       const statusDiff = (p[a.status] ?? 9) - (p[b.status] ?? 9)
       if (statusDiff !== 0) return statusDiff
       return distFromDriver(a.pickup_location) - distFromDriver(b.pickup_location)
