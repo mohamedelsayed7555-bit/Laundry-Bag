@@ -8,6 +8,7 @@ import { useTheme } from '../src/contexts/ThemeContext'
 import { useCustomAlert } from '../src/components/CustomAlert'
 import { useLanguage } from '../src/contexts/LanguageContext'
 import { supabase } from '../src/lib/supabase'
+import { SkeletonPage } from '../src/components/Skeleton'
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!
 
@@ -155,11 +156,7 @@ export default function BagOrderScreen() {
     })
   }
 
-  if (loading) return (
-    <View style={[s.center, { backgroundColor: colors.navy[900] }]}>
-      <ActivityIndicator size="large" color={colors.primary} />
-    </View>
-  )
+  if (loading) return <SkeletonPage />
 
   if (!bagOffer) return (
     <View style={[s.center, { backgroundColor: colors.navy[900] }]}>

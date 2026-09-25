@@ -5,6 +5,7 @@ import { useAuth } from '../src/contexts/AuthContext'
 import { useTheme } from '../src/contexts/ThemeContext'
 import { useLanguage } from '../src/contexts/LanguageContext'
 import { supabase } from '../src/lib/supabase'
+import { SkeletonPage } from '../src/components/Skeleton'
 
 type Tab = 'orders' | 'offers'
 
@@ -142,7 +143,7 @@ export default function NotificationsScreen() {
       </View>
 
       {loading ? (
-        <View style={s.center}><ActivityIndicator size="large" color={colors.primary} /></View>
+        <SkeletonPage />
       ) : filtered.length === 0 ? (
         <View style={s.center}>
           <Text style={{ fontSize: 48, marginBottom: 12 }}>🔕</Text>

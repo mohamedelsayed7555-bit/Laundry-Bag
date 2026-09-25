@@ -8,6 +8,7 @@ import { useLanguage } from '../../src/contexts/LanguageContext'
 import { useCustomAlert } from '../../src/components/CustomAlert'
 import { ActivityIndicator } from 'react-native'
 import { supabase } from '../../src/lib/supabase'
+import { SkeletonPage } from '../../src/components/Skeleton'
 import { CANCELLABLE_STATUSES } from '../../src/shared/types'
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!
@@ -256,7 +257,7 @@ export default function OrderDetailsScreen() {
 
   const s = getStyles(colors)
 
-  if (loading) return <View style={s.container}><Text style={s.loadingText}>{t('loadingText')}</Text></View>
+  if (loading) return <SkeletonPage />
   if (!order) return <View style={s.container}><Text style={s.loadingText}>{t('orderNotFound')}</Text></View>
 
   const status = statusConfig[order.status] ?? statusConfig.pending

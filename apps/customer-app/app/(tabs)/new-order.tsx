@@ -8,6 +8,7 @@ import { useCart } from '../../src/contexts/CartContext'
 import { useTheme } from '../../src/contexts/ThemeContext'
 import { useLanguage } from '../../src/contexts/LanguageContext'
 import { useCustomAlert } from '../../src/components/CustomAlert'
+import { SkeletonPage } from '../../src/components/Skeleton'
 import { supabase } from '../../src/lib/supabase'
 
 const services = [
@@ -173,11 +174,7 @@ export default function NewOrderScreen() {
   const pName = (name: string) => locale === 'en' ? (t(`plan:${name}` as any) !== `plan:${name}` ? t(`plan:${name}` as any) : name) : name
 
   if (dataLoading) {
-    return (
-      <View style={[s.loadingContainer, { backgroundColor: colors.navy[900] }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    )
+    return <SkeletonPage />
   }
 
   return (

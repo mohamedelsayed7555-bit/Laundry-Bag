@@ -11,6 +11,7 @@ import { useCart } from '../src/contexts/CartContext'
 import { useCustomAlert } from '../src/components/CustomAlert'
 import { playNotificationSound } from '../src/hooks/useNotifications'
 import { supabase } from '../src/lib/supabase'
+import { SkeletonPage } from '../src/components/Skeleton'
 
 const paymentMethods = [
   { key: 'cash', icon: '💵', label: 'كاش', labelEn: 'Cash' },
@@ -337,11 +338,7 @@ export default function CartScreen() {
   }
 
   if (loading) {
-    return (
-      <View style={[s.container, { backgroundColor: colors.navy[900], justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    )
+    return <SkeletonPage />
   }
 
   if (cart.length === 0) {

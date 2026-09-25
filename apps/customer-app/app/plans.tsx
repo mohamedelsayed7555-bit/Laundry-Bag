@@ -6,6 +6,7 @@ import { useTheme } from '../src/contexts/ThemeContext'
 import { useLanguage } from '../src/contexts/LanguageContext'
 import { useCustomAlert } from '../src/components/CustomAlert'
 import { supabase } from '../src/lib/supabase'
+import { SkeletonPage } from '../src/components/Skeleton'
 
 type Plan = {
   id: string
@@ -256,11 +257,7 @@ export default function PlansScreen() {
   const durLabel = locale === 'en' ? durationObj.labelEn : durationObj.label
 
   if (loading) {
-    return (
-      <View style={[s.container, { backgroundColor: colors.navy[900], justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    )
+    return <SkeletonPage />
   }
 
   return (

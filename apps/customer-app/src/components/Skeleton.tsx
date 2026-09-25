@@ -84,6 +84,25 @@ export function SkeletonOrderCard() {
   )
 }
 
+export function SkeletonPage() {
+  const { colors } = useTheme()
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.navy[900], padding: 20 }}>
+      <Skeleton width="45%" height={22} style={{ marginBottom: 20 }} />
+      <Skeleton width="100%" height={120} borderRadius={16} style={{ marginBottom: 16 }} />
+      <Skeleton width="35%" height={16} style={{ marginBottom: 12 }} />
+      <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+        <Skeleton width={100} height={40} borderRadius={12} />
+        <Skeleton width={100} height={40} borderRadius={12} />
+        <Skeleton width={100} height={40} borderRadius={12} />
+      </View>
+      <Skeleton width="100%" height={80} borderRadius={14} style={{ marginBottom: 10 }} />
+      <Skeleton width="100%" height={80} borderRadius={14} style={{ marginBottom: 10 }} />
+      <Skeleton width="100%" height={80} borderRadius={14} />
+    </View>
+  )
+}
+
 function getSkStyles(colors: any) { return StyleSheet.create({
   card: {
     backgroundColor: colors.navy[800],
