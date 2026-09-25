@@ -280,39 +280,30 @@ export default function OrdersPage() {
     const reason = cancelReason.trim()
     if (!reason) { toast('يرجى كتابة سبب الإلغاء', 'error'); return }
 
-    const isPaid = order?.payment_status === 'confirmed'
     const driverArrived = ['arrived', 'picked_up'].includes(order?.status ?? '') || Number(order?.cancellation_fee) > 0
-    const total = Number(order?.total) || 0
     const deliveryFee = Number(order?.delivery_fee) || 0
-    const refundAmount = isPaid ? (driverArrived ? (total - deliveryFee) : total) : 0
+    const fee = driverArrived ? deliveryFee : 0
 
     setCancelModal(null)
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: isPaid ? 'refunded' : 'cancelled', payment_status: isPaid ? 'refunded' : o.payment_status } : o))
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'cancelled' } : o))
     setDetail(null)
 
     const updateData: any = {
-      status: isPaid ? 'refunded' : 'cancelled',
+      status: 'cancelled',
       cancellation_reason: reason,
+      cancellation_fee: fee,
       cancelled_by: 'admin',
       cancelled_at: new Date().toISOString(),
       driver_id: null,
-    }
-    if (isPaid) {
-      updateData.payment_status = 'refunded'
-      updateData.refund_amount = refundAmount
     }
 
     const { error } = await supabase.from('orders').update(updateData).eq('id', id)
     if (error) { toast('حدث خطأ — جاري التحديث', 'error'); loadOrders(); return }
 
-    await supabase.from('order_status_history').insert({ order_id: id, status: updateData.status, changed_by: 'admin' })
-    logAuditClient('cancel_order', 'order', id, { order_number: order?.order_number, reason, cancelled_by: 'admin', refund_amount: refundAmount })
+    await supabase.from('order_status_history').insert({ order_id: id, status: 'cancelled', changed_by: 'admin' })
+    logAuditClient('cancel_order', 'order', id, { order_number: order?.order_number, reason, cancelled_by: 'admin' })
 
-    if (isPaid && refundAmount > 0) {
-      toast(`تم إلغاء واسترداد ${refundAmount.toFixed(2)} ج.م${driverArrived ? ' (بدون رسوم التوصيل)' : ''}`, 'warning')
-    } else {
-      toast('تم إلغاء الطلب', 'warning')
-    }
+    toast(`تم إلغاء الطلب${driverArrived ? ` (رسوم توصيل ${fee.toFixed(2)} ج.م)` : ''}`, 'warning')
 
     if (order?.subscription_id && order.items_count) {
       const { data: sub } = await supabase.from('subscriptions').select('items_used').eq('id', order.subscription_id).single()
@@ -815,13 +806,11 @@ export default function OrdersPage() {
             const order = orders.find(o => o.id === cancelModal?.id)
             const isPaid = order?.payment_status === 'confirmed'
             const driverArrived = ['arrived', 'picked_up'].includes(order?.status ?? '') || Number(order?.cancellation_fee) > 0
-            const total = Number(order?.total) || 0
             const deliveryFee = Number(order?.delivery_fee) || 0
-            const refundAmount = isPaid ? (driverArrived ? (total - deliveryFee) : total) : 0
             return isPaid ? (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-3">
-                <p className="text-sm font-semibold text-red-700">⚠️ هذا الطلب مدفوع — سيتم استرداد {refundAmount.toFixed(2)} ج.م</p>
-                {driverArrived && <p className="text-xs text-red-500 mt-1">السائق وصل — رسوم التوصيل ({deliveryFee.toFixed(2)} ج.م) لن تُسترد</p>}
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                <p className="text-sm font-semibold text-amber-700">⚠️ هذا الطلب مدفوع — يمكنك تأكيد الاسترداد لاحقاً من المالية</p>
+                {driverArrived && <p className="text-xs text-amber-600 mt-1">السائق وصل — رسوم التوصيل ({deliveryFee.toFixed(2)} ج.م) ستُحتسب</p>}
               </div>
             ) : null
           })()}

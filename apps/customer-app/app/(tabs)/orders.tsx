@@ -14,12 +14,12 @@ const statusFlow = ['pending', 'assigned', 'arrived', 'picked_up', 'processing',
 
 const statusColors: Record<string, string> = {
   scheduled: '#a855f7', pending: '#f59e0b', assigned: '#3b82f6', picked_up: '#8b5cf6', processing: '#06b6d4',
-  ready: '#10b981', delivering: '#8b5cf6', delivered: '#10b981', cancelled: '#ef4444',
+  ready: '#10b981', delivering: '#8b5cf6', delivered: '#10b981', cancelled: '#ef4444', refunded: '#f97316',
 }
 
 const statusIcons: Record<string, string> = {
   scheduled: '🕐', pending: '⏳', assigned: '🚗', picked_up: '📦', processing: '🔄',
-  ready: '✅', delivering: '🛵', delivered: '🎉', cancelled: '❌',
+  ready: '✅', delivering: '🛵', delivered: '🎉', cancelled: '❌', refunded: '💰',
 }
 
 function OrderProgress({ status, trackColor }: { status: string; trackColor: string }) {
@@ -90,14 +90,14 @@ export default function OrdersScreen() {
   const activeStatuses = ['scheduled', 'pending', 'assigned', 'arrived', 'picked_up', 'processing', 'ready', 'delivering']
   const filteredOrders = orders.filter(o => {
     if (tab === 'active') return activeStatuses.includes(o.status)
-    if (!['delivered', 'cancelled'].includes(o.status)) return false
+    if (!['delivered', 'cancelled', 'refunded'].includes(o.status)) return false
     if (dateRange === 'all') return true
     const daysAgo = new Date()
     daysAgo.setDate(daysAgo.getDate() - Number(dateRange))
     return new Date(o.created_at) >= daysAgo
   })
   const activeCount = orders.filter(o => activeStatuses.includes(o.status)).length
-  const completedCount = orders.filter(o => ['delivered', 'cancelled'].includes(o.status)).length
+  const completedCount = orders.filter(o => ['delivered', 'cancelled', 'refunded'].includes(o.status)).length
 
   const getStatusLabel = (status: string) => {
     const key = `status${status.charAt(0).toUpperCase() + status.slice(1).replace(/_([a-z])/g, (_, c) => c.toUpperCase())}` as any
@@ -111,7 +111,7 @@ export default function OrdersScreen() {
   const renderOrder = ({ item, index }: { item: any; index: number }) => {
     const sColor = statusColors[item.status] ?? '#f59e0b'
     const sIcon = statusIcons[item.status] ?? '⏳'
-    const isActive = !['delivered', 'cancelled'].includes(item.status)
+    const isActive = !['delivered', 'cancelled', 'refunded'].includes(item.status)
 
     return (
       <Animated.View entering={FadeInRight.duration(400).delay(index * 60)}>
