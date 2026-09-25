@@ -24,7 +24,7 @@ export default function ActionsPage() {
   useEffect(() => { loadTab() }, [tab])
 
   useEffect(() => {
-    const ch = supabase.channel('actions-rt')
+    const ch = supabase.channel(`actions-rt-${tab}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => { loadTab(); refresh() })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'subscriptions' }, () => { loadTab(); refresh() })
       .subscribe()
