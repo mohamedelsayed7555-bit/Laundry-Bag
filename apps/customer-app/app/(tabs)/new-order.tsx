@@ -212,7 +212,10 @@ export default function NewOrderScreen() {
           </View>
         )}
 
-        <Text style={[s.sectionTitle, { color: colors.text }]}>{t('pickupAddress')}</Text>
+        <View style={s.sectionTitleRow}>
+          <View style={[s.sectionBar, { backgroundColor: colors.primary }]} />
+          <Text style={[s.sectionTitle, { color: colors.text }]}>{t('pickupAddress')}</Text>
+        </View>
         {addresses.length === 0 ? (
           <TouchableOpacity style={[s.addAddressBtn, { backgroundColor: colors.cardBg, borderColor: colors.primary }]} onPress={() => router.push('/addresses')}>
             <Text style={[s.addAddressText, { color: colors.primary }]}>📍 {locale === 'en' ? 'Add new address' : 'إضافة عنوان جديد'}</Text>
@@ -242,7 +245,10 @@ export default function NewOrderScreen() {
           </View>
         ) : null}
 
-        <Text style={[s.sectionTitle, { color: colors.text }]}>{locale === 'en' ? 'Service type' : 'نوع الخدمة'}</Text>
+        <View style={s.sectionTitleRow}>
+          <View style={[s.sectionBar, { backgroundColor: colors.primary }]} />
+          <Text style={[s.sectionTitle, { color: colors.text }]}>{locale === 'en' ? 'Service type' : 'نوع الخدمة'}</Text>
+        </View>
         <View style={s.serviceGrid}>
           {availableServicesForScreen.map(svc => (
             <TouchableOpacity key={svc.key} onPress={() => { setSelectedService(svc.key); setExpandedCategories({}) }}
@@ -255,7 +261,10 @@ export default function NewOrderScreen() {
 
         {selectedService && categoriesWithItems.length > 0 && (
           <>
-            <Text style={[s.sectionTitle, { color: colors.text }]}>{locale === 'en' ? 'Choose item' : 'اختر القطعة'}</Text>
+            <View style={s.sectionTitleRow}>
+              <View style={[s.sectionBar, { backgroundColor: colors.primary }]} />
+              <Text style={[s.sectionTitle, { color: colors.text }]}>{locale === 'en' ? 'Choose item' : 'اختر القطعة'}</Text>
+            </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.catTabsRow} contentContainerStyle={s.catTabsContent}>
               {categoriesWithItems.map(cat => (
                 <TouchableOpacity key={cat.id} onPress={() => setActiveCatId(cat.id)}
@@ -355,7 +364,9 @@ const s = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: 20, paddingTop: 56, paddingBottom: 100 },
   title: { fontSize: 24, fontWeight: '800', marginBottom: 24 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 12, marginTop: 20 },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, marginTop: 20 },
+  sectionBar: { width: 4, height: 18, borderRadius: 2 },
+  sectionTitle: { fontSize: 18, fontWeight: '800' },
   serviceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   serviceCard: {
     width: '30%', flexGrow: 1, borderRadius: 16, padding: 12,

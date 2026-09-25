@@ -316,12 +316,12 @@ export default function HomeScreen() {
   }
 
   const services = [
-    { icon: '👔', label: t('wash'), key: 'wash', desc: t('washDesc') },
-    { icon: '🧹', label: t('dryClean'), key: 'dry_clean', desc: t('dryCleanDesc') },
-    { icon: '👕', label: t('ironOnly'), key: 'iron', desc: t('ironDesc') },
-    { icon: '✨', label: t('washIron'), key: 'wash_iron', desc: t('washIronDesc') },
-    { icon: '✂️', label: t('tailor'), key: 'tailor', desc: t('tailorDesc') },
-    { icon: '🧹', label: t('carpet') || 'سجاد وبطاطين', key: 'carpet', desc: t('carpetDesc') || 'غسيل سجاد وبطاطين ومفروشات' },
+    { icon: '👔', label: t('wash'), key: 'wash', desc: t('washDesc'), color: '#0ea5e9' },
+    { icon: '🧹', label: t('dryClean'), key: 'dry_clean', desc: t('dryCleanDesc'), color: '#a855f7' },
+    { icon: '👕', label: t('ironOnly'), key: 'iron', desc: t('ironDesc'), color: '#f59e0b' },
+    { icon: '✨', label: t('washIron'), key: 'wash_iron', desc: t('washIronDesc'), color: '#10b981' },
+    { icon: '✂️', label: t('tailor'), key: 'tailor', desc: t('tailorDesc'), color: '#ef4444' },
+    { icon: '🧹', label: t('carpet') || 'سجاد وبطاطين', key: 'carpet', desc: t('carpetDesc') || 'غسيل سجاد وبطاطين ومفروشات', color: '#6366f1' },
   ]
 
   const getStatusLabel = (status: string) => {
@@ -380,19 +380,19 @@ export default function HomeScreen() {
       />
 
       {/* Services */}
-      <Animated.View entering={FadeInDown.duration(400).delay(120)}>
+      <Animated.View entering={FadeInDown.duration(400).delay(120)} style={[s.sectionTitleRow, { marginBottom: 14 }]}>
+        <View style={[s.sectionBar, { backgroundColor: colors.primary }]} />
         <Text style={[s.sectionTitle, { color: colors.text }]}>{t('services')}</Text>
       </Animated.View>
       <View style={s.servicesGrid}>
         {services.map((svc, i) => (
           <Animated.View key={svc.key} entering={FadeInDown.duration(300).delay(150 + i * 40)} style={s.serviceGridItem}>
-            <TouchableOpacity style={[s.serviceCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]} activeOpacity={0.7}
+            <TouchableOpacity style={[s.serviceCard, { backgroundColor: colors.cardBg, borderColor: svc.color + '30' }]} activeOpacity={0.7}
               onPress={() => router.push({ pathname: '/(tabs)/new-order', params: { service: svc.key } })}>
-              <View style={[s.serviceIconWrap, { backgroundColor: colors.navy[700] }]}>
+              <View style={[s.serviceIconWrap, { backgroundColor: svc.color + '18' }]}>
                 <Text style={s.serviceIcon}>{svc.icon}</Text>
               </View>
               <Text style={[s.serviceLabel, { color: colors.text }]}>{svc.label}</Text>
-              <Text numberOfLines={2} style={[s.serviceDesc, { color: colors.navy[300] }]}>{svc.desc}</Text>
             </TouchableOpacity>
           </Animated.View>
         ))}
@@ -401,7 +401,10 @@ export default function HomeScreen() {
       {/* Recent Orders */}
       <Animated.View entering={FadeInDown.duration(400).delay(250)}>
         <View style={s.sectionHeader}>
-          <Text style={[s.sectionTitle, { color: colors.text }]}>{t('recentOrders')}</Text>
+          <View style={s.sectionTitleRow}>
+            <View style={[s.sectionBar, { backgroundColor: colors.primary }]} />
+            <Text style={[s.sectionTitle, { color: colors.text }]}>{t('recentOrders')}</Text>
+          </View>
           {recentOrders.length > 0 && (
             <TouchableOpacity onPress={() => router.push('/(tabs)/orders')}>
               <Text style={[s.seeAll, { color: colors.primary }]}>{t('viewAll')}</Text>
@@ -529,23 +532,25 @@ const s = StyleSheet.create({
 
 
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', marginBottom: 2 },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  sectionBar: { width: 4, height: 20, borderRadius: 2 },
+  sectionTitle: { fontSize: 20, fontWeight: '800' },
   seeAll: { fontSize: 13, fontWeight: '600' },
 
   servicesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
   serviceGridItem: { width: SERVICE_CARD_WIDTH },
   serviceCard: {
     borderRadius: 16,
-    padding: 14, alignItems: 'center', gap: 4,
-    borderWidth: 1, height: 130,
+    padding: 14, alignItems: 'center', gap: 6,
+    borderWidth: 1, height: 110,
+    justifyContent: 'center',
   },
   serviceIconWrap: {
-    width: 44, height: 44, borderRadius: 14,
-    justifyContent: 'center', alignItems: 'center', marginBottom: 4,
+    width: 48, height: 48, borderRadius: 24,
+    justifyContent: 'center', alignItems: 'center', marginBottom: 2,
   },
-  serviceIcon: { fontSize: 22 },
-  serviceLabel: { fontSize: 12, fontWeight: '700', textAlign: 'center' },
-  serviceDesc: { fontSize: 10, textAlign: 'center' },
+  serviceIcon: { fontSize: 24 },
+  serviceLabel: { fontSize: 13, fontWeight: '700', textAlign: 'center' },
 
   emptyCard: {
     borderRadius: 20, padding: 32,
