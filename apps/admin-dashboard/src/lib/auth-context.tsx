@@ -98,11 +98,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .eq('id', authUser.id)
       .single()
 
-    if (profile) {
+    if (profile && profile.role in ROLE_DEFAULTS) {
       setUser({
         ...profile,
         permissions: profile.permissions ?? ROLE_DEFAULTS[profile.role] ?? [],
       })
+    } else {
+      await supabase.auth.signOut()
+      setUser(null)
     }
     setLoading(false)
   }

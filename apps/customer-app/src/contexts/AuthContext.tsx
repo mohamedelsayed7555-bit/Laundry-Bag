@@ -104,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq('id', session.user.id)
       .single()
 
-    if (!data || data.is_active === false) {
+    if (!data || data.is_active === false || data.role !== 'customer') {
       await supabase.auth.signOut()
       setState(s => ({ ...s, session: null, profile: null, loading: false }))
       return
