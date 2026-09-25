@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, RefreshControl, Modal, TextInput, Dimensions, NativeScrollEvent, NativeSyntheticEvent, I18nManager } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, RefreshControl, Modal, TextInput, Dimensions, NativeScrollEvent, NativeSyntheticEvent, I18nManager, AppState } from 'react-native'
 import { useRouter } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated'
@@ -190,6 +190,7 @@ export default function HomeScreen() {
   const [activeSub, setActiveSub] = useState<any>(null)
   const [unreadCount, setUnreadCount] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
   const [bagOffer, setBagOffer] = useState<any>(null)
   const [ratingOrder, setRatingOrder] = useState<any>(null)
   const [ratingService, setRatingService] = useState(0)
@@ -209,6 +210,7 @@ export default function HomeScreen() {
   const onRefresh = useCallback(async () => {
     if (!profile) return
     setRefreshing(true)
+    setRefreshKey(k => k + 1)
     await Promise.all([
       supabase.from('orders').select('id, order_number, status, total, created_at')
         .eq('customer_id', profile.id).order('created_at', { ascending: false }).limit(3)
@@ -223,6 +225,13 @@ export default function HomeScreen() {
     ])
     setRefreshing(false)
   }, [profile, loadBagOffer])
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') setRefreshKey(k => k + 1)
+    })
+    return () => sub.remove()
+  }, [])
 
   const loadRecentOrders = useCallback(() => {
     if (!profile) return
@@ -369,6 +378,7 @@ export default function HomeScreen() {
 
       {/* Banners Carousel */}
       <BannersCarousel
+        key={refreshKey}
         bagOffer={bagOffer}
         activeSub={activeSub}
         colors={colors}
