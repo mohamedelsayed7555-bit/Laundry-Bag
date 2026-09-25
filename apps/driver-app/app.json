@@ -15,7 +15,10 @@
     },
     "ios": {
       "bundleIdentifier": "com.cleano.driver",
-      "supportsTablet": false
+      "supportsTablet": false,
+      "runtimeVersion": {
+        "policy": "appVersion"
+      }
     },
     "android": {
       "package": "com.cleano.driver",
@@ -27,8 +30,14 @@
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_BACKGROUND_LOCATION",
         "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.USE_BIOMETRIC",
         "android.permission.USE_FINGERPRINT"
-      ]
+      ],
+      "runtimeVersion": "1.0.0"
     },
     "plugins": [
       "expo-router",
@@ -54,6 +63,9 @@
         "projectId": "8f59b30a-bef7-4b6b-9a10-f43fc7aba175"
       }
     },
-    "owner": "mohamedhassan12"
+    "owner": "mohamedhassan12",
+    "updates": {
+      "url": "https://u.expo.dev/8f59b30a-bef7-4b6b-9a10-f43fc7aba175"
+    }
   }
 }
