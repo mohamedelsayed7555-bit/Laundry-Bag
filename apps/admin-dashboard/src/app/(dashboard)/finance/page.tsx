@@ -173,11 +173,10 @@ export default function FinancePage() {
     const deliveryFee = Number(row?.delivery_fee) || 0
     const paidAmount = total - deliveryFee
     setConfirmModal(null)
-    setRows(prev => prev.map(r => r.id === id ? { ...r, payment_status: 'confirmed' } : r))
-    setStats(prev => ({ ...prev, paid: prev.paid + paidAmount, unpaid: Math.max(0, prev.unpaid - total), deliveryFees: prev.deliveryFees + deliveryFee }))
     toast('تم تأكيد الدفع بنجاح')
     const { error } = await supabase.from('orders').update({ payment_status: 'confirmed' }).eq('id', id)
-    if (error) { toast('حدث خطأ — جاري التحديث', 'error'); load() }
+    if (error) { toast('حدث خطأ', 'error') }
+    await load()
   }
 
   async function markRefunded(id: string) {
@@ -187,15 +186,10 @@ export default function FinancePage() {
     const driverArrived = ['arrived', 'picked_up'].includes(row?.status ?? '') || Number(row?.cancellation_fee) > 0
     const refundAmount = driverArrived ? (total - deliveryFee) : total
     setConfirmModal(null)
-    setRows(prev => prev.map(r => r.id === id ? { ...r, payment_status: 'refunded', status: 'refunded' } : r))
-    setStats(prev => ({
-      ...prev,
-      revenue: prev.revenue - refundAmount,
-      paid: prev.paid - refundAmount,
-    }))
     toast(`تم استرداد ${refundAmount.toFixed(2)} ج.م${driverArrived ? ' (بدون رسوم التوصيل)' : ' (شامل التوصيل)'}`)
     const { error } = await supabase.from('orders').update({ payment_status: 'refunded', status: 'refunded', refund_amount: refundAmount }).eq('id', id)
-    if (error) { toast('حدث خطأ — جاري التحديث', 'error'); load() }
+    if (error) { toast('حدث خطأ', 'error') }
+    await load()
   }
 
   const columns = [
