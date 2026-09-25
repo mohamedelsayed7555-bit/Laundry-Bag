@@ -66,6 +66,7 @@ export default function OrderDetailsScreen() {
     delivering: { label: t('statusDelivering'), color: '#8b5cf6', icon: '🛵', step: 6 },
     delivered:  { label: t('statusDelivered'),  color: '#10b981', icon: '🎉', step: 7 },
     cancelled:  { label: t('statusCancelled'),  color: '#ef4444', icon: '❌', step: -1 },
+    refunded:   { label: t('statusRefunded') || 'مسترد', color: '#f97316', icon: '💰', step: -1 },
   }
 
   const serviceLabel: Record<string, string> = {
