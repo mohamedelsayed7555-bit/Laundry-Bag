@@ -23,6 +23,14 @@ export default function ActionsPage() {
 
   useEffect(() => { loadTab() }, [tab])
 
+  useEffect(() => {
+    const ch = supabase.channel('actions-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => { loadTab(); refresh() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'subscriptions' }, () => { loadTab(); refresh() })
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [tab])
+
   async function loadTab() {
     setLoading(true)
     let data: any[] = []

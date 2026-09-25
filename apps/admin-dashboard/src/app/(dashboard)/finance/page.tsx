@@ -33,12 +33,12 @@ export default function FinancePage() {
   useEffect(() => { load() }, [preset, dateFrom, dateTo])
 
   useEffect(() => {
-    const ch = supabase.channel('finance-rt')
+    const ch = supabase.channel(`finance-rt-${preset}-${dateFrom}-${dateTo}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => load())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'subscriptions' }, () => load())
       .subscribe()
     return () => { supabase.removeChannel(ch) }
-  }, [])
+  }, [preset, dateFrom, dateTo])
 
   function getDateRange(): { from: string | null; to: string | null } {
     const now = new Date()
