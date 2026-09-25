@@ -7,9 +7,9 @@
     "scheme": "cleano",
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
-    "icon": "./assets/logo.jpg",
+    "icon": "./assets/icon.jpg",
     "splash": {
-      "image": "./assets/logo.jpg",
+      "image": "./assets/icon.jpg",
       "resizeMode": "contain",
       "backgroundColor": "#0a0e1a"
     },

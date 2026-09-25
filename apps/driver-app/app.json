@@ -7,9 +7,9 @@
     "scheme": "cleano-driver",
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
-    "icon": "./assets/logo.jpg",
+    "icon": "./assets/icon.jpg",
     "splash": {
-      "image": "./assets/logo.jpg",
+      "image": "./assets/icon.jpg",
       "resizeMode": "contain",
       "backgroundColor": "#00af5f"
     },
@@ -25,8 +25,10 @@
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_BACKGROUND_LOCATION"
-      ],
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -49,9 +51,9 @@
         "origin": false
       },
       "eas": {
-        "projectId": "9f91156d-9d01-4151-ac7c-31ad246b5aae"
+        "projectId": "8f59b30a-bef7-4b6b-9a10-f43fc7aba175"
       }
     },
-    "owner": "mohamed_hassan12"
+    "owner": "mohamedhassan12"
   }
 }
