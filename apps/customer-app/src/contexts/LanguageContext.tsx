@@ -27,6 +27,9 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       if (saved === 'ar' || saved === 'en') {
         setLocale(saved)
         setLocaleState(saved)
+      } else {
+        setLocale('ar')
+        setLocaleState('ar')
       }
     })
   }, [])

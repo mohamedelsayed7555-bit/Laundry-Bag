@@ -9,9 +9,18 @@ import { ThemeProvider, useTheme } from '../src/contexts/ThemeContext'
 import { LanguageProvider } from '../src/contexts/LanguageContext'
 import { useNotifications } from '../src/hooks/useNotifications'
 import { colors } from '../src/theme'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
-I18nManager.allowRTL(true)
-I18nManager.forceRTL(true)
+AsyncStorage.getItem('@app_language').then(saved => {
+  const shouldBeRTL = saved !== 'en'
+  I18nManager.allowRTL(shouldBeRTL)
+  if (I18nManager.isRTL !== shouldBeRTL) {
+    I18nManager.forceRTL(shouldBeRTL)
+  }
+}).catch(() => {
+  I18nManager.allowRTL(true)
+  I18nManager.forceRTL(true)
+})
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
   state = { hasError: false, errorMsg: '' }
