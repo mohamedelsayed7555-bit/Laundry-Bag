@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, RefreshControl, Modal, TextInput, Dimensions, NativeScrollEvent, NativeSyntheticEvent, I18nManager, AppState } from 'react-native'
 import { useRouter } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
-import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated'
+import Animated, { FadeInLeft, FadeInRight } from 'react-native-reanimated'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { useTheme } from '../../src/contexts/ThemeContext'
 import { useLanguage } from '../../src/contexts/LanguageContext'
@@ -26,6 +26,7 @@ const BANNER_WIDTH = SCREEN_WIDTH - 40
 const SERVICE_CARD_WIDTH = (SCREEN_WIDTH - 40 - 20) / 3
 
 function BannersCarousel({ bagOffer, activeSub, colors, t, locale, onBagPress, onNewOrderPress, onPlansPress }: any) {
+  const SlideIn = I18nManager.isRTL ? FadeInRight : FadeInLeft
   const [activeIndex, setActiveIndex] = useState(0)
   const scrollRef = useRef<ScrollView>(null)
   const autoScrollTimer = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -154,7 +155,7 @@ function BannersCarousel({ bagOffer, activeSub, colors, t, locale, onBagPress, o
   }
 
   return (
-    <Animated.View entering={FadeInDown.duration(400)} style={{ marginBottom: 16 }}>
+    <Animated.View entering={SlideIn.duration(250)} style={{ marginBottom: 16 }}>
       <ScrollView
         ref={scrollRef}
         horizontal
@@ -191,6 +192,7 @@ export default function HomeScreen() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
+  const SlideIn = I18nManager.isRTL ? FadeInRight : FadeInLeft
   const [bagOffer, setBagOffer] = useState<any>(null)
   const [ratingOrder, setRatingOrder] = useState<any>(null)
   const [ratingService, setRatingService] = useState(0)
@@ -342,7 +344,7 @@ export default function HomeScreen() {
     <>
     <ScrollView style={[s.container, { backgroundColor: colors.navy[900] }]} contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}>
       {/* Header */}
-      <Animated.View entering={FadeInDown.duration(500)} style={s.header}>
+      <Animated.View entering={SlideIn.duration(250)} style={s.header}>
         <View style={{ flex: 1 }}>
           <Text style={[s.greetSmall, { color: colors.navy[200] }]}>{greeting()} 👋</Text>
           <Text style={[s.greetName, { color: colors.text }]}>{profile?.name ?? ''}</Text>
@@ -390,13 +392,13 @@ export default function HomeScreen() {
       />
 
       {/* Services */}
-      <Animated.View entering={FadeInDown.duration(400).delay(120)} style={[s.sectionTitleRow, { marginBottom: 14 }]}>
+      <Animated.View entering={SlideIn.duration(250).delay(120)} style={[s.sectionTitleRow, { marginBottom: 14 }]}>
         <View style={[s.sectionBar, { backgroundColor: colors.primary }]} />
         <Text style={[s.sectionTitle, { color: colors.text }]}>{t('services')}</Text>
       </Animated.View>
       <View style={s.servicesGrid}>
         {services.map((svc, i) => (
-          <Animated.View key={svc.key} entering={FadeInDown.duration(300).delay(150 + i * 40)} style={s.serviceGridItem}>
+          <Animated.View key={svc.key} entering={SlideIn.duration(250).delay(50 + i * 20)} style={s.serviceGridItem}>
             <TouchableOpacity style={[s.serviceCard, { backgroundColor: colors.cardBg, borderColor: svc.color + '30' }]} activeOpacity={0.7}
               onPress={() => router.push({ pathname: '/(tabs)/new-order', params: { service: svc.key } })}>
               <View style={[s.serviceIconWrap, { backgroundColor: svc.color + '18' }]}>
@@ -409,7 +411,7 @@ export default function HomeScreen() {
       </View>
 
       {/* Recent Orders */}
-      <Animated.View entering={FadeInDown.duration(400).delay(250)}>
+      <Animated.View entering={SlideIn.duration(250).delay(250)}>
         <View style={s.sectionHeader}>
           <View style={s.sectionTitleRow}>
             <View style={[s.sectionBar, { backgroundColor: colors.primary }]} />
@@ -429,7 +431,7 @@ export default function HomeScreen() {
           <SkeletonOrderCard />
         </>
       ) : recentOrders.length === 0 ? (
-        <Animated.View entering={FadeInDown.duration(300).delay(280)} style={[s.emptyCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
+        <Animated.View entering={SlideIn.duration(250).delay(100)} style={[s.emptyCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
           <Text style={s.emptyIcon}>📋</Text>
           <Text style={[s.emptyText, { color: colors.navy[200] }]}>{t('noOrders')}</Text>
           <Text style={[s.emptySubText, { color: colors.navy[400] }]}>{t('startFirstOrder')}</Text>
@@ -439,7 +441,7 @@ export default function HomeScreen() {
           const sColor = statusColors[order.status] ?? '#f59e0b'
           const sIcon = statusIcons[order.status] ?? '⏳'
           return (
-            <Animated.View key={order.id} entering={FadeInRight.duration(300).delay(280 + i * 60)}>
+            <Animated.View key={order.id} entering={SlideIn.duration(250).delay(100 + i * 30)}>
               <TouchableOpacity style={[s.orderCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]} onPress={() => router.push(`/order/${order.id}`)}>
                 <View style={s.orderRow}>
                   <Text style={[s.orderNumber, { color: colors.text }]}>{order.order_number}</Text>
