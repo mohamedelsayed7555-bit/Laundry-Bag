@@ -7,6 +7,12 @@
     "scheme": "cleano-driver",
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
+    "icon": "./assets/logo.jpg",
+    "splash": {
+      "image": "./assets/logo.jpg",
+      "resizeMode": "contain",
+      "backgroundColor": "#00af5f"
+    },
     "ios": {
       "bundleIdentifier": "com.cleano.driver",
       "supportsTablet": false
@@ -21,17 +27,13 @@
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_BACKGROUND_LOCATION"
       ],
-      "config": {
-        "googleMaps": {
-          "apiKey": "AIzaSyDummyKeyForBuild"
-        }
-      }
     },
     "plugins": [
       "expo-router",
       "expo-secure-store",
       "expo-local-authentication",
       "expo-location",
+      "expo-updates",
       [
         "expo-notifications",
         {

@@ -7,6 +7,12 @@
     "scheme": "cleano",
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
+    "icon": "./assets/logo.jpg",
+    "splash": {
+      "image": "./assets/logo.jpg",
+      "resizeMode": "contain",
+      "backgroundColor": "#0a0e1a"
+    },
     "ios": {
       "bundleIdentifier": "com.cleano.customer",
       "supportsTablet": false,
@@ -26,11 +32,6 @@
         "android.permission.USE_FINGERPRINT",
         "android.permission.RECORD_AUDIO"
       ],
-      "config": {
-        "googleMaps": {
-          "apiKey": "AIzaSyDummyKeyForBuild"
-        }
-      }
     },
     "plugins": [
       "expo-router",
@@ -40,6 +41,7 @@
       "expo-image-picker",
       "@react-native-community/datetimepicker",
       "expo-localization",
+      "expo-updates",
       ["expo-notifications", {
         "sounds": ["./assets/sounds/order_update.wav", "./assets/sounds/order_placed.wav"]
       }]
