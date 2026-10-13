@@ -261,14 +261,15 @@ export default function CouponsPage() {
         </PermissionGate>
       </div>
 
-      <DataTable
-        columns={columns}
-        data={coupons}
-        loading={loading}
-        emptyMessage="لا توجد كوبونات حتى الآن"
-        searchPlaceholder="بحث بالكود..."
-        searchKeys={['code']}
-      />
+      {loading ? (
+        <div className="flex items-center justify-center py-20 text-gray-400">جاري التحميل...</div>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={coupons}
+          emptyMessage="لا توجد كوبونات حتى الآن"
+        />
+      )}
 
       {/* Add Modal */}
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="كوبون جديد">

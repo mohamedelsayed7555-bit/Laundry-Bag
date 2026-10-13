@@ -28,6 +28,7 @@ const services = [
   { key: 'wash_iron', label: 'غسيل وكي', labelEn: 'Wash & Iron' },
   { key: 'housekeeping', label: 'تنظيف منازل', labelEn: 'House Keeping' },
   { key: 'carpet', label: 'سجاد وبطاطين', labelEn: 'Carpets & Blankets' },
+  { key: 'accessories', label: 'منتجات وإكسسوارات', labelEn: 'Accessories & Products' },
 ]
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!

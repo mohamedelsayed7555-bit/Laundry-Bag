@@ -41,8 +41,8 @@ interface Plan {
   created_at: string
 }
 
-const allServiceKeys = ['wash', 'iron', 'wash_iron', 'dry_clean', 'housekeeping', 'carpet']
-const serviceLabelsMap: Record<string, string> = { wash: 'غسيل', iron: 'كوي', wash_iron: 'غسيل وكوي', dry_clean: 'تنظيف جاف', housekeeping: 'تنظيف منازل', carpet: 'سجاد وبطاطين' }
+const allServiceKeys = ['wash', 'iron', 'wash_iron', 'dry_clean', 'housekeeping', 'carpet', 'accessories']
+const serviceLabelsMap: Record<string, string> = { wash: 'غسيل', iron: 'كوي', wash_iron: 'غسيل وكوي', dry_clean: 'تنظيف جاف', housekeeping: 'تنظيف منازل', carpet: 'سجاد وبطاطين', accessories: 'منتجات وإكسسوارات' }
 
 const emptyForm = {
   name: '', description: '', tier: 'individual', items_per_month: 20,

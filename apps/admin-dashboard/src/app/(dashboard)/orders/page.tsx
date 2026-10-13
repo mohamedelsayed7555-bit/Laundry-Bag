@@ -776,6 +776,7 @@ export default function OrdersPage() {
               <option value="wash_iron">غسيل وكوي</option><option value="dry_clean">تنظيف جاف</option>
               <option value="housekeeping">تنظيف منازل</option>
               <option value="carpet">سجاد وبطاطين</option>
+              <option value="accessories">منتجات وإكسسوارات</option>
             </select>
           </div>
           <div>

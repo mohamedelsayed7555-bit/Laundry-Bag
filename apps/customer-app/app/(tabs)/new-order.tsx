@@ -18,6 +18,7 @@ const services = [
   { key: 'wash_iron', icon: '✨', label: 'غسيل وكي', labelEn: 'Wash & Iron' },
   { key: 'housekeeping', icon: '🏠', label: 'تنظيف منازل', labelEn: 'House Keeping' },
   { key: 'carpet', icon: '🛋️', label: 'سجاد وبطاطين', labelEn: 'Carpets & Blankets' },
+  { key: 'accessories', icon: '🛍️', label: 'منتجات وإكسسوارات', labelEn: 'Accessories & Products' },
 ]
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!
