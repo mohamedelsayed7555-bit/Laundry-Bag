@@ -373,7 +373,7 @@ export default function CartScreen() {
         order_id: orderData.id,
         discount_amount: couponDiscount,
       })
-      await supabase.from('coupons').update({ used_count: (appliedCoupon.used_count ?? 0) + 1 }).eq('id', appliedCoupon.id)
+      await supabase.rpc('increment_coupon_usage', { p_coupon_id: appliedCoupon.id })
     }
 
     if (!error && useSubscription) {

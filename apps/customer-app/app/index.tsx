@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { Redirect } from 'expo-router'
-import { ActivityIndicator, View, Image, Animated, StyleSheet } from 'react-native'
+import { View, Text, Image, Animated, StyleSheet } from 'react-native'
 import { useAuth } from '../src/contexts/AuthContext'
 
 export default function Index() {
@@ -21,7 +21,7 @@ export default function Index() {
         <Animated.View style={{ opacity: fadeAnim, transform: [{ scale: scaleAnim }] }}>
           <Image source={require('../assets/logo.jpg')} style={s.logo} resizeMode="contain" />
         </Animated.View>
-        <ActivityIndicator size="large" color="#0ea5e9" style={s.loader} />
+        <Animated.Text style={[s.appName, { opacity: fadeAnim }]}>Laundry Bag</Animated.Text>
       </View>
     )
   }
@@ -41,7 +41,11 @@ const s = StyleSheet.create({
   logo: {
     width: 140, height: 140, borderRadius: 70,
   },
-  loader: {
-    marginTop: 24,
+  appName: {
+    marginTop: 20,
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#ffffff',
+    letterSpacing: 2,
   },
 })
