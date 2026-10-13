@@ -105,7 +105,7 @@ export default function OrdersScreen() {
   }
 
   const serviceLabel: Record<string, string> = {
-    wash: t('wash'), iron: t('ironOnly'), wash_iron: t('washIron'), dry_clean: t('dryClean'), tailor: t('tailor'),
+    wash: t('wash'), iron: t('ironOnly'), wash_iron: t('washIron'), dry_clean: t('dryClean'), housekeeping: t('housekeeping'),
   }
 
   const renderOrder = ({ item, index }: { item: any; index: number }) => {

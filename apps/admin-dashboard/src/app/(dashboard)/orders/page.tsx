@@ -369,7 +369,7 @@ export default function OrdersPage() {
       <input type="checkbox" checked={selected.has(item.id)} onChange={() => toggleSelect(item.id)}
         className="w-4 h-4 rounded border-gray-300 text-primary-500 focus:ring-primary-500/20 cursor-pointer" />
     )},
-    { key: 'order_number', label: 'رقم الطلب', render: (item: any) => <span className="font-semibold text-navy-800">{item.order_number}</span> },
+    { key: 'order_number', label: 'رقم الطلب', render: (item: any) => <span className="font-semibold text-navy-800">{item.order_number}{item.gift_included && ' 🎁'}</span> },
     { key: 'customer', label: 'العميل', render: (item: any) => (
       <div>
         <p className="font-medium text-gray-800">{item.customer?.name ?? '—'}</p>
@@ -576,6 +576,8 @@ export default function OrdersPage() {
                 { label: 'العميل', value: <div><p>{detail.customer?.name}</p>{detail.customer?.phone && <p className="text-[11px] text-gray-400 font-normal mt-0.5" dir="ltr">{detail.customer.phone}</p>}</div> },
                 { label: 'الحالة', value: <Badge variant={statusVariant[detail.status]}>{ORDER_STATUS_LABELS[detail.status as OrderStatus]}</Badge> },
                 { label: 'المبلغ', value: `${detail.total?.toFixed(2) ?? '—'} ج.م` },
+                ...(detail.discount > 0 ? [{ label: '🏷️ كوبون', value: <div><Badge variant="info">-{Number(detail.discount).toFixed(2)} ج.م</Badge>{detail.coupon_code && <p className="text-[10px] text-gray-400 mt-0.5 font-mono">{detail.coupon_code}</p>}</div> }] : []),
+                ...(detail.gift_included ? [{ label: 'هدية ترحيبية', value: <Badge variant="success">🎁 يشمل هدية</Badge> }] : []),
                 { label: 'الدفع', value: <div>
                   <Badge variant={detail.payment_status === 'confirmed' ? 'success' : detail.payment_status === 'failed' ? 'danger' : 'warning'}>
                     {detail.payment_status === 'confirmed' ? 'مدفوع' : detail.payment_status === 'failed' ? 'فشل' : 'معلق'}
@@ -772,7 +774,7 @@ export default function OrdersPage() {
             }} required className={inputClass}>
               <option value="wash">غسيل</option><option value="iron">كوي</option>
               <option value="wash_iron">غسيل وكوي</option><option value="dry_clean">تنظيف جاف</option>
-              <option value="tailor">تفصيل وتعديلات</option>
+              <option value="housekeeping">تنظيف منازل</option>
               <option value="carpet">سجاد وبطاطين</option>
             </select>
           </div>

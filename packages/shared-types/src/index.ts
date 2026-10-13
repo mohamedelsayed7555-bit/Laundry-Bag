@@ -15,7 +15,7 @@ export type OrderStatus =
 
 export type PaymentMethod = 'cash' | 'instapay' | 'wallet'
 export type PaymentStatus = 'pending' | 'confirmed' | 'refunded'
-export type ServiceType = 'wash' | 'iron' | 'wash_iron' | 'dry_clean' | 'tailor' | 'carpet'
+export type ServiceType = 'wash' | 'iron' | 'wash_iron' | 'dry_clean' | 'housekeeping' | 'carpet'
 export type UserRole = 'customer' | 'driver' | 'admin'
 export type UserTier = 'bronze' | 'silver' | 'gold' | 'platinum'
 export type ChurnRisk = 'low' | 'medium' | 'high'
@@ -108,6 +108,7 @@ export interface Order {
   rating_driver?: number
   rating_note?: string
   rated_at?: string
+  gift_included?: boolean
   created_at: string
   updated_at: string
 }
@@ -248,7 +249,7 @@ export const SERVICE_TYPE_LABELS: Record<ServiceType, string> = {
   iron: 'كوي',
   wash_iron: 'غسيل وكوي',
   dry_clean: 'تنظيف جاف',
-  tailor: 'تفصيل وتعديلات',
+  housekeeping: 'تنظيف منازل',
   carpet: 'سجاد وبطاطين',
 }
 

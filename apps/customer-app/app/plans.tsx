@@ -431,7 +431,7 @@ export default function PlansScreen() {
           { key: 'all', icon: '📋', label: 'الكل', labelEn: 'All' },
           { key: 'clothes', icon: '👔', label: 'ملابس', labelEn: 'Clothes' },
           { key: 'carpet', icon: '🧹', label: 'سجاد وبطاطين', labelEn: 'Carpets' },
-          { key: 'tailor', icon: '✂️', label: 'تفصيل', labelEn: 'Tailoring' },
+          { key: 'housekeeping', icon: '🏠', label: 'تنظيف منازل', labelEn: 'House Keeping' },
         ].map(f => (
           <TouchableOpacity
             key={f.key}
@@ -455,7 +455,7 @@ export default function PlansScreen() {
         const cs = plan.covered_services ?? []
         if (serviceFilter === 'clothes') return cs.some(s => ['wash', 'iron', 'wash_iron', 'dry_clean'].includes(s))
         if (serviceFilter === 'carpet') return cs.includes('carpet')
-        if (serviceFilter === 'tailor') return cs.includes('tailor')
+        if (serviceFilter === 'housekeeping') return cs.includes('housekeeping')
         return true
       }).map(plan => {
         const price = calcPrice(plan.monthly_price, selectedDuration)
@@ -489,7 +489,7 @@ export default function PlansScreen() {
               {plan.includes_all_services
                 ? <Text style={[s.featureText, { color: colors.navy[100] }]}>✨ {locale === 'en' ? 'All services included' : 'جميع الخدمات متاحة'}</Text>
                 : plan.covered_services && plan.covered_services.length > 0
-                  ? <Text style={[s.featureText, { color: colors.navy[100] }]}>✅ {plan.covered_services.map((s: string) => (locale === 'en' ? { wash: 'Wash', iron: 'Iron', wash_iron: 'Wash & Iron', dry_clean: 'Dry Clean', tailor: 'Tailoring', carpet: 'Carpets' } : { wash: 'غسيل', iron: 'كوي', wash_iron: 'غسيل وكوي', dry_clean: 'تنظيف جاف', tailor: 'تفصيل', carpet: 'سجاد' })[s] ?? s).join(' • ')}</Text>
+                  ? <Text style={[s.featureText, { color: colors.navy[100] }]}>✅ {plan.covered_services.map((s: string) => (locale === 'en' ? { wash: 'Wash', iron: 'Iron', wash_iron: 'Wash & Iron', dry_clean: 'Dry Clean', housekeeping: 'House Keeping', carpet: 'Carpets' } : { wash: 'غسيل', iron: 'كوي', wash_iron: 'غسيل وكوي', dry_clean: 'تنظيف جاف', housekeeping: 'تنظيف منازل', carpet: 'سجاد' })[s] ?? s).join(' • ')}</Text>
                   : null}
               {plan.tier === 'premium' && <Text style={[s.featureText, { color: colors.navy[100] }]}>⚡ {locale === 'en' ? 'Priority delivery' : 'أولوية في التوصيل'}</Text>}
             </View>

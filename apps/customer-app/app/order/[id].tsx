@@ -71,7 +71,7 @@ export default function OrderDetailsScreen() {
   }
 
   const serviceLabel: Record<string, string> = {
-    wash: t('wash'), iron: t('ironOnly'), wash_iron: t('washIron'), dry_clean: t('dryClean'), tailor: t('tailor'),
+    wash: t('wash'), iron: t('ironOnly'), wash_iron: t('washIron'), dry_clean: t('dryClean'), housekeeping: t('housekeeping'),
   }
   const [order, setOrder] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -130,7 +130,7 @@ export default function OrderDetailsScreen() {
     if (!profile?.id) return
     const { data } = await supabase
       .from('orders')
-      .select('id, order_number, status, service_type, items_count, total, delivery_fee, cancellation_fee, notes, payment_method, payment_status, driver_id, rated_at, rating_service, rating_driver, rating_note, created_at, delivery_location, subscription_id, order_type, driver:users!orders_driver_id_fkey(name, phone)')
+      .select('id, order_number, status, service_type, items_count, total, subtotal, discount, coupon_code, delivery_fee, cancellation_fee, notes, payment_method, payment_status, driver_id, rated_at, rating_service, rating_driver, rating_note, created_at, delivery_location, subscription_id, order_type, driver:users!orders_driver_id_fkey(name, phone)')
       .eq('id', id)
       .eq('customer_id', profile.id)
       .single()
@@ -351,6 +351,7 @@ export default function OrderDetailsScreen() {
         <DetailRow colors={colors} label={t('service')} value={serviceLabel[order.service_type] ?? order.service_type} />
         <DetailRow colors={colors} label={t('itemsCount')} value={String(order.items_count)} />
         {order.delivery_fee > 0 && <DetailRow colors={colors} label={t('deliveryFee')} value={`${Number(order.delivery_fee).toFixed(2)} ${t('currency')}`} />}
+        {order.discount > 0 && <DetailRow colors={colors} label={`🏷️ ${isEn ? 'Coupon' : 'كوبون'}${order.coupon_code ? ` (${order.coupon_code})` : ''}`} value={`-${Number(order.discount).toFixed(2)} ${t('currency')}`} />}
         <DetailRow colors={colors} label={t('total')} value={`${order.total?.toFixed(2)} ${t('currency')}`} highlight />
         <DetailRow colors={colors} label={t('paymentMethodLabel')} value={({ cash: t('pmCash'), visa: t('pmVisa'), e_wallet: t('pmWallet'), instapay: t('pmInstapay'), wallet: t('pmWallet') } as Record<string, string>)[order.payment_method] ?? order.payment_method} />
         <DetailRow colors={colors} label={t('paymentStatusLabel')} value={({ confirmed: t('payStatusConfirmed'), refunded: t('payStatusRefunded'), failed: t('payStatusFailed'), pending: t('payStatusPending') } as Record<string, string>)[order.payment_status] ?? t('payStatusPending')} warn={order.payment_status === 'failed'} />

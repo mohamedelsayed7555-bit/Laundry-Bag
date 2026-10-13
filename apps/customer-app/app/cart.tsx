@@ -10,6 +10,7 @@ import { haversineKm } from '../src/utils/distance'
 import { useCart } from '../src/contexts/CartContext'
 import { useCustomAlert } from '../src/components/CustomAlert'
 import { playNotificationSound } from '../src/hooks/useNotifications'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { supabase } from '../src/lib/supabase'
 import { SkeletonPage } from '../src/components/Skeleton'
 
@@ -25,7 +26,7 @@ const services = [
   { key: 'dry_clean', label: 'تنظيف جاف', labelEn: 'Dry Clean' },
   { key: 'iron', label: 'كي فقط', labelEn: 'Iron Only' },
   { key: 'wash_iron', label: 'غسيل وكي', labelEn: 'Wash & Iron' },
-  { key: 'tailor', label: 'تفصيل وتعديلات', labelEn: 'Tailoring' },
+  { key: 'housekeeping', label: 'تنظيف منازل', labelEn: 'House Keeping' },
   { key: 'carpet', label: 'سجاد وبطاطين', labelEn: 'Carpets & Blankets' },
 ]
 
@@ -59,8 +60,14 @@ export default function CartScreen() {
   const [zoneSettings, setZoneSettings] = useState({ max_zone_km: 30, price_per_km: 2, base_delivery_km: 5, laundry_lat: 30.0444, laundry_lng: 31.2357 })
   const [distanceKm, setDistanceKm] = useState<number | null>(null)
   const [outOfZone, setOutOfZone] = useState(false)
+  const [deliveryOutOfZone, setDeliveryOutOfZone] = useState(false)
+  const [deliveryDistanceKm, setDeliveryDistanceKm] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [couponCode, setCouponCode] = useState('')
+  const [appliedCoupon, setAppliedCoupon] = useState<any>(null)
+  const [couponDiscount, setCouponDiscount] = useState(0)
+  const [couponLoading, setCouponLoading] = useState(false)
   const paymentScrollRef = useRef<ScrollView>(null)
   const [showPickupPicker, setShowPickupPicker] = useState(false)
   const [showDeliveryPicker, setShowDeliveryPicker] = useState(false)
@@ -145,6 +152,22 @@ export default function CartScreen() {
     }
   }, [selectedAddress, zoneSettings, deliveryFeeBase])
 
+  useEffect(() => {
+    if (sameAddress) {
+      setDeliveryOutOfZone(false)
+      setDeliveryDistanceKm(null)
+      return
+    }
+    if (deliveryAddress?.lat && deliveryAddress?.lng) {
+      const dist = haversineKm(zoneSettings.laundry_lat, zoneSettings.laundry_lng, deliveryAddress.lat, deliveryAddress.lng)
+      setDeliveryDistanceKm(Math.round(dist * 10) / 10)
+      setDeliveryOutOfZone(dist > zoneSettings.max_zone_km)
+    } else {
+      setDeliveryOutOfZone(false)
+      setDeliveryDistanceKm(null)
+    }
+  }, [deliveryAddress, sameAddress, zoneSettings])
+
   // Build coverage from all active subscriptions
   const subCoverage = useMemo(() => {
     if (!activeSubs.length) return { coveredServices: [] as string[], subs: [] as any[], totalRemaining: 0 }
@@ -184,7 +207,61 @@ export default function CartScreen() {
     return total
   }, [coveredItems, overflowCount])
   const fee = useSubscription && uncoveredCount === 0 && overflowCount === 0 ? 0 : deliveryFee
-  const orderTotal = useSubscription ? uncoveredTotal + overflowTotal + fee : totalPrice + fee
+  const subtotalBeforeDiscount = useSubscription ? uncoveredTotal + overflowTotal + fee : totalPrice + fee
+  const orderTotal = Math.max(0, subtotalBeforeDiscount - couponDiscount)
+
+  async function applyCoupon() {
+    if (!couponCode.trim()) return
+    setCouponLoading(true)
+    const code = couponCode.trim().toUpperCase()
+    const { data: coupon, error } = await supabase.from('coupons').select('*').eq('code', code).eq('is_active', true).single()
+    if (error || !coupon) {
+      setCouponLoading(false)
+      showAlert({ title: isEn ? 'Invalid Code' : 'كود غير صالح', message: isEn ? 'This coupon code is invalid or expired' : 'كود الخصم غير صالح أو منتهي', type: 'warning' })
+      return
+    }
+    if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
+      setCouponLoading(false)
+      showAlert({ title: isEn ? 'Expired' : 'منتهي', message: isEn ? 'This coupon has expired' : 'كود الخصم منتهي الصلاحية', type: 'warning' })
+      return
+    }
+    if (coupon.max_uses && coupon.used_count >= coupon.max_uses) {
+      setCouponLoading(false)
+      showAlert({ title: isEn ? 'Limit Reached' : 'نفذ', message: isEn ? 'This coupon has reached its usage limit' : 'كود الخصم نفذت مرات استخدامه', type: 'warning' })
+      return
+    }
+    const itemsTotal = useSubscription ? uncoveredTotal + overflowTotal : totalPrice
+    if (coupon.min_order_amount > 0 && itemsTotal < coupon.min_order_amount) {
+      setCouponLoading(false)
+      showAlert({ title: isEn ? 'Minimum not met' : 'الحد الأدنى', message: isEn ? `Minimum order is ${coupon.min_order_amount} EGP` : `الحد الأدنى للطلب ${coupon.min_order_amount} ج.م`, type: 'warning' })
+      return
+    }
+    if (profile) {
+      const { count } = await supabase.from('coupon_usage').select('id', { count: 'exact', head: true }).eq('coupon_id', coupon.id).eq('user_id', profile.id)
+      if ((count ?? 0) >= (coupon.per_user_limit ?? 1)) {
+        setCouponLoading(false)
+        showAlert({ title: isEn ? 'Already Used' : 'مستخدم', message: isEn ? 'You already used this coupon' : 'لقد استخدمت هذا الكوبون من قبل', type: 'warning' })
+        return
+      }
+    }
+    let discount = 0
+    if (coupon.type === 'percentage') {
+      discount = itemsTotal * (coupon.value / 100)
+      if (coupon.max_discount && discount > coupon.max_discount) discount = coupon.max_discount
+    } else {
+      discount = coupon.value
+    }
+    discount = Math.min(discount, itemsTotal)
+    setAppliedCoupon(coupon)
+    setCouponDiscount(Math.round(discount * 100) / 100)
+    setCouponLoading(false)
+  }
+
+  function removeCoupon() {
+    setAppliedCoupon(null)
+    setCouponDiscount(0)
+    setCouponCode('')
+  }
 
   const serviceLabel = (key: string) => {
     const svc = services.find(s => s.key === key)
@@ -212,7 +289,11 @@ export default function CartScreen() {
       return
     }
     if (outOfZone) {
-      showAlert({ title: isEn ? 'Out of zone' : 'خارج نطاق التوصيل', message: isEn ? `Address is ${distanceKm} km away — max ${zoneSettings.max_zone_km} km` : `العنوان المختار يبعد ${distanceKm} كم — الحد الأقصى ${zoneSettings.max_zone_km} كم`, type: 'warning' })
+      showAlert({ title: isEn ? 'Out of zone' : 'خارج نطاق التوصيل', message: isEn ? `Pickup address is ${distanceKm} km away — max ${zoneSettings.max_zone_km} km` : `عنوان الاستلام يبعد ${distanceKm} كم — الحد الأقصى ${zoneSettings.max_zone_km} كم`, type: 'warning' })
+      return
+    }
+    if (deliveryOutOfZone) {
+      showAlert({ title: isEn ? 'Out of zone' : 'خارج نطاق التوصيل', message: isEn ? `Delivery address is ${deliveryDistanceKm} km away — max ${zoneSettings.max_zone_km} km` : `عنوان التسليم يبعد ${deliveryDistanceKm} كم — الحد الأقصى ${zoneSettings.max_zone_km} كم`, type: 'warning' })
       return
     }
 
@@ -245,6 +326,12 @@ export default function CartScreen() {
       return
     }
 
+    let giftEligible = false
+    try {
+      const giftFlag = await AsyncStorage.getItem('@gift_eligible')
+      if (giftFlag === 'true') giftEligible = true
+    } catch {}
+
     const { data: orderData, error } = await supabase.from('orders').insert({
       customer_id: profile.id,
       service_type: [...new Set(cart.map((i: any) => i.service_type))].join('+'),
@@ -268,7 +355,25 @@ export default function CartScreen() {
       is_scheduled: isScheduled,
       scheduled_at: isScheduled ? scheduledDate.toISOString() : null,
       delivery_distance_km: distanceKm,
+      gift_included: giftEligible,
+      discount: couponDiscount,
+      coupon_id: appliedCoupon?.id || null,
+      coupon_code: appliedCoupon?.code || null,
     }).select('id').single()
+
+    if (giftEligible) {
+      AsyncStorage.removeItem('@gift_eligible').catch(() => {})
+    }
+
+    if (!error && appliedCoupon && orderData?.id && profile) {
+      await supabase.from('coupon_usage').insert({
+        coupon_id: appliedCoupon.id,
+        user_id: profile.id,
+        order_id: orderData.id,
+        discount_amount: couponDiscount,
+      })
+      await supabase.from('coupons').update({ used_count: (appliedCoupon.used_count ?? 0) + 1 }).eq('id', appliedCoupon.id)
+    }
 
     if (!error && useSubscription) {
       // Distribute covered items across subscriptions (only deduct what the plan covers)
@@ -597,6 +702,39 @@ export default function CartScreen() {
             multiline numberOfLines={3} textAlignVertical="top" textAlign={isEn ? 'left' : 'right'} />
         )}
 
+        {/* Coupon Code */}
+        <View style={[s.couponWrap, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
+          {appliedCoupon ? (
+            <View style={s.couponApplied}>
+              <View style={{ flex: 1 }}>
+                <Text style={[s.couponAppliedCode, { color: colors.success }]}>✅ {appliedCoupon.code}</Text>
+                <Text style={[s.couponAppliedAmount, { color: colors.navy[300] }]}>
+                  {isEn ? `Discount: ${couponDiscount.toFixed(2)} EGP` : `خصم: ${couponDiscount.toFixed(2)} ج.م`}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={removeCoupon} style={[s.couponRemoveBtn, { backgroundColor: colors.navy[700] }]}>
+                <Text style={{ color: colors.navy[300], fontSize: 12 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={s.couponRow}>
+              <TextInput
+                style={[s.couponInput, { backgroundColor: colors.navy[700], color: colors.text, borderColor: colors.navy[600] }]}
+                value={couponCode}
+                onChangeText={t => setCouponCode(t.toUpperCase())}
+                placeholder={isEn ? 'Coupon code' : 'كود الخصم'}
+                placeholderTextColor={colors.navy[400]}
+                autoCapitalize="characters"
+                textAlign={isEn ? 'left' : 'right'}
+              />
+              <TouchableOpacity onPress={applyCoupon} disabled={couponLoading || !couponCode.trim()}
+                style={[s.couponApplyBtn, { backgroundColor: couponCode.trim() ? colors.primary : colors.navy[600] }]}>
+                <Text style={s.couponApplyText}>{couponLoading ? '...' : (isEn ? 'Apply' : 'تطبيق')}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
         <View style={[s.totalCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
           {useSubscription ? (
             uncoveredCount > 0 ? (
@@ -604,6 +742,7 @@ export default function CartScreen() {
                 <View style={s.totalRow}><Text style={[s.breakdownLabel, { color: colors.success }]}>👑 {isEn ? 'Plan items' : 'قطع الباقة'} ({coveredCount})</Text><Text style={[s.breakdownValue, { color: colors.success }]}>{isEn ? 'Free' : 'مجاناً'}</Text></View>
                 <View style={s.totalRow}><Text style={[s.breakdownLabel, { color: colors.navy[400] }]}>📋 {isEn ? 'Uncovered items' : 'قطع خارج الباقة'} ({uncoveredCount})</Text><Text style={[s.breakdownValue, { color: colors.navy[200] }]}>{uncoveredTotal.toFixed(2)} {t('currency')}</Text></View>
                 {fee > 0 && <View style={s.totalRow}><Text style={[s.breakdownLabel, { color: colors.navy[400] }]}>🚚 {isEn ? 'Delivery' : 'التوصيل'}{distanceKm ? ` (${distanceKm} ${isEn ? 'km' : 'كم'})` : ''}</Text><Text style={[s.breakdownValue, { color: colors.navy[200] }]}>{fee.toFixed(2)} {t('currency')}</Text></View>}
+                {couponDiscount > 0 && <View style={s.totalRow}><Text style={[s.breakdownLabel, { color: colors.success }]}>🏷️ {isEn ? 'Coupon' : 'كوبون'} ({appliedCoupon?.code})</Text><Text style={[s.breakdownValue, { color: colors.success }]}>-{couponDiscount.toFixed(2)} {t('currency')}</Text></View>}
                 <View style={[s.totalRow, { borderTopWidth: 1, borderTopColor: colors.navy[700], paddingTop: 8, marginTop: 4 }]}>
                   <Text style={[s.totalLabel, { color: colors.navy[200] }]}>{isEn ? 'Amount to pay' : 'المبلغ المطلوب'}</Text>
                   <Text style={[s.totalValue, { color: colors.primary }]}>{orderTotal.toFixed(2)} {t('currency')}</Text>
@@ -619,6 +758,7 @@ export default function CartScreen() {
             <>
               <View style={s.totalRow}><Text style={[s.breakdownLabel, { color: colors.navy[400] }]}>{isEn ? 'Subtotal' : 'المجموع'}</Text><Text style={[s.breakdownValue, { color: colors.navy[200] }]}>{totalPrice.toFixed(2)} {t('currency')}</Text></View>
               {deliveryFee > 0 && <View style={s.totalRow}><Text style={[s.breakdownLabel, { color: colors.navy[400] }]}>🚚 {isEn ? 'Delivery' : 'التوصيل'}{distanceKm ? ` (${distanceKm} ${isEn ? 'km' : 'كم'})` : ''}</Text><Text style={[s.breakdownValue, { color: colors.navy[200] }]}>{deliveryFee.toFixed(2)} {t('currency')}</Text></View>}
+              {couponDiscount > 0 && <View style={s.totalRow}><Text style={[s.breakdownLabel, { color: colors.success }]}>🏷️ {isEn ? 'Coupon' : 'كوبون'} ({appliedCoupon?.code})</Text><Text style={[s.breakdownValue, { color: colors.success }]}>-{couponDiscount.toFixed(2)} {t('currency')}</Text></View>}
               <View style={[s.totalRow, { borderTopWidth: 1, borderTopColor: colors.navy[700], paddingTop: 8, marginTop: 4 }]}>
                 <Text style={[s.totalLabel, { color: colors.navy[200] }]}>{isEn ? 'Total' : 'الإجمالي'}</Text>
                 <Text style={[s.totalValue, { color: colors.primary }]}>{orderTotal.toFixed(2)} {t('currency')}</Text>
@@ -753,8 +893,37 @@ const s = StyleSheet.create({
     borderRadius: 12, padding: 14,
     fontSize: 14, borderWidth: 1, minHeight: 70, marginTop: 8,
   },
+  couponWrap: {
+    borderRadius: 16, padding: 14, marginTop: 16, borderWidth: 1,
+  },
+  couponRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+  },
+  couponInput: {
+    flex: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10,
+    fontSize: 14, fontFamily: 'monospace', borderWidth: 1,
+  },
+  couponApplyBtn: {
+    borderRadius: 12, paddingHorizontal: 18, paddingVertical: 10,
+  },
+  couponApplyText: {
+    color: '#fff', fontSize: 13, fontWeight: '700',
+  },
+  couponApplied: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+  },
+  couponAppliedCode: {
+    fontSize: 14, fontWeight: '700', fontFamily: 'monospace',
+  },
+  couponAppliedAmount: {
+    fontSize: 12, marginTop: 2,
+  },
+  couponRemoveBtn: {
+    width: 28, height: 28, borderRadius: 14,
+    justifyContent: 'center', alignItems: 'center',
+  },
   totalCard: {
-    borderRadius: 16, padding: 20, marginTop: 24,
+    borderRadius: 16, padding: 20, marginTop: 16,
     borderWidth: 1,
   },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

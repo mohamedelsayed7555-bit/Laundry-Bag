@@ -54,6 +54,7 @@ function useNavGroups(badges: Record<string, number>) {
       label: t.sidebar.financialOps,
       items: [
         { label: t.sidebar.prices, href: '/prices', icon: Tag, badge: 0 },
+        { label: 'الكوبونات', href: '/coupons', icon: Sparkles, badge: 0 },
         { label: t.sidebar.plans, href: '/plans', icon: Crown, badge: 0 },
         { label: 'الاشتراكات', href: '/subscriptions', icon: Crown, badge: badges.subs || 0 },
         { label: t.sidebar.finance, href: '/finance', icon: DollarSign, badge: badges.finance || 0 },

@@ -42,7 +42,7 @@ const nextAction: Record<string, { status: string; label: string }> = {
 }
 
 const serviceLabel: Record<string, string> = {
-  wash: 'غسيل', iron: 'كي', wash_iron: 'غسيل وكي', dry_clean: 'تنظيف جاف', tailor: 'تفصيل وتعديلات', carpet: 'سجاد وبطاطين',
+  wash: 'غسيل', iron: 'كي', wash_iron: 'غسيل وكي', dry_clean: 'تنظيف جاف', housekeeping: 'تنظيف منازل', carpet: 'سجاد وبطاطين',
 }
 
 const paymentMethodLabel: Record<string, { label: string; icon: string }> = {
@@ -355,7 +355,7 @@ export default function DriverOrdersScreen() {
           {item.order_type === 'subscription' && item.total > 0 && (
             <View style={{ backgroundColor: '#f59e0b15', borderColor: '#f59e0b30', borderWidth: 1, borderRadius: 10, padding: 10, marginTop: 6 }}>
               <Text style={{ fontSize: 12, fontWeight: '700', color: '#f59e0b' }}>💰 مطلوب تحصيل: {item.total.toFixed(2)} ج.م</Text>
-              <Text style={{ fontSize: 10, color: colors.navy[400], marginTop: 2 }}>قطع التفصيل خارج الباقة</Text>
+              <Text style={{ fontSize: 10, color: colors.navy[400], marginTop: 2 }}>خدمات خارج الباقة</Text>
             </View>
           )}
 

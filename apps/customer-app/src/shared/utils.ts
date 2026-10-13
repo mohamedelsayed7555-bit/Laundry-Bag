@@ -48,6 +48,7 @@ export function getServiceLabel(type: ServiceType): string {
     iron: 'كوي',
     wash_iron: 'غسيل وكوي',
     dry_clean: 'تنظيف جاف',
+    housekeeping: 'تنظيف منازل',
   }
   return labels[type]
 }

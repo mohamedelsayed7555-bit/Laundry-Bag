@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { useTheme } from '../../src/contexts/ThemeContext'
 import { useLanguage } from '../../src/contexts/LanguageContext'
+import { I18nManager } from 'react-native'
 import { useCustomAlert } from '../../src/components/CustomAlert'
 
 export default function LoginScreen() {
@@ -22,7 +23,8 @@ export default function LoginScreen() {
   const [serverError, setServerError] = useState('')
   const { signInWithPassword, signUp, signInWithBiometric, biometricEnabled } = useAuth()
   const { colors } = useTheme()
-  const { t } = useLanguage()
+  const { t, locale, setLanguage } = useLanguage()
+  const isRTL = locale === 'ar'
   const router = useRouter()
   const { showAlert, AlertComponent } = useCustomAlert()
   const [bioLoading, setBioLoading] = useState(false)
@@ -100,6 +102,15 @@ export default function LoginScreen() {
     <View style={{ flex: 1, backgroundColor: colors.navy[900] }}>
     <KeyboardAvoidingView style={[s.container, { backgroundColor: colors.navy[900] }]} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView style={{ backgroundColor: colors.navy[900] }} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
+        {/* Language Toggle */}
+        <TouchableOpacity
+          style={[s.langBtn, { backgroundColor: colors.navy[800], borderColor: colors.navy[700] }]}
+          onPress={() => setLanguage(locale === 'ar' ? 'en' : 'ar')}
+        >
+          <Text style={s.langIcon}>🌐</Text>
+          <Text style={[s.langText, { color: colors.primary }]}>{locale === 'ar' ? 'English' : 'العربية'}</Text>
+        </TouchableOpacity>
+
         {/* Logo Section */}
         <View style={s.logoSection}>
           <View style={s.logoGlowWrap}>
@@ -195,7 +206,7 @@ export default function LoginScreen() {
           />
 
           <View>
-            <Text style={[s.label, { color: colors.navy[100] }]}>🔒  {t('password')}</Text>
+            <Text style={[s.label, { color: colors.navy[100], textAlign: isRTL ? 'right' : 'left' }]}>🔒  {t('password')}</Text>
             <View style={[s.inputWrap, { borderColor: colors.inputBorder, backgroundColor: colors.inputBg }, errors.password ? { borderColor: colors.danger, backgroundColor: colors.dangerGlow } : null]}>
               <TouchableOpacity style={s.eyeBtn} onPress={() => setShowPassword(!showPassword)}>
                 <Text style={s.eyeIcon}>{showPassword ? '🙈' : '👁️'}</Text>
@@ -280,9 +291,10 @@ export default function LoginScreen() {
 }
 
 function InputField({ label, error, colors, ...inputProps }: any) {
+  const { locale } = useLanguage()
   return (
     <View>
-      <Text style={[s.label, { color: colors.navy[100] }]}>{label}</Text>
+      <Text style={[s.label, { color: colors.navy[100], textAlign: locale === 'ar' ? 'right' : 'left' }]}>{label}</Text>
       <View style={[s.inputWrap, { borderColor: colors.inputBorder, backgroundColor: colors.inputBg }, error ? { borderColor: colors.danger, backgroundColor: colors.dangerGlow } : null]}>
         <TextInput
           style={[s.input, { color: colors.text }]}
@@ -300,6 +312,9 @@ function InputField({ label, error, colors, ...inputProps }: any) {
 const s = StyleSheet.create({
   container: { flex: 1 },
   content: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40 },
+  langBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, borderWidth: 1, marginBottom: 8 },
+  langIcon: { fontSize: 16 },
+  langText: { fontSize: 13, fontWeight: '700' },
 
   logoSection: { alignItems: 'center', marginBottom: 32 },
   logoGlowWrap: { position: 'relative', marginBottom: 16 },
@@ -327,7 +342,7 @@ const s = StyleSheet.create({
   tabTextActive: { color: '#fff', fontSize: 15, fontWeight: '700' },
 
   form: { gap: 16 },
-  label: { fontSize: 13, fontWeight: '600', textAlign: 'right', marginBottom: 6 },
+  label: { fontSize: 13, fontWeight: '600', marginBottom: 6, writingDirection: 'auto' },
   inputWrap: {
     flexDirection: 'row', alignItems: 'center',
     borderWidth: 1.5, borderRadius: 14,
@@ -342,10 +357,10 @@ const s = StyleSheet.create({
   eyeBtn: { paddingHorizontal: 16, justifyContent: 'center' },
   eyeIcon: { fontSize: 20 },
   errorText: {
-    fontSize: 11, textAlign: 'right', marginTop: 4, fontWeight: '600',
+    fontSize: 11, marginTop: 4, fontWeight: '600',
   },
   hintText: {
-    fontSize: 11, textAlign: 'right', marginTop: 4,
+    fontSize: 11, marginTop: 4,
   },
   serverErrorBox: {
     borderWidth: 1,

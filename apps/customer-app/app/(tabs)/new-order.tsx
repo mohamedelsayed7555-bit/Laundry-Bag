@@ -16,7 +16,7 @@ const services = [
   { key: 'dry_clean', icon: '🧹', label: 'تنظيف جاف', labelEn: 'Dry Clean' },
   { key: 'iron', icon: '👕', label: 'كي فقط', labelEn: 'Iron Only' },
   { key: 'wash_iron', icon: '✨', label: 'غسيل وكي', labelEn: 'Wash & Iron' },
-  { key: 'tailor', icon: '✂️', label: 'تفصيل وتعديلات', labelEn: 'Tailoring' },
+  { key: 'housekeeping', icon: '🏠', label: 'تنظيف منازل', labelEn: 'House Keeping' },
   { key: 'carpet', icon: '🛋️', label: 'سجاد وبطاطين', labelEn: 'Carpets & Blankets' },
 ]
 

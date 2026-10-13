@@ -198,7 +198,11 @@ export default function AddressesScreen() {
     showAlert({ title: t('deleteAddress'), message: t('deleteAddressConfirm'), type: 'confirm', buttons: [
       { text: t('cancel'), style: 'cancel' },
       { text: t('delete'), style: 'destructive', onPress: async () => {
-        await supabase.from('addresses').delete().eq('id', id)
+        const { error } = await supabase.from('addresses').delete().eq('id', id)
+        if (error) {
+          showAlert({ title: t('error'), message: error.message, type: 'error' })
+          return
+        }
         loadAddresses()
       }},
     ] })

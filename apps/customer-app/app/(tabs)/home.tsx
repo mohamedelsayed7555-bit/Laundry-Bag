@@ -10,6 +10,7 @@ import { supabase } from '../../src/lib/supabase'
 import { SkeletonOrderCard } from '../../src/components/Skeleton'
 import { useRealtimeOrders } from '../../src/hooks/useRealtimeOrders'
 import { useCart } from '../../src/contexts/CartContext'
+import WelcomeGiftPopup from '../../src/components/WelcomeGiftPopup'
 
 const statusIcons: Record<string, string> = {
   pending: '⏳', assigned: '🚗', picked_up: '📦', processing: '🔄',
@@ -331,7 +332,7 @@ export default function HomeScreen() {
     { icon: '🧹', label: t('dryClean'), key: 'dry_clean', desc: t('dryCleanDesc'), color: '#a855f7' },
     { icon: '👕', label: t('ironOnly'), key: 'iron', desc: t('ironDesc'), color: '#f59e0b' },
     { icon: '✨', label: t('washIron'), key: 'wash_iron', desc: t('washIronDesc'), color: '#10b981' },
-    { icon: '✂️', label: t('tailor'), key: 'tailor', desc: t('tailorDesc'), color: '#ef4444' },
+    { icon: '🏠', label: t('housekeeping'), key: 'housekeeping', desc: t('housekeepingDesc'), color: '#ef4444' },
     { icon: '🧹', label: t('carpet') || 'سجاد وبطاطين', key: 'carpet', desc: t('carpetDesc') || 'غسيل سجاد وبطاطين ومفروشات', color: '#6366f1' },
   ]
 
@@ -517,6 +518,7 @@ export default function HomeScreen() {
         </View>
       </View>
     </Modal>
+    <WelcomeGiftPopup userId={profile?.id} onOrderNow={() => router.push('/new-order')} />
     </>
   )
 }

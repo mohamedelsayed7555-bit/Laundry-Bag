@@ -127,9 +127,9 @@ export function useCustomAlert() {
   const showAlert = useCallback((opts: ShowAlertOptions) => {
     const wrappedButtons = (opts.buttons ?? [{ text: 'حسناً' }]).map(btn => ({
       ...btn,
-      onPress: () => {
-        btn.onPress?.()
+      onPress: async () => {
         setAlertState(prev => ({ ...prev, visible: false }))
+        await btn.onPress?.()
       },
     }))
     setAlertState({ ...opts, buttons: wrappedButtons, visible: true })
