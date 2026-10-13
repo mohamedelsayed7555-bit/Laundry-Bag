@@ -167,7 +167,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loginEmail = user.email
     }
     const { error, data } = await supabase.auth.signInWithPassword({ email: loginEmail, password })
-    if (error) return { error: error.message }
+    if (error) {
+      let msg = error.message
+      if (msg.includes('Invalid login'))
+        msg = 'البريد الإلكتروني أو كلمة المرور غلط'
+      else if (msg.includes('Email not confirmed'))
+        msg = 'الحساب لم يتم تأكيده — تحقق من بريدك الإلكتروني'
+      return { error: msg }
+    }
 
     if (data.user) {
       const { data: profile } = await supabase.from('users').select('is_active').eq('id', data.user.id).single()
@@ -182,7 +189,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signUp(email: string, password: string, name: string, phone: string) {
     const { error, data } = await supabase.auth.signUp({ email, password })
-    if (error) return { error: error.message }
+    if (error) {
+      let msg = error.message
+      if (msg.includes('Password should contain'))
+        msg = 'كلمة المرور لازم تحتوي على حروف كبيرة وصغيرة وأرقام ورموز'
+      else if (msg.includes('already registered'))
+        msg = 'البريد الإلكتروني مسجل بالفعل'
+      else if (msg.includes('valid email'))
+        msg = 'البريد الإلكتروني غير صالح'
+      else if (msg.includes('at least'))
+        msg = 'كلمة المرور لازم تكون 6 حروف على الأقل'
+      return { error: msg }
+    }
 
     if (data.user) {
       await supabase.from('users').upsert({
