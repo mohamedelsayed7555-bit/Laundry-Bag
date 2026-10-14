@@ -130,7 +130,7 @@ export default function OrderDetailsScreen() {
     if (!profile?.id) return
     const { data } = await supabase
       .from('orders')
-      .select('id, order_number, status, service_type, items_count, total, subtotal, discount, coupon_code, delivery_fee, cancellation_fee, notes, payment_method, payment_status, driver_id, rated_at, rating_service, rating_driver, rating_note, created_at, delivery_location, subscription_id, order_type, driver:users!orders_driver_id_fkey(name, phone)')
+      .select('id, order_number, status, service_type, items_count, total, subtotal, discount, coupon_code, delivery_fee, cancellation_fee, notes, payment_method, payment_status, driver_id, rated_at, rating_service, rating_driver, rating_note, gift_included, created_at, delivery_location, subscription_id, order_type, driver:users!orders_driver_id_fkey(name, phone)')
       .eq('id', id)
       .eq('customer_id', profile.id)
       .single()
@@ -277,6 +277,11 @@ export default function OrderDetailsScreen() {
           <Text style={{ fontSize: 16 }}>{status.icon}</Text>
           <Text style={[s.statusLabel, { color: status.color }]}>{status.label}</Text>
         </View>
+        {order.gift_included && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f59e0b20', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, marginTop: 8, alignSelf: 'center' }}>
+            <Text style={{ fontSize: 14, color: '#f59e0b', fontWeight: '600' }}>🎁 {isEn ? 'Includes Welcome Gift' : 'يشمل هدية ترحيبية'}</Text>
+          </View>
+        )}
       </View>
 
       {order.status !== 'cancelled' && (

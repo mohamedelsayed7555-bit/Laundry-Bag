@@ -97,7 +97,7 @@ export default function DriverOrdersScreen() {
     }
     const { data } = await supabase
       .from('orders')
-      .select('id, order_number, status, service_type, items_count, total, notes, payment_method, payment_status, order_type, pickup_location, delivery_location, created_at, is_scheduled, scheduled_at, rating_driver, rating_note, customer:users!orders_customer_id_fkey(name, phone, customer_code), address:addresses(label, building, floor, apartment, landmark, lat, lng)')
+      .select('id, order_number, status, service_type, items_count, total, notes, payment_method, payment_status, order_type, pickup_location, delivery_location, created_at, is_scheduled, scheduled_at, rating_driver, rating_note, gift_included, customer:users!orders_customer_id_fkey(name, phone, customer_code), address:addresses(label, building, floor, apartment, landmark, lat, lng)')
       .eq('driver_id', profile.id)
       .not('status', 'in', '("scheduled","cancelled","refunded")')
       .order('created_at', { ascending: false })
@@ -244,7 +244,7 @@ export default function DriverOrdersScreen() {
         <View style={[s.orderCard, item.status !== 'delivered' && { borderColor: status.color + '40' }]}>
           <View style={s.orderHeader}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={s.orderNumber}>{item.order_number}</Text>
+              <Text style={s.orderNumber}>{item.gift_included ? '🎁 ' : ''}{item.order_number}</Text>
               {item.order_type === 'bag_offer' && (
                 <View style={{ backgroundColor: '#05966920', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 }}>
                   <Text style={{ fontSize: 10, color: '#059669', fontWeight: '700' }}>👜 شنطة</Text>
