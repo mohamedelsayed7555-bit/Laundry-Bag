@@ -337,6 +337,15 @@ export default {
   'item:تنظيف بعد التشطيب': 'Post-Construction Cleaning',
   'item:تنظيف أثاث ومفروشات': 'Furniture & Upholstery Cleaning',
 
+  // Accessories / Products
+  'cat:منتجات': 'Products',
+  'item:كيس غسيل بالوجو': 'Branded Laundry Bag',
+  'item:معطر ملابس': 'Fabric Softener',
+  'item:مسحوق غسيل (كيس صغير)': 'Detergent (Small Pack)',
+  'item:منعم أقمشة': 'Fabric Conditioner',
+  'item:بشكير بالوجو': 'Branded Towel',
+  'item:فوطة وش بالوجو': 'Branded Face Towel',
+
   // Plan names (DB names → English)
   'plan:باقة فردي': 'Individual Plan',
   'plan:باقة زوجي': 'Couple Plan',
