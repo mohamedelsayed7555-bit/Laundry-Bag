@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
     password,
     email_confirm: true,
     user_metadata: { name, role: role || 'customer' },
+    app_metadata: { role: role || 'customer' },
   })
 
   if (authError) {

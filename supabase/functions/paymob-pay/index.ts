@@ -18,15 +18,22 @@ Deno.serve(async (req: Request) => {
 
   try {
     const authHeader = req.headers.get("Authorization")!;
-    const supabase = createClient(
+    const userClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: authHeader } } }
     );
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await userClient.auth.getUser();
     if (!user) throw new Error("Unauthorized");
 
-    const { order_id, subscription_id, payment_method, wallet_phone, amount_override } = await req.json();
+    // Ownership is checked explicitly below; the service client lets us record the
+    // amount due and Paymob ids that customers are not allowed to write themselves.
+    const admin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    const { order_id, subscription_id, payment_method, wallet_phone } = await req.json();
     if (!order_id && !subscription_id) throw new Error("order_id or subscription_id required");
 
     let payAmount: number;
@@ -37,32 +44,39 @@ Deno.serve(async (req: Request) => {
     if (subscription_id) {
       entityType = "subscription";
       entityId = subscription_id;
-      const { data: sub } = await supabase
+      const { data: sub } = await admin
         .from("subscriptions")
-        .select("id, user_id, total_paid, plan_id, plans(name)")
+        .select("id, user_id, total_paid, status")
         .eq("id", subscription_id)
         .single();
-      if (!sub || sub.user_id !== user.id) throw new Error("Subscription not found");
-      payAmount = sub.total_paid || 0;
+      if (!sub || sub.user_id !== user.id) throw new Error("الاشتراك غير موجود");
+      if (sub.status !== "pending") throw new Error("الاشتراك ده مش محتاج دفع");
+      payAmount = Number(sub.total_paid || 0);
       merchantOrderId = `SUB-${subscription_id.slice(0, 8)}-${Date.now()}`;
     } else {
       entityType = "order";
       entityId = order_id;
-      const { data: order } = await supabase
+      const { data: order } = await admin
         .from("orders")
-        .select("id, order_number, total, customer_id")
+        .select("id, order_number, total, customer_id, status, payment_status, price_difference")
         .eq("id", order_id)
         .single();
-      if (!order || order.customer_id !== user.id) throw new Error("Order not found");
-      payAmount = order.total;
+      if (!order || order.customer_id !== user.id) throw new Error("الطلب غير موجود");
+      if (order.status === "cancelled") throw new Error("الطلب ملغي");
+      const difference = Number(order.price_difference || 0);
+      if (difference > 0) {
+        payAmount = difference;
+      } else if (order.payment_status === "confirmed") {
+        throw new Error("الطلب مدفوع بالفعل");
+      } else {
+        payAmount = Number(order.total || 0);
+      }
       merchantOrderId = `${order.order_number || order.id}-${Date.now()}`;
     }
 
-    if (typeof amount_override === "number" && amount_override > 0) {
-      payAmount = amount_override;
-    }
+    if (!(payAmount > 0)) throw new Error("مفيش مبلغ مطلوب دفعه");
 
-    const { data: profile } = await supabase
+    const { data: profile } = await admin
       .from("users")
       .select("name, phone, email")
       .eq("id", user.id)
@@ -129,14 +143,14 @@ Deno.serve(async (req: Request) => {
     });
     const { token: paymentKey } = await paymentKeyRes.json();
 
-    // Save paymob order id
+    // Record the Paymob order and the exact amount the callback must see.
     if (entityType === "order") {
-      await supabase
+      await admin
         .from("orders")
-        .update({ paymob_order_id: String(paymobOrder.id) })
+        .update({ paymob_order_id: String(paymobOrder.id), amount_due: payAmount })
         .eq("id", entityId);
     } else {
-      await supabase
+      await admin
         .from("subscriptions")
         .update({ paymob_order_id: String(paymobOrder.id) })
         .eq("id", entityId);

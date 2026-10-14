@@ -10,6 +10,7 @@ import { ActivityIndicator } from 'react-native'
 import { supabase } from '../../src/lib/supabase'
 import { SkeletonPage } from '../../src/components/Skeleton'
 import { CANCELLABLE_STATUSES } from '../../src/shared/types'
+import { serverErrorMessage } from '../../src/lib/serverErrors'
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!
 
@@ -152,27 +153,11 @@ export default function OrderDetailsScreen() {
         text: driverArrived ? `${t('yesCancelPay')} ${fee.toFixed(2)} ${t('currency')}` : t('yesCancel'),
         style: 'destructive',
         onPress: async () => {
-          const updateData: Record<string, any> = {
-            status: 'cancelled',
-            cancellation_reason: driverArrived ? 'إلغاء بعد وصول السائق — رسوم توصيل' : 'إلغاء بواسطة العميل',
-            cancellation_fee: fee,
-            cancelled_by: 'customer',
-            cancelled_at: new Date().toISOString(),
-          }
-          const { error, data } = await supabase.from('orders').update(updateData).eq('id', id).eq('customer_id', profile!.id).select()
+          // The server sets the cancellation fee and returns plan items to the subscription.
+          const { error } = await supabase.rpc('cancel_order', { p_order_id: id })
           if (error) {
-            showAlert({ title: t('error'), message: `${t('connectionError')}\n${error.message}`, type: 'error' })
-          } else if (!data || data.length === 0) {
-            showAlert({ title: t('error'), message: isEn ? `Cancel failed — no rows updated.\nOrder ID: ${id}\nProfile: ${profile!.id}` : `فشل الإلغاء — لم يتم تحديث أي صف.\nOrder: ${id}\nProfile: ${profile!.id}`, type: 'error' })
+            showAlert({ title: t('error'), message: serverErrorMessage(error.message, isEn), type: 'error' })
           } else {
-            if (order.subscription_id && order.items_count > 0) {
-              const { data: sub } = await supabase.from('subscriptions').select('items_used').eq('id', order.subscription_id).single()
-              if (sub) {
-                const currentUsed = sub.items_used ?? 0
-                const newUsed = Math.max(0, currentUsed - order.items_count)
-                await supabase.from('subscriptions').update({ items_used: newUsed }).eq('id', order.subscription_id).eq('items_used', currentUsed)
-              }
-            }
             showAlert({
               title: t('cancelledDone'),
               message: driverArrived

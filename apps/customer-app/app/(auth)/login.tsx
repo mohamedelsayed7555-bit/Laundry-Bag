@@ -101,9 +101,7 @@ export default function LoginScreen() {
     if (error) {
       setServerError(error)
     } else {
-      showAlert({ title: t('success'), message: t('signupSuccess'), type: 'success', buttons: [
-        { text: t('ok'), onPress: () => { setIsSignUp(false); setErrors({}); setServerError('') } },
-      ] })
+      router.replace('/(tabs)/home')
     }
   }
 

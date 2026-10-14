@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { useCustomAlert } from '../../src/components/CustomAlert'
 import { supabase } from '../../src/lib/supabase'
+import { serverErrorMessage } from '../../src/lib/serverErrors'
 import { useTheme } from '../../src/contexts/ThemeContext'
 import { useLanguage } from '../../src/contexts/LanguageContext'
 
@@ -44,7 +45,7 @@ export default function EditOrderScreen() {
 
   async function loadData() {
     const [orderRes, pricesRes] = await Promise.all([
-      supabase.from('orders').select('id, order_number, status, items, items_count, subtotal, total, delivery_fee, subscription_id, service_type, payment_method, payment_status').eq('id', id).eq('customer_id', profile!.id).single(),
+      supabase.from('orders').select('id, order_number, status, items, items_count, subtotal, total, discount, delivery_fee, subscription_id, service_type, payment_method, payment_status').eq('id', id).eq('customer_id', profile!.id).single(),
       supabase.from('prices').select('id, item_type, service_type, price').eq('is_active', true).limit(200),
     ])
 
@@ -108,7 +109,7 @@ export default function EditOrderScreen() {
   const fee = order ? (order.delivery_fee ?? 0) : 0
   const isSubOrder = !!order?.subscription_id
   const oldTotal = order?.total ?? 0
-  const newTotal = isSubOrder ? 0 : totalPrice + fee
+  const newTotal = isSubOrder ? 0 : Math.max(0, totalPrice + fee - Number(order?.discount ?? 0))
   const priceDiff = newTotal - oldTotal
 
   async function handleSave() {
@@ -135,7 +136,7 @@ export default function EditOrderScreen() {
             type: 'warning',
             buttons: [
               { text: isEn ? 'Cancel' : 'إلغاء', style: 'cancel' },
-              { text: isEn ? 'Continue' : 'متابعة', onPress: () => doSave(available, overflow, overflowPrice) },
+              { text: isEn ? 'Continue' : 'متابعة', onPress: () => doSave() },
             ],
           })
           return
@@ -162,56 +163,22 @@ export default function EditOrderScreen() {
     doSave()
   }
 
-  async function doSave(subAvailable?: number, overflow?: number, overflowPrice?: number) {
+  async function doSave() {
     setSaving(true)
 
-    const hasOverflow = overflow && overflow > 0
-    const finalTotal = isSubOrder ? (hasOverflow ? (overflowPrice ?? 0) + fee : 0) : totalPrice + fee
-    const needsPayment = !isSubOrder && finalTotal > oldTotal && order.payment_status === 'confirmed'
-    const subOverflowNeedsPayment = isSubOrder && hasOverflow
+    // The server re-prices the items, adjusts the plan balance and works out any amount still due.
+    const { data: result, error } = await supabase.rpc('edit_order_items', {
+      p_order_id: id,
+      p_items: cart.map(i => ({ name: i.name, service_type: i.service_type, quantity: i.quantity })),
+    })
 
-    const updateData: any = {
-      items: cart,
-      items_count: totalItems,
-      subtotal: totalPrice,
-      total: finalTotal,
-      service_type: [...new Set(cart.map(i => i.service_type))].join('+'),
-    }
-
-    if (needsPayment) {
-      updateData.payment_status = 'pending'
-      updateData.price_difference = priceDiff
-    }
-
-    if (subOverflowNeedsPayment) {
-      updateData.payment_status = 'pending'
-      updateData.price_difference = overflowPrice
-      updateData.order_type = 'mixed'
-    }
-
-    const { error } = await supabase.from('orders').update(updateData).eq('id', id).eq('customer_id', profile!.id)
-
-    // Update subscription items_used
-    if (!error && isSubOrder) {
-      const oldItems = order.items_count ?? 0
-      const actualDeduct = hasOverflow ? (subAvailable ?? totalItems) : totalItems
-      const diff = actualDeduct - oldItems
-      if (diff !== 0) {
-        const { data: subData } = await supabase.from('subscriptions').select('items_used').eq('id', order.subscription_id).single()
-        if (subData) {
-          const currentUsed = subData.items_used ?? 0
-          await supabase.from('subscriptions').update({ items_used: currentUsed + diff }).eq('id', order.subscription_id).eq('items_used', currentUsed)
-        }
-      }
-    }
-
-    if (error) {
+    if (error || !result) {
       setSaving(false)
-      showAlert({ title: isEn ? 'Error' : 'خطأ', message: isEn ? 'Failed to update order' : 'حدث خطأ أثناء تعديل الطلب', type: 'error' })
+      showAlert({ title: isEn ? 'Error' : 'خطأ', message: serverErrorMessage(error?.message, isEn), type: 'error' })
       return
     }
 
-    const amountToPay = needsPayment ? priceDiff : subOverflowNeedsPayment ? (overflowPrice ?? 0) : 0
+    const amountToPay = Number(result.amount_to_pay ?? 0)
     const isOnlineMethod = ['visa', 'e_wallet', 'wallet'].includes(order.payment_method)
 
     // If online payment and there's a difference to pay, open payment gateway
@@ -226,7 +193,6 @@ export default function EditOrderScreen() {
           },
           body: JSON.stringify({
             order_id: id,
-            amount_override: amountToPay,
             payment_method: order.payment_method === 'visa' ? 'card' : 'wallet',
             ...(order.payment_method === 'e_wallet' ? { wallet_phone: order.wallet_phone } : {}),
           }),

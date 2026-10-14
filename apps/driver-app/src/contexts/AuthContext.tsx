@@ -167,9 +167,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const isPhone = /^01[0-9]{9}$/.test(identifier.trim())
     let loginEmail = identifier
     if (isPhone) {
-      const { data: user } = await supabase.from('users').select('email').eq('phone', identifier.trim()).single()
-      if (!user?.email) return { error: 'رقم التليفون غير مسجل' }
-      loginEmail = user.email
+      const { data: phoneEmail } = await supabase.rpc('login_email_for_phone', { p_phone: identifier.trim(), p_app: 'driver' })
+      if (!phoneEmail) return { error: 'رقم التليفون غير مسجل' }
+      loginEmail = phoneEmail as string
     }
     const { error, data } = await supabase.auth.signInWithPassword({ email: loginEmail, password })
     if (error) return { error: error.message }

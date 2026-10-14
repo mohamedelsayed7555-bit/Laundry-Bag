@@ -10,7 +10,7 @@ import * as ImagePicker from 'expo-image-picker'
 
 export default function EditProfileScreen() {
   const { colors } = useTheme()
-  const { t } = useLanguage()
+  const { t, locale } = useLanguage()
   const s = getStyles(colors)
   const { profile, refreshProfile, toggleBiometric, biometricEnabled } = useAuth()
   const router = useRouter()
@@ -94,8 +94,8 @@ export default function EditProfileScreen() {
     if (!profile) return
     setSaving(true)
     if (phone.trim() !== profile.phone) {
-      const { data: existingPhone } = await supabase.from('users').select('id').eq('phone', phone.trim()).neq('id', profile.id).maybeSingle()
-      if (existingPhone) {
+      const { data: phoneTaken } = await supabase.rpc('is_phone_registered', { p_phone: phone.trim(), p_exclude: profile.id })
+      if (phoneTaken) {
         setSaving(false)
         setErrors({ phone: locale === 'en' ? 'Phone number already registered' : 'رقم الموبايل مسجل بالفعل' })
         return

@@ -169,9 +169,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const isPhone = /^01[0-9]{9}$/.test(identifier.trim())
     let loginEmail = identifier
     if (isPhone) {
-      const { data: user } = await supabase.from('users').select('email').eq('phone', identifier.trim()).single()
-      if (!user?.email) return { error: en ? 'Phone number not registered' : 'رقم التليفون غير مسجل' }
-      loginEmail = user.email
+      const { data: phoneEmail } = await supabase.rpc('login_email_for_phone', { p_phone: identifier.trim(), p_app: 'customer' })
+      if (!phoneEmail) return { error: en ? 'Phone number not registered' : 'رقم التليفون غير مسجل' }
+      loginEmail = phoneEmail as string
     }
     const { error, data } = await supabase.auth.signInWithPassword({ email: loginEmail, password })
     if (error) {
@@ -196,12 +196,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signUp(email: string, password: string, name: string, phone: string) {
     const en = await isEn()
-    const { data: existingPhone } = await supabase
-      .from('users')
-      .select('id')
-      .eq('phone', phone.trim())
-      .maybeSingle()
-    if (existingPhone) return { error: en ? 'Phone number already registered' : 'رقم الموبايل مسجل بالفعل' }
+    const { data: phoneTaken } = await supabase.rpc('is_phone_registered', { p_phone: phone.trim() })
+    if (phoneTaken) return { error: en ? 'Phone number already registered' : 'رقم الموبايل مسجل بالفعل' }
 
     const { error, data } = await supabase.auth.signUp({ email, password })
     if (error) {

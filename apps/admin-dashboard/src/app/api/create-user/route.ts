@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
     password,
     email_confirm: true,
     user_metadata: { name, role },
+    app_metadata: { role },
   })
 
   if (authError) {
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
       const { data: listData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 50 })
       const existingAuth = listData?.users?.find((u: any) => u.email === email)
       if (existingAuth) {
-        await supabaseAdmin.auth.admin.updateUserById(existingAuth.id, { password, user_metadata: { name, role } })
+        await supabaseAdmin.auth.admin.updateUserById(existingAuth.id, { password, user_metadata: { name, role }, app_metadata: { role } })
         const updates: Record<string, any> = { name, role, email, permissions: permissions || [], is_active: true }
         if (phone) updates.phone = phone
         await supabaseAdmin.from('users').upsert({ id: existingAuth.id, ...updates })

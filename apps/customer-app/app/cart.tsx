@@ -13,6 +13,7 @@ import { playNotificationSound } from '../src/hooks/useNotifications'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { supabase } from '../src/lib/supabase'
 import { SkeletonPage } from '../src/components/Skeleton'
+import { serverErrorMessage } from '../src/lib/serverErrors'
 
 const paymentMethods = [
   { key: 'cash', icon: '💵', label: 'كاش', labelEn: 'Cash' },
@@ -327,84 +328,40 @@ export default function CartScreen() {
       return
     }
 
-    let giftEligible = false
+    let giftRequested = false
     try {
-      const giftFlag = await AsyncStorage.getItem('@gift_eligible')
-      if (giftFlag === 'true') {
-        const { data: giftSetting } = await supabase.from('settings').select('value').eq('key', 'welcome_gift_enabled').single()
-        if (!giftSetting || String(giftSetting.value) === 'true') giftEligible = true
-      }
+      giftRequested = (await AsyncStorage.getItem('@gift_eligible')) === 'true'
     } catch {}
 
-    const { data: orderData, error } = await supabase.from('orders').insert({
-      customer_id: profile.id,
-      service_type: [...new Set(cart.map((i: any) => i.service_type))].join('+'),
-      items: cart,
-      items_count: totalItems,
-      subtotal: totalPrice,
-      delivery_fee: fee,
-      total: orderTotal,
-      payment_method: useSubscription && uncoveredCount === 0 && overflowCount === 0 ? 'cash' : paymentMethod,
-      notes: notes || null,
-      status: isScheduled ? 'scheduled' : 'pending',
-      payment_status: useSubscription && uncoveredCount === 0 && overflowCount === 0 ? 'confirmed' : 'pending',
-      order_type: useSubscription ? 'subscription' : 'regular',
-      subscription_id: useSubscription ? activeSubs[0].id : null,
-      address_id: selectedAddress?.id || null,
-      pickup_location: selectedAddress ? { lat: selectedAddress.lat, lng: selectedAddress.lng, label: selectedAddress.label } : null,
-      delivery_location: (() => {
-        const addr = sameAddress ? selectedAddress : deliveryAddress
-        return addr ? { lat: addr.lat, lng: addr.lng, label: addr.label } : null
-      })(),
-      is_scheduled: isScheduled,
-      scheduled_at: isScheduled ? scheduledDate.toISOString() : null,
-      delivery_distance_km: distanceKm,
-      gift_included: giftEligible,
-      discount: couponDiscount,
-      coupon_id: appliedCoupon?.id || null,
-      coupon_code: appliedCoupon?.code || null,
-    }).select('id').single()
+    // Prices, delivery fee, plan coverage and coupon are all computed on the server.
+    const { data: placed, error } = await supabase.rpc('place_order', {
+      p: {
+        items: cart.map((i: any) => ({ name: i.name, service_type: i.service_type, quantity: i.quantity })),
+        address_id: selectedAddress.id,
+        delivery_address_id: sameAddress ? null : deliveryAddress?.id ?? null,
+        payment_method: paymentMethod,
+        notes: notes || null,
+        is_scheduled: isScheduled,
+        scheduled_at: isScheduled ? scheduledDate.toISOString() : null,
+        coupon_code: appliedCoupon?.code ?? null,
+        gift: giftRequested,
+      },
+    })
 
-    if (giftEligible) {
-      AsyncStorage.removeItem('@gift_eligible').catch(() => {})
-    }
-
-    if (!error && appliedCoupon && orderData?.id && profile) {
-      await supabase.from('coupon_usage').insert({
-        coupon_id: appliedCoupon.id,
-        user_id: profile.id,
-        order_id: orderData.id,
-        discount_amount: couponDiscount,
-      })
-      await supabase.rpc('increment_coupon_usage', { p_coupon_id: appliedCoupon.id })
-    }
-
-    if (!error && useSubscription) {
-      // Distribute covered items across subscriptions (only deduct what the plan covers)
-      let remaining = actualCovered
-      for (const sub of activeSubs) {
-        if (remaining <= 0) break
-        const subAvail = Math.max(0, (sub.items_limit ?? 0) - (sub.items_used ?? 0))
-        if (subAvail <= 0) continue
-        const subCoveredSvcs: string[] = sub.plans?.includes_all_services
-          ? cart.map((i: any) => i.service_type)
-          : (sub.plans?.covered_services ?? ['wash', 'iron', 'wash_iron', 'dry_clean'])
-        const relevantCount = cart.filter((i: any) => subCoveredSvcs.includes(i.service_type)).reduce((s: number, i: any) => s + i.quantity, 0)
-        const deduct = Math.min(remaining, subAvail, relevantCount)
-        if (deduct > 0) {
-          await supabase.rpc('increment_subscription_usage', { p_sub_id: sub.id, p_count: deduct })
-          remaining -= deduct
-        }
-      }
-    }
-
-    if (error) {
+    if (error || !placed) {
       setSaving(false)
-      showAlert({ title: isEn ? 'Error' : 'خطأ', message: error.message || (isEn ? 'An error occurred' : 'حدث خطأ أثناء إنشاء الطلب'), type: 'error' })
+      showAlert({ title: isEn ? 'Error' : 'خطأ', message: serverErrorMessage(error?.message, isEn), type: 'error' })
       return
     }
 
-    if (isOnlinePayment && orderData) {
+    if (giftRequested) {
+      AsyncStorage.removeItem('@gift_eligible').catch(() => {})
+    }
+
+    const orderData = { id: placed.id as string }
+    const payOnline = Number(placed.total) > 0 && (paymentMethod === 'visa' || paymentMethod === 'e_wallet')
+
+    if (payOnline) {
       try {
         const session = (await supabase.auth.getSession()).data.session
         const res = await fetch(`${SUPABASE_URL}/functions/v1/paymob-pay`, {

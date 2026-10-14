@@ -17,6 +17,13 @@ async function computeHmac(data: string, secret: string): Promise<string> {
   return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -28,34 +35,24 @@ Deno.serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // GET = browser redirect from Paymob — display-only, no DB writes
-    // Actual payment confirmation happens via the POST webhook with HMAC
     if (req.method === "GET") {
       const url = new URL(req.url);
       const success = url.searchParams.get("success") === "true";
-
       console.log("GET redirect received (display only) - success:", success);
-
       const html = success
         ? `<html><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;background:#0f172a;color:#fff;flex-direction:column"><h1>✅</h1><h2>تم الدفع بنجاح</h2><p>يمكنك إغلاق هذه الصفحة</p></body></html>`
         : `<html><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;background:#0f172a;color:#fff;flex-direction:column"><h1>❌</h1><h2>فشل الدفع</h2><p>يرجى المحاولة مرة أخرى</p></body></html>`;
       return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8" } });
     }
 
-    // POST - webhook from Paymob
     const body = await req.json();
     const obj = body.obj;
 
     console.log("Callback received, success:", obj.success, "order_id:", obj.order?.id);
-    console.log("HMAC_SECRET set:", !!HMAC_SECRET, "length:", HMAC_SECRET?.length);
 
-    // Verify HMAC — mandatory
     if (!HMAC_SECRET) {
-      console.error("PAYMOB_HMAC_SECRET not configured — rejecting webhook");
-      return new Response(JSON.stringify({ error: "Server misconfiguration" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      console.error("PAYMOB_HMAC_SECRET not configured");
+      return json({ error: "Server misconfiguration" }, 500);
     }
     {
       const hmacFields = [
@@ -82,21 +79,12 @@ Deno.serve(async (req: Request) => {
       ];
       const concatenated = hmacFields.map(v => String(v ?? "")).join("");
       const calculatedHmac = await computeHmac(concatenated, HMAC_SECRET);
-      // Paymob may send HMAC in body OR in URL query string
       const urlHmac = new URL(req.url).searchParams.get("hmac");
       const receivedHmac = body.hmac || urlHmac;
 
-      console.log("HMAC match:", calculatedHmac === receivedHmac);
-      console.log("Received HMAC (first 20):", receivedHmac?.substring(0, 20));
-      console.log("Calculated HMAC (first 20):", calculatedHmac.substring(0, 20));
-      console.log("HMAC source:", body.hmac ? "body" : urlHmac ? "url" : "none");
-
       if (calculatedHmac !== receivedHmac) {
-        console.log("HMAC mismatch - rejecting request");
-        return new Response(JSON.stringify({ error: "Invalid HMAC signature" }), {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        console.log("HMAC mismatch - rejecting");
+        return json({ error: "Invalid HMAC signature" }, 403);
       }
     }
 
@@ -104,57 +92,60 @@ Deno.serve(async (req: Request) => {
     const isSuccess = obj.success === true;
     console.log("Looking for paymob_order_id:", paymobOrderId, "isSuccess:", isSuccess);
 
-    // Find our order by paymob_order_id
     const { data: order, error: orderErr } = await supabase
       .from("orders")
-      .select("id, payment_status, total")
+      .select("id, payment_status, total, amount_due, price_difference")
       .eq("paymob_order_id", paymobOrderId)
-      .single();
+      .maybeSingle();
 
     console.log("Order lookup result:", order ? `found ${order.id}` : "not found", "error:", orderErr?.message);
 
     if (order) {
-      if (order.payment_status === "confirmed") {
+      if (order.payment_status === "confirmed" && !(Number(order.price_difference) > 0)) {
         console.log("Order already confirmed, skipping:", order.id);
-        return new Response(JSON.stringify({ received: true, skipped: "already_confirmed" }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return json({ received: true, skipped: "already_confirmed" });
       }
 
-      if (isSuccess && order.total != null) {
-        const expectedCents = Math.round(order.total * 100);
+      if (isSuccess) {
+        // amount_due is what paymob-pay asked for: the full total, or only the difference after an edit.
+        const expected = order.amount_due != null ? Number(order.amount_due) : Number(order.total);
+        const expectedCents = Math.round(expected * 100);
         if (obj.amount_cents !== expectedCents) {
           console.error("Amount mismatch! Expected:", expectedCents, "Got:", obj.amount_cents, "Order:", order.id);
-          return new Response(JSON.stringify({ error: "Amount mismatch" }), {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
+          return json({ error: "Amount mismatch" }, 400);
         }
+        const { error: updateErr } = await supabase
+          .from("orders")
+          .update({ payment_status: "confirmed", price_difference: 0, amount_due: null })
+          .eq("id", order.id);
+        console.log("Order confirmed:", updateErr ? `ERROR: ${updateErr.message}` : "success");
+      } else {
+        const { error: updateErr } = await supabase
+          .from("orders")
+          .update({ payment_status: "failed" })
+          .eq("id", order.id);
+        console.log("Order payment failed:", updateErr ? `ERROR: ${updateErr.message}` : "recorded");
       }
-
-      const newStatus = isSuccess ? "confirmed" : "failed";
-      const { error: updateErr } = await supabase
-        .from("orders")
-        .update({ payment_status: newStatus })
-        .eq("id", order.id);
-      console.log("Order update to", newStatus, "result:", updateErr ? `ERROR: ${updateErr.message}` : "success");
     } else {
       const { data: sub, error: subErr } = await supabase
         .from("subscriptions")
-        .select("id, user_id, duration, plan_id, status, plans(name, items_per_month)")
+        .select("id, user_id, duration, plan_id, status, total_paid, plans(name, items_per_month)")
         .eq("paymob_order_id", paymobOrderId)
-        .single();
+        .maybeSingle();
       console.log("Subscription lookup result:", sub ? `found ${sub.id}` : "not found", "error:", subErr?.message);
 
-      // Idempotency: skip if already active
       if (sub?.status === "active") {
         console.log("Subscription already active, skipping:", sub.id);
-        return new Response(JSON.stringify({ received: true, skipped: "already_active" }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return json({ received: true, skipped: "already_active" });
       }
 
       if (sub && isSuccess) {
+        const expectedCents = Math.round(Number(sub.total_paid || 0) * 100);
+        if (obj.amount_cents !== expectedCents) {
+          console.error("Subscription amount mismatch! Expected:", expectedCents, "Got:", obj.amount_cents, "Sub:", sub.id);
+          return json({ error: "Amount mismatch" }, 400);
+        }
+
         const months = sub.duration === "monthly" ? 1 : sub.duration === "quarterly" ? 3 : sub.duration === "biannual" ? 6 : 12;
         const now = new Date();
         const endDate = new Date(now);
@@ -162,7 +153,7 @@ Deno.serve(async (req: Request) => {
         const plan = sub.plans as any;
         const itemsLimit = (plan?.items_per_month || 0) * months;
 
-        await supabase
+        const { error: subUpdateErr } = await supabase
           .from("subscriptions")
           .update({
             status: "active",
@@ -172,6 +163,7 @@ Deno.serve(async (req: Request) => {
             items_limit: itemsLimit,
           })
           .eq("id", sub.id);
+        console.log("Subscription update result:", subUpdateErr ? `ERROR: ${subUpdateErr.message}` : "success");
 
         await supabase.from("notifications").insert({
           user_id: sub.user_id,
@@ -189,13 +181,9 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    return new Response(JSON.stringify({ received: true }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json({ received: true });
   } catch (error) {
-    return new Response(JSON.stringify({ error: (error as Error).message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    console.error("Callback error:", (error as Error).message);
+    return json({ error: (error as Error).message }, 500);
   }
 });

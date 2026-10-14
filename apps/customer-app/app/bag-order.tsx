@@ -9,6 +9,7 @@ import { useCustomAlert } from '../src/components/CustomAlert'
 import { useLanguage } from '../src/contexts/LanguageContext'
 import { supabase } from '../src/lib/supabase'
 import { SkeletonPage } from '../src/components/Skeleton'
+import { serverErrorMessage } from '../src/lib/serverErrors'
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!
 
@@ -86,26 +87,17 @@ export default function BagOrderScreen() {
     }
 
     setSaving(true)
-    const { data, error } = await supabase.from('orders').insert({
-      customer_id: profile.id,
-      service_type: 'wash_iron',
-      items: [{ name: 'شنطة Laundry Bag', service_type: 'wash_iron', quantity: 1, price: bagOffer.daily_price }],
-      items_count: bagOffer.max_items,
-      subtotal: bagOffer.daily_price,
-      delivery_fee: 0,
-      total: bagOffer.daily_price,
-      payment_method: paymentMethod,
-      payment_status: 'pending',
-      order_type: 'bag_offer',
-      address_id: selectedAddress.id,
-      pickup_location: { lat: selectedAddress.lat, lng: selectedAddress.lng, label: selectedAddress.label },
-      delivery_location: { lat: selectedAddress.lat, lng: selectedAddress.lng, label: selectedAddress.label },
-      notes: `${t('bagNotePrefix')} ${bagOffer.max_items} ${t('bagNoteSuffix')}`,
-    }).select('id').single()
+    const { data, error } = await supabase.rpc('place_bag_order', {
+      p: {
+        address_id: selectedAddress.id,
+        payment_method: paymentMethod,
+        notes: `${t('bagNotePrefix')} ${bagOffer.max_items} ${t('bagNoteSuffix')}`,
+      },
+    })
 
-    if (error) {
+    if (error || !data) {
       setSaving(false)
-      showAlert({ title: t('error'), message: error.message, type: 'error' })
+      showAlert({ title: t('error'), message: serverErrorMessage(error?.message, locale === 'en'), type: 'error' })
       return
     }
 

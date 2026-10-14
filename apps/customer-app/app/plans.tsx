@@ -7,6 +7,7 @@ import { useLanguage } from '../src/contexts/LanguageContext'
 import { useCustomAlert } from '../src/components/CustomAlert'
 import { supabase } from '../src/lib/supabase'
 import { SkeletonPage } from '../src/components/Skeleton'
+import { serverErrorMessage } from '../src/lib/serverErrors'
 
 type Plan = {
   id: string
@@ -211,21 +212,17 @@ export default function PlansScreen() {
           onPress: async () => {
             setSubscribing(true)
 
-            const { data: newSub, error } = await supabase.from('subscriptions').insert({
-              user_id: profile!.id,
-              plan_id: plan.id,
-              duration: selectedDuration,
-              status: 'pending',
-              items_used: 0,
-              items_limit: plan.items_per_month * durationObj.months,
-              auto_renew: autoRenew,
-              payment_method: selectedPayment,
-              total_paid: price,
-            }).select('id').single()
+            // The server computes the plan price and item limit from the plan and current discounts.
+            const { data: newSub, error } = await supabase.rpc('request_subscription', {
+              p_plan_id: plan.id,
+              p_duration: selectedDuration,
+              p_payment_method: selectedPayment,
+              p_auto_renew: autoRenew,
+            })
 
-            if (error) {
+            if (error || !newSub) {
               setSubscribing(false)
-              showAlert({ title: locale === 'en' ? 'Error' : 'خطأ', message: locale === 'en' ? 'An error occurred' : 'حدث خطأ أثناء إرسال الطلب', type: 'error' })
+              showAlert({ title: locale === 'en' ? 'Error' : 'خطأ', message: serverErrorMessage(error?.message, locale === 'en'), type: 'error' })
               return
             }
 
