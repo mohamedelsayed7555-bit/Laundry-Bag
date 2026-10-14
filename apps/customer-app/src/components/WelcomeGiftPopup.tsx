@@ -40,6 +40,13 @@ export default function WelcomeGiftPopup({ userId, onOrderNow }: Props) {
       const dismissed = await AsyncStorage.getItem(GIFT_DISMISSED_KEY)
       if (dismissed) return
 
+      const { data: giftSetting } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'welcome_gift_enabled')
+        .single()
+      if (giftSetting && String(giftSetting.value) !== 'true') return
+
       const { count } = await supabase
         .from('orders')
         .select('id', { count: 'exact', head: true })

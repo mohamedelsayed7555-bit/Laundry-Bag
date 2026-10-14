@@ -330,7 +330,10 @@ export default function CartScreen() {
     let giftEligible = false
     try {
       const giftFlag = await AsyncStorage.getItem('@gift_eligible')
-      if (giftFlag === 'true') giftEligible = true
+      if (giftFlag === 'true') {
+        const { data: giftSetting } = await supabase.from('settings').select('value').eq('key', 'welcome_gift_enabled').single()
+        if (!giftSetting || String(giftSetting.value) === 'true') giftEligible = true
+      }
     } catch {}
 
     const { data: orderData, error } = await supabase.from('orders').insert({

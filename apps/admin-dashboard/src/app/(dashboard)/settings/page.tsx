@@ -36,6 +36,8 @@ export default function SettingsPage() {
   const [savingHours, setSavingHours] = useState(false)
   const [bagOffer, setBagOffer] = useState({ enabled: true, daily_price: 500, original_price: 700, max_items: 15, title: 'شنطة Laundry Bag', subtitle: 'املأ الشنطة غسيل ومكوي بحد أقصى 15 قطعة', badge_text: 'الحق العرض' })
   const [savingBag, setSavingBag] = useState(false)
+  const [welcomeGiftEnabled, setWelcomeGiftEnabled] = useState(true)
+  const [savingGift, setSavingGift] = useState(false)
   const [brandColor, setBrandColor] = useState('#00c966')
   const [savingBrand, setSavingBrand] = useState(false)
   const [contactInfo, setContactInfo] = useState({ whatsapp: '', phone: '', facebook: '', instagram: '', tiktok: '', address: '', google_maps: '' })
@@ -102,6 +104,8 @@ export default function SettingsPage() {
     else if (brandS && typeof brandS.value === 'string' && brandS.value.startsWith('#')) setBrandColor(brandS.value)
     const bagS = data?.find(s => s.key === 'bag_offer')
     if (bagS && typeof bagS.value === 'object') setBagOffer({ ...bagOffer, ...bagS.value })
+    const giftS = data?.find(s => s.key === 'welcome_gift_enabled')
+    if (giftS) setWelcomeGiftEnabled(String(giftS.value) === 'true')
     const contactS = data?.find(s => s.key === 'contact_info')
     if (contactS && typeof contactS.value === 'object') setContactInfo(prev => ({ ...prev, ...contactS.value as any }))
     const oh = data?.find(s => s.key === 'open_hour')
@@ -211,6 +215,21 @@ export default function SettingsPage() {
     setSavingBag(false)
     loadSettings()
     toast('تم حفظ إعدادات عرض الشنطة')
+  }
+
+  async function handleToggleWelcomeGift() {
+    setSavingGift(true)
+    const newVal = !welcomeGiftEnabled
+    const existing = settings.find(s => s.key === 'welcome_gift_enabled')
+    if (existing) {
+      await supabase.from('settings').update({ value: String(newVal) }).eq('id', existing.id)
+    } else {
+      await supabase.from('settings').insert({ key: 'welcome_gift_enabled', value: String(newVal), description: 'تفعيل الهدية الترحيبية للعملاء الجدد' })
+    }
+    setWelcomeGiftEnabled(newVal)
+    setSavingGift(false)
+    loadSettings()
+    toast(newVal ? 'تم تفعيل الهدية الترحيبية' : 'تم إيقاف الهدية الترحيبية')
   }
 
   async function handleSaveBrandColor() {
@@ -494,6 +513,27 @@ export default function SettingsPage() {
               <button onClick={handleSaveBagOffer} disabled={savingBag}
                 className="flex items-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:shadow-glow-green disabled:opacity-50 transition-all">
                 <Save size={14} /> {savingBag ? 'جاري الحفظ...' : 'حفظ إعدادات العرض'}
+              </button>
+            </div>
+          </div>
+
+          {/* Welcome Gift Section */}
+          <div className={sectionClass + ' p-6'}>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-amber-50 rounded-xl"><span className="text-xl">🎁</span></div>
+              <div>
+                <h3 className="font-semibold text-gray-800">الهدية الترحيبية</h3>
+                <p className="text-xs text-gray-400 mt-0.5">هدية مجانية مع أول طلب لكل عميل جديد</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 p-4 bg-surface-muted/50 rounded-xl">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-700">تفعيل الهدية الترحيبية</p>
+                <p className="text-xs text-gray-400">لو مطفي مش هيظهر عرض الهدية للعملاء الجدد</p>
+              </div>
+              <button onClick={handleToggleWelcomeGift} disabled={savingGift}
+                className={`relative w-12 h-6 rounded-full transition-colors ${welcomeGiftEnabled ? 'bg-primary-500' : 'bg-gray-300'}`}>
+                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${welcomeGiftEnabled ? 'left-0.5' : 'left-[26px]'}`} />
               </button>
             </div>
           </div>
