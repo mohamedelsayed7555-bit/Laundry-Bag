@@ -29,6 +29,16 @@ export default function LoginScreen() {
   const { showAlert, AlertComponent } = useCustomAlert()
   const [bioLoading, setBioLoading] = useState(false)
 
+  const screenOpacity = useRef(new Animated.Value(1)).current
+  const [switchingLang, setSwitchingLang] = useState(false)
+
+  const handleLanguageSwitch = () => {
+    setSwitchingLang(true)
+    Animated.timing(screenOpacity, { toValue: 0, duration: 250, useNativeDriver: true }).start(() => {
+      setLanguage(locale === 'ar' ? 'en' : 'ar')
+    })
+  }
+
   const glowAnim = useRef(new Animated.Value(0)).current
   const brandScale = useRef(new Animated.Value(0.8)).current
   const brandOpacity = useRef(new Animated.Value(0)).current
@@ -100,12 +110,14 @@ export default function LoginScreen() {
   return (
     <>
     <View style={{ flex: 1, backgroundColor: colors.navy[900] }}>
+    <Animated.View style={{ flex: 1, opacity: screenOpacity }}>
     <KeyboardAvoidingView style={[s.container, { backgroundColor: colors.navy[900] }]} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView style={{ backgroundColor: colors.navy[900] }} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
         {/* Language Toggle */}
         <TouchableOpacity
           style={[s.langBtn, { backgroundColor: colors.navy[800], borderColor: colors.navy[700] }]}
-          onPress={() => setLanguage(locale === 'ar' ? 'en' : 'ar')}
+          onPress={handleLanguageSwitch}
+          disabled={switchingLang}
         >
           <Text style={s.langIcon}>🌐</Text>
           <Text style={[s.langText, { color: colors.primary }]}>{locale === 'ar' ? 'English' : 'العربية'}</Text>
@@ -284,6 +296,7 @@ export default function LoginScreen() {
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
+    </Animated.View>
     </View>
     {AlertComponent}
     </>

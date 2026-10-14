@@ -93,6 +93,14 @@ export default function EditProfileScreen() {
     if (Object.keys(e).length > 0) return
     if (!profile) return
     setSaving(true)
+    if (phone.trim() !== profile.phone) {
+      const { data: existingPhone } = await supabase.from('users').select('id').eq('phone', phone.trim()).neq('id', profile.id).maybeSingle()
+      if (existingPhone) {
+        setSaving(false)
+        setErrors({ phone: locale === 'en' ? 'Phone number already registered' : 'رقم الموبايل مسجل بالفعل' })
+        return
+      }
+    }
     const { error } = await supabase.from('users').update({
       name: name.trim(),
       phone: phone.trim(),

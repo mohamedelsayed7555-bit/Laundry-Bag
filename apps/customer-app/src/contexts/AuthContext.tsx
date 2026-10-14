@@ -6,7 +6,12 @@ import * as LocalAuthentication from 'expo-local-authentication'
 import * as Notifications from 'expo-notifications'
 import * as Device from 'expo-device'
 import type { Session } from '@supabase/supabase-js'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import type { User } from '../shared/types'
+
+async function isEn() {
+  try { return (await AsyncStorage.getItem('@app_language')) === 'en' } catch { return false }
+}
 
 const BIO_CREDS_KEY = 'bio_credentials'
 
@@ -151,7 +156,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data: profile } = await supabase.from('users').select('is_active').eq('id', data.user.id).single()
       if (profile && profile.is_active === false) {
         await supabase.auth.signOut()
-        return { error: 'تم تعطيل حسابك — تواصل مع الإدارة' }
+        const en = await isEn()
+        return { error: en ? 'Your account has been deactivated — contact support' : 'تم تعطيل حسابك — تواصل مع الإدارة' }
       }
     }
 
@@ -159,20 +165,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signInWithPassword(identifier: string, password: string) {
+    const en = await isEn()
     const isPhone = /^01[0-9]{9}$/.test(identifier.trim())
     let loginEmail = identifier
     if (isPhone) {
       const { data: user } = await supabase.from('users').select('email').eq('phone', identifier.trim()).single()
-      if (!user?.email) return { error: 'رقم التليفون غير مسجل' }
+      if (!user?.email) return { error: en ? 'Phone number not registered' : 'رقم التليفون غير مسجل' }
       loginEmail = user.email
     }
     const { error, data } = await supabase.auth.signInWithPassword({ email: loginEmail, password })
     if (error) {
       let msg = error.message
       if (msg.includes('Invalid login'))
-        msg = 'البريد الإلكتروني أو كلمة المرور غلط'
+        msg = en ? 'Incorrect email or password' : 'البريد الإلكتروني أو كلمة المرور غلط'
       else if (msg.includes('Email not confirmed'))
-        msg = 'الحساب لم يتم تأكيده — تحقق من بريدك الإلكتروني'
+        msg = en ? 'Account not confirmed — check your email' : 'الحساب لم يتم تأكيده — تحقق من بريدك الإلكتروني'
       return { error: msg }
     }
 
@@ -180,7 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data: profile } = await supabase.from('users').select('is_active').eq('id', data.user.id).single()
       if (profile && profile.is_active === false) {
         await supabase.auth.signOut()
-        return { error: 'تم تعطيل حسابك — تواصل مع الإدارة' }
+        return { error: en ? 'Your account has been deactivated — contact support' : 'تم تعطيل حسابك — تواصل مع الإدارة' }
       }
     }
 
@@ -188,17 +195,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signUp(email: string, password: string, name: string, phone: string) {
+    const en = await isEn()
+    const { data: existingPhone } = await supabase
+      .from('users')
+      .select('id')
+      .eq('phone', phone.trim())
+      .maybeSingle()
+    if (existingPhone) return { error: en ? 'Phone number already registered' : 'رقم الموبايل مسجل بالفعل' }
+
     const { error, data } = await supabase.auth.signUp({ email, password })
     if (error) {
       let msg = error.message
       if (msg.includes('Password should contain'))
-        msg = 'كلمة المرور لازم تحتوي على حروف كبيرة وصغيرة وأرقام ورموز'
+        msg = en ? 'Password must contain uppercase, lowercase, numbers and symbols' : 'كلمة المرور لازم تحتوي على حروف كبيرة وصغيرة وأرقام ورموز'
       else if (msg.includes('already registered'))
-        msg = 'البريد الإلكتروني مسجل بالفعل'
+        msg = en ? 'Email already registered' : 'البريد الإلكتروني مسجل بالفعل'
       else if (msg.includes('valid email'))
-        msg = 'البريد الإلكتروني غير صالح'
+        msg = en ? 'Invalid email address' : 'البريد الإلكتروني غير صالح'
       else if (msg.includes('at least'))
-        msg = 'كلمة المرور لازم تكون 6 حروف على الأقل'
+        msg = en ? 'Password must be at least 6 characters' : 'كلمة المرور لازم تكون 6 حروف على الأقل'
       return { error: msg }
     }
 
@@ -252,21 +267,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signInWithBiometric(): Promise<{ error: string | null }> {
     try {
+      const en = await isEn()
       const savedRaw = await SecureStore.getItemAsync(BIO_CREDS_KEY)
-      if (!savedRaw) return { error: 'البصمة غير مفعّلة' }
+      if (!savedRaw) return { error: en ? 'Biometric not enabled' : 'البصمة غير مفعّلة' }
 
       const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'سجّل دخول بالبصمة',
-        cancelLabel: 'إلغاء',
+        promptMessage: en ? 'Sign in with biometric' : 'سجّل دخول بالبصمة',
+        cancelLabel: en ? 'Cancel' : 'إلغاء',
         disableDeviceFallback: false,
       })
 
-      if (!result.success) return { error: 'فشل التحقق بالبصمة' }
+      if (!result.success) return { error: en ? 'Biometric verification failed' : 'فشل التحقق بالبصمة' }
 
       const { email, password } = JSON.parse(savedRaw)
       return signInWithPassword(email, password)
     } catch {
-      return { error: 'حدث خطأ أثناء التحقق بالبصمة' }
+      const en = await isEn()
+      return { error: en ? 'An error occurred during biometric verification' : 'حدث خطأ أثناء التحقق بالبصمة' }
     }
   }
 

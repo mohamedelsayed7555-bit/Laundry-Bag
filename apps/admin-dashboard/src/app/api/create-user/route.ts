@@ -35,6 +35,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'البريد الإلكتروني مستخدم بالفعل' }, { status: 400 })
   }
 
+  if (phone) {
+    const { data: existingPhone } = await supabaseAdmin.from('users').select('id').eq('phone', phone.trim()).maybeSingle()
+    if (existingPhone) {
+      return NextResponse.json({ error: 'رقم الموبايل مستخدم بالفعل' }, { status: 400 })
+    }
+  }
+
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
     email,
     password,

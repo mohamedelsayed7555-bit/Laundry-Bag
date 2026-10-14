@@ -15,23 +15,28 @@ let pendingReload = false
 
 export function setLocale(locale: Locale) {
   i18n.locale = locale
-  const isRTL = locale === 'ar'
-  if (I18nManager.isRTL !== isRTL) {
-    I18nManager.allowRTL(isRTL)
-    I18nManager.forceRTL(isRTL)
+  const shouldBeRTL = locale === 'ar'
+  if (I18nManager.isRTL !== shouldBeRTL) {
+    I18nManager.allowRTL(shouldBeRTL)
+    I18nManager.forceRTL(shouldBeRTL)
     pendingReload = true
   }
 }
 
-export function applyRTLChange() {
-  if (!pendingReload) return
+export function applyRTLChange(): Promise<void> {
+  if (!pendingReload) return Promise.resolve()
   pendingReload = false
-  if (__DEV__) {
-    const { DevSettings } = require('react-native')
-    DevSettings?.reload?.()
-  } else {
-    Updates.reloadAsync().catch(() => {})
-  }
+  return new Promise(resolve => {
+    setTimeout(() => {
+      if (__DEV__) {
+        const { DevSettings } = require('react-native')
+        DevSettings?.reload?.()
+      } else {
+        Updates.reloadAsync().catch(() => {})
+      }
+      resolve()
+    }, 300)
+  })
 }
 
 export function t(key: string, options?: Record<string, any>): string {
