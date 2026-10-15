@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Linkin
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { WebView } from 'react-native-webview'
 import { useAuth } from '../../src/contexts/AuthContext'
-import { useTheme } from '../../src/contexts/ThemeContext'
 import { useLanguage } from '../../src/contexts/LanguageContext'
 import { useCustomAlert } from '../../src/components/CustomAlert'
 import { ActivityIndicator } from 'react-native'
@@ -12,9 +11,11 @@ import { SkeletonPage } from '../../src/components/Skeleton'
 import { CANCELLABLE_STATUSES } from '../../src/shared/types'
 import { serverErrorMessage } from '../../src/lib/serverErrors'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Hourglass, CalendarDays, Car, MapPin, Package, WashingMachine, CircleCheck, Truck, PartyPopper, CircleX, RotateCcw, ChevronDown, ChevronUp, Phone, MessageCircle, Wallet, CreditCard, Banknote, Landmark, Pencil, Gift, Check, type LucideIcon } from 'lucide-react-native'
+import Svg, { Path } from 'react-native-svg'
+import RatingSheet from '../../src/components/RatingSheet'
+import { Hourglass, CalendarDays, Car, MapPin, Package, WashingMachine, CircleCheck, Truck, PartyPopper, CircleX, RotateCcw, Smartphone, Star, TriangleAlert, ChevronDown, ChevronUp, Phone, MessageCircle, Wallet, CreditCard, Banknote, Landmark, Pencil, Gift, Check, type LucideIcon } from 'lucide-react-native'
 import { useBrand, Card, IconButton, BackIcon, FlowLines, Segments, Pill, money, F, SIZE, cardShadow } from '../../src/components/brand'
-import { SecondaryButton } from '../../src/components/auth/ui'
+import { PrimaryButton, SecondaryButton } from '../../src/components/auth/ui'
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!
 
@@ -69,7 +70,6 @@ const steps = ['pending', 'assigned', 'arrived', 'picked_up', 'processing', 'rea
 export default function OrderDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const { profile } = useAuth()
-  const { colors } = useTheme()
   const { t, locale } = useLanguage()
   const isEn = locale === 'en'
   const router = useRouter()
@@ -272,13 +272,12 @@ export default function OrderDetailsScreen() {
     : null
   const etaMinutes = distanceKm !== null ? Math.max(1, Math.round(distanceKm / 0.5)) : null
 
-  const s = getStyles(colors)
   const b = useBrand()
   const insets = useSafeAreaInsets()
   const [showSteps, setShowSteps] = useState(false)
 
   if (loading) return <SkeletonPage />
-  if (!order) return <View style={s.container}><Text style={s.loadingText}>{t('orderNotFound')}</Text></View>
+  if (!order) return <View style={[n.container, { backgroundColor: b.page }]}><Text style={[n.loadingText, { color: b.muted }]}>{t('orderNotFound')}</Text></View>
 
   const status = statusConfig[order.status] ?? statusConfig.pending
   const canCancel = CANCELLABLE_STATUSES.includes(order.status)
@@ -303,7 +302,7 @@ export default function OrderDetailsScreen() {
 
   return (
     <>
-    <ScrollView style={[s.container, { backgroundColor: b.page }]} contentContainerStyle={[s.content, { paddingTop: insets.top + 10, paddingHorizontal: 16 }]}>
+    <ScrollView style={[n.container, { backgroundColor: b.page }]} contentContainerStyle={[n.content, { paddingTop: insets.top + 10, paddingHorizontal: 16 }]}>
       <FlowLines height={280} />
 
       {/* Header */}
@@ -451,50 +450,48 @@ export default function OrderDetailsScreen() {
       </Card>
 
       {showWalletInput && (
-        <View style={{ backgroundColor: colors.navy[800], borderRadius: 16, padding: 16, marginBottom: 12 }}>
-          <Text style={{ color: colors.text, fontSize: 14, fontWeight: '600', textAlign: isEn ? 'left' : 'right', marginBottom: 10 }}>{t('enterWalletPhone')}</Text>
-          <TextInput
-            style={{ backgroundColor: colors.navy[700], color: colors.text, borderRadius: 12, padding: 14, fontSize: 18, fontWeight: '600', letterSpacing: 1, textAlign: 'center', borderWidth: 1, borderColor: colors.navy[600] }}
-            value={walletPhone}
-            onChangeText={setWalletPhone}
-            placeholder="01xxxxxxxxx"
-            placeholderTextColor={colors.navy[400]}
-            keyboardType="phone-pad"
-            maxLength={11}
-          />
-          <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
-            <TouchableOpacity
-              style={{ flex: 1, backgroundColor: colors.navy[600], borderRadius: 12, padding: 12, alignItems: 'center' }}
-              onPress={() => setShowWalletInput(false)}
-            >
-              <Text style={{ color: colors.text, fontWeight: '600' }}>{t('cancel')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={{ flex: 1, backgroundColor: '#f59e0b', borderRadius: 12, padding: 12, alignItems: 'center', opacity: walletPhone.match(/^01[0-9]{9}$/) ? 1 : 0.5 }}
-              onPress={() => {
-                if (!walletPhone.match(/^01[0-9]{9}$/)) {
-                  showAlert({ title: t('warning'), message: t('phoneInvalid'), type: 'warning' })
-                  return
-                }
-                submitRetryPayment(walletPhone)
-              }}
-            >
-              <Text style={{ color: '#fff', fontWeight: '700' }}>{t('pay')}</Text>
-            </TouchableOpacity>
+        <Card style={n.card}>
+          <Text style={[n.eyebrow, { color: b.muted }]}>{t('enterWalletPhone')}</Text>
+          <View style={[n.field, { backgroundColor: b.field, borderColor: b.fieldBorder }]}>
+            <View style={[n.fieldIcon, { backgroundColor: b.iconTile }]}><Smartphone size={15} color={b.accentIcon} /></View>
+            <TextInput
+              style={[n.fieldInput, { color: b.ink }]}
+              value={walletPhone}
+              onChangeText={setWalletPhone}
+              placeholder="01xxxxxxxxx"
+              placeholderTextColor={b.faint}
+              keyboardType="phone-pad"
+              maxLength={11}
+              textAlign="left"
+            />
           </View>
-        </View>
+          <View style={n.payRowBtns}>
+            <SecondaryButton title={t('cancel')} onPress={() => setShowWalletInput(false)} style={{ flex: 1 }} />
+            <PrimaryButton
+              title={`${t('pay')} ${money(order.total)} ${t('currency')}`}
+              loading={retrying}
+              disabled={!walletPhone.match(/^01[0-9]{9}$/)}
+              onPress={() => submitRetryPayment(walletPhone)}
+              style={{ flex: 2 }}
+            />
+          </View>
+        </Card>
       )}
 
       {['pending', 'failed'].includes(order.payment_status) && ['visa', 'e_wallet'].includes(order.payment_method) && order.status !== 'cancelled' && !showWalletInput && (
         <TouchableOpacity
-          style={[s.retryPayBtn, retrying && { opacity: 0.6 }]}
+          style={[n.payBtn, { backgroundColor: b.warnTint }, retrying && { opacity: 0.6 }]}
           onPress={handleRetryPayment}
           disabled={retrying}
+          accessibilityRole="button"
         >
           {retrying ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color={b.warnText} />
           ) : (
-            <Text style={s.retryPayText}>{t('retryPayment')}</Text>
+            <>
+              <CreditCard size={17} color={b.warnText} />
+              <Text style={[n.payBtnText, { color: b.warnText }]}>{t('retryPayment')} — {money(order.total)} {t('currency')}</Text>
+            </>
           )}
         </TouchableOpacity>
       )}
@@ -504,66 +501,40 @@ export default function OrderDetailsScreen() {
       )}
 
       {order.rated_at && (
-        <View style={s.detailsCard}>
-          <Text style={s.sectionTitle}>{t('theRating')}</Text>
-          <DetailRow colors={colors} label={t('serviceRating')} value={'⭐'.repeat(order.rating_service)} />
-          {order.rating_driver && <DetailRow colors={colors} label={t('driverRating')} value={'⭐'.repeat(order.rating_driver)} />}
-          {order.rating_note && <DetailRow colors={colors} label={t('notesLabel')} value={order.rating_note} />}
-        </View>
+        <Card style={n.card}>
+          <Text style={[n.eyebrow, { color: b.muted }]}>{t('theRating')}</Text>
+          <View style={n.rateRow}>
+            <Text style={[n.rateLabel, { color: b.ink2 }]}>{t('serviceRating')}</Text>
+            <StarRow value={order.rating_service} faint={b.faint} />
+          </View>
+          {order.rating_driver ? (
+            <View style={n.rateRow}>
+              <Text style={[n.rateLabel, { color: b.ink2 }]}>{t('driverRating')}</Text>
+              <StarRow value={order.rating_driver} faint={b.faint} />
+            </View>
+          ) : null}
+          {order.rating_note ? <Text style={[n.notes, { color: b.muted }]}>{order.rating_note}</Text> : null}
+        </Card>
       )}
 
       {canRate && !showRating && (
-        <TouchableOpacity style={s.rateBtn} onPress={() => setShowRating(true)}>
-          <Text style={s.rateBtnText}>{t('rateOrder')}</Text>
-        </TouchableOpacity>
+        <SecondaryButton title={t('rateOrder')} icon={<Star size={16} color={b.ink} />} onPress={() => setShowRating(true)} style={{ marginBottom: 6 }} />
       )}
 
-      {showRating && (
-        <View style={s.detailsCard}>
-          <Text style={s.sectionTitle}>{t('rateOrderTitle')}</Text>
-
-          <Text style={s.ratingLabel}>{t('serviceRating')}</Text>
-          <View style={s.starsRow}>
-            {[1, 2, 3, 4, 5].map(n => (
-              <TouchableOpacity key={n} onPress={() => setRatingService(n)}>
-                <Text style={[s.star, n <= ratingService && s.starActive]}>{n <= ratingService ? '⭐' : '☆'}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {order.driver && (
-            <>
-              <Text style={s.ratingLabel}>{t('driverRating')}</Text>
-              <View style={s.starsRow}>
-                {[1, 2, 3, 4, 5].map(n => (
-                  <TouchableOpacity key={n} onPress={() => setRatingDriver(n)}>
-                    <Text style={[s.star, n <= ratingDriver && s.starActive]}>{n <= ratingDriver ? '⭐' : '☆'}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </>
-          )}
-
-          <TextInput
-            style={s.ratingInput}
-            placeholder={t('ratingNotes')}
-            placeholderTextColor={colors.navy[400]}
-            value={ratingNote}
-            onChangeText={setRatingNote}
-            multiline
-            textAlign={isEn ? 'left' : 'right'}
-          />
-
-          <View style={s.ratingActions}>
-            <TouchableOpacity style={s.cancelRateBtn} onPress={() => setShowRating(false)}>
-              <Text style={s.cancelRateText}>{t('later')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[s.submitRateBtn, submitting && { opacity: 0.6 }]} onPress={handleRate} disabled={submitting}>
-              <Text style={s.submitRateText}>{submitting ? t('submittingRating') : t('submitRating')}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
+      <RatingSheet
+        visible={showRating}
+        orderNumber={order.order_number}
+        showDriver={!!order.driver}
+        service={ratingService}
+        driver={ratingDriver}
+        note={ratingNote}
+        submitting={submitting}
+        onService={setRatingService}
+        onDriver={setRatingDriver}
+        onNote={setRatingNote}
+        onSubmit={handleRate}
+        onDismiss={() => setShowRating(false)}
+      />
 
       {canCancel && (
         <TouchableOpacity style={n.cancelLink} onPress={handleCancel} accessibilityRole="button">
@@ -572,18 +543,44 @@ export default function OrderDetailsScreen() {
       )}
 
       {!canCancel && order.status !== 'cancelled' && order.status !== 'delivered' && (
-        <View style={s.noCancelCard}>
-          <Text style={s.noCancelText}>⚠️ {t('cannotCancelStatus')} "{status.label}"</Text>
-          <Text style={s.noCancelSub}>{t('cannotCancelHint')}</Text>
+        <View style={[n.noCancel, { backgroundColor: b.warnTint }]}>
+          <TriangleAlert size={16} color={b.warnText} />
+          <View style={{ flex: 1 }}>
+            <Text style={[n.noCancelTitle, { color: b.warnText }]}>{t('cannotCancelStatus')} "{status.label}"</Text>
+            <Text style={[n.noCancelSub, { color: b.warnText }]}>{t('cannotCancelHint')}</Text>
+          </View>
         </View>
       )}
+
+      <View style={{ height: 24 }} />
     </ScrollView>
     {AlertComponent}
     </>
   )
 }
 
+function StarRow({ value, faint }: { value: number; faint: string }) {
+  return (
+    <View style={{ flexDirection: 'row', gap: 3 }}>
+      {[1, 2, 3, 4, 5].map(i => (
+        <Svg key={i} width={15} height={15} viewBox="0 0 24 24">
+          <Path
+            d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"
+            fill={i <= value ? '#FBBF24' : 'none'}
+            stroke={i <= value ? '#F59E0B' : faint}
+            strokeWidth={2}
+            strokeLinejoin="round"
+          />
+        </Svg>
+      ))}
+    </View>
+  )
+}
+
 const n = StyleSheet.create({
+  container: { flex: 1 },
+  content: { paddingBottom: 40 },
+  loadingText: { textAlign: 'center', marginTop: 100, fontSize: 15, fontFamily: F.medium },
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
   title: { fontSize: 18, fontFamily: F.display },
   date: { fontSize: 11.5, fontFamily: F.regular, marginTop: 1 },
@@ -626,120 +623,18 @@ const n = StyleSheet.create({
   notes: { fontSize: 12, fontFamily: F.regular, marginTop: 8 },
   cancelLink: { alignSelf: 'center', paddingVertical: 10, paddingHorizontal: 20, marginTop: 4 },
   cancelLinkText: { fontSize: 13.5, fontFamily: F.bold },
+  field: { flexDirection: 'row', alignItems: 'center', gap: 8, height: SIZE.L, borderRadius: SIZE.rL, borderWidth: 1, paddingHorizontal: 8 },
+  fieldIcon: { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  fieldInput: { flex: 1, fontSize: 15, fontFamily: F.semibold, letterSpacing: 1, paddingVertical: 0 },
+  payRowBtns: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  payBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: SIZE.L, borderRadius: SIZE.rL, marginBottom: 10 },
+  payBtnText: { fontSize: 14, fontFamily: F.bold },
+  rateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 34 },
+  rateLabel: { fontSize: 13, fontFamily: F.medium },
+  noCancel: { flexDirection: 'row', gap: 9, borderRadius: 14, padding: 12, marginTop: 6 },
+  noCancelTitle: { fontSize: 12.5, fontFamily: F.bold, lineHeight: 20 },
+  noCancelSub: { fontSize: 11.5, fontFamily: F.regular, lineHeight: 19, marginTop: 2, opacity: 0.9 },
 })
 
-function DetailRow({ label, value, highlight, warn, colors: c }: { label: string; value: string; highlight?: boolean; warn?: boolean; colors: any }) {
-  return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: c.navy[700] }}>
-      <Text style={{ fontSize: 13, color: c.navy[300] }}>{label}</Text>
-      <Text style={[{ fontSize: 13, color: c.text, fontWeight: '500', maxWidth: '60%', textAlign: 'left' }, highlight && { color: c.primary, fontWeight: '700' as const }, warn && { color: '#ef4444', fontWeight: '700' as const }]}>{value}</Text>
-    </View>
-  )
-}
 
-function getStyles(colors: any) { return StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.navy[900] },
-  content: { padding: 20, paddingTop: 56, paddingBottom: 40 },
-  loadingText: { color: colors.navy[300], textAlign: 'center', marginTop: 100, fontSize: 16 },
-  backBtn: { marginBottom: 16 },
-  backText: { color: colors.primary, fontSize: 16, fontWeight: '600' },
 
-  headerCard: {
-    backgroundColor: colors.navy[800], borderRadius: 20, padding: 24,
-    alignItems: 'center', gap: 12, borderWidth: 1, borderColor: colors.navy[700], marginBottom: 16,
-  },
-  orderNumber: { fontSize: 22, fontWeight: '800', color: colors.text },
-  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 },
-  statusLabel: { fontSize: 14, fontWeight: '700' },
-
-  timelineCard: {
-    backgroundColor: colors.navy[800], borderRadius: 20, padding: 20,
-    borderWidth: 1, borderColor: colors.navy[700], marginBottom: 16,
-  },
-  timelineRow: { flexDirection: 'row', alignItems: 'flex-start', minHeight: 40 },
-  timelineLeft: { alignItems: 'center', width: 24, marginLeft: 8 },
-  dot: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.navy[600], borderWidth: 2, borderColor: colors.navy[500] },
-  dotDone: { backgroundColor: colors.primary, borderColor: colors.primary },
-  dotCurrent: { backgroundColor: colors.accent, borderColor: colors.accent, width: 16, height: 16, borderRadius: 8 },
-  line: { width: 2, flex: 1, backgroundColor: colors.navy[600], marginVertical: 2 },
-  lineDone: { backgroundColor: colors.primary },
-  timelineLabel: { fontSize: 13, color: colors.navy[400], marginRight: 12, paddingTop: 0 },
-  timelineLabelDone: { color: colors.navy[100] },
-  timelineLabelCurrent: { color: colors.text, fontWeight: '700' },
-
-  detailsCard: {
-    backgroundColor: colors.navy[800], borderRadius: 20, padding: 20,
-    borderWidth: 1, borderColor: colors.navy[700], marginBottom: 16,
-  },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 16 },
-  detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.navy[700] },
-  detailLabel: { fontSize: 13, color: colors.navy[300] },
-  detailValue: { fontSize: 13, color: colors.text, fontWeight: '500', maxWidth: '60%', textAlign: 'left' },
-
-  driverInfoRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.navy[700] },
-  driverInfoLeft: { flex: 1, gap: 4 },
-  driverInfoName: { fontSize: 15, color: colors.text, fontWeight: '700' },
-  driverInfoPhone: { fontSize: 14, color: colors.primary, fontWeight: '500' },
-
-  rateBtn: {
-    backgroundColor: colors.accent, borderRadius: 16, padding: 16, alignItems: 'center', marginBottom: 16,
-  },
-  rateBtnText: { color: colors.text, fontSize: 16, fontWeight: '700' },
-
-  ratingLabel: { fontSize: 14, color: colors.navy[100], marginBottom: 8, marginTop: 8 },
-  starsRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  star: { fontSize: 28, color: colors.navy[400] },
-  starActive: { color: '#f59e0b' },
-  ratingInput: {
-    backgroundColor: colors.navy[700], borderRadius: 12, padding: 12,
-    color: colors.text, fontSize: 14, minHeight: 60, marginTop: 8,
-  },
-  ratingActions: { flexDirection: 'row', gap: 12, marginTop: 16 },
-  cancelRateBtn: { flex: 1, borderWidth: 1, borderColor: colors.navy[500], borderRadius: 12, padding: 12, alignItems: 'center' },
-  cancelRateText: { color: colors.navy[200], fontSize: 14, fontWeight: '600' },
-  submitRateBtn: { flex: 2, backgroundColor: colors.accent, borderRadius: 12, padding: 12, alignItems: 'center' },
-  submitRateText: { color: colors.text, fontSize: 14, fontWeight: '700' },
-
-  chatBtn: {
-    backgroundColor: colors.primary + '15', borderRadius: 12, padding: 12, alignItems: 'center', marginTop: 12,
-    borderWidth: 1, borderColor: colors.primary + '30',
-  },
-  chatBtnText: { color: colors.primary, fontSize: 14, fontWeight: '700' },
-
-  cancelBtn: {
-    borderWidth: 1.5, borderColor: colors.danger, borderRadius: 16,
-    padding: 16, alignItems: 'center', marginTop: 8,
-  },
-  cancelText: { color: colors.danger, fontSize: 16, fontWeight: '700' },
-
-  noCancelCard: {
-    backgroundColor: colors.warning + '12', borderRadius: 14, padding: 16, marginTop: 8,
-    borderWidth: 1, borderColor: colors.warning + '30',
-  },
-  noCancelText: { fontSize: 14, fontWeight: '700', color: colors.warning, marginBottom: 6 },
-  noCancelSub: { fontSize: 12, color: colors.navy[300], lineHeight: 18 },
-
-  retryPayBtn: {
-    backgroundColor: '#f59e0b', borderRadius: 16, padding: 16, alignItems: 'center', marginBottom: 12,
-  },
-  retryPayText: { color: colors.text, fontSize: 15, fontWeight: '700' },
-
-  editBtn: {
-    backgroundColor: colors.navy[800], borderRadius: 16, padding: 16, alignItems: 'center', marginBottom: 16,
-    borderWidth: 1.5, borderColor: colors.primary,
-  },
-  editBtnText: { color: colors.primary, fontSize: 15, fontWeight: '700' },
-
-  trackingCard: {
-    backgroundColor: colors.navy[800], borderRadius: 20, padding: 20,
-    borderWidth: 1, borderColor: colors.primary + '30', marginBottom: 16, overflow: 'hidden',
-  },
-  trackingHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  expandHint: { fontSize: 12, color: colors.primary, fontWeight: '600' },
-  mapWrapper: { borderRadius: 14, overflow: 'hidden', height: 240, marginBottom: 14 },
-  map: { flex: 1 },
-  etaRow: { flexDirection: 'row', justifyContent: 'space-around' },
-  etaItem: { alignItems: 'center', gap: 4 },
-  etaValue: { fontSize: 18, fontWeight: '800', color: colors.text },
-  etaLabel: { fontSize: 11, color: colors.navy[300] },
-}) }

@@ -22,6 +22,7 @@
     },
     "android": {
       "package": "com.cleano.customer",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/app-icon.png",
         "backgroundColor": "#7ECDE6"

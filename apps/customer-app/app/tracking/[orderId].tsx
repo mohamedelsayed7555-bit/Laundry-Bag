@@ -1,9 +1,12 @@
 import { useEffect, useState, useRef, useMemo } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Linking, Platform } from 'react-native'
+import { View, Text, StyleSheet, Linking } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Car, Phone, MessageCircle, MapPin, TriangleAlert } from 'lucide-react-native'
+import { useBrand, IconButton, BackIcon, cardShadow, F } from '../../src/components/brand'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { WebView } from 'react-native-webview'
 import { supabase } from '../../src/lib/supabase'
-import { useTheme } from '../../src/contexts/ThemeContext'
 import { useLanguage } from '../../src/contexts/LanguageContext'
 
 function buildFullTrackingMapHTML(driverLat: number, driverLng: number, customerLat?: number, customerLng?: number, driverName?: string) {
@@ -60,10 +63,10 @@ const statusLabels: Record<string, { ar: string; en: string }> = {
 }
 
 export default function TrackingScreen() {
-  const { colors } = useTheme()
+  const b = useBrand()
+  const insets = useSafeAreaInsets()
   const { locale } = useLanguage()
   const isEn = locale === 'en'
-  const s = getStyles(colors)
   const { orderId } = useLocalSearchParams<{ orderId: string }>()
   const router = useRouter()
   const mapWebviewRef = useRef<WebView>(null)
@@ -151,132 +154,118 @@ export default function TrackingScreen() {
     [mapSeed, customerLat, customerLng, order?.driver?.name],
   )
 
+  const statusText = statusLabels[order?.status] ? (isEn ? statusLabels[order.status].en : statusLabels[order.status].ar) : order?.status
+
   return (
-    <View style={s.container}>
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Text style={s.backText}>{isEn ? '← Back' : 'رجوع ←'}</Text>
-        </TouchableOpacity>
-        <Text style={s.title}>{isEn ? 'Track Driver' : 'تتبع السائق'}</Text>
-        <View style={{ width: 60 }} />
+    <View style={[n.container, { backgroundColor: b.page }]}>
+      {/* Map fills the screen; the panel floats over it */}
+      {showMap ? (
+        <WebView
+          ref={mapWebviewRef}
+          source={{ html: mapHtml }}
+          onLoadEnd={() => driverLoc && mapWebviewRef.current?.injectJavaScript(`window.updateDriver && window.updateDriver(${driverLoc.lat}, ${driverLoc.lng}); true;`)}
+          style={n.map}
+          javaScriptEnabled
+          domStorageEnabled
+          startInLoadingState
+          originWhitelist={['*']}
+        />
+      ) : (
+        <View style={[n.noMap, { backgroundColor: b.page }]}>
+          <View style={[n.noMapIcon, { backgroundColor: b.iconTile }]}><MapPin size={34} color={b.faint} /></View>
+          <Text style={[n.noMapTitle, { color: b.ink }]}>{isEn ? 'Driver location unavailable' : 'موقع السائق غير متاح'}</Text>
+          <Text style={[n.noMapText, { color: b.muted }]}>
+            {isEn ? "We'll show the map as soon as your driver is on the way" : 'الخريطة هتظهر أول ما السائق يتحرك ناحيتك'}
+          </Text>
+        </View>
+      )}
+
+      {/* Floating header */}
+      <View style={[n.overlay, { top: insets.top + 8 }]}>
+        <IconButton onPress={() => router.back()} label={isEn ? 'Back' : 'رجوع'} style={cardShadow(b)}>
+          <BackIcon color={b.ink} />
+        </IconButton>
+        <View style={[n.statusChip, { backgroundColor: b.card }, cardShadow(b)]}>
+          <Car size={15} color={b.tintText} />
+          <Text style={[n.statusChipText, { color: b.ink }]} numberOfLines={1}>{statusText}</Text>
+        </View>
       </View>
 
-      {/* Map */}
-      <View style={s.mapContainer}>
-        {showMap ? (
-          <WebView
-            ref={mapWebviewRef}
-            source={{ html: mapHtml }}
-            onLoadEnd={() => driverLoc && mapWebviewRef.current?.injectJavaScript(`window.updateDriver && window.updateDriver(${driverLoc.lat}, ${driverLoc.lng}); true;`)}
-            style={s.map}
-            javaScriptEnabled
-            domStorageEnabled
-            startInLoadingState
-            originWhitelist={['*']}
-          />
-        ) : (
-          <View style={s.noMap}>
-            <Text style={s.noMapIcon}>📍</Text>
-            <Text style={s.noMapText}>{isEn ? 'Driver location unavailable' : 'موقع السائق غير متاح حالياً'}</Text>
-          </View>
-        )}
-      </View>
+      {/* Driver panel */}
+      <View style={[n.panel, { backgroundColor: b.card, borderTopColor: b.cardBorder, paddingBottom: Math.max(insets.bottom, 12) + 14 }]}>
+        <View style={[n.grab, { backgroundColor: b.cardBorder }]} />
 
-      {/* Info Panel */}
-      <View style={s.panel}>
         {order?.driver && (
-          <View style={s.driverRow}>
-            <View style={s.driverAvatar}>
-              <Text style={s.driverAvatarText}>{order.driver.name?.[0] ?? '؟'}</Text>
+          <View style={n.driverRow}>
+            <LinearGradient colors={['#38BDF8', '#0284C7']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={n.avatar}>
+              <Text style={n.avatarText}>{order.driver.name?.[0] ?? '؟'}</Text>
+            </LinearGradient>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={[n.driverName, { color: b.ink }]} numberOfLines={1}>{order.driver.name}</Text>
+              <Text style={[n.driverSub, { color: b.tintText }]} numberOfLines={1}>{statusText}</Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.driverName}>{order.driver.name}</Text>
-              <Text style={s.statusText}>{statusLabels[order?.status] ? (isEn ? statusLabels[order.status].en : statusLabels[order.status].ar) : order?.status}</Text>
-            </View>
-            {order.driver.phone && (
-              <TouchableOpacity style={s.callBtn} onPress={() => Linking.openURL(`tel:${order.driver.phone}`)}>
-                <Text style={s.callBtnText}>📞</Text>
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity style={s.chatBtn} onPress={() => router.push(`/chat/${orderId}`)}>
-              <Text style={s.chatBtnText}>💬</Text>
-            </TouchableOpacity>
+            {order.driver.phone ? (
+              <IconButton tone="tint" label={isEn ? 'Call driver' : 'اتصل بالسائق'} onPress={() => Linking.openURL(`tel:${order.driver.phone}`)}>
+                <Phone size={17} color={b.okText} />
+              </IconButton>
+            ) : null}
+            <IconButton tone="tint" label={isEn ? 'Chat' : 'محادثة'} onPress={() => router.push(`/chat/${orderId}`)}>
+              <MessageCircle size={17} color={b.tintText} />
+            </IconButton>
           </View>
         )}
 
-        <View style={s.etaRow}>
-          {distanceKm !== null && (
-            <View style={s.etaItem}>
-              <Text style={s.etaValue}>{distanceKm < 1 ? `${Math.round(distanceKm * 1000)} ${isEn ? 'm' : 'م'}` : `${distanceKm.toFixed(1)} ${isEn ? 'km' : 'كم'}`}</Text>
-              <Text style={s.etaLabel}>{isEn ? 'Distance' : 'المسافة'}</Text>
-            </View>
-          )}
-          {etaMinutes !== null && (
-            <View style={s.etaItem}>
-              <Text style={[s.etaValue, { color: stale ? colors.navy[300] : colors.primary }]}>~{etaMinutes} {isEn ? 'min' : 'دقيقة'}</Text>
-              <Text style={s.etaLabel}>{stale ? (isEn ? `Updated ${stale} min ago` : `آخر تحديث من ${stale} د`) : (isEn ? 'ETA' : 'الوقت المتوقع')}</Text>
-            </View>
-          )}
-          <View style={s.etaItem}>
-            <Text style={s.etaValue}>{order?.order_number}</Text>
-            <Text style={s.etaLabel}>{isEn ? 'Order #' : 'رقم الطلب'}</Text>
+        <View style={n.stats}>
+          <View style={[n.stat, { backgroundColor: b.iconTile }]}>
+            <Text style={[n.statValue, { color: b.ink }]}>
+              {distanceKm !== null ? (distanceKm < 1 ? `${Math.round(distanceKm * 1000)} ${isEn ? 'm' : 'م'}` : `${distanceKm.toFixed(1)} ${isEn ? 'km' : 'كم'}`) : '—'}
+            </Text>
+            <Text style={[n.statLabel, { color: b.muted }]}>{isEn ? 'Distance' : 'المسافة'}</Text>
+          </View>
+          <View style={[n.stat, { backgroundColor: b.iconTile }]}>
+            <Text style={[n.statValue, { color: stale ? b.muted : b.ink }]}>{etaMinutes !== null ? `~${etaMinutes} ${isEn ? 'min' : 'د'}` : '—'}</Text>
+            <Text style={[n.statLabel, { color: b.muted }]}>{isEn ? 'ETA' : 'الوقت المتوقع'}</Text>
+          </View>
+          <View style={[n.stat, { backgroundColor: b.iconTile }]}>
+            <Text style={[n.statValue, { color: b.ink }]} numberOfLines={1}>{'⁦'}#{String(order?.order_number ?? '').replace(/^#+/, '')}{'⁩'}</Text>
+            <Text style={[n.statLabel, { color: b.muted }]}>{isEn ? 'Order' : 'رقم الطلب'}</Text>
           </View>
         </View>
+
+        {stale !== null && (
+          <View style={[n.stale, { backgroundColor: b.warnTint }]}>
+            <TriangleAlert size={15} color={b.warnText} />
+            <Text style={[n.staleText, { color: b.warnText }]}>
+              {isEn ? `Driver location last updated ${stale} min ago` : `آخر تحديث لموقع السائق من ${stale} دقيقة`}
+            </Text>
+          </View>
+        )}
       </View>
     </View>
   )
 }
 
-function getStyles(colors: any) { return StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.navy[900] },
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingTop: 56, paddingBottom: 12,
-    backgroundColor: colors.navy[900],
-  },
-  backBtn: { width: 60 },
-  backText: { color: colors.primary, fontSize: 16, fontWeight: '600' },
-  title: { fontSize: 18, fontWeight: '800', color: colors.text },
-
-  mapContainer: { flex: 1 },
+const n = StyleSheet.create({
+  container: { flex: 1 },
   map: { flex: 1 },
-  noMap: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.navy[800] },
-  noMapIcon: { fontSize: 48, marginBottom: 12 },
-  noMapText: { fontSize: 16, color: colors.navy[300] },
-
-  panel: {
-    backgroundColor: colors.navy[800], borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    padding: 20, paddingBottom: 36,
-    borderTopWidth: 1, borderColor: colors.navy[600],
-    shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 16,
-  },
-  driverRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20,
-    paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: colors.navy[700],
-  },
-  driverAvatar: {
-    width: 48, height: 48, borderRadius: 24,
-    backgroundColor: colors.primary + '25', justifyContent: 'center', alignItems: 'center',
-  },
-  driverAvatarText: { fontSize: 20, fontWeight: '700', color: colors.primary },
-  driverName: { fontSize: 16, fontWeight: '700', color: colors.text },
-  statusText: { fontSize: 12, color: colors.primary, marginTop: 2, fontWeight: '600' },
-  callBtn: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: colors.primaryGlow, justifyContent: 'center', alignItems: 'center',
-    borderWidth: 1, borderColor: colors.primary + '30',
-  },
-  callBtnText: { fontSize: 20 },
-  chatBtn: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: colors.accentGlow, justifyContent: 'center', alignItems: 'center',
-    borderWidth: 1, borderColor: colors.accent + '30',
-  },
-  chatBtnText: { fontSize: 20 },
-
-  etaRow: { flexDirection: 'row', justifyContent: 'space-around' },
-  etaItem: { alignItems: 'center', gap: 4 },
-  etaValue: { fontSize: 20, fontWeight: '800', color: colors.text },
-  etaLabel: { fontSize: 11, color: colors.navy[300] },
-}) }
+  overlay: { position: 'absolute', left: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 10, zIndex: 3 },
+  statusChip: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: 12, paddingHorizontal: 12 },
+  statusChipText: { fontSize: 12.5, fontFamily: F.bold },
+  noMap: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
+  noMapIcon: { width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
+  noMapTitle: { fontSize: 16, fontFamily: F.display },
+  noMapText: { fontSize: 13, fontFamily: F.regular, textAlign: 'center', marginTop: 4, lineHeight: 21 },
+  panel: { position: 'absolute', left: 0, right: 0, bottom: 0, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, paddingHorizontal: 14, paddingTop: 8, zIndex: 3 },
+  grab: { width: 38, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
+  driverRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: '#fff', fontSize: 16, fontFamily: F.display },
+  driverName: { fontSize: 14.5, fontFamily: F.bold },
+  driverSub: { fontSize: 11.5, fontFamily: F.semibold, marginTop: 1 },
+  stats: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  stat: { flex: 1, borderRadius: 13, paddingVertical: 8, paddingHorizontal: 8, alignItems: 'center' },
+  statValue: { fontSize: 14.5, fontFamily: F.display },
+  statLabel: { fontSize: 10.5, fontFamily: F.regular, marginTop: 1 },
+  stale: { flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8, marginTop: 10 },
+  staleText: { flex: 1, fontSize: 11.5, fontFamily: F.bold },
+})

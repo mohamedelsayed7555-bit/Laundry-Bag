@@ -4,7 +4,6 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import Animated, { FadeInDown } from 'react-native-reanimated'
 import { useAuth } from '../src/contexts/AuthContext'
-import { useTheme } from '../src/contexts/ThemeContext'
 import { useCustomAlert } from '../src/components/CustomAlert'
 import { useLanguage } from '../src/contexts/LanguageContext'
 import { supabase } from '../src/lib/supabase'
@@ -26,7 +25,6 @@ const PAYMENT_METHODS = [
 
 export default function BagOrderScreen() {
   const { profile } = useAuth()
-  const { colors } = useTheme()
   const router = useRouter()
   const { showAlert, AlertComponent } = useCustomAlert()
   const { t, locale } = useLanguage()
@@ -166,6 +164,9 @@ export default function BagOrderScreen() {
     ? Math.round((1 - bagOffer.daily_price / bagOffer.original_price) * 100)
     : 0
   const en = locale === 'en'
+  // Texts are edited in the dashboard (Arabic); English keeps the translation.
+  const bagBadge = (!en && bagOffer.badge_text) || t('bagBadge')
+  const bagSub = (!en && bagOffer.subtitle) || t('bagSubtitle')
   const rtl = I18nManager.isRTL
   const payItems: Choice[] = PAYMENT_METHODS.map(pm => {
     const c = paymentMethod === pm.key ? '#fff' : b.accentIcon
@@ -203,7 +204,7 @@ export default function BagOrderScreen() {
           />
           <View style={s.heroText}>
             <View style={s.badges}>
-              <View style={s.badgeHot}><Text style={s.badgeHotText}>{t('bagBadge')}</Text></View>
+              <View style={s.badgeHot}><Text style={s.badgeHotText}>{bagBadge}</Text></View>
               {discount > 0 && <View style={s.badgeOff}><Text style={s.badgeOffText}>-{discount}%</Text></View>}
             </View>
             {en ? (
@@ -214,7 +215,7 @@ export default function BagOrderScreen() {
                 <Text style={s.brand}>Laundry <Text style={s.brandAccent}>Bag</Text></Text>
               </View>
             )}
-            <Text style={s.heroSub} numberOfLines={2}>{t('bagSubtitle')}</Text>
+            <Text style={s.heroSub} numberOfLines={2}>{bagSub}</Text>
             <View style={s.priceRow}>
               <Text style={s.price}>{bagOffer.daily_price} <Text style={s.priceCur}>{t('currency')}</Text></Text>
               {discount > 0 && <Text style={s.oldPrice}>{bagOffer.original_price}</Text>}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Platform } from 'react-native'
+import { Platform, AppState } from 'react-native'
 import * as Notifications from 'expo-notifications'
 import * as Device from 'expo-device'
 import { Audio } from 'expo-av'
@@ -51,11 +51,13 @@ Notifications.setNotificationHandler({
     const d: any = n.request.content.data ?? {}
     if (!d.local) {
       // App is open: show our own in-app banner instead of the system one.
-      if (d.type === 'new_order' && d.order_id && assignHandler) {
+      // Only swallow the push for our own banner when the app is really in front:
+      // with the screen locked (or the app in the background) the driver must see the notification.
+      if (d.type === 'new_order' && d.order_id && assignHandler && AppState.currentState === 'active') {
         assignHandler(d.order_id, d.phase === 'delivery' ? 'delivery' : 'pickup')
         return HIDE
       }
-      if ((d.type === 'message' || d.type === 'chat') && d.order_id && (activeChatOrderId === d.order_id || !gate(`chat:${d.order_id}`, CHAT_WINDOW))) return HIDE
+      if ((d.type === 'message' || d.type === 'chat') && d.order_id && AppState.currentState === 'active' && (activeChatOrderId === d.order_id || !gate(`chat:${d.order_id}`, CHAT_WINDOW))) return HIDE
     }
     return SHOW
   },

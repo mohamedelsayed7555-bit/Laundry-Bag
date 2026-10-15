@@ -7,7 +7,7 @@ import Animated, {
   withTiming,
   interpolate,
 } from 'react-native-reanimated'
-import { useTheme } from '../contexts/ThemeContext'
+import { useBrand, type Brand } from './brand'
 
 interface SkeletonProps {
   width?: number | string
@@ -17,7 +17,7 @@ interface SkeletonProps {
 }
 
 export default function Skeleton({ width = '100%', height = 16, borderRadius = 10, style }: SkeletonProps) {
-  const { colors } = useTheme()
+  const b = useBrand()
   const shimmer = useSharedValue(0)
 
   useEffect(() => {
@@ -25,7 +25,7 @@ export default function Skeleton({ width = '100%', height = 16, borderRadius = 1
   }, [])
 
   const animatedStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(shimmer.value, [0, 1], [0.3, 0.7]),
+    opacity: interpolate(shimmer.value, [0, 1], [0.35, 0.75]),
   }))
 
   return (
@@ -35,7 +35,7 @@ export default function Skeleton({ width = '100%', height = 16, borderRadius = 1
           width: width as any,
           height,
           borderRadius,
-          backgroundColor: colors.navy[700],
+          backgroundColor: b.isDark ? '#1E2B44' : '#DFE7F1',
         },
         animatedStyle,
         style,
@@ -45,12 +45,12 @@ export default function Skeleton({ width = '100%', height = 16, borderRadius = 1
 }
 
 export function SkeletonCard({ lines = 3 }: { lines?: number }) {
-  const { colors } = useTheme()
-  const sk = getSkStyles(colors)
+  const b = useBrand()
+  const sk = getSkStyles(b)
   return (
     <View style={sk.card}>
       <View style={sk.row}>
-        <Skeleton width={44} height={44} borderRadius={14} />
+        <Skeleton width={42} height={42} borderRadius={13} />
         <View style={sk.textCol}>
           <Skeleton width="60%" height={14} />
           <Skeleton width="40%" height={10} style={{ marginTop: 8 }} />
@@ -64,8 +64,8 @@ export function SkeletonCard({ lines = 3 }: { lines?: number }) {
 }
 
 export function SkeletonOrderCard() {
-  const { colors } = useTheme()
-  const sk = getSkStyles(colors)
+  const b = useBrand()
+  const sk = getSkStyles(b)
   return (
     <View style={sk.card}>
       <View style={sk.row}>
@@ -73,7 +73,13 @@ export function SkeletonOrderCard() {
           <Skeleton width="50%" height={16} />
           <Skeleton width="35%" height={12} style={{ marginTop: 8 }} />
         </View>
-        <Skeleton width={70} height={28} borderRadius={14} />
+        <Skeleton width={70} height={26} borderRadius={13} />
+      </View>
+      {/* the 8-step progress bar the order cards show */}
+      <View style={[sk.row, { marginTop: 14, gap: 3 }]}>
+        {Array.from({ length: 8 }).map((_, i) => (
+          <Skeleton key={i} width={`${100 / 8 - 1}%`} height={4} borderRadius={2} />
+        ))}
       </View>
       <View style={[sk.row, { marginTop: 14 }]}>
         <Skeleton width="30%" height={12} />
@@ -85,39 +91,44 @@ export function SkeletonOrderCard() {
 }
 
 export function SkeletonPage() {
-  const { colors } = useTheme()
+  const b = useBrand()
   return (
-    <View style={{ flex: 1, backgroundColor: colors.navy[900], padding: 20 }}>
-      <Skeleton width="45%" height={22} style={{ marginBottom: 20 }} />
-      <Skeleton width="100%" height={120} borderRadius={16} style={{ marginBottom: 16 }} />
-      <Skeleton width="35%" height={16} style={{ marginBottom: 12 }} />
-      <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
-        <Skeleton width={100} height={40} borderRadius={12} />
-        <Skeleton width={100} height={40} borderRadius={12} />
-        <Skeleton width={100} height={40} borderRadius={12} />
+    <View style={{ flex: 1, backgroundColor: b.page, paddingHorizontal: 16, paddingTop: 60 }}>
+      {/* header: back button + title */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+        <Skeleton width={36} height={36} borderRadius={12} />
+        <Skeleton width="45%" height={18} />
       </View>
-      <Skeleton width="100%" height={80} borderRadius={14} style={{ marginBottom: 10 }} />
-      <Skeleton width="100%" height={80} borderRadius={14} style={{ marginBottom: 10 }} />
-      <Skeleton width="100%" height={80} borderRadius={14} />
+      <Skeleton width="100%" height={120} borderRadius={18} style={{ marginBottom: 12 }} />
+      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+        <Skeleton width={96} height={44} borderRadius={12} />
+        <Skeleton width={96} height={44} borderRadius={12} />
+        <Skeleton width={96} height={44} borderRadius={12} />
+      </View>
+      <Skeleton width="100%" height={86} borderRadius={18} style={{ marginBottom: 10 }} />
+      <Skeleton width="100%" height={86} borderRadius={18} style={{ marginBottom: 10 }} />
+      <Skeleton width="100%" height={86} borderRadius={18} />
     </View>
   )
 }
 
-function getSkStyles(colors: any) { return StyleSheet.create({
-  card: {
-    backgroundColor: colors.navy[800],
-    borderRadius: 18,
-    padding: 18,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: colors.navy[700],
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  textCol: {
-    flex: 1,
-  },
-}) }
+function getSkStyles(b: Brand) {
+  return StyleSheet.create({
+    card: {
+      backgroundColor: b.card,
+      borderRadius: 18,
+      padding: 14,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: b.cardBorder,
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    textCol: {
+      flex: 1,
+    },
+  })
+}

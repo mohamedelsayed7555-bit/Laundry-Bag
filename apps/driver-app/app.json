@@ -22,6 +22,7 @@
     },
     "android": {
       "package": "com.cleano.driver",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#00af5f"
       },

@@ -6,7 +6,6 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter, useFocusEffect } from 'expo-router'
 import DateTimePicker from '@react-native-community/datetimepicker'
 import { useAuth } from '../src/contexts/AuthContext'
-import { useTheme } from '../src/contexts/ThemeContext'
 import { useLanguage } from '../src/contexts/LanguageContext'
 import { haversineKm } from '../src/utils/distance'
 import { useCart } from '../src/contexts/CartContext'
@@ -49,7 +48,6 @@ const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!
 
 export default function CartScreen() {
   const { profile } = useAuth()
-  const { colors } = useTheme()
   const { t, locale } = useLanguage()
   const { cart, removeItem, updateQuantity, clearCart, totalPrice, totalItems } = useCart()
   const router = useRouter()

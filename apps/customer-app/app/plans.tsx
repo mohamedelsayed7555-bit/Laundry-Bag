@@ -7,7 +7,6 @@ import { useBrand, Card, Chip, Pill, ChoiceGrid, IconButton, BackIcon, FlowLines
 import { PrimaryButton } from '../src/components/auth/ui'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../src/contexts/AuthContext'
-import { useTheme } from '../src/contexts/ThemeContext'
 import { useLanguage } from '../src/contexts/LanguageContext'
 import { useCustomAlert } from '../src/components/CustomAlert'
 import { supabase } from '../src/lib/supabase'
@@ -65,7 +64,6 @@ const paymentMethods = [
 
 export default function PlansScreen() {
   const { profile } = useAuth()
-  const { colors } = useTheme()
   const { t, locale } = useLanguage()
   const planName = (name: string) => locale === 'en' ? (t(`plan:${name}` as any) !== `plan:${name}` ? t(`plan:${name}` as any) : name) : name
   const router = useRouter()

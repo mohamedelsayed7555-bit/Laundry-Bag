@@ -252,39 +252,27 @@ export default function OrdersPage() {
     const reason = cancelReason.trim()
     if (!reason) { toast('يرجى كتابة سبب الإلغاء', 'error'); return }
 
-    const driverArrived = ['arrived', 'picked_up'].includes(order?.status ?? '') || Number(order?.cancellation_fee) > 0
-    const deliveryFee = Number(order?.delivery_fee) || 0
-    const fee = driverArrived ? deliveryFee : 0
-
     setCancelModal(null)
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'cancelled' } : o))
     setDetail(null)
 
-    const updateData: any = {
-      status: 'cancelled',
-      cancellation_reason: reason,
-      cancellation_fee: fee,
-      cancelled_by: 'admin',
-      cancelled_at: new Date().toISOString(),
-      driver_id: null,
+    // One transaction in the database: cancels, sets the fee, and returns to the plan only the
+    // items the plan actually paid for (not the order's full item count).
+    const { data: res, error } = await supabase.rpc('admin_cancel_order', { p_order_id: id, p_reason: reason })
+    if (error) {
+      toast(error.message?.includes('already_cancelled') ? 'الطلب ملغي بالفعل' : 'حدث خطأ — جاري التحديث', 'error')
+      loadOrders()
+      return
     }
 
-    const { error } = await supabase.from('orders').update(updateData).eq('id', id)
-    if (error) { toast('حدث خطأ — جاري التحديث', 'error'); loadOrders(); return }
+    const fee = Number((res as any)?.cancellation_fee) || 0
+    const returned = Number((res as any)?.returned_items) || 0
 
     await supabase.from('order_status_history').insert({ order_id: id, status: 'cancelled', changed_by: 'admin' })
-    logAuditClient('cancel_order', 'order', id, { order_number: order?.order_number, reason, cancelled_by: 'admin' })
+    logAuditClient('cancel_order', 'order', id, { order_number: order?.order_number, reason, cancelled_by: 'admin', cancellation_fee: fee, returned_items: returned })
 
-    toast(`تم إلغاء الطلب${driverArrived ? ` (رسوم توصيل ${fee.toFixed(2)} ج.م)` : ''}`, 'warning')
-
-    if (order?.subscription_id && order.items_count) {
-      const { data: sub } = await supabase.from('subscriptions').select('items_used').eq('id', order.subscription_id).single()
-      if (sub) {
-        const currentUsed = sub.items_used ?? 0
-        const newUsed = Math.max(0, currentUsed - order.items_count)
-        await supabase.from('subscriptions').update({ items_used: newUsed }).eq('id', order.subscription_id).eq('items_used', currentUsed)
-      }
-    }
+    toast(`تم إلغاء الطلب${fee > 0 ? ` (رسوم توصيل ${fee.toFixed(2)} ج.م)` : ''}${returned > 0 ? ` — رجّعنا ${returned} قطعة للباقة` : ''}`, 'warning')
+    loadOrders()
   }
 
   async function handleAddOrder(e: React.FormEvent) {

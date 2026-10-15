@@ -16,7 +16,7 @@ import { openLegalPage } from '../../src/lib/legal'
 
 export default function ProfileScreen() {
   const { profile, signOut, biometricEnabled, biometricAvailable, toggleBiometric } = useAuth()
-  const { colors, isDark, mode, setMode } = useTheme()
+  const { isDark, mode, setMode } = useTheme()
   const { t, locale, setLanguage } = useLanguage()
   const { showAlert, AlertComponent } = useCustomAlert()
   const b = useBrand()
@@ -51,7 +51,7 @@ export default function ProfileScreen() {
   const handleSignOut = () => {
     showAlert({ title: t('logout'), message: t('logoutConfirm'), type: 'confirm', buttons: [
       { text: t('cancel'), style: 'cancel' },
-      { text: t('logout'), style: 'destructive', onPress: async () => { await signOut(); router.replace('/') } },
+      { text: t('logout'), onPress: async () => { await signOut(); router.replace('/') } },
     ] })
   }
 

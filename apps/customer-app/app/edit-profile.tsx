@@ -10,12 +10,10 @@ import { useAuth } from '../src/contexts/AuthContext'
 import { useCustomAlert } from '../src/components/CustomAlert'
 import { supabase } from '../src/lib/supabase'
 import { passwordChecks } from '../src/lib/passwordRules'
-import { useTheme } from '../src/contexts/ThemeContext'
 import { useLanguage } from '../src/contexts/LanguageContext'
 import * as ImagePicker from 'expo-image-picker'
 
 export default function EditProfileScreen() {
-  const { colors } = useTheme()
   const { t, locale } = useLanguage()
   const b = useBrand()
   const insets = useSafeAreaInsets()
@@ -189,7 +187,7 @@ export default function EditProfileScreen() {
   // Strength follows how many of the sign-up rules are met (at least "weak" once something is typed).
   const passwordStrength = newPassword.length > 0 ? Math.max(1, passedChecks) : 0
   const strengthLabel = ['', t('strengthWeak'), t('strengthFair'), t('strengthGood'), t('strengthStrong')][passwordStrength]
-  const strengthColor = ['', colors.danger, colors.warning, colors.primary, colors.success][passwordStrength]
+  const strengthColor = ['', b.dangerText, '#F59E0B', b.primary, b.okText][passwordStrength]
 
   const mismatch = confirmPassword.length > 0 && confirmPassword !== newPassword
   const pwDisabled = savingPassword || !passwordOk || newPassword !== confirmPassword

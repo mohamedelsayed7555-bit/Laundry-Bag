@@ -37,8 +37,6 @@ interface AuthState {
 }
 
 interface AuthContextType extends AuthState {
-  signInWithOtp: (email: string) => Promise<{ error: string | null }>
-  verifyOtp: (email: string, token: string) => Promise<{ error: string | null }>
   signInWithPassword: (email: string, password: string) => Promise<{ error: string | null }>
   signUp: (email: string, password: string, name: string, phone: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
@@ -158,27 +156,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const token = tokenData.data
       await supabase.from('users').update({ fcm_token: token }).eq('id', userId)
     } catch {}
-  }
-
-  async function signInWithOtp(email: string) {
-    const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } })
-    return { error: error?.message ?? null }
-  }
-
-  async function verifyOtp(email: string, token: string) {
-    const { error, data } = await supabase.auth.verifyOtp({ email, token, type: 'email' })
-    if (error) return { error: error.message }
-
-    if (data.user) {
-      const { data: profile } = await supabase.from('users').select('is_active').eq('id', data.user.id).single()
-      if (profile && profile.is_active === false) {
-        await supabase.auth.signOut()
-        const en = await isEn()
-        return { error: en ? 'Your account has been deactivated — contact support' : 'تم تعطيل حسابك — تواصل مع الإدارة' }
-      }
-    }
-
-    return { error: null }
   }
 
   async function signInWithPassword(identifier: string, password: string) {
@@ -326,7 +303,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const value = useMemo(() => ({
-    ...state, signInWithOtp, verifyOtp, signInWithPassword, signUp,
+    ...state, signInWithPassword, signUp,
     signOut, refreshProfile, toggleBiometric, signInWithBiometric, biometricEmail,
   }), [state])
 

@@ -7,7 +7,6 @@ import Animated, { useSharedValue, useAnimatedStyle, withSpring, withSequence, w
 import { MapPin, Plus, Check, Lock, Crown, Settings2 } from 'lucide-react-native'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { useCart } from '../../src/contexts/CartContext'
-import { useTheme } from '../../src/contexts/ThemeContext'
 import { useLanguage } from '../../src/contexts/LanguageContext'
 import { useCustomAlert } from '../../src/components/CustomAlert'
 import { SkeletonPage } from '../../src/components/Skeleton'
@@ -66,7 +65,6 @@ function PinTile() {
 export default function NewOrderScreen() {
   const { profile } = useAuth()
   const { cart, addItem, removeItem, updateQuantity, totalPrice, totalItems, lastAddedIndex, clearLastAdded } = useCart()
-  const { colors } = useTheme()
   const { t, locale } = useLanguage()
   const router = useRouter()
   const params = useLocalSearchParams<{ service?: string }>()
@@ -464,8 +462,8 @@ export default function NewOrderScreen() {
                   {money(totalPrice)} <Text style={[s.barCur, { color: barMuted }]}>{t('currency')}</Text>
                 </Text>
               </View>
-              <View style={[s.barCta, { shadowColor: colors.primary }]}>
-                <LinearGradient colors={[colors.primary, colors.primaryDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.barCtaFill} />
+              <View style={[s.barCta, { shadowColor: b.primary }]}>
+                <LinearGradient colors={['#38BDF8', '#0284C7']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.barCtaFill} />
                 <Text style={s.barCtaText}>{locale === 'en' ? 'Complete order' : 'إتمام الطلب'}</Text>
                 <ForwardIcon color="#fff" size={16} />
               </View>

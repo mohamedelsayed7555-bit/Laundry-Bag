@@ -60,10 +60,10 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
 }
 
 const ebStyles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.navy[900], justifyContent: 'center', alignItems: 'center', padding: 40 },
+  container: { flex: 1, backgroundColor: '#0A1222', justifyContent: 'center', alignItems: 'center', padding: 40 },
   icon: { fontSize: 48, marginBottom: 16 },
   title: { fontSize: 20, fontWeight: '700', color: '#fff', marginBottom: 8 },
-  message: { fontSize: 14, color: colors.navy[300], marginBottom: 24 },
+  message: { fontSize: 14, color: '#8A9BB4', marginBottom: 24 },
   btn: { backgroundColor: colors.primary, paddingHorizontal: 32, paddingVertical: 14, borderRadius: 14 },
   btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 })

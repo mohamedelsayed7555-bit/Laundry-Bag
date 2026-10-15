@@ -173,12 +173,9 @@ Deno.serve(async (req: Request) => {
           data: { subscription_id: sub.id },
           sent_at: new Date().toISOString(),
         });
-      } else if (sub && !isSuccess) {
-        await supabase
-          .from("subscriptions")
-          .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
-          .eq("id", sub.id);
       }
+      // A failed payment leaves the request pending so the customer can retry, exactly like
+      // orders do. The housekeeping job cancels it if it stays unpaid for 24 hours.
     }
 
     return json({ received: true });

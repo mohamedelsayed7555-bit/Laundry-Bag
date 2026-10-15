@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Platform } from 'react-native'
+import { Platform, AppState } from 'react-native'
 import * as Notifications from 'expo-notifications'
 import * as Device from 'expo-device'
 import { Audio } from 'expo-av'
@@ -50,7 +50,9 @@ const SHOW = { shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: tru
 Notifications.setNotificationHandler({
   handleNotification: async (n) => {
     const d: any = n.request.content.data ?? {}
-    if (!d.local) {
+    // With the screen locked (or the app in the background) always show it: the in-app
+    // notification only replaces the push while the app is really in front.
+    if (!d.local && AppState.currentState === 'active') {
       // A push that arrives while the app is open: realtime has usually notified already.
       if (d.type === 'order_update' && d.order_id && d.status && !gate(`order:${d.order_id}:${d.status}`, ORDER_WINDOW)) return HIDE
       if ((d.type === 'chat' || d.type === 'message') && d.order_id && (activeChatOrderId === d.order_id || !gate(`chat:${d.order_id}`, CHAT_WINDOW))) return HIDE

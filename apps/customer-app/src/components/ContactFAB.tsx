@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Linking, Pressable } from 'react-native'
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, withRepeat, withSequence, withDelay, SlideInDown } from 'react-native-reanimated'
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, withRepeat, withSequence, withDelay, runOnJS, Easing } from 'react-native-reanimated'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Path, Rect, Circle } from 'react-native-svg'
@@ -93,9 +93,31 @@ export default function ContactFAB() {
     transform: [{ scale: scale.value }, { translateY: bounce.value }],
   }))
 
+  // The sheet is animated here (modal opens with no animation of its own), so only one
+  // animation runs and the sheet never flashes at the wrong position first.
+  const open = useSharedValue(0)
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    if (visible) {
+      setMounted(true)
+      open.value = 0
+      open.value = withTiming(1, { duration: 240, easing: Easing.out(Easing.cubic) })
+    }
+  }, [visible])
+  const sheetStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: (1 - open.value) * 420 }],
+  }))
+  const scrimStyle = useAnimatedStyle(() => ({ opacity: open.value }))
+  const closeSheet = useCallback(() => {
+    open.value = withTiming(0, { duration: 180, easing: Easing.in(Easing.cubic) }, (done) => {
+      if (done) runOnJS(setMounted)(false)
+    })
+    setVisible(false)
+  }, [])
+
   const openLink = (url: string) => {
     Linking.openURL(url).catch(() => {})
-    setVisible(false)
+    closeSheet()
   }
 
   const hasAny = contact && (contact.whatsapp || contact.phone || contact.facebook || contact.instagram || contact.tiktok || contact.address)
@@ -106,7 +128,7 @@ export default function ContactFAB() {
   if (contact.instagram) socials.push({ key: 'ig', label: isEn ? 'Instagram' : 'انستجرام', bg: ['#F58529', '#DD2A7B', '#8134AF'], logo: <InstagramLogo />, url: contact.instagram })
   if (contact.tiktok) socials.push({ key: 'tt', label: isEn ? 'TikTok' : 'تيك توك', bg: ['#111111', '#111111'], logo: <TikTokLogo />, url: contact.tiktok })
 
-  const close = () => setVisible(false)
+  const close = closeSheet
 
   return (
     <>
@@ -125,10 +147,12 @@ export default function ContactFAB() {
         </TouchableOpacity>
       </Animated.View>
 
-      <Modal visible={visible} transparent animationType="fade" onRequestClose={close} statusBarTranslucent>
+      <Modal visible={visible || mounted} transparent animationType="none" onRequestClose={close} statusBarTranslucent>
         <View style={s.overlay}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel={isEn ? 'Close' : 'إغلاق'} />
-          <Animated.View entering={SlideInDown.duration(260)} style={[s.sheet, { backgroundColor: b.card, borderColor: b.cardBorder, paddingBottom: Math.max(insets.bottom, 12) + 10 }]}>
+          <Animated.View style={[StyleSheet.absoluteFill, s.scrim, scrimStyle]}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel={isEn ? 'Close' : 'إغلاق'} />
+          </Animated.View>
+          <Animated.View style={[s.sheet, sheetStyle, { backgroundColor: b.card, borderColor: b.cardBorder, paddingBottom: Math.max(insets.bottom, 12) + 10 }]}>
             <View style={[s.handle, { backgroundColor: b.cardBorder }]} />
 
             <View style={s.header}>
@@ -217,7 +241,8 @@ const s = StyleSheet.create({
   fabDot: { top: 5, end: 5 },
   logoDot: { bottom: -2, end: -2 },
 
-  overlay: { flex: 1, backgroundColor: 'rgba(2,6,14,0.6)', justifyContent: 'flex-end' },
+  overlay: { flex: 1, justifyContent: 'flex-end' },
+  scrim: { backgroundColor: 'rgba(2,6,14,0.6)' },
   sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderBottomWidth: 0, paddingHorizontal: 16, paddingTop: 8 },
   handle: { width: 38, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },

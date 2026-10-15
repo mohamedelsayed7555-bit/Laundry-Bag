@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "899890604430",
+    "project_id": "laundary-bag-abb18",
+    "storage_bucket": "laundary-bag-abb18.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:899890604430:android:01a3820999ffa7d3579cdf",
+        "android_client_info": {
+          "package_name": "com.cleano.driver"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDM1IgqO_A1_0oiurcaG5FdofrpGdA81nI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

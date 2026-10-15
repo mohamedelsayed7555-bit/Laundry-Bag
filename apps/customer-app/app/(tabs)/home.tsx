@@ -9,13 +9,13 @@ import {
   Sparkles, ArrowUpLeft, ArrowUpRight, ClipboardList,
 } from 'lucide-react-native'
 import { useAuth } from '../../src/contexts/AuthContext'
-import { useTheme } from '../../src/contexts/ThemeContext'
 import { useLanguage } from '../../src/contexts/LanguageContext'
 import { supabase } from '../../src/lib/supabase'
 import { SkeletonOrderCard } from '../../src/components/Skeleton'
 import { useRealtimeOrders } from '../../src/hooks/useRealtimeOrders'
 import { useCart } from '../../src/contexts/CartContext'
 import WelcomeGiftPopup from '../../src/components/WelcomeGiftPopup'
+import RatingSheet from '../../src/components/RatingSheet'
 import {
   useBrand, SIZE, F, HIT, DotsBackdrop, SectionTitle, Segments, Pill, IconButton, ForwardChevron, ForwardIcon,
   cardShadow, money, shortDate,
@@ -84,7 +84,8 @@ function BannerCta({ label }: { label: string }) {
   )
 }
 
-function BannersCarousel({ bagOffer, activeSub, colors, t, locale, onBagPress, onNewOrderPress, onPlansPress }: any) {
+function BannersCarousel({ bagOffer, activeSub, t, locale, onBagPress, onNewOrderPress, onPlansPress }: any) {
+  const brand = useBrand()
   const SlideIn = I18nManager.isRTL ? FadeInRight : FadeInLeft
   const [activeIndex, setActiveIndex] = useState(0)
   const scrollRef = useRef<ScrollView>(null)
@@ -94,12 +95,15 @@ function BannersCarousel({ bagOffer, activeSub, colors, t, locale, onBagPress, o
 
   if (bagOffer) {
     const hasDiscount = bagOffer.original_price > bagOffer.daily_price
+    // Texts are edited in the dashboard (Arabic); English keeps the translation.
+    const bagBadge = (!en && bagOffer.badge_text) || t('bagBadge')
+    const bagSub = (!en && bagOffer.subtitle) || t('bagSubtitle')
     banners.push({
       key: 'bag',
       node: (
         <BannerShell image={BANNER_IMAGES.bag} onPress={onBagPress}>
           <View style={cr.badges}>
-            <View style={cr.badgeHot}><Text style={cr.badgeHotText}>{t('bagBadge')}</Text></View>
+            <View style={cr.badgeHot}><Text style={cr.badgeHotText}>{bagBadge}</Text></View>
             {hasDiscount && (
               <View style={cr.badgeOff}><Text style={cr.badgeOffText}>-{Math.round((1 - bagOffer.daily_price / bagOffer.original_price) * 100)}%</Text></View>
             )}
@@ -108,7 +112,7 @@ function BannersCarousel({ bagOffer, activeSub, colors, t, locale, onBagPress, o
             {!en && <View style={cr.prePill}><Text style={cr.prePillText}>شنطة</Text></View>}
             <Text style={cr.brand}>Laundry <Text style={cr.brandAccent}>Bag</Text></Text>
           </View>
-          <Text style={cr.sub} numberOfLines={1}>{t('bagSubtitle')}</Text>
+          <Text style={cr.sub} numberOfLines={1}>{bagSub}</Text>
           <View style={cr.priceRow}>
             <Text style={cr.price}>{bagOffer.daily_price} <Text style={cr.priceCur}>{t('currency')}</Text></Text>
             {hasDiscount && <Text style={cr.oldPrice}>{bagOffer.original_price}</Text>}
@@ -211,7 +215,7 @@ function BannersCarousel({ bagOffer, activeSub, colors, t, locale, onBagPress, o
       {banners.length > 1 && (
         <View style={[cr.dots, { flexDirection: I18nManager.isRTL ? 'row-reverse' : 'row' }]}>
           {banners.map((b, i) => (
-            <View key={b.key} style={[cr.dot, i === activeIndex ? { width: 18, backgroundColor: colors.primary } : { backgroundColor: colors.navy[600] }]} />
+            <View key={b.key} style={[cr.dot, i === activeIndex ? { width: 18, backgroundColor: brand.primary } : { backgroundColor: brand.isDark ? '#2A3852' : '#D5DEEA' }]} />
           ))}
         </View>
       )}
@@ -221,7 +225,6 @@ function BannersCarousel({ bagOffer, activeSub, colors, t, locale, onBagPress, o
 
 export default function HomeScreen() {
   const { profile } = useAuth()
-  const { colors } = useTheme()
   const b = useBrand()
   const insets = useSafeAreaInsets()
   const { t, locale } = useLanguage()
@@ -440,7 +443,7 @@ export default function HomeScreen() {
       contentContainerStyle={[s.content, { paddingTop: insets.top + 12 }]}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={b.primary} colors={[b.primary]} />}
     >
       <DotsBackdrop height={230 + insets.top} />
 
@@ -479,7 +482,7 @@ export default function HomeScreen() {
         <IconButton onPress={() => router.push('/notifications')} label="Notifications">
           <Bell size={19} color={b.ink} />
           {unreadCount > 0 && (
-            <View style={[s.badge, { backgroundColor: colors.danger, borderColor: b.raised }]}>
+            <View style={[s.badge, { backgroundColor: '#EF4444', borderColor: b.raised }]}>
               <Text style={s.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
             </View>
           )}
@@ -526,7 +529,6 @@ export default function HomeScreen() {
         key={refreshKey}
         bagOffer={bagOffer}
         activeSub={activeSub}
-        colors={colors}
         t={t}
         locale={locale}
         onBagPress={() => router.push('/bag-order')}
@@ -629,59 +631,20 @@ export default function HomeScreen() {
       <View style={{ height: 100 }} />
     </ScrollView>
 
-    <Modal visible={!!ratingOrder} transparent animationType="slide" onRequestClose={dismissRating}>
-      <View style={rs.overlay}>
-        <View style={[rs.card, { backgroundColor: colors.navy[800], borderColor: colors.navy[700] }]}>
-          <Text style={[rs.title, { color: colors.text }]}>{t('rateOrderTitle')}</Text>
-          <Text style={[rs.subtitle, { color: colors.navy[300] }]}>{t('orderHash')}{cleanNumber(ratingOrder?.order_number)}</Text>
-
-          <Text style={[rs.label, { color: colors.navy[100] }]}>{t('serviceRating')}</Text>
-          <View style={rs.starsRow}>
-            {[1, 2, 3, 4, 5].map(n => (
-              <TouchableOpacity key={n} onPress={() => setRatingService(n)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-                <Text style={[rs.star, n <= ratingService && rs.starActive]}>{n <= ratingService ? '⭐' : '☆'}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {ratingOrder?.driver_id && (
-            <>
-              <Text style={[rs.label, { color: colors.navy[100] }]}>{t('driverRating')}</Text>
-              <View style={rs.starsRow}>
-                {[1, 2, 3, 4, 5].map(n => (
-                  <TouchableOpacity key={n} onPress={() => setRatingDriver(n)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-                    <Text style={[rs.star, n <= ratingDriver && rs.starActive]}>{n <= ratingDriver ? '⭐' : '☆'}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </>
-          )}
-
-          <TextInput
-            style={[rs.input, { backgroundColor: colors.navy[700], color: colors.text, borderColor: colors.navy[600] }]}
-            placeholder={t('ratingNotes')}
-            placeholderTextColor={colors.navy[400]}
-            value={ratingNote}
-            onChangeText={setRatingNote}
-            multiline
-            textAlign="right"
-          />
-
-          <View style={rs.actions}>
-            <TouchableOpacity style={[rs.cancelBtn, { borderColor: colors.navy[500] }]} onPress={dismissRating}>
-              <Text style={[rs.cancelText, { color: colors.navy[200] }]}>{t('later')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[rs.submitBtn, { backgroundColor: colors.accent, opacity: ratingService === 0 || ratingSubmitting ? 0.5 : 1 }]}
-              onPress={handleSubmitRating}
-              disabled={ratingService === 0 || ratingSubmitting}
-            >
-              <Text style={[rs.submitText, { color: colors.text }]}>{ratingSubmitting ? t('submittingRating') : t('submitRating')}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
+    <RatingSheet
+      visible={!!ratingOrder}
+      orderNumber={ratingOrder?.order_number}
+      showDriver={!!ratingOrder?.driver_id}
+      service={ratingService}
+      driver={ratingDriver}
+      note={ratingNote}
+      submitting={ratingSubmitting}
+      onService={setRatingService}
+      onDriver={setRatingDriver}
+      onNote={setRatingNote}
+      onSubmit={handleSubmitRating}
+      onDismiss={dismissRating}
+    />
     <WelcomeGiftPopup userId={profile?.id} onOrderNow={() => router.push('/new-order')} />
     </>
   )
@@ -760,19 +723,3 @@ const cr = StyleSheet.create({
   dot: { width: 6, height: 6, borderRadius: 3 },
 })
 
-const rs = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  card: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40, borderWidth: 1, borderBottomWidth: 0 },
-  title: { fontSize: 20, fontWeight: '800', textAlign: 'center', marginBottom: 4 },
-  subtitle: { fontSize: 13, textAlign: 'center', marginBottom: 20 },
-  label: { fontSize: 14, marginBottom: 8, marginTop: 8 },
-  starsRow: { flexDirection: 'row', gap: 10, marginBottom: 8 },
-  star: { fontSize: 30, color: '#555' },
-  starActive: { color: '#f59e0b' },
-  input: { borderRadius: 14, padding: 14, fontSize: 14, minHeight: 60, marginTop: 12, borderWidth: 1 },
-  actions: { flexDirection: 'row', gap: 12, marginTop: 20 },
-  cancelBtn: { flex: 1, borderWidth: 1.5, borderRadius: 14, padding: 14, alignItems: 'center' },
-  cancelText: { fontSize: 14, fontWeight: '600' },
-  submitBtn: { flex: 2, borderRadius: 14, padding: 14, alignItems: 'center' },
-  submitText: { fontSize: 14, fontWeight: '700' },
-})

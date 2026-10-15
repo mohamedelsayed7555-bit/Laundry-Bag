@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { TriangleAlert, Shirt, Plus, Minus } from 'lucide-react-native'
+import { useBrand, Card, Stepper, IconButton, BackIcon, FlowLines, money, F, SIZE } from '../../src/components/brand'
+import { PrimaryButton, SecondaryButton } from '../../src/components/auth/ui'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { useCustomAlert } from '../../src/components/CustomAlert'
 import { supabase } from '../../src/lib/supabase'
 import { serverErrorMessage } from '../../src/lib/serverErrors'
-import { useTheme } from '../../src/contexts/ThemeContext'
 import { useLanguage } from '../../src/contexts/LanguageContext'
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!
@@ -21,10 +24,10 @@ const servicesMap = [
 type OrderItem = { name: string; service_type: string; quantity: number; price: number }
 
 export default function EditOrderScreen() {
-  const { colors } = useTheme()
+  const b = useBrand()
+  const insets = useSafeAreaInsets()
   const { t, locale } = useLanguage()
   const isEn = locale === 'en'
-  const s = getStyles(colors)
   const { id } = useLocalSearchParams<{ id: string }>()
   const { profile } = useAuth()
   const router = useRouter()
@@ -221,206 +224,188 @@ export default function EditOrderScreen() {
   }
 
   if (loading) {
-    return <View style={[s.container, { justifyContent: 'center', alignItems: 'center' }]}><ActivityIndicator size="large" color={colors.primary} /></View>
+    return <View style={[n.container, { backgroundColor: b.page, justifyContent: 'center', alignItems: 'center' }]}><ActivityIndicator size="large" color={b.primary} /></View>
   }
 
   const isPaidOnline = order && ['visa', 'e_wallet', 'wallet'].includes(order.payment_method) && order.payment_status === 'confirmed'
 
   if (!order || !['pending', 'assigned'].includes(order.status) || isPaidOnline) {
     return (
-      <View style={[s.container, { justifyContent: 'center', alignItems: 'center', padding: 40 }]}>
-        <Text style={{ fontSize: 40, marginBottom: 16 }}>⚠️</Text>
-        <Text style={{ color: '#fff', fontSize: 16, textAlign: 'center' }}>
+      <View style={[n.container, { backgroundColor: b.page, justifyContent: 'center', alignItems: 'center', padding: 32 }]}>
+        <View style={[n.blockIcon, { backgroundColor: b.warnTint }]}>
+          <TriangleAlert size={30} color={b.warnText} />
+        </View>
+        <Text style={[n.blockText, { color: b.ink }]}>
           {isPaidOnline ? (isEn ? 'Cannot edit a paid order — contact support' : 'لا يمكن تعديل طلب مدفوع إلكترونياً — تواصل مع الدعم') : (isEn ? 'This order cannot be edited' : 'لا يمكن تعديل هذا الطلب')}
         </Text>
-        <TouchableOpacity style={s.backBtnAlt} onPress={() => router.back()}>
-          <Text style={{ color: colors.primary, fontSize: 15, fontWeight: '600' }}>{isEn ? 'Back' : 'رجوع'}</Text>
-        </TouchableOpacity>
+        <SecondaryButton title={isEn ? 'Back' : 'رجوع'} onPress={() => router.back()} style={{ alignSelf: 'stretch', marginTop: 18 }} />
       </View>
     )
   }
 
+  const cur = isEn ? 'EGP' : 'ج.م'
+
   return (
     <>
-    <ScrollView style={s.container} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
-      <View style={s.headerRow}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={s.backText}>{isEn ? '← Back' : 'رجوع ←'}</Text>
-        </TouchableOpacity>
-        <Text style={s.title}>{isEn ? 'Edit Order' : 'تعديل الطلب'}</Text>
-        <View style={{ width: 60 }} />
-      </View>
+    <View style={[n.container, { backgroundColor: b.page }]}>
+      <ScrollView contentContainerStyle={[n.content, { paddingTop: insets.top + 10 }]} keyboardShouldPersistTaps="handled">
+        <FlowLines height={260} />
 
-      <View style={s.orderBadge}>
-        <Text style={s.orderNumber}>{order.order_number}</Text>
-      </View>
-
-      {/* Current items */}
-      <Text style={s.sectionTitle}>{isEn ? `Items (${totalItems})` : `القطع (${totalItems})`}</Text>
-      {cart.map((item, i) => (
-        <View key={i} style={s.cartItem}>
-          <View style={{ flex: 1 }}>
-            <Text style={s.cartItemName}>{itemName(item.name)} — {serviceLabel(item.service_type)}</Text>
-            <Text style={s.cartItemDetail}>{item.quantity} × {item.price} = {item.quantity * item.price} {isEn ? 'EGP' : 'ج.م'}</Text>
+        <View style={n.header}>
+          <IconButton onPress={() => router.back()} label={isEn ? 'Back' : 'رجوع'}><BackIcon color={b.ink} /></IconButton>
+          <Text style={[n.title, { color: b.ink }]} numberOfLines={1}>{isEn ? 'Edit Order' : 'تعديل الطلب'}</Text>
+          <View style={[n.numPill, { backgroundColor: b.tint }]}>
+            <Text style={[n.numPillText, { color: b.tintText }]}>{'⁦'}#{String(order.order_number ?? '').replace(/^#+/, '')}{'⁩'}</Text>
           </View>
-          <View style={s.qtyActions}>
-            <TouchableOpacity style={s.qtyBtn} onPress={() => updateQty(i, -1)}>
-              <Text style={s.qtyBtnText}>−</Text>
-            </TouchableOpacity>
-            <Text style={s.qtyValue}>{item.quantity}</Text>
-            <TouchableOpacity style={s.qtyBtn} onPress={() => updateQty(i, 1)}>
-              <Text style={s.qtyBtnText}>+</Text>
-            </TouchableOpacity>
-          </View>
-          <TouchableOpacity onPress={() => removeFromCart(i)} style={s.removeBtn}>
-            <Text style={s.removeBtnText}>✕</Text>
-          </TouchableOpacity>
         </View>
-      ))}
 
-      {/* Add new item */}
-      <Text style={s.sectionTitle}>{isEn ? 'Add New Item' : 'إضافة قطعة جديدة'}</Text>
-      <Text style={s.stepLabel}>{isEn ? 'Item Type' : 'نوع القطعة'}</Text>
-      <View style={s.grid}>
-        {itemTypes.map(type => (
-          <TouchableOpacity key={type} onPress={() => { setSelectedItemType(type); setSelectedService('') }}
-            style={[s.optionCard, selectedItemType === type && s.optionSelected]}>
-            <Text style={[s.optionLabel, selectedItemType === type && s.optionLabelSelected]}>{itemName(type)}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+        {/* Current items */}
+        <Card style={n.card}>
+          <Text style={[n.eyebrow, { color: b.muted }]}>{isEn ? `Items (${totalItems})` : `القطع (${totalItems})`}</Text>
+          {cart.map((item, i) => (
+            <View key={i} style={[n.item, i > 0 && { borderTopWidth: 1, borderTopColor: b.divider }]}>
+              <View style={[n.thumb, { backgroundColor: b.iconTile }]}><Shirt size={18} color={b.accentIcon} /></View>
+              <View style={n.itemInfo}>
+                <Text style={[n.itemName, { color: b.ink }]} numberOfLines={1}>{itemName(item.name)} — {serviceLabel(item.service_type)}</Text>
+                <Text style={[n.itemSub, { color: b.muted }]}>{item.quantity} × {money(item.price)} = {money(item.quantity * item.price)} {cur}</Text>
+              </View>
+              <Stepper
+                qty={item.quantity}
+                onMinus={() => updateQty(i, -1)}
+                onPlus={() => updateQty(i, 1)}
+                onRemove={() => removeFromCart(i)}
+              />
+            </View>
+          ))}
+        </Card>
 
-      {selectedItemType ? (
-        <>
-          <Text style={s.stepLabel}>{isEn ? 'Service Type' : 'نوع الخدمة'}</Text>
-          <View style={s.grid}>
-            {availableServices().map(svc => (
-              <TouchableOpacity key={svc.key} onPress={() => setSelectedService(svc.key)}
-                style={[s.optionCard, selectedService === svc.key && s.optionSelected]}>
-                <Text style={s.optionIcon}>{svc.icon}</Text>
-                <Text style={[s.optionLabel, selectedService === svc.key && s.optionLabelSelected]}>{isEn ? svc.labelEn : svc.label}</Text>
-                <Text style={s.priceHint}>{getPrice(selectedItemType, svc.key)} {isEn ? 'EGP' : 'ج.م'}</Text>
+        {/* Add a new item */}
+        <Card style={n.card}>
+          <Text style={[n.eyebrow, { color: b.muted }]}>{isEn ? 'Add New Item' : 'إضافة قطعة جديدة'}</Text>
+
+          <Text style={[n.label, { color: b.ink2 }]}>{isEn ? 'Item Type' : 'نوع القطعة'}</Text>
+          <View style={n.grid}>
+            {itemTypes.map(type => {
+              const on = selectedItemType === type
+              return (
+                <TouchableOpacity
+                  key={type}
+                  onPress={() => { setSelectedItemType(type); setSelectedService('') }}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: on }}
+                  style={[n.tile, { backgroundColor: on ? b.tint : b.card, borderColor: on ? 'transparent' : b.cardBorder }]}
+                >
+                  <View style={[n.tileDot, { backgroundColor: on ? b.tintText : b.faint }]} />
+                  <Text style={[n.tileText, { color: on ? b.tintText : b.ink2 }]} numberOfLines={1}>{itemName(type)}</Text>
+                </TouchableOpacity>
+              )
+            })}
+          </View>
+
+          {selectedItemType ? (
+            <>
+              <Text style={[n.label, { color: b.ink2 }]}>{isEn ? 'Service Type' : 'نوع الخدمة'}</Text>
+              <View style={n.grid}>
+                {servicesMap.filter(svc => getPrice(selectedItemType, svc.key) > 0).map(svc => {
+                  const on = selectedService === svc.key
+                  return (
+                    <TouchableOpacity
+                      key={svc.key}
+                      onPress={() => setSelectedService(svc.key)}
+                      activeOpacity={0.8}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: on }}
+                      style={[n.svcTile, { backgroundColor: on ? b.tint : b.card, borderColor: on ? 'transparent' : b.cardBorder }]}
+                    >
+                      <Text style={[n.tileText, { color: on ? b.tintText : b.ink2 }]} numberOfLines={1}>{isEn ? svc.labelEn : svc.label}</Text>
+                      <Text style={[n.svcPrice, { color: on ? b.tintText : b.muted }]}>{money(getPrice(selectedItemType, svc.key))} {cur}</Text>
+                    </TouchableOpacity>
+                  )
+                })}
+              </View>
+            </>
+          ) : null}
+
+          {selectedService ? (
+            <View style={n.addRow}>
+              <Stepper qty={itemQty} onMinus={() => setItemQty(Math.max(1, itemQty - 1))} onPlus={() => setItemQty(itemQty + 1)} />
+              <TouchableOpacity style={[n.addBtn, { backgroundColor: b.tint }]} onPress={addToCart} activeOpacity={0.8} accessibilityRole="button">
+                <Plus size={16} color={b.tintText} />
+                <Text style={[n.addBtnText, { color: b.tintText }]}>{isEn ? 'Add' : 'أضف'}</Text>
               </TouchableOpacity>
-            ))}
-          </View>
-        </>
-      ) : null}
+            </View>
+          ) : null}
+        </Card>
 
-      {selectedService ? (
-        <View style={s.addRow}>
-          <View style={s.counterRow}>
-            <TouchableOpacity style={s.counterBtn} onPress={() => setItemQty(itemQty + 1)}>
-              <Text style={s.counterText}>+</Text>
-            </TouchableOpacity>
-            <Text style={s.counterValue}>{itemQty}</Text>
-            <TouchableOpacity style={s.counterBtn} onPress={() => setItemQty(Math.max(1, itemQty - 1))}>
-              <Text style={s.counterText}>−</Text>
-            </TouchableOpacity>
-          </View>
-          <TouchableOpacity style={s.addBtn} onPress={addToCart}>
-            <Text style={s.addBtnText}>{isEn ? '+ Add' : '+ أضف'}</Text>
-          </TouchableOpacity>
-        </View>
-      ) : null}
+        <View style={{ height: 8 }} />
+      </ScrollView>
 
-      {/* Total */}
-      <View style={s.totalCard}>
-        <View>
-          <Text style={s.totalLabel}>{isEn ? 'Total' : 'الإجمالي'}</Text>
-          {!isSubOrder && priceDiff !== 0 && (
-            <Text style={[s.totalLabel, { fontSize: 12, marginTop: 4 }]}>
-              {isEn ? `Was: ${oldTotal.toFixed(2)} EGP` : `كان: ${oldTotal.toFixed(2)} ج.م`}
+      {/* Total + save */}
+      <View style={[n.foot, { backgroundColor: b.card, borderTopColor: b.cardBorder, paddingBottom: Math.max(insets.bottom, 10) + 10 }]}>
+        {!isSubOrder && priceDiff !== 0 && (
+          <View style={[n.diff, { backgroundColor: priceDiff > 0 ? b.warnTint : b.okTint }]}>
+            {priceDiff > 0 ? <Plus size={14} color={b.warnText} /> : <Minus size={14} color={b.okText} />}
+            <Text style={[n.diffText, { color: priceDiff > 0 ? b.warnText : b.okText }]}>
+              {priceDiff > 0
+                ? (isEn ? `You will pay ${money(priceDiff)} ${cur} more after saving` : `هتدفع فرق ${money(priceDiff)} ${cur} بعد الحفظ`)
+                : (isEn ? `${money(Math.abs(priceDiff))} ${cur} will be refunded` : `هيترد لك ${money(Math.abs(priceDiff))} ${cur}`)}
             </Text>
-          )}
-        </View>
-        <View style={{ alignItems: 'flex-end' }}>
-          <Text style={s.totalValue}>
-            {isSubOrder ? (isEn ? 'Free (Plan)' : 'مجاناً (باقة)') : `${newTotal.toFixed(2)} ${isEn ? 'EGP' : 'ج.م'}`}
-          </Text>
-          {!isSubOrder && priceDiff > 0 && (
-            <Text style={{ fontSize: 13, fontWeight: '700', color: '#ef4444', marginTop: 2 }}>
-              {isEn ? `+${priceDiff.toFixed(2)} EGP difference` : `+${priceDiff.toFixed(2)} ج.م فرق`}
+          </View>
+        )}
+        <View style={n.footRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={[n.totalLabel, { color: b.muted }]}>{isEn ? 'New total' : 'الإجمالي الجديد'}</Text>
+            <Text style={[n.totalValue, { color: b.accentIcon }]} numberOfLines={1}>
+              {isSubOrder ? (isEn ? 'Free (Plan)' : 'مجاناً (باقة)') : `${money(newTotal)} ${cur}`}
             </Text>
-          )}
-          {!isSubOrder && priceDiff < 0 && (
-            <Text style={{ fontSize: 13, fontWeight: '700', color: '#10b981', marginTop: 2 }}>
-              {isEn ? `${priceDiff.toFixed(2)} EGP refund` : `${priceDiff.toFixed(2)} ج.م استرداد`}
-            </Text>
-          )}
+          </View>
+          <PrimaryButton
+            title={isEn ? 'Save Changes' : 'حفظ التعديلات'}
+            loadingTitle={isEn ? 'Saving...' : 'جاري الحفظ...'}
+            loading={saving}
+            disabled={cart.length === 0}
+            onPress={handleSave}
+            style={{ flex: 0, width: 160 }}
+          />
         </View>
       </View>
-
-      <TouchableOpacity
-        style={[s.saveBtn, (saving || cart.length === 0) && { opacity: 0.6 }]}
-        onPress={handleSave}
-        disabled={saving || cart.length === 0}
-      >
-        <Text style={s.saveBtnText}>{saving ? (isEn ? 'Saving...' : 'جاري الحفظ...') : (isEn ? 'Save Changes' : 'حفظ التعديلات')}</Text>
-      </TouchableOpacity>
-    </ScrollView>
+    </View>
     {AlertComponent}
     </>
   )
 }
 
-function getStyles(colors: any) { return StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.navy[900] },
-  content: { padding: 20, paddingTop: 56, paddingBottom: 40 },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  backText: { color: colors.primary, fontSize: 16, fontWeight: '600' },
-  title: { fontSize: 20, fontWeight: 'bold', color: colors.text },
-  orderBadge: { alignSelf: 'center', backgroundColor: colors.navy[800], borderRadius: 12, paddingHorizontal: 20, paddingVertical: 8, marginBottom: 20, borderWidth: 1, borderColor: colors.navy[700] },
-  orderNumber: { fontSize: 16, fontWeight: '700', color: colors.text },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 12, marginTop: 20 },
-  stepLabel: { fontSize: 13, fontWeight: '600', color: colors.navy[200], marginBottom: 8, marginTop: 12 },
-
-  cartItem: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.navy[800],
-    borderRadius: 12, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: colors.navy[700],
-  },
-  cartItemName: { fontSize: 14, fontWeight: '600', color: colors.text },
-  cartItemDetail: { fontSize: 12, color: colors.navy[300], marginTop: 2 },
-  qtyActions: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 8 },
-  qtyBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.navy[700], justifyContent: 'center', alignItems: 'center' },
-  qtyBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  qtyValue: { color: colors.text, fontSize: 16, fontWeight: '700', minWidth: 24, textAlign: 'center' },
-  removeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.navy[700], justifyContent: 'center', alignItems: 'center' },
-  removeBtnText: { color: '#ef4444', fontSize: 14, fontWeight: '700' },
-
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  optionCard: {
-    minWidth: '30%', backgroundColor: colors.navy[800], borderRadius: 16, padding: 14,
-    alignItems: 'center', gap: 4, borderWidth: 1.5, borderColor: colors.navy[700],
-  },
-  optionSelected: { borderColor: colors.primary, backgroundColor: colors.primary + '15' },
-  optionIcon: { fontSize: 24 },
-  optionLabel: { fontSize: 13, fontWeight: '600', color: colors.navy[200], textAlign: 'center' },
-  optionLabelSelected: { color: colors.primary },
-  priceHint: { fontSize: 11, color: colors.navy[300], marginTop: 2 },
-
-  addRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, gap: 12 },
-  counterRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  counterBtn: {
-    width: 40, height: 40, borderRadius: 20, backgroundColor: colors.navy[800],
-    justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.navy[700],
-  },
-  counterText: { fontSize: 20, color: '#fff', fontWeight: '600' },
-  counterValue: { fontSize: 24, fontWeight: 'bold', color: colors.text, minWidth: 32, textAlign: 'center' },
-  addBtn: { flex: 1, backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
-  addBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-
-  totalCard: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: colors.navy[800], borderRadius: 16, padding: 20, marginTop: 24,
-    borderWidth: 1, borderColor: colors.navy[700],
-  },
-  totalLabel: { fontSize: 16, color: colors.navy[200] },
-  totalValue: { fontSize: 22, fontWeight: 'bold', color: colors.primary },
-
-  saveBtn: {
-    backgroundColor: colors.primary, borderRadius: 16, padding: 18, alignItems: 'center', marginTop: 20,
-    shadowColor: colors.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 8,
-  },
-  saveBtnText: { fontSize: 18, fontWeight: '700', color: '#fff' },
-  backBtnAlt: { marginTop: 24, padding: 12 },
-}) }
+const n = StyleSheet.create({
+  container: { flex: 1 },
+  content: { paddingHorizontal: 16, paddingBottom: 30 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+  title: { flex: 1, fontSize: 18, fontFamily: F.display },
+  numPill: { height: 28, paddingHorizontal: 11, borderRadius: 14, justifyContent: 'center' },
+  numPillText: { fontSize: 12.5, fontFamily: F.bold },
+  card: { marginBottom: 12, padding: 14 },
+  eyebrow: { fontSize: 11, fontFamily: F.bold, marginBottom: 6 },
+  item: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 54, paddingVertical: 6 },
+  thumb: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  itemInfo: { flex: 1, minWidth: 0 },
+  itemName: { fontSize: 13, fontFamily: F.bold },
+  itemSub: { fontSize: 11, fontFamily: F.regular, marginTop: 1 },
+  label: { fontSize: 12, fontFamily: F.semibold, marginTop: 12, marginHorizontal: 2 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 8 },
+  tile: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minWidth: '31%', flexGrow: 1, height: SIZE.M, borderRadius: SIZE.rM, borderWidth: 1, paddingHorizontal: 8 },
+  tileDot: { width: 6, height: 6, borderRadius: 3 },
+  tileText: { fontSize: 12.5, fontFamily: F.bold, flexShrink: 1 },
+  svcTile: { alignItems: 'center', justifyContent: 'center', gap: 1, minWidth: '31%', flexGrow: 1, minHeight: SIZE.M + 10, borderRadius: SIZE.rM, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 6 },
+  svcPrice: { fontSize: 11, fontFamily: F.semibold },
+  addRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },
+  addBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: SIZE.M, borderRadius: SIZE.rM },
+  addBtnText: { fontSize: 13.5, fontFamily: F.bold },
+  foot: { borderTopWidth: 1, paddingHorizontal: 16, paddingTop: 11 },
+  footRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  diff: { flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 10 },
+  diffText: { flex: 1, fontSize: 11.5, fontFamily: F.bold, lineHeight: 18 },
+  totalLabel: { fontSize: 10.5, fontFamily: F.regular },
+  totalValue: { fontSize: 19, fontFamily: F.display },
+  blockIcon: { width: 70, height: 70, borderRadius: 35, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
+  blockText: { fontSize: 14.5, fontFamily: F.semibold, textAlign: 'center', lineHeight: 24 },
+})

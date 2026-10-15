@@ -6,7 +6,6 @@ import { Check, CheckCheck, SendHorizontal, WashingMachine, Shirt, Droplet, Spar
 import { useBrand, IconButton, BackIcon, F, clock, shortDate } from '../../src/components/brand'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
-import { useTheme } from '../../src/contexts/ThemeContext'
 import { useLanguage } from '../../src/contexts/LanguageContext'
 import { supabase } from '../../src/lib/supabase'
 import { notifyMessage, setActiveChat } from '../../src/hooks/useNotifications'
@@ -25,7 +24,6 @@ const closedStatuses = ['delivered', 'cancelled']
 export default function ChatScreen() {
   const { orderId } = useLocalSearchParams<{ orderId: string }>()
   const { profile } = useAuth()
-  const { colors } = useTheme()
   const { t, locale } = useLanguage()
   const b = useBrand()
   const insets = useSafeAreaInsets()
