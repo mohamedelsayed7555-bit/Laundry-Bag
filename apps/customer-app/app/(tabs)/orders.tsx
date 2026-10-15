@@ -1,39 +1,58 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Linking, AppState } from 'react-native'
+import { useEffect, useState, useCallback } from 'react'
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Linking, AppState, Image, ScrollView } from 'react-native'
 import { useRouter } from 'expo-router'
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated'
 import { useAuth } from '../../src/contexts/AuthContext'
-import { useTheme } from '../../src/contexts/ThemeContext'
 import { useLanguage } from '../../src/contexts/LanguageContext'
 import { supabase } from '../../src/lib/supabase'
 import { useRealtimeOrders } from '../../src/hooks/useRealtimeOrders'
 import { SkeletonOrderCard } from '../../src/components/Skeleton'
-import { Phone, MessageCircle } from 'lucide-react-native'
+import {
+  Phone, MessageCircle, Clock, Hourglass, Car, MapPin, Package, RefreshCw, CircleCheck, Bike, CircleX, Coins,
+} from 'lucide-react-native'
+import { useBrand, Card, Divider, Segments, Segmented, Chip, Pill, IconButton, FlowLines, F, money, shortDate, type Brand } from '../../src/components/brand'
+import { PrimaryButton } from '../../src/components/auth/ui'
 
 const statusFlow = ['pending', 'assigned', 'arrived', 'picked_up', 'processing', 'ready', 'delivering', 'delivered']
 
-const statusColors: Record<string, string> = {
-  scheduled: '#a855f7', pending: '#f59e0b', assigned: '#3b82f6', picked_up: '#8b5cf6', processing: '#06b6d4',
-  ready: '#10b981', delivering: '#8b5cf6', delivered: '#10b981', cancelled: '#ef4444', refunded: '#f97316',
+const statusIcons: Record<string, typeof Clock> = {
+  scheduled: Clock, pending: Hourglass, assigned: Car, arrived: MapPin, picked_up: Package, processing: RefreshCw,
+  ready: CircleCheck, delivering: Bike, delivered: CircleCheck, cancelled: CircleX, refunded: Coins,
 }
 
-const statusIcons: Record<string, string> = {
-  scheduled: '🕐', pending: '⏳', assigned: '🚗', picked_up: '📦', processing: '🔄',
-  ready: '✅', delivering: '🛵', delivered: '🎉', cancelled: '❌', refunded: '💰',
+const serviceImages: Record<string, any> = {
+  wash: require('../../assets/services/wash.webp'),
+  dry_clean: require('../../assets/services/dry.webp'),
+  iron: require('../../assets/services/iron.webp'),
+  wash_iron: require('../../assets/services/washiron.webp'),
+  housekeeping: require('../../assets/services/home.webp'),
+  carpet: require('../../assets/services/carpet.webp'),
+  accessories: require('../../assets/services/shop.webp'),
 }
 
-function OrderProgress({ status, trackColor }: { status: string; trackColor: string }) {
+type Tone = 'info' | 'ok' | 'warn' | 'danger'
+function statusTone(status: string): Tone {
+  if (status === 'delivered') return 'ok'
+  if (status === 'cancelled') return 'danger'
+  if (status === 'refunded') return 'warn'
+  return 'info'
+}
+function toneColor(b: Brand, tone: Tone) {
+  if (tone === 'ok') return b.okText
+  if (tone === 'danger') return b.dangerText
+  if (tone === 'warn') return b.isDark ? '#FBBF24' : '#B45309'
+  return b.tintText
+}
+
+function OrderProgress({ status, b }: { status: string; b: Brand }) {
   if (status === 'cancelled' || status === 'delivered') return null
   const idx = statusFlow.indexOf(status)
   if (idx < 0) return null
-  const progress = ((idx + 1) / statusFlow.length) * 100
 
   return (
     <View style={prog.container}>
-      <View style={[prog.track, { backgroundColor: trackColor }]}>
-        <View style={[prog.fill, { width: `${progress}%`, backgroundColor: statusColors[status] ?? '#0ea5e9' }]} />
-      </View>
-      <Text style={[prog.label, { color: statusColors[status] }]}>
+      <Segments total={statusFlow.length} done={idx + 1} />
+      <Text style={[prog.label, { color: b.accentIcon }]}>
         {idx + 1}/{statusFlow.length}
       </Text>
     </View>
@@ -41,25 +60,23 @@ function OrderProgress({ status, trackColor }: { status: string; trackColor: str
 }
 
 const prog = StyleSheet.create({
-  container: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
-  track: { flex: 1, height: 4, borderRadius: 2, overflow: 'hidden' },
-  fill: { height: '100%', borderRadius: 2 },
-  label: { fontSize: 10, fontWeight: '700' },
+  container: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingTop: 2, paddingBottom: 12 },
+  label: { fontSize: 11, fontFamily: F.display },
 })
 
 type TabFilter = 'active' | 'completed'
 type DateRange = '7' | '14' | '30' | 'all'
 export default function OrdersScreen() {
   const { profile } = useAuth()
-  const { colors } = useTheme()
-  const { t } = useLanguage()
+  const b = useBrand()
+  const { t, locale } = useLanguage()
+  const isEn = locale === 'en'
   const dateRangeLabels: Record<DateRange, string> = { '7': t('last7Days'), '14': t('last14Days'), '30': t('last30Days'), all: t('allTime') }
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [tab, setTab] = useState<TabFilter>('active')
   const [dateRange, setDateRange] = useState<DateRange>('14')
-  const [showDatePicker, setShowDatePicker] = useState(false)
 
   const router = useRouter()
   const loadOrders = useCallback(async () => {
@@ -109,238 +126,180 @@ export default function OrdersScreen() {
   }
 
   const renderOrder = ({ item, index }: { item: any; index: number }) => {
-    const sColor = statusColors[item.status] ?? '#f59e0b'
-    const sIcon = statusIcons[item.status] ?? '⏳'
     const isActive = !['delivered', 'cancelled', 'refunded'].includes(item.status)
+    const tone = statusTone(item.status)
+    const StatusIcon = statusIcons[item.status] ?? Hourglass
+    const num = String(item.order_number ?? '').replace(/^#/, '')
+    const meta = [
+      serviceLabel[item.service_type] ?? item.service_type,
+      `${item.items_count ?? 0} ${t('pieces')}`,
+      shortDate(new Date(item.created_at), isEn),
+    ].filter(Boolean).join(' · ')
 
     return (
-      <Animated.View entering={FadeInRight.duration(400).delay(index * 60)}>
+      <Animated.View entering={FadeInRight.duration(400).delay(index * 60)} style={s.cardWrap}>
         <TouchableOpacity
-          style={[s.orderCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, isActive && { borderColor: colors.navy[600] }]}
-          activeOpacity={0.7}
+          activeOpacity={0.8}
           onPress={() => router.push(`/order/${item.id}`)}
+          accessibilityRole="button"
+          accessibilityLabel={`#${num}`}
         >
-          <View style={s.orderHeader}>
-            <View>
-              <Text style={[s.orderNumber, { color: colors.text }]}>{item.order_number}</Text>
-              <Text style={[s.orderDate, { color: colors.navy[400] }]}>
-                {new Date(item.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' })}
-              </Text>
-            </View>
-            <View style={[s.statusBadge, { backgroundColor: sColor + '18' }]}>
-              <Text style={{ fontSize: 12 }}>{sIcon}</Text>
-              <Text style={[s.statusText, { color: sColor }]}>{getStatusLabel(item.status)}</Text>
-            </View>
-          </View>
-
-          <OrderProgress status={item.status} trackColor={colors.navy[700]} />
-
-          <View style={[s.detailsRow, { borderTopColor: colors.navy[700] }]}>
-            <View style={s.detailItem}>
-              <Text style={[s.detailLabel, { color: colors.navy[400] }]}>{t('serviceType')}</Text>
-              <Text style={[s.detailValue, { color: colors.text }]}>{serviceLabel[item.service_type] ?? item.service_type}</Text>
-            </View>
-            <View style={s.detailItem}>
-              <Text style={[s.detailLabel, { color: colors.navy[400] }]}>{t('items')}</Text>
-              <Text style={[s.detailValue, { color: colors.text }]}>{item.items_count}</Text>
-            </View>
-            <View style={s.detailItem}>
-              <Text style={[s.detailLabel, { color: colors.navy[400] }]}>{t('total')}</Text>
-              <Text style={[s.detailValue, { color: colors.primary, fontWeight: '800' }]}>{item.total?.toFixed(2)} {t('currency')}</Text>
-            </View>
-          </View>
-
-          {item.status === 'cancelled' && item.cancellation_fee > 0 && (
-            <View style={[s.cancelFeeRow, { borderTopColor: colors.navy[700] }]}>
-              <Text style={s.cancelFeeText}>💰 {Number(item.cancellation_fee).toFixed(2)} {t('currency')}</Text>
-            </View>
-          )}
-
-          {item.driver?.name && (
-            <View style={[s.driverSection, { borderTopColor: colors.navy[700] }]}>
-              <View style={s.driverInfo}>
-                <View style={[s.driverAvatar, { backgroundColor: colors.accent + '30' }]}>
-                  <Text style={[s.driverAvatarText, { color: colors.accent }]}>{item.driver.name[0]}</Text>
-                </View>
-                <View>
-                  <Text style={[s.driverName, { color: colors.text }]}>{item.driver.name}</Text>
-                  {item.driver.phone && <Text style={[s.driverPhone, { color: colors.navy[300] }]}>{item.driver.phone}</Text>}
-                </View>
+          <Card pad={false}>
+            <View style={s.topRow}>
+              <Image source={serviceImages[item.service_type] ?? serviceImages.wash} style={s.thumb} />
+              <View style={s.topMeta}>
+                <Text style={[s.orderNumber, { color: b.ink }]} numberOfLines={1}>#{num}</Text>
+                <Text style={[s.metaLine, { color: b.muted }]} numberOfLines={1}>{meta}</Text>
               </View>
-              {isActive && (
+              <Pill label={getStatusLabel(item.status)} tone={tone} icon={<StatusIcon size={12} color={toneColor(b, tone)} />} />
+            </View>
+
+            <OrderProgress status={item.status} b={b} />
+
+            {item.status === 'cancelled' && item.cancellation_fee > 0 && (
+              <View style={[s.cancelFeeRow, { backgroundColor: b.dangerTint }]}>
+                <Coins size={14} color={b.dangerText} />
+                <Text style={[s.cancelFeeText, { color: b.dangerText }]}>{money(item.cancellation_fee)} {t('currency')}</Text>
+              </View>
+            )}
+
+            <Divider />
+            <View style={s.bottomRow}>
+              {item.driver?.name ? (
+                <View style={s.driverInfo}>
+                  <View style={[s.driverAvatar, { backgroundColor: b.isDark ? 'rgba(139,92,246,0.18)' : '#EDE9FE' }]}>
+                    <Text style={[s.driverAvatarText, { color: b.isDark ? '#A78BFA' : '#7C3AED' }]}>{item.driver.name[0]}</Text>
+                  </View>
+                  <View style={{ flexShrink: 1 }}>
+                    <Text style={[s.driverName, { color: b.ink2 }]} numberOfLines={1}>{item.driver.name}</Text>
+                    {item.driver.phone && <Text style={[s.driverPhone, { color: b.muted }]} numberOfLines={1}>{item.driver.phone}</Text>}
+                  </View>
+                </View>
+              ) : <View style={{ flex: 1 }} />}
+              {item.driver?.name && isActive && (
                 <View style={s.contactActions}>
-                  <TouchableOpacity style={[s.contactBtn, { backgroundColor: colors.navy[700], borderColor: colors.navy[600] }]} onPress={() => router.push(`/chat/${item.id}`)}>
-                    <MessageCircle size={16} color={colors.primary} />
-                  </TouchableOpacity>
+                  <IconButton onPress={() => router.push(`/chat/${item.id}`)} label={t('chatWithDriver').replace(/^\S+\s/, '')}>
+                    <MessageCircle size={17} color={b.accentIcon} />
+                  </IconButton>
                   {item.driver.phone && (
-                    <TouchableOpacity style={[s.contactBtn, { backgroundColor: colors.navy[700], borderColor: colors.navy[600] }]} onPress={() => Linking.openURL(`tel:${item.driver.phone}`)}>
-                      <Phone size={16} color={colors.accent} />
-                    </TouchableOpacity>
+                    <IconButton onPress={() => Linking.openURL(`tel:${item.driver.phone}`)} label={isEn ? 'Call driver' : 'اتصل بالسائق'}>
+                      <Phone size={17} color={b.accentIcon} />
+                    </IconButton>
                   )}
                 </View>
               )}
+              <Text style={[s.price, { color: b.primary }]} numberOfLines={1}>
+                {money(item.total)} <Text style={[s.currency, { color: b.muted }]}>{t('currency')}</Text>
+              </Text>
             </View>
-          )}
+          </Card>
         </TouchableOpacity>
       </Animated.View>
     )
   }
 
-  return (
-    <View style={[s.container, { backgroundColor: colors.navy[900] }]}>
-      <Animated.Text entering={FadeInDown.duration(500)} style={[s.title, { color: colors.text }]}>{t('myOrders')}</Animated.Text>
+  const header = (
+    <View style={s.header}>
+      <FlowLines height={260} />
+      <Animated.Text entering={FadeInDown.duration(500)} style={[s.title, { color: b.ink }]}>{t('myOrders')}</Animated.Text>
 
-      {/* Tab Filters */}
-      <View style={[s.tabRow, { backgroundColor: colors.navy[800], borderColor: colors.navy[700] }]}>
-        <TouchableOpacity
-          style={[s.tabBtn, tab === 'active' && { backgroundColor: colors.primary }]}
-          onPress={() => setTab('active')}
-        >
-          <Text style={[s.tabText, { color: tab === 'active' ? '#fff' : colors.navy[300] }]}>
-            {t('inProgress')} {activeCount > 0 ? `(${activeCount})` : ''}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[s.tabBtn, tab === 'completed' && { backgroundColor: colors.primary }]}
-          onPress={() => setTab('completed')}
-        >
-          <Text style={[s.tabText, { color: tab === 'completed' ? '#fff' : colors.navy[300] }]}>
-            {t('completedTab')} {completedCount > 0 ? `(${completedCount})` : ''}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <Segmented
+        value={tab}
+        onChange={k => setTab(k as TabFilter)}
+        items={[
+          { key: 'active', label: t('inProgress'), badge: activeCount > 0 ? activeCount : undefined },
+          { key: 'completed', label: t('completedTab'), badge: completedCount > 0 ? completedCount : undefined },
+        ]}
+      />
 
       {tab === 'completed' && (
-        <View style={{ marginBottom: 12, zIndex: 10 }}>
-          <TouchableOpacity
-            style={[s.dateFilterBtn, { backgroundColor: colors.navy[800], borderColor: colors.navy[700] }]}
-            onPress={() => setShowDatePicker(!showDatePicker)}>
-            <Text style={[s.dateFilterBtnText, { color: colors.navy[200] }]}>📅 {dateRangeLabels[dateRange]}</Text>
-            <Text style={{ fontSize: 10, color: colors.navy[400] }}>{showDatePicker ? '▲' : '▼'}</Text>
-          </TouchableOpacity>
-          {showDatePicker && (
-            <View style={[s.dateDropdown, { backgroundColor: colors.navy[800], borderColor: colors.navy[700] }]}>
-              {(Object.keys(dateRangeLabels) as DateRange[]).map(key => (
-                <TouchableOpacity key={key}
-                  style={[s.dateDropdownItem, { borderBottomColor: colors.navy[700] }, dateRange === key && { backgroundColor: colors.primary + '20' }]}
-                  onPress={() => { setDateRange(key); setShowDatePicker(false) }}>
-                  <Text style={[s.dateDropdownText, { color: colors.navy[200] }, dateRange === key && { color: colors.primary }]}>{dateRangeLabels[key]}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chips} style={s.chipsScroll}>
+          {(Object.keys(dateRangeLabels) as DateRange[]).map(key => (
+            <Chip key={key} label={dateRangeLabels[key]} active={dateRange === key} onPress={() => setDateRange(key)} />
+          ))}
+        </ScrollView>
       )}
+    </View>
+  )
 
-      {loading ? (
-        <View style={{ gap: 12 }}>
-          <SkeletonOrderCard />
-          <SkeletonOrderCard />
-          <SkeletonOrderCard />
+  const EmptyIcon = tab === 'active' ? CircleCheck : Package
+
+  const empty = loading ? (
+    <View style={[s.cardWrap, { gap: 12 }]}>
+      <SkeletonOrderCard />
+      <SkeletonOrderCard />
+      <SkeletonOrderCard />
+    </View>
+  ) : (
+    <Animated.View entering={FadeInDown.duration(500).delay(200)} style={s.cardWrap}>
+      <Card style={s.emptyCard}>
+        <View style={[s.emptyIcon, { backgroundColor: b.iconTile }]}>
+          <EmptyIcon size={30} color={b.accentIcon} />
         </View>
-      ) : filteredOrders.length === 0 ? (
-        <Animated.View entering={FadeInDown.duration(500).delay(200)} style={[s.emptyCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
-          <Text style={s.emptyIcon}>{tab === 'active' ? '✅' : '📦'}</Text>
-          <Text style={[s.emptyText, { color: colors.navy[200] }]}>
-            {tab === 'active' ? t('noActiveOrders') : t('noCompletedOrders')}
-          </Text>
-          {tab === 'active' && orders.length === 0 && (
-            <>
-              <Text style={[s.emptySubText, { color: colors.navy[400] }]}>{t('orderFirst')}</Text>
-              <TouchableOpacity style={[s.emptyBtn, { backgroundColor: colors.primary }]} onPress={() => router.push('/(tabs)/new-order')}>
-                <Text style={s.emptyBtnText}>{t('orderNow')}</Text>
-              </TouchableOpacity>
-            </>
-          )}
-        </Animated.View>
-      ) : (
-        <FlatList
-          data={filteredOrders}
-          renderItem={renderOrder}
-          keyExtractor={item => item.id}
-          contentContainerStyle={{ gap: 12, paddingBottom: 100 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
+        <Text style={[s.emptyText, { color: b.ink }]}>
+          {tab === 'active' ? t('noActiveOrders') : t('noCompletedOrders')}
+        </Text>
+        {tab === 'active' && orders.length === 0 && (
+          <>
+            <Text style={[s.emptySubText, { color: b.muted }]}>{t('orderFirst')}</Text>
+            <PrimaryButton title={t('orderNow')} onPress={() => router.push('/(tabs)/new-order')} style={s.emptyBtn} />
+          </>
+        )}
+      </Card>
+    </Animated.View>
+  )
+
+  const showList = !loading && filteredOrders.length > 0
+
+  return (
+    <View style={[s.container, { backgroundColor: b.page }]}>
+      <FlatList
+        data={showList ? filteredOrders : []}
+        renderItem={renderOrder}
+        keyExtractor={item => item.id}
+        ListHeaderComponent={header}
+        ListEmptyComponent={empty}
+        contentContainerStyle={{ gap: 10, paddingBottom: 100 }}
+        refreshControl={showList ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={b.primary} /> : undefined}
+        showsVerticalScrollIndicator={false}
+      />
     </View>
   )
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, padding: 20, paddingTop: 56 },
-  title: { fontSize: 24, fontWeight: '800', marginBottom: 16 },
-  tabRow: {
-    flexDirection: 'row', borderRadius: 14, padding: 4,
-    marginBottom: 16, borderWidth: 1,
-  },
-  tabBtn: {
-    flex: 1, paddingVertical: 10, borderRadius: 11,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  tabText: { fontSize: 13, fontWeight: '700' },
+  container: { flex: 1 },
+  header: { paddingTop: 56, paddingHorizontal: 16, paddingBottom: 2 },
+  title: { fontSize: 20, fontFamily: F.display, marginBottom: 12 },
+  chipsScroll: { marginTop: 10, marginHorizontal: -16 },
+  chips: { gap: 6, paddingHorizontal: 16 },
+  cardWrap: { paddingHorizontal: 16 },
 
-  orderCard: {
-    borderRadius: 20, padding: 18,
-    borderWidth: 1,
-  },
-  orderHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  orderNumber: { fontSize: 16, fontWeight: '800' },
-  orderDate: { fontSize: 11, marginTop: 2 },
-  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12 },
-  statusText: { fontSize: 11, fontWeight: '700' },
+  topRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 },
+  thumb: { width: 40, height: 40, borderRadius: 12 },
+  topMeta: { flex: 1, minWidth: 0 },
+  orderNumber: { fontSize: 15, fontFamily: F.display },
+  metaLine: { fontSize: 11.5, fontFamily: F.regular, marginTop: 1 },
 
-  detailsRow: {
-    flexDirection: 'row', marginTop: 14, paddingTop: 14,
-    borderTopWidth: 1,
-  },
-  detailItem: { flex: 1, alignItems: 'center' },
-  detailLabel: { fontSize: 11, marginBottom: 4 },
-  detailValue: { fontSize: 13, fontWeight: '600' },
-
-  driverSection: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    marginTop: 14, paddingTop: 14, borderTopWidth: 1,
-  },
-  driverInfo: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  driverAvatar: {
-    width: 36, height: 36, borderRadius: 18,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  driverAvatarText: { fontSize: 14, fontWeight: '700' },
-  driverName: { fontSize: 13, fontWeight: '600' },
-  driverPhone: { fontSize: 11 },
-  contactActions: { flexDirection: 'row', gap: 8 },
-  contactBtn: {
-    width: 38, height: 38, borderRadius: 12,
-    justifyContent: 'center', alignItems: 'center', borderWidth: 1,
-  },
+  bottomRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10 },
+  driverInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0 },
+  driverAvatar: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  driverAvatarText: { fontSize: 13, fontFamily: F.bold },
+  driverName: { fontSize: 12.5, fontFamily: F.semibold },
+  driverPhone: { fontSize: 11, fontFamily: F.regular, writingDirection: 'ltr', alignSelf: 'flex-start' },
+  contactActions: { flexDirection: 'row', gap: 6 },
+  price: { fontSize: 16, fontFamily: F.display, marginStart: 4 },
+  currency: { fontSize: 10.5, fontFamily: F.semibold },
 
   cancelFeeRow: {
-    marginTop: 10, paddingTop: 10, borderTopWidth: 1,
-    backgroundColor: '#ef444415', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    marginHorizontal: 12, marginBottom: 12, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8,
   },
-  cancelFeeText: { fontSize: 12, color: '#ef4444', fontWeight: '600', textAlign: 'center' },
+  cancelFeeText: { fontSize: 12, fontFamily: F.semibold },
 
-  emptyCard: {
-    borderRadius: 24, padding: 40,
-    alignItems: 'center', borderWidth: 1,
-  },
-  emptyIcon: { fontSize: 48, marginBottom: 12 },
-  emptyText: { fontSize: 16, fontWeight: '600' },
-  emptySubText: { fontSize: 13, marginTop: 6, textAlign: 'center' },
-  emptyBtn: {
-    paddingHorizontal: 28, paddingVertical: 12,
-    borderRadius: 14, marginTop: 20,
-  },
-  emptyBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-
-  dateFilterBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1,
-  },
-  dateFilterBtnText: { fontSize: 13, fontWeight: '600' },
-  dateDropdown: { borderRadius: 12, marginTop: 6, borderWidth: 1, overflow: 'hidden' },
-  dateDropdownItem: { paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: 1 },
-  dateDropdownText: { fontSize: 13, fontWeight: '600' },
+  emptyCard: { alignItems: 'center', paddingVertical: 32, paddingHorizontal: 20, marginTop: 4 },
+  emptyIcon: { width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
+  emptyText: { fontSize: 15, fontFamily: F.display, textAlign: 'center' },
+  emptySubText: { fontSize: 13, fontFamily: F.regular, marginTop: 6, textAlign: 'center' },
+  emptyBtn: { marginTop: 18, alignSelf: 'stretch' },
 })

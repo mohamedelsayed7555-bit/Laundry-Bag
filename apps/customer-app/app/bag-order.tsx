@@ -10,6 +10,10 @@ import { useLanguage } from '../src/contexts/LanguageContext'
 import { supabase } from '../src/lib/supabase'
 import { SkeletonPage } from '../src/components/Skeleton'
 import { serverErrorMessage } from '../src/lib/serverErrors'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { MapPin, Package, Truck, Plus, CreditCard, Banknote, Wallet, Landmark, Smartphone, ShoppingBag } from 'lucide-react-native'
+import { useBrand, Card, ChoiceGrid, StickyFooter, IconButton, BackIcon, SoftWaves, money, cardShadow, F, SIZE, HIT, type Choice } from '../src/components/brand'
+import { PrimaryButton } from '../src/components/auth/ui'
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!
 
@@ -26,6 +30,8 @@ export default function BagOrderScreen() {
   const router = useRouter()
   const { showAlert, AlertComponent } = useCustomAlert()
   const { t, locale } = useLanguage()
+  const b = useBrand()
+  const insets = useSafeAreaInsets()
 
   const [bagOffer, setBagOffer] = useState<any>(null)
   const [addresses, setAddresses] = useState<any[]>([])
@@ -151,199 +157,268 @@ export default function BagOrderScreen() {
   if (loading) return <SkeletonPage />
 
   if (!bagOffer) return (
-    <View style={[s.center, { backgroundColor: colors.navy[900] }]}>
-      <Text style={{ color: colors.navy[300], fontSize: 16 }}>{t('bagOfferUnavailable')}</Text>
+    <View style={[s.center, { backgroundColor: b.page }]}>
+      <Text style={{ color: b.muted, fontSize: 16, fontFamily: F.medium }}>{t('bagOfferUnavailable')}</Text>
     </View>
   )
 
   const discount = bagOffer.original_price > bagOffer.daily_price
     ? Math.round((1 - bagOffer.daily_price / bagOffer.original_price) * 100)
     : 0
+  const en = locale === 'en'
+  const rtl = I18nManager.isRTL
+  const payItems: Choice[] = PAYMENT_METHODS.map(pm => {
+    const c = paymentMethod === pm.key ? '#fff' : b.accentIcon
+    const Icon = pm.key === 'cash' ? Banknote : pm.key === 'visa' ? CreditCard : pm.key === 'instapay' ? Landmark : Wallet
+    return { key: pm.key, label: t(pm.labelKey), icon: <Icon size={15} color={c} /> }
+  })
+  const addrDetails = (a: any) => [a.building && `${t('bagBuilding')} ${a.building}`, a.floor && `${t('bagFloor')}${a.floor}`].filter(Boolean).join(' · ')
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.navy[900] }}>
+    <View style={{ flex: 1, backgroundColor: b.page }}>
       {AlertComponent}
-      <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}>
-        {/* Offer Card */}
-        <Animated.View entering={FadeInDown.duration(500)}>
-          <LinearGradient colors={['#1a2138', '#121829']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.offerCard, { borderWidth: 1, borderColor: colors.primary + '40' }]}>
-            <View style={s.offerBadges}>
-              <View style={[s.badge, { backgroundColor: colors.primary }]}><Text style={[s.badgeText, { color: '#fff' }]}>{t('bagBadge')}</Text></View>
-              {discount > 0 && <View style={s.discountBadge}><Text style={s.discountText}>-{discount}%</Text></View>}
+      <ScrollView
+        contentContainerStyle={[s.content, { paddingTop: insets.top + 12, paddingBottom: 120 + insets.bottom }]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={b.primary} colors={[b.primary]} />}
+      >
+        <SoftWaves height={520} crest={300} />
+
+        <View style={s.header}>
+          <IconButton onPress={() => router.back()} label={t('back')}>
+            <BackIcon color={b.ink} />
+          </IconButton>
+        </View>
+
+        {/* Offer hero: same look as the home banner */}
+        <Animated.View entering={FadeInDown.duration(500)} style={s.hero}>
+          <Image source={require('../assets/banners/bag.webp')} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          <LinearGradient
+            colors={['rgba(7,22,46,0.95)', 'rgba(7,22,46,0.75)', 'rgba(7,22,46,0.1)']}
+            locations={[0, 0.5, 1]}
+            start={{ x: rtl ? 1 : 0, y: 0 }}
+            end={{ x: rtl ? 0 : 1, y: 0 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={s.heroText}>
+            <View style={s.badges}>
+              <View style={s.badgeHot}><Text style={s.badgeHotText}>{t('bagBadge')}</Text></View>
+              {discount > 0 && <View style={s.badgeOff}><Text style={s.badgeOffText}>-{discount}%</Text></View>}
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.offerTitle}>{t('bagTitle')}</Text>
-                <Text style={s.offerSub}>{t('bagSubtitle')}</Text>
-                <View style={s.priceRow}>
-                  {discount > 0 && <Text style={s.oldPrice}>{bagOffer.original_price} {t('currency')}</Text>}
-                  <Text style={s.price}>{bagOffer.daily_price} {t('currency')}</Text>
-                  <Text style={s.perDay}>/ {t('bagPerDay')}</Text>
-                </View>
+            {en ? (
+              <Text style={s.brand} numberOfLines={1}>{t('bagTitle')}</Text>
+            ) : (
+              <View style={s.brandRow}>
+                <View style={s.prePill}><Text style={s.prePillText}>شنطة</Text></View>
+                <Text style={s.brand}>Laundry <Text style={s.brandAccent}>Bag</Text></Text>
               </View>
-              <Image source={require('../assets/logo.jpg')} style={{ width: 60, height: 60, borderRadius: 30, borderWidth: 2, borderColor: colors.primary + '60' }} resizeMode="contain" />
+            )}
+            <Text style={s.heroSub} numberOfLines={2}>{t('bagSubtitle')}</Text>
+            <View style={s.priceRow}>
+              <Text style={s.price}>{bagOffer.daily_price} <Text style={s.priceCur}>{t('currency')}</Text></Text>
+              {discount > 0 && <Text style={s.oldPrice}>{bagOffer.original_price}</Text>}
+              <Text style={s.perDay}>/ {t('bagPerDay')}</Text>
             </View>
-            <View style={s.infoRow}>
-              <Text style={s.infoText}>📦 {t('bagMaxItems')}: {bagOffer.max_items} {t('pieces')}</Text>
-              <Text style={s.infoText}>🚚 {t('bagFreeDelivery')}</Text>
+          </View>
+        </Animated.View>
+
+        {/* Max items + free delivery */}
+        <Animated.View entering={FadeInDown.duration(500).delay(80)} style={s.meta}>
+          <View style={[s.metaCard, { backgroundColor: b.card, borderColor: b.cardBorder }, cardShadow(b)]}>
+            <View style={[s.metaIcon, { backgroundColor: b.tint }]}><Package size={15} color={b.tintText} /></View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={[s.metaKey, { color: b.muted }]} numberOfLines={1}>{t('bagMaxItems')}</Text>
+              <Text style={[s.metaVal, { color: b.ink }]} numberOfLines={1}>{bagOffer.max_items} {t('pieces')}</Text>
             </View>
-          </LinearGradient>
+          </View>
+          <View style={[s.metaCard, { backgroundColor: b.card, borderColor: b.cardBorder }, cardShadow(b)]}>
+            <View style={[s.metaIcon, { backgroundColor: b.okTint }]}><Truck size={15} color={b.okText} /></View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={[s.metaKey, { color: b.muted }]} numberOfLines={1}>{t('deliveryFee')}</Text>
+              <Text style={[s.metaVal, { color: b.okText }]} numberOfLines={1}>{t('bagFreeDelivery')}</Text>
+            </View>
+          </View>
         </Animated.View>
 
         {/* Address */}
-        <Animated.View entering={FadeInDown.duration(500).delay(100)}>
-          <Text style={[s.sectionTitle, { color: colors.text }]}>📍 {t('deliveryAddress')}</Text>
+        <Animated.View entering={FadeInDown.duration(500).delay(140)}>
+          <View style={s.secRow}>
+            <View style={[s.secIcon, { backgroundColor: b.tint }]}><MapPin size={14} color={b.tintText} /></View>
+            <Text style={[s.sectionTitle, { color: b.ink }]}>{t('deliveryAddress')}</Text>
+          </View>
           {addresses.length === 0 ? (
-            <TouchableOpacity style={[s.addAddressBtn, { borderColor: colors.navy[600] }]} onPress={() => router.push('/addresses')}>
-              <Text style={{ color: colors.primary, fontWeight: '700' }}>+ {t('selectAddress')}</Text>
+            <TouchableOpacity style={[s.dashed, { borderColor: b.isDark ? 'rgba(56,189,248,0.35)' : '#BFDDF7' }]} onPress={() => router.push('/addresses')} accessibilityRole="button">
+              <Plus size={15} color={b.accentIcon} />
+              <Text style={[s.dashedText, { color: b.accentIcon }]}>{t('selectAddress')}</Text>
             </TouchableOpacity>
           ) : selectedAddress && !showAddressPicker ? (
-            <View style={[s.compactAddrCard, { backgroundColor: colors.cardBg, borderColor: colors.primary }]}>
-              <TouchableOpacity onPress={() => setShowAddressPicker(true)} style={[s.addrChangeBtn, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '40' }]}>
-                <Text style={[s.addrChangeBtnText, { color: colors.primary }]}>{locale === 'en' ? 'Change' : 'تغيير'}</Text>
-              </TouchableOpacity>
-              <View style={{ flex: 1 }}>
-                <Text style={[s.addressLabel, { color: colors.text }]}>{selectedAddress.label}</Text>
-                {(selectedAddress.building || selectedAddress.floor) && (
-                  <Text style={{ color: colors.navy[300], fontSize: 12, marginTop: 4 }}>{[selectedAddress.building && `${t('bagBuilding')} ${selectedAddress.building}`, selectedAddress.floor && `${t('bagFloor')}${selectedAddress.floor}`].filter(Boolean).join(' — ')}</Text>
-                )}
+            <Card pad={false} style={s.addrRow}>
+              <LinearGradient colors={['#38BDF8', '#0284C7']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.pinTile}>
+                <MapPin size={17} color="#fff" />
+              </LinearGradient>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={[s.addressLabel, { color: b.ink }]} numberOfLines={1}>{selectedAddress.label}</Text>
+                {(selectedAddress.building || selectedAddress.floor) ? <Text style={[s.addressDetail, { color: b.muted }]} numberOfLines={1}>{addrDetails(selectedAddress)}</Text> : null}
               </View>
-            </View>
-          ) : (
-            <View style={{ gap: 8 }}>
-              {addresses.map(addr => (
-                <TouchableOpacity key={addr.id} onPress={() => { setSelectedAddress(addr); setShowAddressPicker(false) }}
-                  style={[s.addressCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, selectedAddress?.id === addr.id && { borderColor: colors.primary, backgroundColor: colors.primary + '10' }]}>
-                  <Text style={[s.addressLabel, { color: colors.text }]}>{selectedAddress?.id === addr.id ? '✅' : '📍'} {addr.label}</Text>
-                  {addr.building && <Text style={{ color: colors.navy[400], fontSize: 11, marginTop: 4 }}>{t('bagBuilding')} {addr.building}{addr.floor ? ` — ${t('bagFloor')}${addr.floor}` : ''}</Text>}
-                </TouchableOpacity>
-              ))}
-              <TouchableOpacity style={[s.addAddressBtn, { borderColor: colors.primary }]} onPress={() => router.push('/addresses')}>
-                <Text style={{ color: colors.primary, fontWeight: '700' }}>+ {locale === 'en' ? 'Add new address' : 'إضافة عنوان جديد'}</Text>
+              <TouchableOpacity onPress={() => setShowAddressPicker(true)} hitSlop={HIT} accessibilityRole="button" style={[s.changeChip, { backgroundColor: b.tint, borderColor: b.tintBorder }]}>
+                <Text style={[s.changeChipText, { color: b.tintText }]}>{en ? 'Change' : 'تغيير'}</Text>
               </TouchableOpacity>
-            </View>
+            </Card>
+          ) : (
+            <Card pad={false} style={{ overflow: 'hidden' }}>
+              {addresses.map((addr, idx) => {
+                const on = selectedAddress?.id === addr.id
+                return (
+                  <TouchableOpacity
+                    key={addr.id}
+                    onPress={() => { setSelectedAddress(addr); setShowAddressPicker(false) }}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: on }}
+                    style={[s.pickRow, idx > 0 && { borderTopWidth: 1, borderTopColor: b.divider }, on && { backgroundColor: b.isDark ? 'rgba(14,165,233,0.08)' : '#F0F8FF' }]}
+                  >
+                    <View style={[s.radio, { borderColor: on ? b.primary : b.raisedBorder }, on && { borderWidth: 5 }]} />
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={[s.addressLabel, { color: b.ink }]} numberOfLines={1}>{addr.label}</Text>
+                      {addr.building ? <Text style={[s.addressDetail, { color: b.muted }]} numberOfLines={1}>{addrDetails(addr)}</Text> : null}
+                    </View>
+                  </TouchableOpacity>
+                )
+              })}
+              <TouchableOpacity style={[s.dashedRow, { borderTopColor: b.divider }]} onPress={() => router.push('/addresses')} accessibilityRole="button">
+                <Plus size={15} color={b.accentIcon} />
+                <Text style={[s.dashedText, { color: b.accentIcon }]}>{en ? 'Add new address' : 'إضافة عنوان جديد'}</Text>
+              </TouchableOpacity>
+            </Card>
           )}
         </Animated.View>
 
         {/* Payment */}
         <Animated.View entering={FadeInDown.duration(500).delay(200)}>
-          <Text style={[s.sectionTitle, { color: colors.text }]}>💳 {t('paymentMethod')}</Text>
-          <View style={s.paymentScrollWrap}>
-            <ScrollView horizontal nestedScrollEnabled={true} showsHorizontalScrollIndicator={false} contentContainerStyle={s.paymentChipsRow}
-              ref={bagPayScrollRef}
-            >
-              {PAYMENT_METHODS.map(pm => (
-                <TouchableOpacity key={pm.key} onPress={() => setPaymentMethod(pm.key)}
-                  style={[s.paymentChip, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, paymentMethod === pm.key && { borderColor: colors.primary, backgroundColor: colors.primary + '10' }]}>
-                  <Text style={{ fontSize: 18 }}>{pm.icon}</Text>
-                  <Text style={[s.paymentChipLabel, { color: colors.navy[300] }, paymentMethod === pm.key && { color: colors.primary }]}>{t(pm.labelKey)}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <View style={[s.scrollArrow, I18nManager.isRTL ? { left: 0 } : { right: 0 }]}>
-              <Text style={[s.scrollArrowText, { color: colors.primary }]}>{I18nManager.isRTL ? '‹' : '›'}</Text>
-            </View>
+          <View style={s.secRow}>
+            <View style={[s.secIcon, { backgroundColor: b.tint }]}><CreditCard size={14} color={b.tintText} /></View>
+            <Text style={[s.sectionTitle, { color: b.ink }]}>{t('paymentMethod')}</Text>
           </View>
+          <ChoiceGrid items={payItems} value={paymentMethod} onChange={setPaymentMethod} />
 
           {paymentMethod === 'e_wallet' && (
-            <View style={[s.paymentInfoCard, { backgroundColor: colors.cardBg, borderColor: colors.primary + '30' }]}>
-              <Text style={[s.paymentInfoTitle, { color: colors.text }]}>📱 {t('enterWalletPhone')}</Text>
-              <TextInput
-                style={[s.walletInput, { color: colors.text, borderColor: colors.navy[600], backgroundColor: colors.navy[800] }]}
-                placeholder="01xxxxxxxxx"
-                placeholderTextColor={colors.navy[400]}
-                value={walletPhone}
-                onChangeText={setWalletPhone}
-                keyboardType="phone-pad"
-                maxLength={11}
-              />
-            </View>
+            <Card style={{ marginTop: 10 }}>
+              <Text style={[s.infoTitle, { color: b.ink }]}>{t('enterWalletPhone').replace(/^\S+\s/, '')}</Text>
+              <View style={[s.field, { backgroundColor: b.field, borderColor: b.fieldBorder }]}>
+                <View style={[s.fieldIcon, { backgroundColor: b.iconTile }]}><Smartphone size={15} color={b.accentIcon} /></View>
+                <TextInput
+                  style={[s.fieldInput, { color: b.ink }]}
+                  placeholder="01xxxxxxxxx"
+                  placeholderTextColor={b.faint}
+                  value={walletPhone}
+                  onChangeText={setWalletPhone}
+                  keyboardType="phone-pad"
+                  maxLength={11}
+                  textAlign="left"
+                />
+              </View>
+            </Card>
           )}
 
           {paymentMethod === 'instapay' && paymentSettings.instapay && (
-            <View style={[s.paymentInfoCard, { backgroundColor: colors.cardBg, borderColor: colors.primary + '30' }]}>
-              <Text style={[s.paymentInfoTitle, { color: colors.text }]}>🏦 {t('bagInstapayTitle')}</Text>
-              <Text style={[s.paymentInfoNumber, { color: colors.primary }]} selectable>{paymentSettings.instapay}</Text>
-              <Text style={[s.paymentInfoHint, { color: colors.navy[300] }]}>{t('bagInstapayHint')}</Text>
+            <View style={[s.infoCard, { backgroundColor: b.tint, borderColor: b.tintBorder }]}>
+              <Text style={[s.infoTitle, { color: b.ink, textAlign: 'center' }]}>{t('bagInstapayTitle')}</Text>
+              <Text style={[s.instaNumber, { color: b.tintText }]} selectable>{paymentSettings.instapay}</Text>
+              <Text style={[s.infoHint, { color: b.muted }]}>{t('bagInstapayHint')}</Text>
             </View>
           )}
         </Animated.View>
 
-        {/* Summary + Order Button */}
-        <Animated.View entering={FadeInDown.duration(500).delay(300)}>
-          <View style={[s.summaryCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
+        {/* Receipt */}
+        <Animated.View entering={FadeInDown.duration(500).delay(260)}>
+          <Card style={{ marginTop: 14 }}>
             <View style={s.summaryRow}>
-              <Text style={{ color: colors.navy[300], fontSize: 14 }}>{t('bagPrice')}</Text>
-              <Text style={{ color: colors.text, fontSize: 14, fontWeight: '700' }}>{bagOffer.daily_price} {t('currency')}</Text>
+              <Text style={[s.sumKey, { color: b.muted }]}>{t('bagPrice')}</Text>
+              <Text style={[s.sumVal, { color: b.ink2 }]}>{money(bagOffer.daily_price)} {t('currency')}</Text>
             </View>
             <View style={s.summaryRow}>
-              <Text style={{ color: colors.navy[300], fontSize: 14 }}>{t('deliveryFee')}</Text>
-              <Text style={{ color: colors.primary, fontSize: 14, fontWeight: '700' }}>{t('bagFree')}</Text>
+              <Text style={[s.sumKey, { color: b.muted }]}>{t('deliveryFee')}</Text>
+              <Text style={[s.sumVal, { color: b.okText }]}>{t('bagFree')}</Text>
             </View>
-            <View style={[s.summaryDivider, { backgroundColor: colors.navy[700] }]} />
-            <View style={s.summaryRow}>
-              <Text style={{ color: colors.text, fontSize: 16, fontWeight: '800' }}>{t('total')}</Text>
-              <Text style={{ color: colors.primary, fontSize: 20, fontWeight: '900' }}>{bagOffer.daily_price} {t('currency')}</Text>
+            <View style={[s.summaryRow, s.totalLine, { borderTopColor: b.raisedBorder }]}>
+              <Text style={[s.totalKey, { color: b.ink }]}>{t('total')}</Text>
+              <Text style={[s.totalVal, { color: b.isDark ? '#38BDF8' : '#0284C7' }]}>{money(bagOffer.daily_price)} <Text style={[s.totalCur, { color: b.muted }]}>{t('currency')}</Text></Text>
             </View>
-          </View>
-
-          <TouchableOpacity onPress={handleOrder} disabled={saving || !selectedAddress} activeOpacity={0.85} style={{ marginTop: 16 }}>
-            <LinearGradient colors={[colors.primary, colors.primaryDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={[s.orderBtn, { opacity: saving || !selectedAddress ? 0.5 : 1 }]}>
-              {saving ? <ActivityIndicator color="#fff" /> : (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Text style={s.orderBtnText}>{t('bagOrderNow')}</Text>
-                  <Text style={{ fontSize: 20 }}>👜</Text>
-                </View>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
+          </Card>
         </Animated.View>
-
-        <View style={{ height: 40 }} />
       </ScrollView>
+
+      <StickyFooter label={t('total')} total={money(bagOffer.daily_price)} currency={t('currency')} bottomInset={insets.bottom}>
+        <PrimaryButton
+          title={t('bagOrderNow')}
+          onPress={handleOrder}
+          loading={saving}
+          disabled={!selectedAddress}
+          leading={<ShoppingBag size={18} color="#fff" />}
+        />
+      </StickyFooter>
     </View>
   )
 }
 
 const s = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  content: { padding: 20, paddingTop: 56 },
-  offerCard: { borderRadius: 24, padding: 20, marginBottom: 24 },
-  offerBadges: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  badge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20 },
-  badgeText: { fontSize: 11, fontWeight: '800' },
-  discountBadge: { backgroundColor: '#ef4444', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
-  discountText: { color: '#fff', fontSize: 11, fontWeight: '800' },
-  offerTitle: { color: '#fff', fontSize: 22, fontWeight: '800', marginBottom: 4 },
-  offerSub: { color: 'rgba(255,255,255,0.7)', fontSize: 13, marginBottom: 12, lineHeight: 20 },
-  priceRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  oldPrice: { color: 'rgba(255,255,255,0.4)', fontSize: 14, textDecorationLine: 'line-through' },
-  price: { color: '#fff', fontSize: 26, fontWeight: '900' },
-  perDay: { color: 'rgba(255,255,255,0.6)', fontSize: 12 },
-  infoRow: { flexDirection: 'row', gap: 16, marginTop: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.15)' },
-  infoText: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '600' },
-  sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 12, marginTop: 24 },
-  addAddressBtn: { borderWidth: 1.5, borderStyle: 'dashed', borderRadius: 16, padding: 16, alignItems: 'center' },
-  compactAddrCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, padding: 12, borderWidth: 1.5, gap: 12 },
-  addrChangeBtn: { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1.5 },
-  addrChangeBtnText: { fontSize: 13, fontWeight: '700' },
-  addressCard: { borderRadius: 12, padding: 12, borderWidth: 1.5 },
-  addressLabel: { fontSize: 14, fontWeight: '600' },
-  paymentScrollWrap: { position: 'relative' },
-  paymentChipsRow: { gap: 8, paddingVertical: 4, paddingEnd: 24 },
-  scrollArrow: { position: 'absolute', top: 0, bottom: 0, justifyContent: 'center', zIndex: 10 },
-  scrollArrowText: { fontSize: 24, fontWeight: '900' },
-  paymentChip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1.5 },
-  paymentChipLabel: { fontSize: 12, fontWeight: '600' },
-  paymentInfoCard: { borderRadius: 16, padding: 16, marginTop: 12, borderWidth: 1 },
-  paymentInfoTitle: { fontSize: 14, fontWeight: '700', marginBottom: 8 },
-  paymentInfoNumber: { fontSize: 22, fontWeight: 'bold', textAlign: 'center', marginBottom: 8, letterSpacing: 2 },
-  paymentInfoHint: { fontSize: 11, textAlign: 'center', marginTop: 8 },
-  walletInput: { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 18, textAlign: 'center', fontWeight: '700', letterSpacing: 2 },
-  summaryCard: { borderRadius: 18, padding: 18, marginTop: 16, borderWidth: 1 },
-  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6 },
-  summaryDivider: { height: 1, marginVertical: 8 },
-  orderBtn: { borderRadius: 18, padding: 18, alignItems: 'center' },
-  orderBtnText: { color: '#fff', fontSize: 17, fontWeight: '800' },
+  content: { paddingHorizontal: 16 },
+  header: { flexDirection: 'row', marginBottom: 12 },
+  hero: { height: 184, borderRadius: 20, overflow: 'hidden', backgroundColor: '#0F1A2E' },
+  heroText: { position: 'absolute', top: 0, bottom: 0, start: 0, width: '76%', paddingHorizontal: 16, justifyContent: 'center', alignItems: 'flex-start' },
+  badges: { flexDirection: 'row', gap: 5, marginBottom: 6 },
+  badgeHot: { backgroundColor: '#F59E0B', paddingHorizontal: 9, height: 21, justifyContent: 'center', borderRadius: 11 },
+  badgeHotText: { color: '#3A2300', fontSize: 11, fontFamily: F.bold },
+  badgeOff: { backgroundColor: '#EF4444', paddingHorizontal: 9, height: 21, justifyContent: 'center', borderRadius: 11 },
+  badgeOffText: { color: '#fff', fontSize: 11, fontFamily: F.bold },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  prePill: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.45)', borderRadius: 8, paddingHorizontal: 7, height: 22, justifyContent: 'center' },
+  prePillText: { color: '#fff', fontSize: 11.5, fontFamily: F.bold },
+  brand: { color: '#fff', fontFamily: F.display, fontSize: 22, writingDirection: 'ltr' },
+  brandAccent: { color: '#7DD3FC' },
+  heroSub: { color: 'rgba(255,255,255,0.88)', fontSize: 12.5, fontFamily: F.regular, marginTop: 3, lineHeight: 19 },
+  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 6 },
+  price: { color: '#FCD34D', fontSize: 23, fontFamily: F.display },
+  priceCur: { fontSize: 12, fontFamily: F.semibold },
+  oldPrice: { color: 'rgba(255,255,255,0.6)', fontSize: 13, textDecorationLine: 'line-through', fontFamily: F.regular },
+  perDay: { color: 'rgba(255,255,255,0.82)', fontSize: 12, fontFamily: F.regular },
+
+  meta: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  metaCard: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, padding: 9, borderRadius: 14, borderWidth: 1 },
+  metaIcon: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  metaKey: { fontSize: 10.5, fontFamily: F.medium },
+  metaVal: { fontSize: 13, fontFamily: F.bold },
+
+  secRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 20, marginBottom: 9, marginHorizontal: 2 },
+  secIcon: { width: 24, height: 24, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  sectionTitle: { fontSize: 15, fontFamily: F.display },
+
+  dashed: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: SIZE.M, borderRadius: SIZE.rM, borderWidth: 1.5, borderStyle: 'dashed' },
+  dashedRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: SIZE.M, borderTopWidth: 1 },
+  dashedText: { fontSize: 13, fontFamily: F.bold },
+  addrRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10 },
+  pinTile: { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  addressLabel: { fontSize: 14, fontFamily: F.bold },
+  addressDetail: { fontSize: 11.5, fontFamily: F.regular, marginTop: 1 },
+  changeChip: { height: SIZE.S - 4, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  changeChipText: { fontSize: 12, fontFamily: F.bold },
+  pickRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: SIZE.M + 6, paddingHorizontal: 12, paddingVertical: 8 },
+  radio: { width: 18, height: 18, borderRadius: 9, borderWidth: 1.5, backgroundColor: '#fff' },
+
+  infoCard: { borderRadius: 14, borderWidth: 1, padding: 12, marginTop: 10, gap: 4 },
+  infoTitle: { fontSize: 13, fontFamily: F.bold, marginBottom: 8 },
+  instaNumber: { fontSize: 22, fontFamily: F.display, textAlign: 'center', letterSpacing: 1.5 },
+  infoHint: { fontSize: 11.5, fontFamily: F.regular, textAlign: 'center' },
+  field: { flexDirection: 'row', alignItems: 'center', gap: 9, height: SIZE.L, borderRadius: 13, borderWidth: 1, paddingHorizontal: 10 },
+  fieldIcon: { width: 28, height: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  fieldInput: { flex: 1, fontSize: 15, fontFamily: F.medium, paddingVertical: 0, letterSpacing: 1 },
+
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 },
+  sumKey: { fontSize: 13, fontFamily: F.regular },
+  sumVal: { fontSize: 13.5, fontFamily: F.semibold },
+  totalLine: { borderTopWidth: 1.5, borderStyle: 'dashed', paddingTop: 10, marginTop: 6 },
+  totalKey: { fontSize: 14.5, fontFamily: F.bold },
+  totalVal: { fontSize: 21, fontFamily: F.display },
+  totalCur: { fontSize: 11, fontFamily: F.semibold },
 })

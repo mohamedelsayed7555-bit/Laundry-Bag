@@ -1,11 +1,13 @@
 import { useEffect, useState, useCallback } from 'react'
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Vibration } from 'react-native'
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Vibration, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
+import { LinearGradient } from 'expo-linear-gradient'
+import { MessageCircle } from 'lucide-react-native'
 import { useAuth } from '../../src/contexts/AuthContext'
-import { useTheme } from '../../src/contexts/ThemeContext'
 import { useLanguage } from '../../src/contexts/LanguageContext'
 import { supabase } from '../../src/lib/supabase'
-import { playNotificationSound, sendLocalNotification } from '../../src/hooks/useNotifications'
+import { notifyMessage } from '../../src/hooks/useNotifications'
+import { useBrand, Card, F, clock, shortDate } from '../../src/components/brand'
 
 type Conversation = {
   order_id: string
@@ -17,10 +19,13 @@ type Conversation = {
   order_number: string
 }
 
+const AVATAR = 46
+
 export default function MessagesScreen() {
   const { profile } = useAuth()
-  const { colors } = useTheme()
-  const { t } = useLanguage()
+  const b = useBrand()
+  const { t, locale } = useLanguage()
+  const isEn = locale === 'en'
   const router = useRouter()
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [loading, setLoading] = useState(true)
@@ -48,98 +53,117 @@ export default function MessagesScreen() {
     if (!profile) return
     const channel = supabase
       .channel('user-messages')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${profile.id}` }, (payload) => { playNotificationSound('order-update'); Vibration.vibrate(300); sendLocalNotification(t('newMessage'), (payload.new as any).body ?? '', 'messages'); load() })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${profile.id}` }, (payload) => { notifyMessage(payload.new as any, t('newMessage')); load() })
       .subscribe((status, err) => {
         if (err) console.warn('user-messages realtime error:', err.message)
       })
     return () => { supabase.removeChannel(channel) }
   }, [profile, load])
 
+  const timeLabel = (dateStr: string) => {
+    const d = new Date(dateStr)
+    if (Number.isNaN(d.getTime())) return ''
+    const today = new Date()
+    const yesterday = new Date()
+    yesterday.setDate(today.getDate() - 1)
+    if (d.toDateString() === today.toDateString()) return clock(d, isEn)
+    if (d.toDateString() === yesterday.toDateString()) return t('chatYesterday')
+    return shortDate(d, isEn)
+  }
+
   return (
-    <View style={[s.container, { backgroundColor: colors.navy[900] }]}>
-      <Text style={[s.title, { color: colors.text }]}>{t('messages')}</Text>
+    <View style={[s.container, { backgroundColor: b.page }]}>
+      <Text style={[s.title, { color: b.ink }]}>{t('messages')}</Text>
 
       {loading ? (
-        <Text style={[s.emptyText, { color: colors.navy[300] }]}>{t('loading')}</Text>
+        <View style={s.loading}>
+          <ActivityIndicator color={b.primary} />
+          <Text style={[s.emptyText, { color: b.muted }]}>{t('loading')}</Text>
+        </View>
       ) : conversations.length === 0 ? (
-        <View style={[s.emptyCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
-          <Text style={s.emptyIcon}>💬</Text>
-          <Text style={[s.emptyText, { color: colors.navy[300] }]}>{t('noMessages')}</Text>
+        <View style={s.pad}>
+          <Card style={s.emptyCard}>
+            <View style={[s.emptyIcon, { backgroundColor: b.iconTile }]}>
+              <MessageCircle size={30} color={b.accentIcon} />
+            </View>
+            <Text style={[s.emptyText, { color: b.muted }]}>{t('noMessages')}</Text>
+          </Card>
         </View>
       ) : (
         <FlatList
           data={conversations}
           keyExtractor={i => i.order_id}
-          contentContainerStyle={{ gap: 8, paddingBottom: 100 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={colors.primary} />}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[s.convoCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, item.unread > 0 && { backgroundColor: colors.navy[700], borderColor: colors.primary + '40' }]}
-              onPress={() => router.push(`/chat/${item.order_id}`)}
-            >
-              <View style={[s.avatar, { backgroundColor: colors.primary + '25' }]}>
-                <Text style={[s.avatarText, { color: colors.primary }]}>{item.other_name[0] ?? '?'}</Text>
-              </View>
-              <View style={s.convoContent}>
-                <View style={s.convoHeader}>
-                  <Text style={[s.convoName, { color: colors.navy[100] }, item.unread > 0 && { color: colors.text }]}>{item.other_name}</Text>
-                  <Text style={[s.convoTime, { color: colors.navy[400] }]}>{timeAgo(item.last_time)}</Text>
+          contentContainerStyle={{ paddingBottom: 100 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={b.primary} />}
+          ItemSeparatorComponent={() => <View style={[s.sep, { backgroundColor: b.divider }]} />}
+          renderItem={({ item }) => {
+            const unread = item.unread > 0
+            const num = String(item.order_number || item.order_id.slice(0, 8)).replace(/^#/, '')
+            return (
+              <TouchableOpacity
+                style={s.row}
+                activeOpacity={0.7}
+                onPress={() => router.push(`/chat/${item.order_id}`)}
+                accessibilityRole="button"
+                accessibilityLabel={item.other_name}
+              >
+                <LinearGradient colors={['#38BDF8', '#0284C7']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.avatar}>
+                  <Text style={s.avatarText}>{item.other_name?.[0] ?? '?'}</Text>
+                </LinearGradient>
+                <View style={s.content}>
+                  <View style={s.line}>
+                    <Text style={[s.name, { color: b.ink, fontFamily: unread ? F.bold : F.semibold }]} numberOfLines={1}>{item.other_name}</Text>
+                    <Text style={[s.time, unread ? { color: b.primary, fontFamily: F.bold } : { color: b.faint }]}>{timeLabel(item.last_time)}</Text>
+                  </View>
+                  <View style={[s.line, { marginTop: 3 }]}>
+                    <View style={s.lastRow}>
+                      <View style={[s.orderChip, { backgroundColor: b.tint }]}>
+                        <Text style={[s.orderChipText, { color: b.tintText }]}>{t('order') || 'طلب'} #{num}</Text>
+                      </View>
+                      <Text
+                        style={[s.lastMsg, unread ? { color: b.ink2, fontFamily: F.semibold } : { color: b.muted }]}
+                        numberOfLines={1}
+                      >
+                        {item.last_message}
+                      </Text>
+                    </View>
+                    {unread && (
+                      <View style={[s.badge, { backgroundColor: b.primary }]}><Text style={s.badgeText}>{item.unread}</Text></View>
+                    )}
+                  </View>
                 </View>
-                <Text style={[s.convoOrderId, { color: colors.navy[400] }]}>{t('order') || 'طلب'} #{item.order_number || item.order_id.slice(0, 8)}</Text>
-                <Text style={[s.convoLastMsg, { color: colors.navy[300] }, item.unread > 0 && { color: colors.navy[100] }]} numberOfLines={1}>{item.last_message}</Text>
-              </View>
-              {item.unread > 0 && (
-                <View style={[s.badge, { backgroundColor: colors.primary }]}><Text style={s.badgeText}>{item.unread}</Text></View>
-              )}
-            </TouchableOpacity>
-          )}
+              </TouchableOpacity>
+            )
+          }}
         />
       )}
     </View>
   )
 }
 
-function timeAgo(dateStr: string): string {
-  const d = new Date(dateStr)
-  const diff = Date.now() - d.getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'now'
-  if (mins < 60) return `${mins}m`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h`
-  const time = d.toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit', hour12: true })
-  const days = Math.floor(hours / 24)
-  if (days < 7) return `${days}d · ${time}`
-  return d.toLocaleDateString('en', { month: 'short', day: 'numeric' }) + ` · ${time}`
-}
-
 const s = StyleSheet.create({
-  container: { flex: 1, padding: 20, paddingTop: 56 },
-  title: { fontSize: 24, fontWeight: '800', marginBottom: 20 },
-  emptyCard: {
-    borderRadius: 20, padding: 40,
-    alignItems: 'center', borderWidth: 1,
-  },
-  emptyIcon: { fontSize: 40, marginBottom: 12 },
-  emptyText: { fontSize: 15, textAlign: 'center' },
-  convoCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    borderRadius: 16, padding: 14, borderWidth: 1,
-  },
-  avatar: {
-    width: 48, height: 48, borderRadius: 24,
-    justifyContent: 'center', alignItems: 'center', marginLeft: 12,
-  },
-  avatarText: { fontSize: 18, fontWeight: '700' },
-  convoContent: { flex: 1 },
-  convoHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  convoName: { fontSize: 15, fontWeight: '700' },
-  convoTime: { fontSize: 10 },
-  convoOrderId: { fontSize: 11, marginTop: 2 },
-  convoLastMsg: { fontSize: 13, marginTop: 2 },
+  container: { flex: 1, paddingTop: 56 },
+  title: { fontSize: 20, fontFamily: F.display, paddingHorizontal: 16, marginBottom: 8 },
+  pad: { paddingHorizontal: 16, paddingTop: 8 },
+  loading: { alignItems: 'center', gap: 10, paddingTop: 40 },
+  emptyCard: { alignItems: 'center', paddingVertical: 32, paddingHorizontal: 20 },
+  emptyIcon: { width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  emptyText: { fontSize: 14, fontFamily: F.medium, textAlign: 'center' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingHorizontal: 16, paddingVertical: 11 },
+  sep: { height: StyleSheet.hairlineWidth * 2, marginStart: 16 + AVATAR + 11, marginEnd: 16 },
+  avatar: { width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: '#fff', fontSize: 17, fontFamily: F.display },
+  content: { flex: 1, minWidth: 0 },
+  line: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  name: { flex: 1, fontSize: 14.5 },
+  time: { fontSize: 11, fontFamily: F.regular },
+  lastRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 },
+  orderChip: { borderRadius: 7, paddingHorizontal: 6, paddingVertical: 1 },
+  orderChipText: { fontSize: 10.5, fontFamily: F.bold },
+  lastMsg: { flex: 1, fontSize: 12.5, fontFamily: F.regular },
   badge: {
     borderRadius: 10, minWidth: 20, height: 20,
-    justifyContent: 'center', alignItems: 'center', paddingHorizontal: 6, marginRight: 4,
+    justifyContent: 'center', alignItems: 'center', paddingHorizontal: 6,
   },
-  badgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  badgeText: { color: '#fff', fontSize: 11, fontFamily: F.bold },
 })

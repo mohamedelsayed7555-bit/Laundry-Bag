@@ -182,7 +182,7 @@ export default function OrdersPage() {
       if (customer?.fcm_token) {
         fetch('https://exp.host/--/api/v2/push/send', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ to: customer.fcm_token, title, body, sound: 'default', data: { type: 'order_update', order_id: orderId, status: newStatus } }),
+          body: JSON.stringify({ to: customer.fcm_token, title, body, sound: 'order_update.wav', channelId: 'order-updates-v2', priority: 'high', data: { type: 'order_update', order_id: orderId, status: newStatus } }),
         }).catch(() => {})
       }
     } catch {}

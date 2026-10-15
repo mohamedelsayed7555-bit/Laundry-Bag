@@ -181,7 +181,8 @@ export default function SubscriptionsPage() {
             to: userData.fcm_token,
             title: notifTitle,
             body: notifBody,
-            sound: 'default',
+            sound: 'order_update.wav',
+            channelId: 'order-updates-v2',
             data: { type: 'subscription' },
           }),
         }).catch(() => {})
@@ -269,7 +270,8 @@ export default function SubscriptionsPage() {
           to: userData.fcm_token,
           title: 'تم تفعيل اشتراكك ✅',
           body: `تم قبول وتفعيل اشتراكك في باقة ${planName}. يمكنك الآن إنشاء طلباتك.`,
-          sound: 'default',
+          sound: 'order_update.wav',
+          channelId: 'order-updates-v2',
           data: { type: 'subscription', subscription_id: sub.id },
         }),
       }).catch(() => {})

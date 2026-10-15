@@ -1,7 +1,6 @@
 import { useEffect } from 'react'
-import { Vibration } from 'react-native'
 import { supabase } from '../lib/supabase'
-import { sendLocalNotification, playNotificationSound } from './useNotifications'
+import { notifyOrderStatus } from './useNotifications'
 
 const statusMessages: Record<string, string> = {
   assigned: 'تم تعيين سائق لطلبك',
@@ -34,9 +33,8 @@ export function useRealtimeOrders(userId: string | undefined, onUpdate: () => vo
           const orderNumber = payload.new.order_number as string
           const message = statusMessages[newStatus]
           if (message) {
-            sendLocalNotification(`طلب ${orderNumber}`, message, 'order-updates')
-            playNotificationSound('order-update')
-            Vibration.vibrate(400)
+            // Home and Orders both listen; notifyOrderStatus shows it once (sound + vibration come from the channel).
+            notifyOrderStatus(payload.new.id as string, newStatus, `طلب ${orderNumber}`, message)
           }
           onUpdate()
         }

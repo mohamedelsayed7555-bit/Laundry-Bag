@@ -1,8 +1,13 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, RefreshControl, Modal, TextInput, Dimensions, NativeScrollEvent, NativeSyntheticEvent, I18nManager, AppState } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, RefreshControl, Modal, TextInput, Dimensions, NativeScrollEvent, NativeSyntheticEvent, I18nManager, AppState, Linking } from 'react-native'
 import { useRouter } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
 import Animated, { FadeInLeft, FadeInRight } from 'react-native-reanimated'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import {
+  ShoppingBag, Bell, MapPin, ChevronDown, Phone, Truck, Clock3, CircleCheck, CircleX, Package, WashingMachine,
+  Sparkles, ArrowUpLeft, ArrowUpRight, ClipboardList,
+} from 'lucide-react-native'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { useTheme } from '../../src/contexts/ThemeContext'
 import { useLanguage } from '../../src/contexts/LanguageContext'
@@ -11,20 +16,73 @@ import { SkeletonOrderCard } from '../../src/components/Skeleton'
 import { useRealtimeOrders } from '../../src/hooks/useRealtimeOrders'
 import { useCart } from '../../src/contexts/CartContext'
 import WelcomeGiftPopup from '../../src/components/WelcomeGiftPopup'
-
-const statusIcons: Record<string, string> = {
-  pending: '⏳', assigned: '🚗', picked_up: '📦', processing: '🔄',
-  ready: '✅', delivering: '🛵', delivered: '🎉', cancelled: '❌',
-}
-
-const statusColors: Record<string, string> = {
-  pending: '#f59e0b', assigned: '#3b82f6', picked_up: '#8b5cf6', processing: '#06b6d4',
-  ready: '#10b981', delivering: '#8b5cf6', delivered: '#10b981', cancelled: '#ef4444',
-}
+import {
+  useBrand, SIZE, F, HIT, DotsBackdrop, SectionTitle, Segments, Pill, IconButton, ForwardChevron, ForwardIcon,
+  cardShadow, money, shortDate,
+} from '../../src/components/brand'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
-const BANNER_WIDTH = SCREEN_WIDTH - 40
-const SERVICE_CARD_WIDTH = (SCREEN_WIDTH - 40 - 20) / 3
+const BANNER_WIDTH = SCREEN_WIDTH - 32
+const BANNER_HEIGHT = 140
+const TILE_WIDTH = (SCREEN_WIDTH - 32 - 10) / 2
+
+const STATUS_FLOW = ['pending', 'assigned', 'arrived', 'picked_up', 'processing', 'ready', 'delivering', 'delivered']
+const ACTIVE_STATUSES = ['scheduled', 'pending', 'assigned', 'arrived', 'picked_up', 'processing', 'ready', 'delivering']
+
+const SERVICE_IMAGES: Record<string, any> = {
+  wash: require('../../assets/services/wash.webp'),
+  dry_clean: require('../../assets/services/dry.webp'),
+  iron: require('../../assets/services/iron.webp'),
+  wash_iron: require('../../assets/services/washiron.webp'),
+  housekeeping: require('../../assets/services/home.webp'),
+  carpet: require('../../assets/services/carpet.webp'),
+  accessories: require('../../assets/services/shop.webp'),
+}
+const BANNER_IMAGES = {
+  bag: require('../../assets/banners/bag.webp'),
+  newOrder: require('../../assets/banners/new-order.webp'),
+  plans: require('../../assets/banners/plans.webp'),
+}
+
+// "ابدأ الآن ←" → "ابدأ الآن" (the arrow becomes an icon).
+const stripArrow = (s: string) => (s ?? '').replace(/\s*[←→]\s*$/, '')
+const cleanNumber = (n?: string | null) => (n ?? '').replace(/^#+/, '')
+
+function statusLook(status: string) {
+  if (status === 'delivered') return { tone: 'ok' as const, Icon: CircleCheck }
+  if (status === 'cancelled' || status === 'refunded') return { tone: 'danger' as const, Icon: CircleX }
+  if (status === 'pending' || status === 'scheduled') return { tone: 'warn' as const, Icon: Clock3 }
+  if (status === 'processing' || status === 'ready') return { tone: 'info' as const, Icon: WashingMachine }
+  if (status === 'picked_up') return { tone: 'info' as const, Icon: Package }
+  return { tone: 'info' as const, Icon: Truck }
+}
+
+function BannerShell({ image, onPress, children }: { image: any; onPress: () => void; children: React.ReactNode }) {
+  const rtl = I18nManager.isRTL
+  return (
+    <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={cr.banner} accessibilityRole="button">
+      <Image source={image} style={StyleSheet.absoluteFill} resizeMode="cover" />
+      {/* Dark on the text (start) side, clear on the photo side. */}
+      <LinearGradient
+        colors={['rgba(7,22,46,0.94)', 'rgba(7,22,46,0.72)', 'rgba(7,22,46,0.05)']}
+        locations={[0, 0.5, 1]}
+        start={{ x: rtl ? 1 : 0, y: 0 }}
+        end={{ x: rtl ? 0 : 1, y: 0 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={cr.bannerText}>{children}</View>
+    </TouchableOpacity>
+  )
+}
+
+function BannerCta({ label }: { label: string }) {
+  return (
+    <View style={cr.cta}>
+      <Text style={cr.ctaText}>{label}</Text>
+      <ForwardIcon color="#0284C7" size={14} />
+    </View>
+  )
+}
 
 function BannersCarousel({ bagOffer, activeSub, colors, t, locale, onBagPress, onNewOrderPress, onPlansPress }: any) {
   const SlideIn = I18nManager.isRTL ? FadeInRight : FadeInLeft
@@ -32,33 +90,31 @@ function BannersCarousel({ bagOffer, activeSub, colors, t, locale, onBagPress, o
   const scrollRef = useRef<ScrollView>(null)
   const autoScrollTimer = useRef<ReturnType<typeof setInterval> | null>(null)
   const banners: { key: string; node: React.ReactNode }[] = []
+  const en = locale === 'en'
 
   if (bagOffer) {
+    const hasDiscount = bagOffer.original_price > bagOffer.daily_price
     banners.push({
       key: 'bag',
       node: (
-        <TouchableOpacity activeOpacity={0.9} onPress={onBagPress} style={{ width: BANNER_WIDTH }}>
-          <LinearGradient colors={colors.gradientAccent as unknown as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={cr.bannerGradient}>
-            <View style={cr.badgeWrap}>
-              <View style={cr.badge}><Text style={cr.badgeText}>{t('bagBadge')}</Text></View>
-              {bagOffer.original_price > bagOffer.daily_price && (
-                <View style={cr.discountBadge}><Text style={cr.discountText}>-{Math.round((1 - bagOffer.daily_price / bagOffer.original_price) * 100)}%</Text></View>
-              )}
-            </View>
-            <View style={cr.row}>
-              <View style={{ flex: 1 }}>
-                <Text style={cr.title}>{locale === 'en' ? '' : 'شنطة '}<Text style={{ color: colors.navy[900] }}>Laundry Bag</Text></Text>
-                <Text style={cr.subtitle}>{t('bagSubtitle')}</Text>
-                <View style={cr.priceRow}>
-                  {bagOffer.original_price > bagOffer.daily_price && <Text style={cr.oldPrice}>{bagOffer.original_price} {t('currency')}</Text>}
-                  <Text style={cr.price}>{bagOffer.daily_price} {t('currency')}</Text>
-                  <Text style={cr.perDay}>/ {t('bagPerDay')}</Text>
-                </View>
-              </View>
-              <Image source={require('../../assets/logo.jpg')} style={{ width: 90, height: 90, borderRadius: 45, marginTop: -10 }} resizeMode="contain" />
-            </View>
-          </LinearGradient>
-        </TouchableOpacity>
+        <BannerShell image={BANNER_IMAGES.bag} onPress={onBagPress}>
+          <View style={cr.badges}>
+            <View style={cr.badgeHot}><Text style={cr.badgeHotText}>{t('bagBadge')}</Text></View>
+            {hasDiscount && (
+              <View style={cr.badgeOff}><Text style={cr.badgeOffText}>-{Math.round((1 - bagOffer.daily_price / bagOffer.original_price) * 100)}%</Text></View>
+            )}
+          </View>
+          <View style={cr.brandRow}>
+            {!en && <View style={cr.prePill}><Text style={cr.prePillText}>شنطة</Text></View>}
+            <Text style={cr.brand}>Laundry <Text style={cr.brandAccent}>Bag</Text></Text>
+          </View>
+          <Text style={cr.sub} numberOfLines={1}>{t('bagSubtitle')}</Text>
+          <View style={cr.priceRow}>
+            <Text style={cr.price}>{bagOffer.daily_price} <Text style={cr.priceCur}>{t('currency')}</Text></Text>
+            {hasDiscount && <Text style={cr.oldPrice}>{bagOffer.original_price}</Text>}
+            <Text style={cr.perDay}>/ {t('bagPerDay')}</Text>
+          </View>
+        </BannerShell>
       ),
     })
   }
@@ -66,49 +122,31 @@ function BannersCarousel({ bagOffer, activeSub, colors, t, locale, onBagPress, o
   banners.push({
     key: 'newOrder',
     node: (
-      <TouchableOpacity activeOpacity={0.85} onPress={onNewOrderPress} style={{ width: BANNER_WIDTH }}>
-        <LinearGradient colors={colors.gradientAccent as unknown as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={cr.bannerGradient}>
-          <View style={cr.row}>
-            <View style={{ flex: 1 }}>
-              <Text style={cr.title}>{t('newOrder')}</Text>
-              <Text style={cr.subtitle}>{t('newOrderSub')}</Text>
-              <View style={cr.ctaWrap}><Text style={cr.ctaText}>{t('startNow')}</Text></View>
-            </View>
-            <Text style={{ fontSize: 48 }}>🧺</Text>
-          </View>
-        </LinearGradient>
-      </TouchableOpacity>
+      <BannerShell image={BANNER_IMAGES.newOrder} onPress={onNewOrderPress}>
+        <Text style={cr.title} numberOfLines={1}>{t('newOrder')}</Text>
+        <Text style={cr.sub} numberOfLines={2}>{t('newOrderSub')}</Text>
+        <BannerCta label={stripArrow(t('startNow'))} />
+      </BannerShell>
     ),
   })
 
   banners.push({
     key: 'plans',
     node: activeSub ? (
-      <TouchableOpacity activeOpacity={0.85} onPress={onPlansPress} style={{ width: BANNER_WIDTH }}>
-        <LinearGradient colors={colors.gradientAccent as unknown as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={cr.bannerGradient}>
-          <View style={cr.row}>
-            <View style={{ flex: 1 }}>
-              <Text style={cr.title}>{t('packagePrefix')} {locale === 'en' && activeSub.plans?.name ? (t(`plan:${activeSub.plans.name}` as any) !== `plan:${activeSub.plans.name}` ? t(`plan:${activeSub.plans.name}` as any) : activeSub.plans.name) : activeSub.plans?.name}</Text>
-              <Text style={cr.subtitle}>{t('remaining')} {(activeSub.plans?.items_per_month ?? 0) - (activeSub.items_used ?? 0)} {t('pieces')}</Text>
-              <View style={cr.ctaWrap}><Text style={cr.ctaText}>{t('viewPlan')}</Text></View>
-            </View>
-            <Text style={{ fontSize: 48 }}>👑</Text>
-          </View>
-        </LinearGradient>
-      </TouchableOpacity>
+      <BannerShell image={BANNER_IMAGES.plans} onPress={onPlansPress}>
+        <Text style={cr.title} numberOfLines={1}>{t('packagePrefix')} {locale === 'en' && activeSub.plans?.name ? (t(`plan:${activeSub.plans.name}` as any) !== `plan:${activeSub.plans.name}` ? t(`plan:${activeSub.plans.name}` as any) : activeSub.plans.name) : activeSub.plans?.name}</Text>
+        <Text style={cr.sub} numberOfLines={1}>{t('remaining')} {(activeSub.plans?.items_per_month ?? 0) - (activeSub.items_used ?? 0)} {t('pieces')}</Text>
+        <View style={cr.meter}>
+          <View style={[cr.meterFill, { width: `${Math.max(0, Math.min(100, (((activeSub.plans?.items_per_month ?? 0) - (activeSub.items_used ?? 0)) / Math.max(1, activeSub.plans?.items_per_month ?? 1)) * 100))}%` }]} />
+        </View>
+        <BannerCta label={stripArrow(t('viewPlan'))} />
+      </BannerShell>
     ) : (
-      <TouchableOpacity activeOpacity={0.85} onPress={onPlansPress} style={{ width: BANNER_WIDTH }}>
-        <LinearGradient colors={colors.gradientAccent as unknown as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={cr.bannerGradient}>
-          <View style={cr.row}>
-            <View style={{ flex: 1 }}>
-              <Text style={cr.title}>{t('subscriptionPlans')}</Text>
-              <Text style={cr.subtitle}>{t('saveMore')}</Text>
-              <View style={cr.ctaWrap}><Text style={cr.ctaText}>{t('viewPlans')}</Text></View>
-            </View>
-            <Text style={{ fontSize: 48 }}>👑</Text>
-          </View>
-        </LinearGradient>
-      </TouchableOpacity>
+      <BannerShell image={BANNER_IMAGES.plans} onPress={onPlansPress}>
+        <Text style={cr.title} numberOfLines={1}>{t('subscriptionPlans')}</Text>
+        <Text style={cr.sub} numberOfLines={2}>{t('saveMore')}</Text>
+        <BannerCta label={stripArrow(t('viewPlans'))} />
+      </BannerShell>
     ),
   })
 
@@ -156,7 +194,7 @@ function BannersCarousel({ bagOffer, activeSub, colors, t, locale, onBagPress, o
   }
 
   return (
-    <Animated.View entering={SlideIn.duration(250)} style={{ marginBottom: 16 }}>
+    <Animated.View entering={SlideIn.duration(250)} style={{ marginTop: 16 }}>
       <ScrollView
         ref={scrollRef}
         horizontal
@@ -173,7 +211,7 @@ function BannersCarousel({ bagOffer, activeSub, colors, t, locale, onBagPress, o
       {banners.length > 1 && (
         <View style={[cr.dots, { flexDirection: I18nManager.isRTL ? 'row-reverse' : 'row' }]}>
           {banners.map((b, i) => (
-            <View key={b.key} style={[cr.dot, { backgroundColor: i === activeIndex ? colors.primary : colors.navy[600] }]} />
+            <View key={b.key} style={[cr.dot, i === activeIndex ? { width: 18, backgroundColor: colors.primary } : { backgroundColor: colors.navy[600] }]} />
           ))}
         </View>
       )}
@@ -184,7 +222,10 @@ function BannersCarousel({ bagOffer, activeSub, colors, t, locale, onBagPress, o
 export default function HomeScreen() {
   const { profile } = useAuth()
   const { colors } = useTheme()
+  const b = useBrand()
+  const insets = useSafeAreaInsets()
   const { t, locale } = useLanguage()
+  const en = locale === 'en'
   const { totalItems: cartCount } = useCart()
   const router = useRouter()
   const [recentOrders, setRecentOrders] = useState<any[]>([])
@@ -200,7 +241,12 @@ export default function HomeScreen() {
   const [ratingDriver, setRatingDriver] = useState(0)
   const [ratingNote, setRatingNote] = useState('')
   const [ratingSubmitting, setRatingSubmitting] = useState(false)
+  const [defaultAddress, setDefaultAddress] = useState<{ label: string } | null | undefined>(undefined)
+  const [minPrices, setMinPrices] = useState<Record<string, number>>({})
   const shownRatingIds = useRef(new Set<string>())
+
+  // Extra fields for the live order card and the order list (service, pieces, driver).
+  const ORDER_FIELDS = 'id, order_number, status, total, created_at, service_type, items_count, driver_id, driver:users!orders_driver_id_fkey(name, phone)'
 
   const loadBagOffer = useCallback(async () => {
     const { data } = await supabase.from('settings').select('value').eq('key', 'bag_offer').single()
@@ -210,12 +256,32 @@ export default function HomeScreen() {
     else setBagOffer(null)
   }, [])
 
+  // Header address chip: the default address (else the first), same rule as the new-order screen.
+  const loadDefaultAddress = useCallback(async () => {
+    if (!profile) return
+    const { data } = await supabase.from('addresses').select('label, is_default')
+      .eq('user_id', profile.id).order('is_default', { ascending: false }).limit(1)
+    setDefaultAddress(data?.[0] ?? null)
+  }, [profile])
+
+  // "من X ج.م" on each service tile: the cheapest active price for that service.
+  const loadMinPrices = useCallback(async () => {
+    const { data } = await supabase.from('prices').select('service_type, price').eq('is_active', true)
+    const mins: Record<string, number> = {}
+    for (const p of data ?? []) {
+      const v = Number(p.price)
+      if (!Number.isFinite(v)) continue
+      if (mins[p.service_type] == null || v < mins[p.service_type]) mins[p.service_type] = v
+    }
+    setMinPrices(mins)
+  }, [])
+
   const onRefresh = useCallback(async () => {
     if (!profile) return
     setRefreshing(true)
     setRefreshKey(k => k + 1)
     await Promise.all([
-      supabase.from('orders').select('id, order_number, status, total, created_at')
+      supabase.from('orders').select(ORDER_FIELDS)
         .eq('customer_id', profile.id).order('created_at', { ascending: false }).limit(3)
         .then(({ data }) => setRecentOrders(data ?? [])),
       supabase.from('subscriptions').select('*, plans(name, items_per_month)')
@@ -225,9 +291,11 @@ export default function HomeScreen() {
         .eq('user_id', profile.id).is('read_at', null)
         .then(({ count }) => setUnreadCount(count ?? 0)),
       loadBagOffer(),
+      loadDefaultAddress(),
+      loadMinPrices(),
     ])
     setRefreshing(false)
-  }, [profile, loadBagOffer])
+  }, [profile, loadBagOffer, loadDefaultAddress, loadMinPrices])
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
@@ -238,7 +306,7 @@ export default function HomeScreen() {
 
   const loadRecentOrders = useCallback(() => {
     if (!profile) return
-    supabase.from('orders').select('id, order_number, status, total, created_at')
+    supabase.from('orders').select(ORDER_FIELDS)
       .eq('customer_id', profile.id)
       .order('created_at', { ascending: false })
       .limit(3)
@@ -294,7 +362,7 @@ export default function HomeScreen() {
   useEffect(() => {
     if (!profile) { setLoading(false); return }
     Promise.all([
-      supabase.from('orders').select('id, order_number, status, total, created_at')
+      supabase.from('orders').select(ORDER_FIELDS)
         .eq('customer_id', profile.id).order('created_at', { ascending: false }).limit(3)
         .then(({ data }) => { setRecentOrders(data ?? []); setLoading(false) }),
       supabase.from('subscriptions').select('*, plans(name, items_per_month)')
@@ -305,6 +373,8 @@ export default function HomeScreen() {
         .then(({ count }) => setUnreadCount(count ?? 0)),
       loadBagOffer(),
       checkUnratedOrder(),
+      loadDefaultAddress(),
+      loadMinPrices(),
     ])
 
     const channel = supabase
@@ -320,6 +390,9 @@ export default function HomeScreen() {
     return () => { supabase.removeChannel(channel) }
   }, [profile, loadBagOffer])
 
+  // The address may change on the addresses screen; refresh it whenever home comes back into view.
+  useEffect(() => { loadDefaultAddress() }, [refreshKey, loadDefaultAddress])
+
   const greeting = () => {
     const h = new Date().getHours()
     if (h < 12) return t('goodMorning')
@@ -328,56 +401,125 @@ export default function HomeScreen() {
   }
 
   const services = [
-    { icon: '👔', label: t('wash'), key: 'wash', desc: t('washDesc'), color: '#0ea5e9' },
-    { icon: '🧹', label: t('dryClean'), key: 'dry_clean', desc: t('dryCleanDesc'), color: '#a855f7' },
-    { icon: '👕', label: t('ironOnly'), key: 'iron', desc: t('ironDesc'), color: '#f59e0b' },
-    { icon: '✨', label: t('washIron'), key: 'wash_iron', desc: t('washIronDesc'), color: '#10b981' },
-    { icon: '🏠', label: t('housekeeping'), key: 'housekeeping', desc: t('housekeepingDesc'), color: '#ef4444' },
-    { icon: '🧹', label: t('carpet') || 'سجاد وبطاطين', key: 'carpet', desc: t('carpetDesc') || 'غسيل سجاد وبطاطين ومفروشات', color: '#6366f1' },
+    { label: t('wash'), en: 'WASH', key: 'wash' },
+    { label: t('dryClean'), en: 'DRY CLEAN', key: 'dry_clean' },
+    { label: t('ironOnly'), en: 'IRON', key: 'iron' },
+    { label: t('washIron'), en: 'WASH & IRON', key: 'wash_iron' },
+    { label: t('housekeeping'), en: 'HOME', key: 'housekeeping' },
+    { label: t('carpet') || 'سجاد وبطاطين', en: 'CARPETS', key: 'carpet' },
   ]
+  const accessoriesLabel = en ? 'Accessories & Products' : 'منتجات وإكسسوارات'
+  // The small kicker shows the other language: English words on the Arabic UI, Arabic on the English UI.
+  const AR_NAMES: Record<string, string> = { wash: 'غسيل', dry_clean: 'تنظيف جاف', iron: 'كي فقط', wash_iron: 'غسيل وكي', housekeeping: 'تنظيف منازل', carpet: 'سجاد وبطاطين', accessories: 'منتجات' }
 
   const getStatusLabel = (status: string) => {
     const key = `status${status.charAt(0).toUpperCase() + status.slice(1).replace(/_([a-z])/g, (_, c) => c.toUpperCase())}` as any
     return t(key) || status
   }
 
+  const serviceLabel = (key?: string | null) => {
+    if (!key) return ''
+    const first = key.split('+')[0]
+    const svc = services.find(s => s.key === first)
+    return svc?.label ?? (first === 'accessories' ? accessoriesLabel : '')
+  }
+
+  const liveOrder = useMemo(() => recentOrders.find(o => ACTIVE_STATUSES.includes(o.status)), [recentOrders])
+  const liveStep = liveOrder ? Math.max(1, STATUS_FLOW.indexOf(liveOrder.status) + 1) : 0
+
+  function callDriver(phone?: string | null) {
+    if (phone) Linking.openURL(`tel:${phone}`).catch(() => {})
+  }
+
+  const priceFrom = (key: string) => minPrices[key] != null ? `${t('priceFrom')} ${money(minPrices[key])} ${t('currency')}` : ''
+
   return (
     <>
-    <ScrollView style={[s.container, { backgroundColor: colors.navy[900] }]} contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}>
+    <ScrollView
+      style={[s.container, { backgroundColor: b.page }]}
+      contentContainerStyle={[s.content, { paddingTop: insets.top + 12 }]}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
+    >
+      <DotsBackdrop height={230 + insets.top} />
+
       {/* Header */}
       <Animated.View entering={SlideIn.duration(250)} style={s.header}>
-        <View style={{ flex: 1 }}>
-          <Text style={[s.greetSmall, { color: colors.navy[200] }]}>{greeting()} 👋</Text>
-          <Text style={[s.greetName, { color: colors.text }]}>{profile?.name ?? ''}</Text>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <TouchableOpacity onPress={() => router.push('/cart')} style={s.bellBtn}>
-            <Text style={{ fontSize: 22, opacity: cartCount > 0 ? 1 : 0.35 }}>🛒</Text>
-            {cartCount > 0 && (
-              <View style={[s.badge, { backgroundColor: colors.primary }]}>
-                <Text style={s.badgeText}>{cartCount > 9 ? '9+' : cartCount}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push('/notifications')} style={s.bellBtn}>
-            <Text style={{ fontSize: 22 }}>🔔</Text>
-            {unreadCount > 0 && (
-              <View style={[s.badge, { backgroundColor: colors.danger }]}>
-                <Text style={s.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push('/(tabs)/profile')}>
+        <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} accessibilityRole="button" accessibilityLabel={profile?.name ?? ''}>
+          <LinearGradient colors={['#38BDF8', '#0EA5E9', '#0284C7']} style={s.avatarRing}>
             {profile?.avatar_url ? (
-              <Image source={{ uri: profile.avatar_url }} style={[s.avatarImg, { borderColor: colors.accentLight }]} />
+              <Image source={{ uri: profile.avatar_url }} style={[s.avatarImg, { borderColor: b.page }]} />
             ) : (
-              <View style={[s.avatar, { backgroundColor: colors.accent, borderColor: colors.accentLight }]}>
+              <View style={[s.avatarImg, s.avatarFallback, { borderColor: b.page }]}>
                 <Text style={s.avatarText}>{profile?.name?.[0] ?? '؟'}</Text>
               </View>
             )}
-          </TouchableOpacity>
+          </LinearGradient>
+        </TouchableOpacity>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={[s.greetSmall, { color: b.muted }]}>{greeting()} 👋</Text>
+          <Text style={[s.greetName, { color: b.ink }]} numberOfLines={1}>{profile?.name ?? ''}</Text>
+          {defaultAddress !== undefined && (
+            <TouchableOpacity onPress={() => router.push('/addresses')} hitSlop={HIT} accessibilityRole="button" style={[s.addrChip, { backgroundColor: b.tint }]}>
+              <MapPin size={12} color={b.tintText} />
+              <Text style={[s.addrText, { color: b.tintText }]} numberOfLines={1}>{defaultAddress?.label ?? t('addNewAddress')}</Text>
+              <ChevronDown size={12} color={b.tintText} />
+            </TouchableOpacity>
+          )}
         </View>
+        <IconButton onPress={() => router.push('/cart')} label="Cart">
+          <ShoppingBag size={19} color={cartCount > 0 ? b.ink : b.muted} />
+          {cartCount > 0 && (
+            <View style={[s.badge, { backgroundColor: b.primary, borderColor: b.raised }]}>
+              <Text style={s.badgeText}>{cartCount > 9 ? '9+' : cartCount}</Text>
+            </View>
+          )}
+        </IconButton>
+        <IconButton onPress={() => router.push('/notifications')} label="Notifications">
+          <Bell size={19} color={b.ink} />
+          {unreadCount > 0 && (
+            <View style={[s.badge, { backgroundColor: colors.danger, borderColor: b.raised }]}>
+              <Text style={s.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+            </View>
+          )}
+        </IconButton>
       </Animated.View>
+
+      {/* Live order: only while an order is in progress */}
+      {liveOrder && (
+        <Animated.View entering={SlideIn.duration(250).delay(60)}>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => router.push(`/order/${liveOrder.id}`)}
+            accessibilityRole="button"
+            style={[s.live, { borderColor: b.tintBorder }, cardShadow(b)]}
+          >
+            <LinearGradient
+              colors={b.isDark ? ['rgba(14,165,233,0.18)', 'rgba(14,165,233,0.04)'] : ['#E6F4FE', '#FFFFFF']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            <LinearGradient colors={['#38BDF8', '#0284C7']} style={s.liveIcon}>
+              {(() => { const L = statusLook(liveOrder.status).Icon; return <L size={21} color="#fff" /> })()}
+            </LinearGradient>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={[s.liveMeta, { color: b.tintText }]} numberOfLines={1}>
+                {t('orderHash')}{cleanNumber(liveOrder.order_number)}{serviceLabel(liveOrder.service_type) ? ` · ${serviceLabel(liveOrder.service_type)}` : ''}
+              </Text>
+              <Text style={[s.liveTitle, { color: b.ink }]} numberOfLines={1}>{getStatusLabel(liveOrder.status)}</Text>
+              <View style={{ flexDirection: 'row', marginTop: 7 }}>
+                <Segments total={STATUS_FLOW.length} done={liveStep} />
+              </View>
+            </View>
+            {liveOrder.driver?.phone ? (
+              <IconButton onPress={() => callDriver(liveOrder.driver?.phone)} label="Call driver" tone="tint">
+                <Phone size={17} color={b.accentIcon} />
+              </IconButton>
+            ) : null}
+          </TouchableOpacity>
+        </Animated.View>
+      )}
 
       {/* Banners Carousel */}
       <BannersCarousel
@@ -393,38 +535,51 @@ export default function HomeScreen() {
       />
 
       {/* Services */}
-      <Animated.View entering={SlideIn.duration(250).delay(120)} style={[s.sectionTitleRow, { marginBottom: 14 }]}>
-        <View style={[s.sectionBar, { backgroundColor: colors.primary }]} />
-        <Text style={[s.sectionTitle, { color: colors.text }]}>{t('services')}</Text>
-      </Animated.View>
-      <View style={s.servicesGrid}>
+      <SectionTitle eyebrow={t('homeEyebrowServices')} title={t('services')} />
+      <View style={s.tiles}>
         {services.map((svc, i) => (
-          <Animated.View key={svc.key} entering={SlideIn.duration(250).delay(50 + i * 20)} style={s.serviceGridItem}>
-            <TouchableOpacity style={[s.serviceCard, { backgroundColor: colors.cardBg, borderColor: svc.color + '30' }]} activeOpacity={0.7}
-              onPress={() => router.push({ pathname: '/(tabs)/new-order', params: { service: svc.key } })}>
-              <View style={[s.serviceIconWrap, { backgroundColor: svc.color + '18' }]}>
-                <Text style={s.serviceIcon}>{svc.icon}</Text>
+          <Animated.View key={svc.key} entering={SlideIn.duration(250).delay(50 + i * 20)} style={{ width: TILE_WIDTH }}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              onPress={() => router.push({ pathname: '/(tabs)/new-order', params: { service: svc.key } })}
+              style={s.tile}
+            >
+              <Image source={SERVICE_IMAGES[svc.key]} style={StyleSheet.absoluteFill} resizeMode="cover" />
+              <LinearGradient colors={['rgba(5,12,26,0)', 'rgba(5,12,26,0.88)']} locations={[0.25, 1]} style={StyleSheet.absoluteFill} />
+              <View style={s.tileArrow}>{I18nManager.isRTL ? <ArrowUpLeft size={13} color="#fff" /> : <ArrowUpRight size={13} color="#fff" />}</View>
+              <View style={s.tileText}>
+                <Text style={s.kicker} numberOfLines={1}>{en ? AR_NAMES[svc.key] : svc.en}</Text>
+                <Text style={s.tileName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{svc.label}</Text>
+                {priceFrom(svc.key) ? <Text style={s.tilePrice}>{priceFrom(svc.key)}</Text> : null}
               </View>
-              <Text style={[s.serviceLabel, { color: colors.text }]}>{svc.label}</Text>
             </TouchableOpacity>
           </Animated.View>
         ))}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          onPress={() => router.push({ pathname: '/(tabs)/new-order', params: { service: 'accessories' } })}
+          style={[s.tile, s.tileWide]}
+        >
+          <Image source={require('../../assets/services/shop-wide.webp')} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          <LinearGradient colors={['rgba(5,12,26,0)', 'rgba(5,12,26,0.88)']} locations={[0.2, 1]} style={StyleSheet.absoluteFill} />
+          <View style={s.tileArrow}>{I18nManager.isRTL ? <ArrowUpLeft size={13} color="#fff" /> : <ArrowUpRight size={13} color="#fff" />}</View>
+          <View style={s.tileText}>
+            <Text style={s.kicker}>{en ? AR_NAMES.accessories : 'SHOP'}</Text>
+            <Text style={s.tileName}>{accessoriesLabel}</Text>
+            {priceFrom('accessories') ? <Text style={s.tilePrice}>{priceFrom('accessories')}</Text> : null}
+          </View>
+        </TouchableOpacity>
       </View>
 
       {/* Recent Orders */}
-      <Animated.View entering={SlideIn.duration(250).delay(250)}>
-        <View style={s.sectionHeader}>
-          <View style={s.sectionTitleRow}>
-            <View style={[s.sectionBar, { backgroundColor: colors.primary }]} />
-            <Text style={[s.sectionTitle, { color: colors.text }]}>{t('recentOrders')}</Text>
-          </View>
-          {recentOrders.length > 0 && (
-            <TouchableOpacity onPress={() => router.push('/(tabs)/orders')}>
-              <Text style={[s.seeAll, { color: colors.primary }]}>{t('viewAll')}</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </Animated.View>
+      <SectionTitle
+        eyebrow={t('homeEyebrowOrders')}
+        title={t('recentOrders')}
+        action={recentOrders.length > 0 ? stripArrow(t('viewAll')) : undefined}
+        onAction={() => router.push('/(tabs)/orders')}
+      />
 
       {loading ? (
         <>
@@ -432,34 +587,43 @@ export default function HomeScreen() {
           <SkeletonOrderCard />
         </>
       ) : recentOrders.length === 0 ? (
-        <Animated.View entering={SlideIn.duration(250).delay(100)} style={[s.emptyCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
-          <Text style={s.emptyIcon}>📋</Text>
-          <Text style={[s.emptyText, { color: colors.navy[200] }]}>{t('noOrders')}</Text>
-          <Text style={[s.emptySubText, { color: colors.navy[400] }]}>{t('startFirstOrder')}</Text>
+        <Animated.View entering={SlideIn.duration(250).delay(100)} style={[s.emptyCard, { backgroundColor: b.card, borderColor: b.cardBorder }]}>
+          <View style={[s.emptyIcon, { backgroundColor: b.iconTile }]}><ClipboardList size={24} color={b.accentIcon} /></View>
+          <Text style={[s.emptyText, { color: b.ink }]}>{t('noOrders')}</Text>
+          <Text style={[s.emptySubText, { color: b.muted }]}>{t('startFirstOrder')}</Text>
         </Animated.View>
       ) : (
-        recentOrders.map((order, i) => {
-          const sColor = statusColors[order.status] ?? '#f59e0b'
-          const sIcon = statusIcons[order.status] ?? '⏳'
-          return (
-            <Animated.View key={order.id} entering={SlideIn.duration(250).delay(100 + i * 30)}>
-              <TouchableOpacity style={[s.orderCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]} onPress={() => router.push(`/order/${order.id}`)}>
-                <View style={s.orderRow}>
-                  <Text style={[s.orderNumber, { color: colors.text }]}>{order.order_number}</Text>
-                  <View style={[s.statusBadge, { backgroundColor: sColor + '18' }]}>
-                    <Text style={{ fontSize: 10 }}>{sIcon}</Text>
-                    <Text style={[s.statusText, { color: sColor }]}>{getStatusLabel(order.status)}</Text>
+        <Animated.View entering={SlideIn.duration(250).delay(100)} style={[s.list, { backgroundColor: b.card, borderColor: b.cardBorder }, cardShadow(b)]}>
+          {recentOrders.map((order, i) => {
+            const look = statusLook(order.status)
+            const svc = serviceLabel(order.service_type)
+            const meta = [svc, order.items_count ? `${order.items_count} ${t('pieces')}` : '', shortDate(new Date(order.created_at), en)].filter(Boolean).join(' · ')
+            return (
+              <TouchableOpacity
+                key={order.id}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                onPress={() => router.push(`/order/${order.id}`)}
+                style={[s.row, i > 0 && { borderTopWidth: 1, borderTopColor: b.divider }]}
+              >
+                <View style={[s.rowIcon, { backgroundColor: look.tone === 'ok' ? b.okTint : look.tone === 'danger' ? b.dangerTint : b.tint }]}>
+                  <look.Icon size={19} color={look.tone === 'ok' ? b.okText : look.tone === 'danger' ? b.dangerText : b.tintText} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <View style={s.rowTop}>
+                    <Text style={[s.rowNum, { color: b.ink }]}>#{cleanNumber(order.order_number)}</Text>
+                    <Pill label={getStatusLabel(order.status)} tone={look.tone} />
                   </View>
+                  <Text style={[s.rowMeta, { color: b.muted }]} numberOfLines={1}>{meta}</Text>
                 </View>
-                <View style={[s.orderDivider, { backgroundColor: colors.navy[700] }]} />
-                <View style={s.orderRow}>
-                  <Text style={[s.orderDate, { color: colors.navy[400] }]}>{new Date(order.created_at).toLocaleDateString('ar-EG')}</Text>
-                  <Text style={[s.orderTotal, { color: colors.primary }]}>{order.total > 0 ? `${order.total?.toFixed(2)} ${t('currency')}` : (locale === 'en' ? 'Plan' : 'باقة')}</Text>
-                </View>
+                <Text style={[s.rowPrice, { color: b.ink }]}>
+                  {order.total > 0 ? <>{money(order.total)} <Text style={[s.rowCur, { color: b.muted }]}>{t('currency')}</Text></> : (en ? 'Plan' : 'باقة')}
+                </Text>
+                <ForwardChevron color={b.faint} size={15} />
               </TouchableOpacity>
-            </Animated.View>
-          )
-        })
+            )
+          })}
+        </Animated.View>
       )}
 
       <View style={{ height: 100 }} />
@@ -469,7 +633,7 @@ export default function HomeScreen() {
       <View style={rs.overlay}>
         <View style={[rs.card, { backgroundColor: colors.navy[800], borderColor: colors.navy[700] }]}>
           <Text style={[rs.title, { color: colors.text }]}>{t('rateOrderTitle')}</Text>
-          <Text style={[rs.subtitle, { color: colors.navy[300] }]}>{t('orderHash')}{ratingOrder?.order_number}</Text>
+          <Text style={[rs.subtitle, { color: colors.navy[300] }]}>{t('orderHash')}{cleanNumber(ratingOrder?.order_number)}</Text>
 
           <Text style={[rs.label, { color: colors.navy[100] }]}>{t('serviceRating')}</Text>
           <View style={rs.starsRow}>
@@ -525,86 +689,75 @@ export default function HomeScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: 20, paddingTop: 56, paddingBottom: 100 },
+  content: { paddingHorizontal: 16, paddingBottom: 100 },
 
-  header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24 },
-  greetSmall: { fontSize: 14 },
-  greetName: { fontSize: 24, fontWeight: '800', marginTop: 2 },
-  avatar: {
-    width: 48, height: 48, borderRadius: 24,
-    justifyContent: 'center', alignItems: 'center',
-    borderWidth: 2,
-  },
-  avatarText: { fontSize: 20, color: '#fff', fontWeight: 'bold' },
-  bellBtn: { position: 'relative', padding: 4 },
-  badge: { position: 'absolute', top: -2, right: -4, minWidth: 18, height: 18, borderRadius: 9, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 },
-  badgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
-  avatarImg: {
-    width: 48, height: 48, borderRadius: 24,
-    borderWidth: 2,
-  },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  avatarRing: { width: 52, height: 52, borderRadius: 26, padding: 2.5 },
+  avatarImg: { width: '100%', height: '100%', borderRadius: 24, borderWidth: 2.5 },
+  avatarFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#0EA5E9' },
+  avatarText: { fontSize: 19, color: '#fff', fontFamily: F.display },
+  greetSmall: { fontSize: 12.5, fontFamily: F.regular },
+  greetName: { fontSize: 20, fontFamily: F.display, lineHeight: 28 },
+  addrChip: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', height: 24, paddingHorizontal: 9, borderRadius: 12, marginTop: 3, maxWidth: '100%' },
+  addrText: { fontSize: 11.5, fontFamily: F.semibold, flexShrink: 1 },
+  badge: { position: 'absolute', top: -4, end: -4, minWidth: 18, height: 18, borderRadius: 9, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4, borderWidth: 2 },
+  badgeText: { color: '#fff', fontSize: 9.5, fontFamily: F.bold },
 
+  live: { marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 11, padding: 12, borderRadius: 18, borderWidth: 1, overflow: 'hidden' },
+  liveIcon: { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  liveMeta: { fontSize: 11, fontFamily: F.semibold },
+  liveTitle: { fontSize: 15, fontFamily: F.display, marginTop: 1 },
 
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  sectionBar: { width: 4, height: 20, borderRadius: 2 },
-  sectionTitle: { fontSize: 20, fontWeight: '800' },
-  seeAll: { fontSize: 13, fontWeight: '600' },
+  tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  tile: { height: 116, borderRadius: 18, overflow: 'hidden', backgroundColor: '#0F1A2E' },
+  tileWide: { width: '100%', height: 124 },
+  tileArrow: { position: 'absolute', top: 8, end: 8, width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.18)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
+  tileText: { position: 'absolute', start: 11, end: 11, bottom: 9 },
+  kicker: { fontFamily: F.displaySemi, fontSize: 9, letterSpacing: 1.8, color: '#7DD3FC' },
+  tileName: { fontFamily: F.display, fontSize: 17, color: '#fff', lineHeight: 23, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
+  tilePrice: { fontFamily: F.semibold, fontSize: 11, color: '#FCD34D' },
 
-  servicesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
-  serviceGridItem: { width: SERVICE_CARD_WIDTH },
-  serviceCard: {
-    borderRadius: 16,
-    padding: 14, alignItems: 'center', gap: 6,
-    borderWidth: 1, height: 110,
-    justifyContent: 'center',
-  },
-  serviceIconWrap: {
-    width: 48, height: 48, borderRadius: 24,
-    justifyContent: 'center', alignItems: 'center', marginBottom: 2,
-  },
-  serviceIcon: { fontSize: 24 },
-  serviceLabel: { fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  list: { borderRadius: 18, borderWidth: 1, overflow: 'hidden' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, minHeight: 64, paddingVertical: 10 },
+  rowIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  rowTop: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  rowNum: { fontFamily: F.display, fontSize: 14 },
+  rowMeta: { fontSize: 11.5, fontFamily: F.regular, marginTop: 3 },
+  rowPrice: { fontFamily: F.display, fontSize: 15 },
+  rowCur: { fontFamily: F.semibold, fontSize: 10 },
 
-  emptyCard: {
-    borderRadius: 20, padding: 32,
-    alignItems: 'center', borderWidth: 1,
-  },
-  emptyIcon: { fontSize: 40, marginBottom: 10 },
-  emptyText: { fontSize: 15, fontWeight: '600' },
-  emptySubText: { fontSize: 12, marginTop: 4 },
-
-  orderCard: {
-    borderRadius: 18, padding: 18, marginBottom: 12,
-    borderWidth: 1,
-  },
-  orderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  orderDivider: { height: 1, marginVertical: 12 },
-  orderNumber: { fontSize: 16, fontWeight: '800' },
-  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 12 },
-  statusText: { fontSize: 11, fontWeight: '700' },
-  orderDate: { fontSize: 12 },
-  orderTotal: { fontSize: 16, fontWeight: '800' },
+  emptyCard: { borderRadius: 18, padding: 28, alignItems: 'center', borderWidth: 1 },
+  emptyIcon: { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  emptyText: { fontSize: 15, fontFamily: F.semibold },
+  emptySubText: { fontSize: 12, marginTop: 4, fontFamily: F.regular },
 })
 
 const cr = StyleSheet.create({
-  bannerGradient: { padding: 20, borderRadius: 24 },
-  badgeWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  badge: { backgroundColor: '#fbbf24', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20 },
-  badgeText: { color: '#78350f', fontSize: 11, fontWeight: '800' },
-  discountBadge: { backgroundColor: '#ef4444', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
-  discountText: { color: '#fff', fontSize: 11, fontWeight: '800' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  title: { color: '#fff', fontSize: 22, fontWeight: '900', marginBottom: 4, textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
-  subtitle: { color: 'rgba(255,255,255,0.85)', fontSize: 13, marginBottom: 12, lineHeight: 19 },
-  priceRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  oldPrice: { color: 'rgba(255,255,255,0.45)', fontSize: 14, textDecorationLine: 'line-through' },
-  price: { color: '#fbbf24', fontSize: 26, fontWeight: '900', textShadowColor: 'rgba(0,0,0,0.25)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
-  perDay: { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
-  ctaWrap: { backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'flex-start', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, marginTop: 12 },
-  ctaText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 10 },
-  dot: { width: 8, height: 8, borderRadius: 4 },
+  banner: { height: BANNER_HEIGHT, borderRadius: 20, overflow: 'hidden', backgroundColor: '#0F1A2E' },
+  bannerText: { position: 'absolute', top: 0, bottom: 0, start: 0, width: '72%', paddingHorizontal: 16, justifyContent: 'center', alignItems: 'flex-start' },
+  badges: { flexDirection: 'row', gap: 5, marginBottom: 5 },
+  badgeHot: { backgroundColor: '#F59E0B', paddingHorizontal: 8, height: 20, justifyContent: 'center', borderRadius: 10 },
+  badgeHotText: { color: '#3A2300', fontSize: 10.5, fontFamily: F.bold },
+  badgeOff: { backgroundColor: '#EF4444', paddingHorizontal: 8, height: 20, justifyContent: 'center', borderRadius: 10 },
+  badgeOffText: { color: '#fff', fontSize: 10.5, fontFamily: F.bold },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  prePill: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.45)', borderRadius: 8, paddingHorizontal: 7, height: 21, justifyContent: 'center' },
+  prePillText: { color: '#fff', fontSize: 11, fontFamily: F.bold },
+  brand: { color: '#fff', fontFamily: F.display, fontSize: 21, writingDirection: 'ltr' },
+  brandAccent: { color: '#7DD3FC' },
+  title: { color: '#fff', fontSize: 19, fontFamily: F.display, lineHeight: 27 },
+  sub: { color: 'rgba(255,255,255,0.86)', fontSize: 12, fontFamily: F.regular, marginTop: 2, lineHeight: 18 },
+  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 4 },
+  price: { color: '#FCD34D', fontSize: 21, fontFamily: F.display },
+  priceCur: { fontSize: 11, fontFamily: F.semibold },
+  oldPrice: { color: 'rgba(255,255,255,0.6)', fontSize: 12, textDecorationLine: 'line-through', fontFamily: F.regular },
+  perDay: { color: 'rgba(255,255,255,0.8)', fontSize: 11.5, fontFamily: F.regular },
+  cta: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#fff', alignSelf: 'flex-start', paddingHorizontal: 12, height: SIZE.S, borderRadius: 12, marginTop: 9 },
+  ctaText: { color: '#0284C7', fontSize: 12, fontFamily: F.bold },
+  meter: { width: '100%', height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.25)', marginTop: 7, overflow: 'hidden' },
+  meterFill: { height: '100%', borderRadius: 3, backgroundColor: '#4ADE80' },
+  dots: { flexDirection: 'row', justifyContent: 'center', gap: 5, marginTop: 10 },
+  dot: { width: 6, height: 6, borderRadius: 3 },
 })
 
 const rs = StyleSheet.create({

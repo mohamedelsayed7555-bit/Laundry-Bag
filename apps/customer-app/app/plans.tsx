@@ -1,5 +1,10 @@
 import { useEffect, useState, useRef } from 'react'
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, RefreshControl, Dimensions, FlatList, Animated, I18nManager } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, RefreshControl, Dimensions, FlatList, Animated, Switch } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { User, Users, Home, Crown, Package, Sparkles, Check, Zap, CircleCheck, TriangleAlert, Hourglass, CreditCard, Wallet, Landmark, Smartphone, Settings2, RefreshCw } from 'lucide-react-native'
+import { useBrand, Card, Chip, Pill, ChoiceGrid, IconButton, BackIcon, FlowLines, money, F, SIZE, type Choice } from '../src/components/brand'
+import { PrimaryButton } from '../src/components/auth/ui'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../src/contexts/AuthContext'
 import { useTheme } from '../src/contexts/ThemeContext'
@@ -65,6 +70,8 @@ export default function PlansScreen() {
   const planName = (name: string) => locale === 'en' ? (t(`plan:${name}` as any) !== `plan:${name}` ? t(`plan:${name}` as any) : name) : name
   const router = useRouter()
   const { showAlert, AlertComponent } = useCustomAlert()
+  const b = useBrand()
+  const insets = useSafeAreaInsets()
   const [plans, setPlans] = useState<Plan[]>([])
   const [activeSubs, setActiveSubs] = useState<(Subscription & { plan_name?: string })[]>([])
   const [pendingSubs, setPendingSubs] = useState<(Subscription & { plan_name?: string })[]>([])
@@ -257,26 +264,48 @@ export default function PlansScreen() {
     return <SkeletonPage />
   }
 
+  const isEn = locale === 'en'
+  const tierIcon = (tier: string, color: string) => {
+    if (tier === 'couple') return <Users size={20} color={color} />
+    if (tier === 'family') return <Home size={20} color={color} />
+    if (tier === 'premium') return <Crown size={20} color={color} />
+    return <User size={20} color={color} />
+  }
+  const payItems: Choice[] = paymentMethods.map(pm => {
+    const c = selectedPayment === pm.key ? '#fff' : b.accentIcon
+    return {
+      key: pm.key,
+      label: isEn ? pm.labelEn : pm.label,
+      icon: pm.key === 'visa' ? <CreditCard size={15} color={c} /> : pm.key === 'wallet' ? <Wallet size={15} color={c} /> : <Landmark size={15} color={c} />,
+    }
+  })
+  const serviceLabels: Record<string, string> = isEn
+    ? { wash: 'Wash', iron: 'Iron', wash_iron: 'Wash & Iron', dry_clean: 'Dry Clean', housekeeping: 'House Keeping', carpet: 'Carpets' }
+    : { wash: 'غسيل', iron: 'كوي', wash_iron: 'غسيل وكوي', dry_clean: 'تنظيف جاف', housekeeping: 'تنظيف منازل', carpet: 'سجاد' }
+
   return (
     <>
-    <ScrollView ref={scrollRef} style={[s.container, { backgroundColor: colors.navy[900] }]} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}>
+    <ScrollView ref={scrollRef} style={[s.container, { backgroundColor: b.page }]} contentContainerStyle={[s.content, { paddingTop: insets.top + 10 }]} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={b.primary} colors={[b.primary]} />}>
+      <FlowLines height={280} />
       <View style={s.headerRow}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={[s.backText, { color: colors.primary }]}>{locale === 'en' ? '← Back' : 'رجوع ←'}</Text>
-        </TouchableOpacity>
-        <Text style={[s.title, { color: colors.text }]}>{t('subscriptionPlans')}</Text>
-        <View style={{ width: 60 }} />
+        <IconButton onPress={() => router.back()} label={t('back')}>
+          <BackIcon color={b.ink} />
+        </IconButton>
+        <Text style={[s.title, { color: b.ink }]} numberOfLines={1}>{t('subscriptionPlans')}</Text>
       </View>
 
       {pendingSubs.map(ps => (
-        <View key={ps.id} style={[s.pendingSubCard, { borderColor: '#f59e0b40' }]}>
-          <Text style={s.pendingSubBadge}>⏳ {locale === 'en' ? 'Pending subscription request' : 'طلب اشتراك قيد المراجعة'}</Text>
-          <Text style={[s.pendingSubName, { color: colors.text }]}>{planName(ps.plan_name ?? '')}</Text>
-          <Text style={[s.pendingSubHint, { color: colors.navy[300] }]}>{locale === 'en' ? 'Will be activated after admin review and payment confirmation' : 'سيتم تفعيل اشتراكك بعد مراجعة الإدارة وتأكيد الدفع'}</Text>
-          <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 12, marginTop: 12 }}>
+        <View key={ps.id} style={[s.pendingSubCard, { backgroundColor: b.warnTint, borderColor: b.isDark ? 'rgba(245,158,11,0.3)' : '#F7DFA6' }]}>
+          <View style={s.pendingHead}>
+            <Hourglass size={15} color={b.isDark ? '#FBBF24' : '#B45309'} />
+            <Text style={[s.pendingSubBadge, { color: b.isDark ? '#FBBF24' : '#B45309' }]}>{isEn ? 'Pending subscription request' : 'طلب اشتراك قيد المراجعة'}</Text>
+          </View>
+          <Text style={[s.pendingSubName, { color: b.ink }]}>{planName(ps.plan_name ?? '')}</Text>
+          <Text style={[s.pendingSubHint, { color: b.warnText }]}>{isEn ? 'Will be activated after admin review and payment confirmation' : 'سيتم تفعيل اشتراكك بعد مراجعة الإدارة وتأكيد الدفع'}</Text>
+          <View style={s.pendingActions}>
             {(ps.payment_method === 'visa' || ps.payment_method === 'wallet') && (
               <TouchableOpacity
-                style={{ paddingHorizontal: 20, paddingVertical: 8, borderRadius: 12, borderWidth: 1.5, borderColor: colors.primary + '50', backgroundColor: colors.primary + '15' }}
+                style={[s.smallBtn, { borderColor: b.tintBorder, backgroundColor: b.tint }]}
                 disabled={subscribing}
                 onPress={async () => {
                   setSubscribing(true)
@@ -289,103 +318,106 @@ export default function PlansScreen() {
                   })
                   setSubscribing(false)
                   if (payError || payData?.error) {
-                    showAlert({ title: locale === 'en' ? 'Error' : 'خطأ', message: payData?.error || (locale === 'en' ? 'Payment failed' : 'فشل في بدء الدفع'), type: 'error' })
+                    showAlert({ title: isEn ? 'Error' : 'خطأ', message: payData?.error || (isEn ? 'Payment failed' : 'فشل في بدء الدفع'), type: 'error' })
                   } else if (payData?.iframe_url) {
                     router.push({ pathname: '/payment', params: { url: payData.iframe_url } })
                   }
                 }}
               >
-                <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '700' }}>{locale === 'en' ? 'Retry payment' : 'إعادة الدفع'}</Text>
+                <Text style={[s.smallBtnText, { color: b.tintText }]}>{isEn ? 'Retry payment' : 'إعادة الدفع'}</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity
-              style={{ paddingHorizontal: 20, paddingVertical: 8, borderRadius: 12, borderWidth: 1.5, borderColor: colors.danger + '50' }}
+              style={[s.smallBtn, { borderColor: b.dangerBorder, backgroundColor: b.dangerTint }]}
               onPress={() => {
                 showAlert({
-                  title: locale === 'en' ? 'Cancel request' : 'إلغاء الطلب',
-                  message: locale === 'en' ? `Cancel your pending request for "${planName(ps.plan_name ?? '')}"?` : `هل تريد إلغاء طلب الاشتراك في "${ps.plan_name}"؟`,
+                  title: isEn ? 'Cancel request' : 'إلغاء الطلب',
+                  message: isEn ? `Cancel your pending request for "${planName(ps.plan_name ?? '')}"?` : `هل تريد إلغاء طلب الاشتراك في "${ps.plan_name}"؟`,
                   type: 'confirm',
                   buttons: [
-                    { text: locale === 'en' ? 'No' : 'لا', style: 'cancel' },
+                    { text: isEn ? 'No' : 'لا', style: 'cancel' },
                     {
-                      text: locale === 'en' ? 'Yes, cancel' : 'نعم، إلغاء',
+                      text: isEn ? 'Yes, cancel' : 'نعم، إلغاء',
                       style: 'destructive',
                       onPress: async () => {
                         await supabase.from('subscriptions').update({ status: 'cancelled' }).eq('id', ps.id)
                         setPendingSubs(prev => prev.filter(p => p.id !== ps.id))
-                        showAlert({ title: locale === 'en' ? 'Done' : 'تم', message: locale === 'en' ? 'Request cancelled' : 'تم إلغاء الطلب', type: 'success' })
+                        showAlert({ title: isEn ? 'Done' : 'تم', message: isEn ? 'Request cancelled' : 'تم إلغاء الطلب', type: 'success' })
                       },
                     },
                   ],
                 })
               }}
             >
-              <Text style={{ color: colors.danger, fontSize: 13, fontWeight: '700' }}>{locale === 'en' ? 'Cancel request' : 'إلغاء الطلب'}</Text>
+              <Text style={[s.smallBtnText, { color: b.dangerText }]}>{isEn ? 'Cancel request' : 'إلغاء الطلب'}</Text>
             </TouchableOpacity>
           </View>
         </View>
       ))}
 
       {activeSubs.length > 0 && (() => {
-        const cardWidth = Dimensions.get('window').width - 40
+        const cardWidth = Dimensions.get('window').width - 32
         const renderSubCard = (sub: typeof activeSubs[0]) => {
           const remaining = Math.max(0, sub.items_limit - sub.items_used)
           const exhausted = sub.items_used >= sub.items_limit
           const usagePercent = Math.min(100, (sub.items_used / sub.items_limit) * 100)
           return (
-          <View style={[s.activeSubCard, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '40', width: cardWidth }]}>
+          <View style={[s.activeSubCard, { borderColor: b.tintBorder, width: cardWidth }]}>
+            <LinearGradient colors={b.isDark ? ['rgba(17,36,69,0.92)', 'rgba(15,26,46,0.97)'] : ['#E6F3FD', '#FFFFFF']} style={StyleSheet.absoluteFill} />
             <View style={s.activeSubHeader}>
-              <Text style={[s.activeSubBadge, { color: colors.primary }]}>{locale === 'en' ? 'Active subscription ✓' : 'اشتراك نشط ✓'}</Text>
+              <Text style={[s.activeSubName, { color: b.ink }]} numberOfLines={1}>{planName(sub.plan_name ?? '')}</Text>
+              <Pill tone="ok" label={isEn ? 'Active subscription' : 'اشتراك نشط'} icon={<CircleCheck size={12} color={b.okText} />} />
             </View>
-            <Text style={[s.activeSubName, { color: colors.text }]}>{planName(sub.plan_name ?? '')}</Text>
 
             {exhausted && (
-              <View style={[s.exhaustedBanner, { backgroundColor: colors.danger + '15', borderColor: colors.danger + '30' }]}>
-                <Text style={[s.exhaustedText, { color: colors.danger }]}>
-                  {locale === 'en' ? '⚠️ Your plan items are used up! New orders will be at regular prices.' : '⚠️ رصيد باقتك خلص! الطلبات الجديدة هتكون بأسعار عادية.'}
+              <View style={[s.exhaustedBanner, { backgroundColor: b.dangerTint, borderColor: b.dangerBorder }]}>
+                <TriangleAlert size={15} color={b.dangerText} />
+                <Text style={[s.exhaustedText, { color: b.dangerText }]}>
+                  {isEn ? 'Your plan items are used up! New orders will be at regular prices.' : 'رصيد باقتك خلص! الطلبات الجديدة هتكون بأسعار عادية.'}
                 </Text>
               </View>
             )}
 
             <View style={s.progressRow}>
-              <Text style={[s.progressLabel, { color: colors.navy[200] }]}>{locale === 'en' ? 'Items used' : 'القطع المستخدمة'}</Text>
-              <Text style={[s.progressValue, { color: exhausted ? colors.danger : colors.text }]}>{sub.items_used} / {sub.items_limit}</Text>
+              <Text style={[s.progressLabel, { color: b.muted }]}>{isEn ? 'Items used' : 'القطع المستخدمة'}</Text>
+              <Text style={[s.progressValue, { color: exhausted ? b.dangerText : b.ink }]}>{sub.items_used} / {sub.items_limit}</Text>
+            </View>
+            <View style={[s.progressBar, { backgroundColor: b.isDark ? '#1E2B44' : '#DCEAF7' }]}>
+              <View style={[s.progressFill, { backgroundColor: exhausted ? b.dangerText : b.primary, width: `${usagePercent}%` }]} />
             </View>
             <View style={s.progressRow}>
-              <Text style={[s.progressLabel, { color: colors.navy[200] }]}>{locale === 'en' ? 'Remaining' : 'المتبقي'}</Text>
-              <Text style={[s.progressValue, { color: exhausted ? colors.danger : colors.success }]}>{remaining} {locale === 'en' ? 'items' : 'قطعة'}</Text>
+              <Text style={[s.progressLabel, { color: b.muted }]}>{isEn ? 'Remaining' : 'المتبقي'}</Text>
+              <Text style={[s.progressValue, { color: exhausted ? b.dangerText : b.okText }]}>{remaining} {isEn ? 'items' : 'قطعة'}</Text>
             </View>
-            <View style={[s.progressBar, { backgroundColor: colors.navy[700] }]}>
-              <View style={[s.progressFill, { backgroundColor: exhausted ? colors.danger : colors.primary, width: `${usagePercent}%` }]} />
+            <View style={[s.subDivider, { backgroundColor: b.isDark ? 'rgba(56,189,248,0.18)' : '#DCEAF7' }]} />
+            <View style={s.subDetailRow}>
+              <Text style={[s.subDetailLabel, { color: b.muted }]}>{isEn ? 'Expires' : 'ينتهي في'}</Text>
+              <Text style={[s.subDetailValue, { color: b.ink }]}>{sub.end_date}</Text>
             </View>
             <View style={s.subDetailRow}>
-              <Text style={[s.subDetailLabel, { color: colors.navy[300] }]}>{locale === 'en' ? 'Expires' : 'ينتهي في'}</Text>
-              <Text style={[s.subDetailValue, { color: colors.text }]}>{sub.end_date}</Text>
+              <Text style={[s.subDetailLabel, { color: b.muted }]}>{isEn ? 'Auto-renew' : 'تجديد تلقائي'}</Text>
+              <Switch
+                value={!!sub.auto_renew}
+                onValueChange={async () => {
+                  const newVal = !sub.auto_renew
+                  await supabase.from('subscriptions').update({ auto_renew: newVal }).eq('id', sub.id)
+                  setActiveSubs(prev => prev.map(s => s.id === sub.id ? { ...s, auto_renew: newVal } : s))
+                }}
+                trackColor={{ false: b.isDark ? '#2A3852' : '#D5DEEA', true: b.primary }}
+                thumbColor="#fff"
+              />
             </View>
-            <TouchableOpacity style={s.subDetailRow} onPress={async () => {
-              const newVal = !sub.auto_renew
-              await supabase.from('subscriptions').update({ auto_renew: newVal }).eq('id', sub.id)
-              setActiveSubs(prev => prev.map(s => s.id === sub.id ? { ...s, auto_renew: newVal } : s))
-            }}>
-              <Text style={[s.subDetailLabel, { color: colors.navy[300] }]}>{locale === 'en' ? 'Auto-renew' : 'تجديد تلقائي'}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text style={[s.subDetailValue, { color: colors.text }]}>{sub.auto_renew ? (locale === 'en' ? 'On' : 'مفعّل') : (locale === 'en' ? 'Off' : 'متوقف')}</Text>
-                <View style={[s.toggleTrackSmall, { backgroundColor: colors.navy[600] }, sub.auto_renew && { backgroundColor: colors.primary }]}>
-                  <View style={[s.toggleThumbSmall, sub.auto_renew && s.toggleThumbActiveSmall]} />
-                </View>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity style={[s.cancelSubBtn, { backgroundColor: colors.dangerGlow, borderColor: colors.danger + '30' }]} onPress={() => handleCancelSub(sub)}>
-              <Text style={[s.cancelSubBtnText, { color: colors.danger }]}>{locale === 'en' ? 'Cancel subscription' : 'إلغاء الاشتراك'}</Text>
+            <TouchableOpacity style={[s.cancelSubBtn, { backgroundColor: b.dangerTint, borderColor: b.dangerBorder }]} onPress={() => handleCancelSub(sub)} accessibilityRole="button">
+              <Text style={[s.cancelSubBtnText, { color: b.dangerText }]}>{isEn ? 'Cancel subscription' : 'إلغاء الاشتراك'}</Text>
             </TouchableOpacity>
           </View>
           )
         }
 
-        if (activeSubs.length === 1) return <View style={{ marginBottom: 24 }}>{renderSubCard(activeSubs[0])}</View>
+        if (activeSubs.length === 1) return <View style={{ marginBottom: 18 }}>{renderSubCard(activeSubs[0])}</View>
 
         return (
-          <View style={{ marginBottom: 24 }}>
+          <View style={{ marginBottom: 18 }}>
             <FlatList
               data={activeSubs}
               horizontal
@@ -404,16 +436,16 @@ export default function PlansScreen() {
               scrollEventThrottle={16}
             />
             {activeSubIdx < activeSubs.length - 1 && (
-              <Animated.View style={[s.scrollArrow, locale === 'en' ? { right: 2 } : { left: 2 }, {
+              <Animated.View style={[s.scrollArrow, isEn ? { right: 2 } : { left: 2 }, {
                 opacity: scrollArrowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }),
-                transform: [{ translateX: scrollArrowAnim.interpolate({ inputRange: [0, 1], outputRange: locale === 'en' ? [0, 6] : [0, -6] }) }],
+                transform: [{ translateX: scrollArrowAnim.interpolate({ inputRange: [0, 1], outputRange: isEn ? [0, 6] : [0, -6] }) }],
               }]}>
-                <Text style={[s.scrollArrowText, { color: colors.primary }]}>{locale === 'en' ? '›' : '‹'}</Text>
+                <Text style={[s.scrollArrowText, { color: b.primary }]}>{isEn ? '›' : '‹'}</Text>
               </Animated.View>
             )}
             <View style={s.dotsRow}>
               {activeSubs.map((_, i) => (
-                <View key={i} style={[s.dot, { backgroundColor: i === activeSubIdx ? colors.primary : colors.navy[600] }]} />
+                <View key={i} style={[s.dot, { backgroundColor: i === activeSubIdx ? b.primary : (b.isDark ? '#2A3852' : '#D5DEEA') }, i === activeSubIdx && { width: 18 }]} />
               ))}
             </View>
           </View>
@@ -421,30 +453,44 @@ export default function PlansScreen() {
       })()}
 
       {/* ── Service Filter ── */}
-      <ScrollView horizontal nestedScrollEnabled={true} showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }} contentContainerStyle={s.filterRow}
+      <ScrollView horizontal nestedScrollEnabled={true} showsHorizontalScrollIndicator={false} style={{ marginBottom: 14, flexGrow: 0 }} contentContainerStyle={s.filterRow}
         ref={filterScrollRef}
       >
         {[
-          { key: 'all', icon: '📋', label: 'الكل', labelEn: 'All' },
-          { key: 'clothes', icon: '👔', label: 'ملابس', labelEn: 'Clothes' },
-          { key: 'carpet', icon: '🧹', label: 'سجاد وبطاطين', labelEn: 'Carpets' },
-          { key: 'housekeeping', icon: '🏠', label: 'تنظيف منازل', labelEn: 'House Keeping' },
+          { key: 'all', label: 'الكل', labelEn: 'All' },
+          { key: 'clothes', label: 'ملابس', labelEn: 'Clothes' },
+          { key: 'carpet', label: 'سجاد وبطاطين', labelEn: 'Carpets' },
+          { key: 'housekeeping', label: 'تنظيف منازل', labelEn: 'House Keeping' },
         ].map(f => (
-          <TouchableOpacity
-            key={f.key}
-            style={[s.filterChip, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, serviceFilter === f.key && { borderColor: colors.primary, backgroundColor: colors.primary + '15' }]}
-            onPress={() => setServiceFilter(f.key)}
-          >
-            <Text style={s.filterIcon}>{f.icon}</Text>
-            <Text style={[s.filterLabel, { color: colors.navy[300] }, serviceFilter === f.key && { color: colors.primary }]}>
-              {locale === 'en' ? f.labelEn : f.label}
-            </Text>
-          </TouchableOpacity>
+          <Chip key={f.key} label={isEn ? f.labelEn : f.label} active={serviceFilter === f.key} onPress={() => setServiceFilter(f.key)} />
         ))}
       </ScrollView>
 
+      {/* ── Duration (drives the prices below) ── */}
+      <Text style={[s.sectionTitle, { color: b.ink }]}>{isEn ? 'Duration' : 'مدة الاشتراك'}</Text>
+      <ScrollView horizontal nestedScrollEnabled={true} showsHorizontalScrollIndicator={false} style={{ marginBottom: 16, flexGrow: 0 }} contentContainerStyle={s.durRow}
+        ref={durScrollRef}
+      >
+        {durationsMeta.map(d => {
+          const rate = d.key !== 'monthly' ? discountRates[d.key as keyof typeof discountRates] : 0
+          const on = selectedDuration === d.key
+          return (
+            <TouchableOpacity
+              key={d.key}
+              style={[s.durChip, { backgroundColor: b.card, borderColor: b.cardBorder }, on && { borderColor: b.primary, backgroundColor: b.tint }]}
+              onPress={() => setSelectedDuration(d.key)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+            >
+              <Text style={[s.durLabel, { color: on ? b.tintText : b.ink2 }]}>{isEn ? d.labelEn : d.label}</Text>
+              {rate > 0 && <Text style={[s.durSave, { color: b.okText }]}>{isEn ? `Save ${rate}%` : `وفّر ${rate}%`}</Text>}
+            </TouchableOpacity>
+          )
+        })}
+      </ScrollView>
+
       {/* ── Plans List ── */}
-      <Text style={[s.sectionTitle, { color: colors.text }]}>{activeSubs.length > 0 ? (locale === 'en' ? 'Upgrade or add plan' : 'ترقية أو إضافة باقة') : (locale === 'en' ? 'Available plans' : 'الباقات المتاحة')}</Text>
+      <Text style={[s.sectionTitle, { color: b.ink }]}>{activeSubs.length > 0 ? (isEn ? 'Upgrade or add plan' : 'ترقية أو إضافة باقة') : (isEn ? 'Available plans' : 'الباقات المتاحة')}</Text>
 
       {plans.filter(plan => {
         if (serviceFilter === 'all') return true
@@ -456,7 +502,8 @@ export default function PlansScreen() {
         return true
       }).map(plan => {
         const price = calcPrice(plan.monthly_price, selectedDuration)
-        const tierColor = tierColors[plan.tier] ?? colors.primary
+        const fullPrice = plan.monthly_price * durationObj.months
+        const tierColor = tierColors[plan.tier] ?? b.primary
         const isCurrentPlan = activeSubs.some(s => s.plan_id === plan.id)
         const pCovered = plan.covered_services ?? []
         const sameTypeSub = activeSubs.find(s => {
@@ -466,159 +513,157 @@ export default function PlansScreen() {
           const sCovered = sPlan.covered_services ?? []
           return pCovered.length > 0 && sCovered.some((sv: string) => pCovered.includes(sv))
         })
+        const selected = selectedPlanForSubscribe?.id === plan.id
 
         return (
-          <View key={plan.id} style={[s.planCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, isCurrentPlan && { borderColor: colors.primary }]}>
-            {isCurrentPlan && (
-              <View style={[s.currentBadge, { backgroundColor: colors.primary }]}><Text style={s.currentBadgeText}>{locale === 'en' ? 'Current plan' : 'باقتك الحالية'}</Text></View>
-            )}
-            <View style={[s.planTierDot, { backgroundColor: tierColor }]} />
-            <Text style={[s.planName, { color: colors.text }]}>{planName(plan.name)}</Text>
-            <Text style={[s.planDesc, { color: colors.navy[300] }]}>{locale === 'en' ? (t(`desc:${plan.description}` as any) !== `desc:${plan.description}` ? t(`desc:${plan.description}` as any) : plan.description) : plan.description}</Text>
+          <Card key={plan.id} style={[s.planCard, (isCurrentPlan || selected) && { borderColor: b.primary, borderWidth: 1.5 }]}>
+            <View style={s.planHead}>
+              <View style={[s.tierIcon, { backgroundColor: tierColor + '1F' }]}>{tierIcon(plan.tier, tierColor)}</View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={[s.planName, { color: b.ink }]} numberOfLines={1}>{planName(plan.name)}</Text>
+                {plan.description ? (
+                  <Text style={[s.planDesc, { color: b.muted }]} numberOfLines={2}>{isEn ? (t(`desc:${plan.description}` as any) !== `desc:${plan.description}` ? t(`desc:${plan.description}` as any) : plan.description) : plan.description}</Text>
+                ) : null}
+              </View>
+              {isCurrentPlan && <Pill tone="info" label={isEn ? 'Current plan' : 'باقتك الحالية'} />}
+            </View>
 
             <View style={s.planPriceRow}>
-              <Text style={[s.planPrice, { color: colors.primary }]}>{price}</Text>
-              <Text style={[s.planCurrency, { color: colors.navy[300] }]}> {t('currency')} / {durLabel}</Text>
+              <Text style={[s.planPrice, { color: b.ink }]}>{money(price)}</Text>
+              <Text style={[s.planCurrency, { color: b.muted }]}>{t('currency')} / {durLabel}</Text>
+              {fullPrice > price && <Text style={[s.planStrike, { color: b.faint }]}>{money(fullPrice)}</Text>}
             </View>
 
             <View style={s.planFeatures}>
-              <Text style={[s.featureText, { color: colors.navy[100] }]}>📦 {plan.items_per_month} {locale === 'en' ? 'items/month' : 'قطعة شهرياً'}</Text>
-              {plan.includes_all_services
-                ? <Text style={[s.featureText, { color: colors.navy[100] }]}>✨ {locale === 'en' ? 'All services included' : 'جميع الخدمات متاحة'}</Text>
-                : plan.covered_services && plan.covered_services.length > 0
-                  ? <Text style={[s.featureText, { color: colors.navy[100] }]}>✅ {plan.covered_services.map((s: string) => (locale === 'en' ? { wash: 'Wash', iron: 'Iron', wash_iron: 'Wash & Iron', dry_clean: 'Dry Clean', housekeeping: 'House Keeping', carpet: 'Carpets' } : { wash: 'غسيل', iron: 'كوي', wash_iron: 'غسيل وكوي', dry_clean: 'تنظيف جاف', housekeeping: 'تنظيف منازل', carpet: 'سجاد' })[s] ?? s).join(' • ')}</Text>
-                  : null}
-              {plan.tier === 'premium' && <Text style={[s.featureText, { color: colors.navy[100] }]}>⚡ {locale === 'en' ? 'Priority delivery' : 'أولوية في التوصيل'}</Text>}
+              <View style={[s.feature, { backgroundColor: b.iconTile }]}>
+                <Package size={13} color={b.accentIcon} />
+                <Text style={[s.featureText, { color: b.ink2 }]}>{plan.items_per_month} {isEn ? 'items/month' : 'قطعة شهرياً'}</Text>
+              </View>
+              {plan.includes_all_services ? (
+                <View style={[s.feature, { backgroundColor: b.iconTile }]}>
+                  <Sparkles size={13} color={b.accentIcon} />
+                  <Text style={[s.featureText, { color: b.ink2 }]}>{isEn ? 'All services included' : 'جميع الخدمات متاحة'}</Text>
+                </View>
+              ) : pCovered.map(sv => (
+                <View key={sv} style={[s.feature, { backgroundColor: b.iconTile }]}>
+                  <Check size={13} color={b.accentIcon} />
+                  <Text style={[s.featureText, { color: b.ink2 }]}>{serviceLabels[sv] ?? sv}</Text>
+                </View>
+              ))}
+              {plan.tier === 'premium' && (
+                <View style={[s.feature, { backgroundColor: b.iconTile }]}>
+                  <Zap size={13} color={b.accentIcon} />
+                  <Text style={[s.featureText, { color: b.ink2 }]}>{isEn ? 'Priority delivery' : 'أولوية في التوصيل'}</Text>
+                </View>
+              )}
             </View>
 
-            <TouchableOpacity
-              style={[s.subscribeBtn, { backgroundColor: colors.primary }, isCurrentPlan && { backgroundColor: colors.navy[600] }]}
-              onPress={() => handleSubscribe(plan)}
-              disabled={isCurrentPlan || subscribing}
-            >
-              <Text style={s.subscribeBtnText}>
-                {isCurrentPlan ? (locale === 'en' ? 'Subscribed ✓' : 'مشترك ✓') : subscribing ? (locale === 'en' ? 'Loading...' : 'جاري...') : sameTypeSub ? (locale === 'en' ? 'Upgrade' : 'ترقية') : (locale === 'en' ? 'Subscribe now' : 'اشترك الآن')}
-              </Text>
-            </TouchableOpacity>
-          </View>
+            {isCurrentPlan ? (
+              <View style={[s.subscribedBtn, { backgroundColor: b.okTint }]}>
+                <CircleCheck size={16} color={b.okText} />
+                <Text style={[s.subscribedText, { color: b.okText }]}>{isEn ? 'Subscribed' : 'مشترك'}</Text>
+              </View>
+            ) : (
+              <PrimaryButton
+                title={sameTypeSub ? (isEn ? 'Upgrade' : 'ترقية') : (isEn ? 'Subscribe now' : 'اشترك الآن')}
+                loadingTitle={isEn ? 'Loading...' : 'جاري...'}
+                loading={subscribing}
+                onPress={() => handleSubscribe(plan)}
+              />
+            )}
+          </Card>
         )
       })}
 
       {/* ── Subscription Settings ── */}
-      <View onLayout={e => { settingsY.current = e.nativeEvent.layout.y }} style={[s.settingsSection, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
-        <Text style={[s.settingsSectionTitle, { color: colors.text }]}>⚙️ {locale === 'en' ? 'Subscription settings' : 'إعدادات الاشتراك'}</Text>
+      <View onLayout={e => { settingsY.current = e.nativeEvent.layout.y }}>
+        <Card style={s.settingsSection}>
+          <View style={s.settingsHead}>
+            <View style={[s.settingsIcon, { backgroundColor: b.tint }]}><Settings2 size={15} color={b.tintText} /></View>
+            <Text style={[s.settingsSectionTitle, { color: b.ink }]}>{isEn ? 'Subscription settings' : 'إعدادات الاشتراك'}</Text>
+          </View>
 
-        {/* Duration */}
-        <Text style={[s.settingsLabel, { color: colors.navy[300] }]}>{locale === 'en' ? 'Duration' : 'مدة الاشتراك'}</Text>
-        <ScrollView horizontal nestedScrollEnabled={true} showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }} contentContainerStyle={s.durRow}
-          ref={durScrollRef}
-        >
-          {durationsMeta.map(d => {
-            const rate = d.key !== 'monthly' ? discountRates[d.key as keyof typeof discountRates] : 0
-            return (
-              <TouchableOpacity
-                key={d.key}
-                style={[s.durChip, { backgroundColor: colors.navy[800], borderColor: colors.navy[600] }, selectedDuration === d.key && { borderColor: colors.primary, backgroundColor: colors.primary + '15' }]}
-                onPress={() => setSelectedDuration(d.key)}
-              >
-                <Text style={[s.durLabel, { color: colors.navy[200] }, selectedDuration === d.key && { color: colors.primary }]}>{locale === 'en' ? d.labelEn : d.label}</Text>
-                {rate > 0 && <Text style={[s.durSave, { color: colors.success }]}>{locale === 'en' ? `Save ${rate}%` : `وفّر ${rate}%`}</Text>}
-              </TouchableOpacity>
-            )
-          })}
-        </ScrollView>
+          <Text style={[s.settingsLabel, { color: b.muted }]}>{isEn ? 'Payment method' : 'طريقة الدفع'}</Text>
+          <ChoiceGrid items={payItems} value={selectedPayment} onChange={setSelectedPayment} />
 
-        {/* Payment */}
-        <Text style={[s.settingsLabel, { color: colors.navy[300] }]}>{locale === 'en' ? 'Payment method' : 'طريقة الدفع'}</Text>
-        <View style={s.paymentList}>
-          {paymentMethods.map(p => (
-            <TouchableOpacity
-              key={p.key}
-              style={[s.paymentCard, { backgroundColor: colors.navy[800], borderColor: colors.navy[600] }, selectedPayment === p.key && { borderColor: colors.primary, backgroundColor: colors.primary + '10' }]}
-              onPress={() => setSelectedPayment(p.key)}
-            >
-              <Text style={s.paymentIcon}>{p.icon}</Text>
-              <Text style={[s.paymentLabel, { color: colors.navy[200] }, selectedPayment === p.key && { color: colors.text }]}>{locale === 'en' ? p.labelEn : p.label}</Text>
-              {selectedPayment === p.key && (
-                <View style={[s.paymentCheck, { backgroundColor: colors.primary }]}><Text style={s.paymentCheckText}>✓</Text></View>
-              )}
-            </TouchableOpacity>
-          ))}
-        </View>
+          {selectedPayment === 'wallet' && (
+            <View style={{ marginTop: 12 }}>
+              <Text style={[s.settingsLabel, { color: b.muted }]}>{isEn ? 'Wallet phone number' : 'رقم موبايل المحفظة'}</Text>
+              <View style={[s.field, { backgroundColor: b.field, borderColor: b.fieldBorder }]}>
+                <View style={[s.fieldIcon, { backgroundColor: b.iconTile }]}><Smartphone size={15} color={b.accentIcon} /></View>
+                <TextInput
+                  style={[s.fieldInput, { color: b.ink }]}
+                  placeholder="01xxxxxxxxx"
+                  placeholderTextColor={b.faint}
+                  value={walletPhone}
+                  onChangeText={setWalletPhone}
+                  keyboardType="phone-pad"
+                  maxLength={11}
+                  textAlign="left"
+                />
+              </View>
+            </View>
+          )}
 
-        {selectedPayment === 'wallet' && (
-          <View style={[s.walletPhoneCard, { backgroundColor: colors.navy[800], borderColor: colors.primary + '30' }]}>
-            <Text style={[s.walletPhoneLabel, { color: colors.text }]}>📱 {locale === 'en' ? 'Wallet phone number' : 'رقم موبايل المحفظة'}</Text>
-            <TextInput
-              style={[s.walletPhoneInput, { color: colors.text, borderColor: colors.navy[600], backgroundColor: colors.navy[700] }]}
-              placeholder="01xxxxxxxxx"
-              placeholderTextColor={colors.navy[400]}
-              value={walletPhone}
-              onChangeText={setWalletPhone}
-              keyboardType="phone-pad"
-              maxLength={11}
+          <View style={[s.autoRenewInline, { borderTopColor: b.divider }]}>
+            <View style={[s.settingsIcon, { backgroundColor: b.iconTile }]}><RefreshCw size={15} color={b.accentIcon} /></View>
+            <View style={s.autoRenewInfo}>
+              <Text style={[s.autoRenewLabel, { color: b.ink }]}>{isEn ? 'Auto-renew' : 'تجديد تلقائي'}</Text>
+              <Text style={[s.autoRenewHint, { color: b.faint }]}>{isEn ? 'Renews when it ends' : 'تتجدد لما تخلص'}</Text>
+            </View>
+            <Switch
+              value={autoRenew}
+              onValueChange={setAutoRenew}
+              trackColor={{ false: b.isDark ? '#2A3852' : '#D5DEEA', true: b.primary }}
+              thumbColor="#fff"
             />
           </View>
-        )}
 
-        {/* Auto-renew */}
-        <TouchableOpacity style={s.autoRenewInline} onPress={() => setAutoRenew(!autoRenew)} activeOpacity={0.7}>
-          <View style={s.autoRenewInfo}>
-            <Text style={[s.autoRenewLabel, { color: colors.text }]}>{locale === 'en' ? 'Auto-renew' : 'تجديد تلقائي'}</Text>
-            <Text style={[s.autoRenewHint, { color: colors.navy[400] }]}>{locale === 'en' ? 'Renews when it ends' : 'تتجدد لما تخلص'}</Text>
-          </View>
-          <View style={[s.toggleTrack, { backgroundColor: colors.navy[600] }, autoRenew && { backgroundColor: colors.primary }]}>
-            <View style={[s.toggleThumb, autoRenew && s.toggleThumbActive]} />
-          </View>
-        </TouchableOpacity>
-
-        {selectedPlanForSubscribe && (
-          <View style={{ marginTop: 16 }}>
-            <Text style={{ color: colors.navy[300], fontSize: 12, textAlign: 'center', marginBottom: 8 }}>
-              {locale === 'en' ? `Selected plan: ${planName(selectedPlanForSubscribe.name)}` : `الباقة المختارة: ${selectedPlanForSubscribe.name}`}
-            </Text>
-            <TouchableOpacity
-              style={[s.subscribeBtn, { backgroundColor: colors.primary, paddingVertical: 16 }]}
-              onPress={() => {
-                const pCovered = selectedPlanForSubscribe.covered_services ?? []
-                const overlappingSub = activeSubs.find(s => {
-                  if (s.plan_id === selectedPlanForSubscribe.id) return false
-                  const sPlan = (s as any).plans ?? {}
-                  if (sPlan.includes_all_services || selectedPlanForSubscribe.includes_all_services) return true
-                  const sCovered = sPlan.covered_services ?? []
-                  return pCovered.length > 0 && sCovered.some((sv: string) => pCovered.includes(sv))
-                })
-                if (overlappingSub) {
-                  showAlert({
-                    title: locale === 'en' ? 'Upgrade plan' : 'ترقية الباقة',
-                    message: locale === 'en'
-                      ? `You are subscribed to "${planName(overlappingSub.plan_name ?? '')}". ⚠️ Paid amount (${overlappingSub.total_paid} EGP) is non-refundable.\n\nUpgrade to "${planName(selectedPlanForSubscribe.name)}"?`
-                      : `أنت مشترك حالياً في "${overlappingSub.plan_name}".\n\n⚠️ المبلغ المدفوع للباقة الحالية (${overlappingSub.total_paid} ج.م) لن يُسترد.\n\nهل تريد الترقية إلى "${selectedPlanForSubscribe.name}"؟`,
-                    type: 'confirm',
-                    buttons: [
-                      { text: locale === 'en' ? 'Cancel' : 'تراجع', style: 'cancel' },
-                      {
-                        text: locale === 'en' ? 'Yes, upgrade' : 'نعم، ترقية',
-                        onPress: async () => {
-                          await supabase.from('subscriptions').update({ status: 'upgraded', auto_renew: false }).eq('id', overlappingSub.id)
-                          setActiveSubs(prev => prev.filter(s => s.id !== overlappingSub.id))
-                          doSubscribe(selectedPlanForSubscribe)
-                        },
-                      },
-                    ],
-                  })
-                } else {
-                  doSubscribe(selectedPlanForSubscribe)
-                }
-              }}
-              disabled={subscribing}
-            >
-              <Text style={[s.subscribeBtnText, { fontSize: 16 }]}>
-                {subscribing ? (locale === 'en' ? 'Loading...' : 'جاري...') : (locale === 'en' ? 'Confirm subscription' : 'تأكيد الاشتراك')}
+          {selectedPlanForSubscribe && (
+            <View style={{ marginTop: 14 }}>
+              <Text style={[s.selectedHint, { color: b.muted }]}>
+                {isEn ? `Selected plan: ${planName(selectedPlanForSubscribe.name)}` : `الباقة المختارة: ${selectedPlanForSubscribe.name}`}
               </Text>
-            </TouchableOpacity>
-          </View>
-        )}
+              <PrimaryButton
+                title={isEn ? 'Confirm subscription' : 'تأكيد الاشتراك'}
+                loadingTitle={isEn ? 'Loading...' : 'جاري...'}
+                loading={subscribing}
+                onPress={() => {
+                  const pCovered = selectedPlanForSubscribe.covered_services ?? []
+                  const overlappingSub = activeSubs.find(s => {
+                    if (s.plan_id === selectedPlanForSubscribe.id) return false
+                    const sPlan = (s as any).plans ?? {}
+                    if (sPlan.includes_all_services || selectedPlanForSubscribe.includes_all_services) return true
+                    const sCovered = sPlan.covered_services ?? []
+                    return pCovered.length > 0 && sCovered.some((sv: string) => pCovered.includes(sv))
+                  })
+                  if (overlappingSub) {
+                    showAlert({
+                      title: isEn ? 'Upgrade plan' : 'ترقية الباقة',
+                      message: isEn
+                        ? `You are subscribed to "${planName(overlappingSub.plan_name ?? '')}". ⚠️ Paid amount (${overlappingSub.total_paid} EGP) is non-refundable.\n\nUpgrade to "${planName(selectedPlanForSubscribe.name)}"?`
+                        : `أنت مشترك حالياً في "${overlappingSub.plan_name}".\n\n⚠️ المبلغ المدفوع للباقة الحالية (${overlappingSub.total_paid} ج.م) لن يُسترد.\n\nهل تريد الترقية إلى "${selectedPlanForSubscribe.name}"؟`,
+                      type: 'confirm',
+                      buttons: [
+                        { text: isEn ? 'Cancel' : 'تراجع', style: 'cancel' },
+                        {
+                          text: isEn ? 'Yes, upgrade' : 'نعم، ترقية',
+                          onPress: async () => {
+                            await supabase.from('subscriptions').update({ status: 'upgraded', auto_renew: false }).eq('id', overlappingSub.id)
+                            setActiveSubs(prev => prev.filter(s => s.id !== overlappingSub.id))
+                            doSubscribe(selectedPlanForSubscribe)
+                          },
+                        },
+                      ],
+                    })
+                  } else {
+                    doSubscribe(selectedPlanForSubscribe)
+                  }
+                }}
+              />
+            </View>
+          )}
+        </Card>
       </View>
 
       <View style={{ height: 40 }} />
@@ -630,133 +675,75 @@ export default function PlansScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: 20, paddingTop: 56, paddingBottom: 40 },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  backText: { fontSize: 16, fontWeight: '600' },
-  title: { fontSize: 20, fontWeight: 'bold' },
-  sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 12, marginTop: 8 },
+  content: { paddingHorizontal: 16, paddingBottom: 40 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
+  title: { flex: 1, fontSize: 18, fontFamily: F.display },
+  sectionTitle: { fontSize: 15, fontFamily: F.bold, marginBottom: 10 },
 
-  pendingSubCard: {
-    backgroundColor: '#f59e0b15', borderRadius: 20, padding: 20, marginBottom: 16,
-    borderWidth: 1.5,
-  },
-  pendingSubBadge: { color: '#f59e0b', fontSize: 14, fontWeight: '700', marginBottom: 8 },
-  pendingSubName: { fontSize: 18, fontWeight: 'bold', marginBottom: 8 },
-  pendingSubHint: { fontSize: 12 },
+  pendingSubCard: { borderRadius: 18, padding: 14, marginBottom: 14, borderWidth: 1 },
+  pendingHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+  pendingSubBadge: { fontSize: 12.5, fontFamily: F.bold },
+  pendingSubName: { fontSize: 17, fontFamily: F.display, marginBottom: 4 },
+  pendingSubHint: { fontSize: 12, fontFamily: F.regular },
+  pendingActions: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  smallBtn: { flex: 1, height: SIZE.M, borderRadius: SIZE.rM, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  smallBtnText: { fontSize: 13, fontFamily: F.bold },
 
-  activeSubCard: {
-    borderRadius: 20, padding: 20, borderWidth: 1.5,
-  },
-  activeSubHeader: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 8 },
-  activeSubBadge: { fontSize: 12, fontWeight: '700' },
-  activeSubName: { fontSize: 22, fontWeight: 'bold', marginBottom: 16 },
+  activeSubCard: { borderRadius: 20, padding: 16, borderWidth: 1, overflow: 'hidden' },
+  activeSubHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 14 },
+  activeSubName: { flex: 1, fontSize: 19, fontFamily: F.display },
   progressRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  progressLabel: { fontSize: 12 },
-  progressValue: { fontSize: 12, fontWeight: '700' },
-  progressBar: { height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 14 },
+  progressLabel: { fontSize: 12, fontFamily: F.regular },
+  progressValue: { fontSize: 12.5, fontFamily: F.bold },
+  progressBar: { height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 8 },
   progressFill: { height: '100%', borderRadius: 4 },
-  subDetailRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  subDetailLabel: { fontSize: 12 },
-  subDetailValue: { fontSize: 12, fontWeight: '600' },
+  subDivider: { height: 1, marginVertical: 8 },
+  subDetailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 34 },
+  subDetailLabel: { fontSize: 12.5, fontFamily: F.regular },
+  subDetailValue: { fontSize: 12.5, fontFamily: F.semibold },
 
-  filterRow: { gap: 8, paddingVertical: 4 },
-  filterChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    borderRadius: 14, paddingHorizontal: 16, paddingVertical: 10, borderWidth: 1.5,
-  },
-  filterIcon: { fontSize: 16 },
-  filterLabel: { fontSize: 13, fontWeight: '600' },
+  filterRow: { gap: 8, paddingVertical: 2 },
 
-  settingsSection: {
-    borderRadius: 20, padding: 20, marginTop: 8, marginBottom: 8, borderWidth: 1,
-  },
-  settingsSectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 16 },
-  settingsLabel: { fontSize: 13, fontWeight: '600', marginBottom: 8 },
-  autoRenewInline: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    marginTop: 8, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)',
-  },
-
-  durScroll: { marginBottom: 20 },
   durRow: { gap: 8 },
-  durChip: {
-    borderRadius: 12, paddingHorizontal: 18, paddingVertical: 10,
-    borderWidth: 1.5, alignItems: 'center',
-  },
-  durLabel: { fontSize: 13, fontWeight: '600' },
-  durSave: { fontSize: 10, fontWeight: '700', marginTop: 2 },
+  durChip: { minHeight: SIZE.M + 4, borderRadius: SIZE.rM, paddingHorizontal: 16, justifyContent: 'center', borderWidth: 1, alignItems: 'center' },
+  durLabel: { fontSize: 13, fontFamily: F.bold },
+  durSave: { fontSize: 10.5, fontFamily: F.bold, marginTop: 1 },
 
-  planCard: {
-    borderRadius: 20, padding: 22, marginBottom: 16,
-    borderWidth: 1.5, position: 'relative',
-  },
-  currentBadge: {
-    position: 'absolute', top: -10, left: 20,
-    borderRadius: 8, paddingHorizontal: 12, paddingVertical: 3,
-  },
-  currentBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
-  planTierDot: { width: 10, height: 10, borderRadius: 5, marginBottom: 8 },
-  planName: { fontSize: 20, fontWeight: 'bold', marginBottom: 4 },
-  planDesc: { fontSize: 13, marginBottom: 16 },
-  planPriceRow: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 16 },
-  planPrice: { fontSize: 32, fontWeight: 'bold' },
-  planCurrency: { fontSize: 14 },
-  planFeatures: { gap: 8, marginBottom: 20 },
-  featureText: { fontSize: 13 },
-  subscribeBtn: {
-    borderRadius: 14, padding: 14, alignItems: 'center',
-  },
-  subscribeBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  planCard: { marginBottom: 12, padding: 14 },
+  planHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  tierIcon: { width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  planName: { fontSize: 16, fontFamily: F.display },
+  planDesc: { fontSize: 12, fontFamily: F.regular, marginTop: 1 },
+  planPriceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 5, marginTop: 12, marginBottom: 10 },
+  planPrice: { fontSize: 28, fontFamily: F.display },
+  planCurrency: { fontSize: 12.5, fontFamily: F.medium },
+  planStrike: { fontSize: 13, fontFamily: F.medium, textDecorationLine: 'line-through', marginStart: 4 },
+  planFeatures: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 },
+  feature: { flexDirection: 'row', alignItems: 'center', gap: 5, height: SIZE.S - 2, paddingHorizontal: 10, borderRadius: 14 },
+  featureText: { fontSize: 11.5, fontFamily: F.semibold },
+  subscribedBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: SIZE.L, borderRadius: SIZE.rL },
+  subscribedText: { fontSize: 14, fontFamily: F.bold },
 
-  paymentList: { gap: 10, marginBottom: 16 },
-  paymentCard: {
-    flexDirection: 'row', alignItems: 'center',
-    borderRadius: 14, padding: 16, borderWidth: 1.5, gap: 12,
-  },
-  paymentIcon: { fontSize: 24 },
-  paymentLabel: { fontSize: 14, fontWeight: '600', flex: 1 },
-  paymentCheck: {
-    width: 24, height: 24, borderRadius: 12,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  paymentCheckText: { color: '#fff', fontSize: 14, fontWeight: '700' },
-
-  walletPhoneCard: { borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1 },
-  walletPhoneLabel: { fontSize: 14, fontWeight: '700', marginBottom: 8 },
-  walletPhoneInput: { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 18, textAlign: 'center', fontWeight: '700', letterSpacing: 2 },
-  autoRenewRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1,
-  },
+  settingsSection: { marginTop: 6, padding: 14 },
+  settingsHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  settingsIcon: { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  settingsSectionTitle: { fontSize: 15, fontFamily: F.bold },
+  settingsLabel: { fontSize: 12, fontFamily: F.semibold, marginBottom: 8 },
+  field: { flexDirection: 'row', alignItems: 'center', gap: 8, height: SIZE.L, borderRadius: SIZE.rL, borderWidth: 1, paddingHorizontal: 8 },
+  fieldIcon: { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  fieldInput: { flex: 1, fontSize: 15, fontFamily: F.semibold, letterSpacing: 1, paddingVertical: 0 },
+  autoRenewInline: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14, paddingTop: 12, borderTopWidth: 1 },
   autoRenewInfo: { flex: 1 },
-  autoRenewLabel: { fontSize: 14, fontWeight: '700' },
-  autoRenewHint: { fontSize: 11, marginTop: 2 },
-  toggleTrack: {
-    width: 48, height: 28, borderRadius: 14,
-    justifyContent: 'center', padding: 2,
-  },
-  toggleThumb: {
-    width: 24, height: 24, borderRadius: 12, backgroundColor: '#fff',
-  },
-  toggleThumbActive: { alignSelf: 'flex-end' },
-  toggleTrackSmall: {
-    width: 36, height: 20, borderRadius: 10,
-    justifyContent: 'center', padding: 2,
-  },
-  toggleThumbSmall: {
-    width: 16, height: 16, borderRadius: 8, backgroundColor: '#fff',
-  },
-  toggleThumbActiveSmall: { alignSelf: 'flex-end' },
-  exhaustedBanner: {
-    borderRadius: 12, padding: 12, marginBottom: 12, borderWidth: 1,
-  },
-  exhaustedText: { fontSize: 13, fontWeight: '600', textAlign: 'center' },
-  cancelSubBtn: {
-    borderWidth: 1, borderRadius: 14, padding: 12, alignItems: 'center', marginTop: 10,
-  },
-  cancelSubBtnText: { fontSize: 14, fontWeight: '700' },
+  autoRenewLabel: { fontSize: 13.5, fontFamily: F.bold },
+  autoRenewHint: { fontSize: 11, fontFamily: F.regular, marginTop: 1 },
+  selectedHint: { fontSize: 12, fontFamily: F.medium, textAlign: 'center', marginBottom: 8 },
+
+  exhaustedBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, padding: 10, marginBottom: 12, borderWidth: 1 },
+  exhaustedText: { flex: 1, fontSize: 12.5, fontFamily: F.semibold },
+  cancelSubBtn: { borderWidth: 1, borderRadius: SIZE.rM, height: SIZE.M, alignItems: 'center', justifyContent: 'center', marginTop: 10 },
+  cancelSubBtnText: { fontSize: 13.5, fontFamily: F.bold },
   dotsRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 10 },
-  dot: { width: 8, height: 8, borderRadius: 4 },
+  dot: { width: 7, height: 7, borderRadius: 4 },
   scrollArrow: { position: 'absolute', top: 80, zIndex: 10 },
   scrollArrowText: { fontSize: 28, fontWeight: '900' },
 })

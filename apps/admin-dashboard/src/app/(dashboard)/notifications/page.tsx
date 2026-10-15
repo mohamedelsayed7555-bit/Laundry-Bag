@@ -166,7 +166,8 @@ export default function NotificationsPage() {
           to: token,
           title: title.trim(),
           body: body.trim(),
-          sound: 'default',
+          sound: 'offer.wav',
+          channelId: 'offers-v1',
           data: { type: 'broadcast' },
         }))
         const res = await fetch('https://exp.host/--/api/v2/push/send', {

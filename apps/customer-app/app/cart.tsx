@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Platform, RefreshControl, I18nManager } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Platform, RefreshControl, I18nManager, Image, Switch } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { MapPin, Package, Plus, Trash2, ShoppingBag, TriangleAlert, CircleCheck, CreditCard, Banknote, Wallet, Landmark, Smartphone, Clock, CalendarDays, Zap, NotebookPen, ChevronDown, ChevronUp, Ticket, X } from 'lucide-react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter, useFocusEffect } from 'expo-router'
 import DateTimePicker from '@react-native-community/datetimepicker'
@@ -13,6 +15,18 @@ import { playNotificationSound } from '../src/hooks/useNotifications'
 import { supabase } from '../src/lib/supabase'
 import { SkeletonPage } from '../src/components/Skeleton'
 import { serverErrorMessage } from '../src/lib/serverErrors'
+import { useBrand, Card, Stepper, ChoiceGrid, Segmented, StickyFooter, IconButton, BackIcon, ForwardIcon, money, clock, F, SIZE, HIT, type Choice } from '../src/components/brand'
+import { PrimaryButton } from '../src/components/auth/ui'
+
+const SERVICE_IMG: Record<string, any> = {
+  wash: require('../assets/services/wash.webp'),
+  dry_clean: require('../assets/services/dry.webp'),
+  iron: require('../assets/services/iron.webp'),
+  wash_iron: require('../assets/services/washiron.webp'),
+  housekeeping: require('../assets/services/home.webp'),
+  carpet: require('../assets/services/carpet.webp'),
+  accessories: require('../assets/services/shop.webp'),
+}
 
 const paymentMethods = [
   { key: 'cash', icon: '💵', label: 'كاش', labelEn: 'Cash' },
@@ -40,6 +54,8 @@ export default function CartScreen() {
   const { cart, removeItem, updateQuantity, clearCart, totalPrice, totalItems } = useCart()
   const router = useRouter()
   const { showAlert, AlertComponent } = useCustomAlert()
+  const b = useBrand()
+  const insets = useSafeAreaInsets()
 
   const [paymentMethod, setPaymentMethod] = useState('cash')
   const [notes, setNotes] = useState('')
@@ -396,144 +412,179 @@ export default function CartScreen() {
     return <SkeletonPage />
   }
 
+  const addrDetails = (a: any) => [a.building && `${isEn ? 'Bldg' : 'مبنى'} ${a.building}`, a.floor && `${isEn ? 'Floor' : 'ط'}${a.floor}`, a.apartment && `${isEn ? 'Apt' : 'ش'}${a.apartment}`].filter(Boolean).join(' · ')
+  const dateLabel = `${scheduledDate.getDate()}/${scheduledDate.getMonth() + 1}/${scheduledDate.getFullYear()}`
+  const payItems: Choice[] = paymentMethods.map(pm => ({
+    key: pm.key,
+    label: isEn ? pm.labelEn : pm.label,
+    icon: (() => {
+      const on = paymentMethod === pm.key
+      const c = on ? '#fff' : b.accentIcon
+      if (pm.key === 'cash') return <Banknote size={15} color={c} />
+      if (pm.key === 'visa') return <CreditCard size={15} color={c} />
+      if (pm.key === 'e_wallet') return <Wallet size={15} color={c} />
+      return <Landmark size={15} color={c} />
+    })(),
+  }))
+  const showPayment = !useSubscription || (useSubscription && uncoveredCount > 0)
+
   if (cart.length === 0) {
     return (
-      <View style={[s.emptyContainer, { backgroundColor: colors.navy[900] }]}>
-        <Text style={s.emptyIcon}>🛒</Text>
-        <Text style={[s.emptyTitle, { color: colors.text }]}>{isEn ? 'Cart is empty' : 'السلة فارغة'}</Text>
-        <Text style={[s.emptyHint, { color: colors.navy[300] }]}>{isEn ? 'Add laundry items from the new order screen' : 'أضف قطع غسيل من شاشة الطلب الجديد'}</Text>
-        <TouchableOpacity onPress={() => router.back()} style={[s.emptyBtn, { backgroundColor: colors.primary }]}>
-          <Text style={s.emptyBtnText}>{isEn ? 'Go back' : 'العودة'}</Text>
-        </TouchableOpacity>
+      <View style={[s.emptyContainer, { backgroundColor: b.page }]}>
+        <View style={[s.emptyIcon, { backgroundColor: b.iconTile }]}><ShoppingBag size={30} color={b.accentIcon} /></View>
+        <Text style={[s.emptyTitle, { color: b.ink }]}>{isEn ? 'Cart is empty' : 'السلة فارغة'}</Text>
+        <Text style={[s.emptyHint, { color: b.muted }]}>{isEn ? 'Add laundry items from the new order screen' : 'أضف قطع غسيل من شاشة الطلب الجديد'}</Text>
+        <PrimaryButton title={isEn ? 'Go back' : 'العودة'} onPress={() => router.back()} style={{ alignSelf: 'stretch' }} />
       </View>
     )
   }
 
+  // One compact address row (pickup or delivery) with a change chip.
+  const AddrRow = ({ addr, onChange, delivery }: { addr: any; onChange: () => void; delivery?: boolean }) => (
+    <View style={s.addrRow}>
+      <LinearGradient colors={delivery ? ['#A78BFA', '#7C3AED'] : ['#38BDF8', '#0284C7']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.pinTile}>
+        {delivery ? <Package size={17} color="#fff" /> : <MapPin size={17} color="#fff" />}
+      </LinearGradient>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        {delivery ? <Text style={[s.addrKicker, { color: b.isDark ? '#C4B5FD' : '#7C3AED' }]}>{isEn ? 'Delivery Address' : 'عنوان التسليم'}</Text> : null}
+        <Text style={[s.addressLabel, { color: b.ink }]} numberOfLines={1}>{addr.label}</Text>
+        {(addr.building || addr.floor || addr.apartment) ? <Text style={[s.addressDetail, { color: b.muted }]} numberOfLines={1}>{addrDetails(addr)}</Text> : null}
+      </View>
+      <TouchableOpacity onPress={onChange} hitSlop={HIT} accessibilityRole="button" style={[s.changeChip, { backgroundColor: b.tint, borderColor: b.tintBorder }]}>
+        <Text style={[s.changeChipText, { color: b.tintText }]}>{isEn ? 'Change' : 'تغيير'}</Text>
+      </TouchableOpacity>
+    </View>
+  )
+
+  // Compact radio list used while picking an address.
+  const AddrPicker = ({ selectedId, onPick }: { selectedId?: string; onPick: (a: any) => void }) => (
+    <View>
+      {addresses.map((addr, idx) => {
+        const on = selectedId === addr.id
+        return (
+          <TouchableOpacity
+            key={addr.id}
+            onPress={() => onPick(addr)}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: on }}
+            style={[s.pickRow, idx > 0 && { borderTopWidth: 1, borderTopColor: b.divider }, on && { backgroundColor: b.isDark ? 'rgba(14,165,233,0.08)' : '#F0F8FF' }]}
+          >
+            <View style={[s.radio, { borderColor: on ? b.primary : b.raisedBorder }, on && { borderWidth: 5 }]} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={[s.addressLabel, { color: b.ink }]} numberOfLines={1}>{addr.label}</Text>
+              {(addr.building || addr.floor || addr.apartment) ? <Text style={[s.addressDetail, { color: b.muted }]} numberOfLines={1}>{addrDetails(addr)}</Text> : null}
+              {addr.landmark ? <Text style={[s.addressLandmark, { color: b.faint }]} numberOfLines={1}>{addr.landmark}</Text> : null}
+            </View>
+          </TouchableOpacity>
+        )
+      })}
+      <TouchableOpacity style={[s.dashedRow, { borderTopColor: b.divider }]} onPress={() => router.push('/addresses')} accessibilityRole="button">
+        <Plus size={15} color={b.accentIcon} />
+        <Text style={[s.addAddressText, { color: b.accentIcon }]}>{isEn ? 'Add new address' : 'إضافة عنوان جديد'}</Text>
+      </TouchableOpacity>
+    </View>
+  )
+
+  const SecTitle = ({ icon, title }: { icon: React.ReactNode; title: string }) => (
+    <View style={s.secRow}>
+      <View style={[s.secIcon, { backgroundColor: b.tint }]}>{icon}</View>
+      <Text style={[s.sectionTitle, { color: b.ink }]}>{title}</Text>
+    </View>
+  )
+
+  const headerH = insets.top + 58
+
   return (
-    <>
-      <ScrollView style={[s.scrollContainer, { backgroundColor: colors.navy[900] }]} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}>
-        <Text style={[s.title, { color: colors.text }]}>{isEn ? `My Cart (${totalItems} items)` : `سلتي (${totalItems} قطعة)`}</Text>
-
-        {cart.map((item, i) => (
-          <View key={i} style={[s.cartItem, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
-            <View style={{ flex: 1 }}>
-              <Text style={[s.cartItemName, { color: colors.text }]}>{itemName(item.name)} — {serviceLabel(item.service_type)}</Text>
-              <Text style={[s.cartItemPrice, { color: colors.navy[300] }]}>{item.price} {t('currency')} / {isEn ? 'item' : 'قطعة'}</Text>
+    <View style={{ flex: 1, backgroundColor: b.page }}>
+      <ScrollView
+        style={s.scrollContainer}
+        contentContainerStyle={[s.content, { paddingTop: headerH + 4, paddingBottom: 120 + insets.bottom }]}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={b.primary} colors={[b.primary]} progressViewOffset={headerH} />}
+      >
+        {/* Items */}
+        <Card pad={false} style={{ overflow: 'hidden' }}>
+          {cart.map((item, i) => (
+            <View key={i} style={[s.itemRow, i > 0 && { borderTopWidth: 1, borderTopColor: b.divider }]}>
+              <Image source={SERVICE_IMG[item.service_type] ?? SERVICE_IMG.wash} style={s.itemImg} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={[s.cartItemName, { color: b.ink }]} numberOfLines={1}>{itemName(item.name)}</Text>
+                <Text style={[s.cartItemPrice, { color: b.muted }]} numberOfLines={1}>
+                  <Text style={[s.cartItemPriceNum, { color: b.isDark ? '#38BDF8' : '#0284C7' }]}>{money(item.price)}</Text> {t('currency')} / {isEn ? 'item' : 'قطعة'} · {serviceLabel(item.service_type)}
+                </Text>
+              </View>
+              <Stepper
+                qty={item.quantity}
+                onRemove={() => removeItem(i)}
+                onMinus={() => updateQuantity(i, item.quantity - 1)}
+                onPlus={() => updateQuantity(i, item.quantity + 1)}
+              />
             </View>
-            <View style={s.cartItemActions}>
-              <TouchableOpacity onPress={() => updateQuantity(i, item.quantity - 1)} style={[s.qtyBtn, { backgroundColor: colors.navy[700] }]}>
-                <Text style={s.qtyBtnText}>−</Text>
-              </TouchableOpacity>
-              <Text style={[s.qtyDisplay, { color: colors.text }]}>{item.quantity}</Text>
-              <TouchableOpacity onPress={() => updateQuantity(i, item.quantity + 1)} style={[s.qtyBtn, { backgroundColor: colors.navy[700] }]}>
-                <Text style={s.qtyBtnText}>+</Text>
-              </TouchableOpacity>
-            </View>
-            <TouchableOpacity onPress={() => removeItem(i)} style={[s.removeBtn, { backgroundColor: colors.danger + '20', marginStart: 10 }]}>
-              <Text style={[s.removeBtnText, { color: colors.danger }]}>✕</Text>
-            </TouchableOpacity>
-          </View>
-        ))}
+          ))}
+        </Card>
 
-        <TouchableOpacity onPress={() => { const svc = cart[0]?.service_type; router.push({ pathname: '/(tabs)/new-order', params: svc ? { service: svc } : {} }) }} style={s.addMoreBtn}>
-          <Text style={[s.addMoreText, { color: colors.primary }]}>{isEn ? '+ Add more items' : '+ إضافة قطع أخرى'}</Text>
+        <TouchableOpacity
+          onPress={() => { const svc = cart[0]?.service_type; router.push({ pathname: '/(tabs)/new-order', params: svc ? { service: svc } : {} }) }}
+          style={[s.addMoreBtn, { borderColor: b.isDark ? 'rgba(56,189,248,0.35)' : '#BFDDF7' }]}
+          accessibilityRole="button"
+        >
+          <Plus size={15} color={b.accentIcon} />
+          <Text style={[s.addMoreText, { color: b.accentIcon }]}>{(isEn ? '+ Add more items' : '+ إضافة قطع أخرى').replace(/^\+\s*/, '')}</Text>
         </TouchableOpacity>
 
         {subExhausted && (
-          <View style={[s.exhaustedBanner, { backgroundColor: colors.danger + '10', borderColor: colors.danger + '30' }]}>
-            <Text style={[s.exhaustedText, { color: colors.danger }]}>
-              {isEn ? '⚠️ Your plan items are used up. This order will be at regular prices.' : '⚠️ رصيد باقتك خلص. الطلب ده هيكون بأسعار عادية.'}
+          <View style={[s.banner, { backgroundColor: b.dangerTint, borderColor: b.dangerBorder }]}>
+            <TriangleAlert size={18} color={b.dangerText} />
+            <Text style={[s.bannerText, { color: b.dangerText }]}>
+              {(isEn ? '⚠️ Your plan items are used up. This order will be at regular prices.' : '⚠️ رصيد باقتك خلص. الطلب ده هيكون بأسعار عادية.').replace(/^⚠️\s*/, '')}
             </Text>
           </View>
         )}
 
-        <Text style={[s.sectionTitle, { color: colors.text }]}>📍 {isEn ? 'Pickup Address' : 'عنوان الاستلام'}</Text>
-        {selectedAddress && !showPickupPicker ? (
-          <View style={[s.compactAddrCard, { backgroundColor: colors.cardBg, borderColor: colors.primary }]}>
-            <TouchableOpacity onPress={() => setShowPickupPicker(true)} style={[s.addrChangeBtn, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '40' }]}>
-              <Text style={[s.addrChangeBtnText, { color: colors.primary }]}>{isEn ? 'Change' : 'تغيير'}</Text>
-            </TouchableOpacity>
-            <View style={{ flex: 1 }}>
-              <Text style={[s.addressLabel, { color: colors.text }]}>{selectedAddress.label}</Text>
-              {(selectedAddress.building || selectedAddress.floor || selectedAddress.apartment) && (
-                <Text style={[s.addressDetail, { color: colors.navy[300] }]}>{[selectedAddress.building && `${isEn ? 'Bldg' : 'مبنى'} ${selectedAddress.building}`, selectedAddress.floor && `${isEn ? 'Floor' : 'ط'}${selectedAddress.floor}`, selectedAddress.apartment && `${isEn ? 'Apt' : 'ش'}${selectedAddress.apartment}`].filter(Boolean).join(' - ')}</Text>
-              )}
-            </View>
+        {/* Addresses */}
+        <SecTitle icon={<MapPin size={14} color={b.tintText} />} title={isEn ? 'Pickup Address' : 'عنوان الاستلام'} />
+        <Card pad={false} style={{ overflow: 'hidden' }}>
+          {selectedAddress && !showPickupPicker
+            ? <AddrRow addr={selectedAddress} onChange={() => setShowPickupPicker(true)} />
+            : <AddrPicker selectedId={selectedAddress?.id} onPick={addr => { setSelectedAddress(addr); setShowPickupPicker(false) }} />}
+          <View style={[s.toggleRow, { borderTopColor: b.divider }]}>
+            <Text style={[s.toggleLabel, { color: b.ink2 }]}>{isEn ? 'Deliver to same address' : 'التسليم لنفس العنوان'}</Text>
+            <Switch
+              value={sameAddress}
+              onValueChange={setSameAddress}
+              trackColor={{ false: b.isDark ? '#2A3852' : '#D5DEEA', true: b.primary }}
+              thumbColor="#fff"
+            />
           </View>
-        ) : (
-          <View style={s.addressList}>
-            {addresses.map(addr => (
-              <TouchableOpacity key={addr.id} onPress={() => { setSelectedAddress(addr); setShowPickupPicker(false) }}
-                style={[s.addressCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, selectedAddress?.id === addr.id && { borderColor: colors.primary, backgroundColor: colors.primary + '10' }]}>
-                <Text style={[s.addressLabel, { color: colors.text }]}>{selectedAddress?.id === addr.id ? '✅' : '📍'} {addr.label}</Text>
-                {(addr.building || addr.floor || addr.apartment) && (
-                  <Text style={[s.addressDetail, { color: colors.navy[300] }]}>{[addr.building && `${isEn ? 'Bldg' : 'مبنى'} ${addr.building}`, addr.floor && `${isEn ? 'Floor' : 'ط'}${addr.floor}`, addr.apartment && `${isEn ? 'Apt' : 'ش'}${addr.apartment}`].filter(Boolean).join(' - ')}</Text>
+          {!sameAddress && (
+            <View style={{ borderTopWidth: 1, borderTopColor: b.divider }}>
+              {deliveryAddress && !showDeliveryPicker
+                ? <AddrRow delivery addr={deliveryAddress} onChange={() => setShowDeliveryPicker(true)} />
+                : (
+                  <>
+                    <Text style={[s.pickTitle, { color: b.isDark ? '#C4B5FD' : '#7C3AED' }]}>{isEn ? 'Delivery Address' : 'عنوان التسليم'}</Text>
+                    <AddrPicker selectedId={deliveryAddress?.id} onPick={addr => { setDeliveryAddress(addr); setShowDeliveryPicker(false) }} />
+                  </>
                 )}
-                {addr.landmark && <Text style={[s.addressLandmark, { color: colors.navy[400] }]}>📌 {addr.landmark}</Text>}
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity style={[s.addAddressBtn, { backgroundColor: colors.cardBg, borderColor: colors.primary }]} onPress={() => router.push('/addresses')}>
-              <Text style={[s.addAddressText, { color: colors.primary }]}>+ {isEn ? 'Add new address' : 'إضافة عنوان جديد'}</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        <TouchableOpacity style={s.toggleRow} onPress={() => setSameAddress(!sameAddress)} activeOpacity={0.7}>
-          <View style={[s.toggleTrack, { backgroundColor: sameAddress ? colors.primary : colors.navy[600] }]}>
-            <View style={[s.toggleThumb, sameAddress ? s.toggleThumbOn : s.toggleThumbOff]} />
-          </View>
-          <Text style={[s.toggleLabel, { color: colors.navy[100] }]}>{isEn ? 'Deliver to same address' : 'التسليم لنفس العنوان'}</Text>
-        </TouchableOpacity>
-
-        {!sameAddress && (
-          <>
-            <Text style={[s.sectionTitle, { color: colors.text }]}>📦 {isEn ? 'Delivery Address' : 'عنوان التسليم'}</Text>
-            {deliveryAddress && !showDeliveryPicker ? (
-              <View style={[s.compactAddrCard, { backgroundColor: colors.cardBg, borderColor: colors.accent }]}>
-                <TouchableOpacity onPress={() => setShowDeliveryPicker(true)} style={[s.addrChangeBtn, { backgroundColor: colors.accent + '15', borderColor: colors.accent + '40' }]}>
-                  <Text style={[s.addrChangeBtnText, { color: colors.accent }]}>{isEn ? 'Change' : 'تغيير'}</Text>
-                </TouchableOpacity>
-                <View style={{ flex: 1 }}>
-                  <Text style={[s.addressLabel, { color: colors.text }]}>{deliveryAddress.label}</Text>
-                  {(deliveryAddress.building || deliveryAddress.floor || deliveryAddress.apartment) && (
-                    <Text style={[s.addressDetail, { color: colors.navy[300] }]}>{[deliveryAddress.building && `${isEn ? 'Bldg' : 'مبنى'} ${deliveryAddress.building}`, deliveryAddress.floor && `${isEn ? 'Floor' : 'ط'}${deliveryAddress.floor}`, deliveryAddress.apartment && `${isEn ? 'Apt' : 'ش'}${deliveryAddress.apartment}`].filter(Boolean).join(' - ')}</Text>
-                  )}
-                </View>
-              </View>
-            ) : (
-              <View style={s.addressList}>
-                {addresses.map(addr => (
-                  <TouchableOpacity key={addr.id} onPress={() => { setDeliveryAddress(addr); setShowDeliveryPicker(false) }}
-                    style={[s.addressCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, deliveryAddress?.id === addr.id && { borderColor: colors.primary, backgroundColor: colors.primary + '10' }]}>
-                    <Text style={[s.addressLabel, { color: colors.text }]}>{deliveryAddress?.id === addr.id ? '✅' : '📍'} {addr.label}</Text>
-                    {(addr.building || addr.floor || addr.apartment) && (
-                      <Text style={[s.addressDetail, { color: colors.navy[300] }]}>{[addr.building && `${isEn ? 'Bldg' : 'مبنى'} ${addr.building}`, addr.floor && `${isEn ? 'Floor' : 'ط'}${addr.floor}`, addr.apartment && `${isEn ? 'Apt' : 'ش'}${addr.apartment}`].filter(Boolean).join(' - ')}</Text>
-                    )}
-                    {addr.landmark && <Text style={[s.addressLandmark, { color: colors.navy[400] }]}>📌 {addr.landmark}</Text>}
-                  </TouchableOpacity>
-                ))}
-                <TouchableOpacity style={[s.addAddressBtn, { backgroundColor: colors.cardBg, borderColor: colors.primary }]} onPress={() => router.push('/addresses')}>
-                  <Text style={[s.addAddressText, { color: colors.primary }]}>+ {isEn ? 'Add new address' : 'إضافة عنوان جديد'}</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </>
-        )}
+            </View>
+          )}
+        </Card>
 
         {outOfZone && distanceKm !== null && (
-          <View style={[s.outOfZoneBanner, { backgroundColor: colors.danger + '10', borderColor: colors.danger + '30' }]}>
-            <Text style={[s.outOfZoneText, { color: colors.danger }]}>
-              ⚠️ {isEn ? `Address is ${distanceKm} km away — max ${zoneSettings.max_zone_km} km` : `العنوان يبعد ${distanceKm} كم — الحد الأقصى ${zoneSettings.max_zone_km} كم`}
+          <View style={[s.banner, { backgroundColor: b.dangerTint, borderColor: b.dangerBorder }]}>
+            <TriangleAlert size={18} color={b.dangerText} />
+            <Text style={[s.bannerText, { color: b.dangerText }]}>
+              {isEn ? `Address is ${distanceKm} km away — max ${zoneSettings.max_zone_km} km` : `العنوان يبعد ${distanceKm} كم — الحد الأقصى ${zoneSettings.max_zone_km} كم`}
             </Text>
           </View>
         )}
 
         {activeSubs.length > 0 && subExhausted && (
-          <View style={[s.subCoverBanner, { backgroundColor: '#f59e0b18', borderColor: '#f59e0b40' }]}>
-            <Text style={s.subCoverIcon}>⚠️</Text>
+          <View style={[s.banner, { backgroundColor: b.warnTint, borderColor: 'rgba(245,158,11,0.32)' }]}>
+            <TriangleAlert size={18} color={b.isDark ? '#FBBF24' : '#B45309'} />
             <View style={{ flex: 1 }}>
-              <Text style={[s.subCoverTitle, { color: '#f59e0b' }]}>{isEn ? 'Plan limit reached' : 'رصيد الباقة خلص'}</Text>
-              <Text style={[s.subCoverDetail, { color: colors.navy[300] }]}>
+              <Text style={[s.bannerTitle, { color: b.isDark ? '#FBBF24' : '#B45309' }]}>{isEn ? 'Plan limit reached' : 'رصيد الباقة خلص'}</Text>
+              <Text style={[s.bannerSub, { color: b.warnText }]}>
                 {isEn ? 'You have used all items in your plan. This order will be paid normally.' : 'استهلكت كل قطع باقتك. الطلب ده هيتدفع عادي.'}
               </Text>
             </View>
@@ -541,87 +592,80 @@ export default function CartScreen() {
         )}
 
         {useSubscription && activeSubs.length > 0 && (
-          <View style={[s.subCoverBanner, { backgroundColor: '#10b98118', borderColor: '#10b98140' }]}>
-            <Text style={s.subCoverIcon}>✅</Text>
+          <View style={[s.banner, { backgroundColor: b.okTint, borderColor: b.isDark ? 'rgba(74,222,128,0.3)' : '#BBF0CF' }]}>
+            <CircleCheck size={18} color={b.okText} />
             <View style={{ flex: 1 }}>
-              <Text style={[s.subCoverTitle, { color: '#10b981' }]}>{isEn ? 'Covered by your plans' : 'مغطى من باقاتك'}</Text>
-              <Text style={[s.subCoverDetail, { color: colors.navy[300] }]}>
+              <Text style={[s.bannerTitle, { color: b.okText }]}>{isEn ? 'Covered by your plans' : 'مغطى من باقاتك'}</Text>
+              <Text style={[s.bannerSub, { color: b.muted }]}>
                 {isEn
-                  ? `${actualCovered} items will be deducted — ${subRemaining - actualCovered} remaining after this order${(uncoveredCount + overflowCount) > 0 ? `\n${uncoveredCount + overflowCount} items charged separately (${(uncoveredTotal + overflowTotal).toFixed(2)} ${t('currency')})` : ''}`
-                  : `سيتم خصم ${actualCovered} قطعة — متبقي ${subRemaining - actualCovered} قطعة بعد الطلب${(uncoveredCount + overflowCount) > 0 ? `\n${uncoveredCount + overflowCount} قطعة محاسبة منفصلة (${(uncoveredTotal + overflowTotal).toFixed(2)} ${t('currency')})` : ''}`}
+                  ? `${actualCovered} items will be deducted — ${subRemaining - actualCovered} remaining after this order${(uncoveredCount + overflowCount) > 0 ? `\n${uncoveredCount + overflowCount} items charged separately (${money(uncoveredTotal + overflowTotal)} ${t('currency')})` : ''}`
+                  : `سيتم خصم ${actualCovered} قطعة — متبقي ${subRemaining - actualCovered} قطعة بعد الطلب${(uncoveredCount + overflowCount) > 0 ? `\n${uncoveredCount + overflowCount} قطعة محاسبة منفصلة (${money(uncoveredTotal + overflowTotal)} ${t('currency')})` : ''}`}
               </Text>
               {activeSubs.map((sub: any, idx: number) => (
-                <Text key={idx} style={[s.subCoverPlan, { color: colors.navy[400] }]}>📦 {sub.plans?.name ?? (isEn ? 'Subscription' : 'الباقة')} ({Math.max(0, (sub.items_limit ?? 0) - (sub.items_used ?? 0))} {isEn ? 'remaining' : 'متبقي'})</Text>
+                <Text key={idx} style={[s.bannerSub, { color: b.faint }]}>{sub.plans?.name ?? (isEn ? 'Subscription' : 'الباقة')} ({Math.max(0, (sub.items_limit ?? 0) - (sub.items_used ?? 0))} {isEn ? 'remaining' : 'متبقي'})</Text>
               ))}
             </View>
           </View>
         )}
 
-        {(!useSubscription || (useSubscription && uncoveredCount > 0)) && (
+        {/* Payment */}
+        {showPayment && (
           <>
-            <Text style={[s.sectionTitle, { color: colors.text }]}>💳 {isEn ? (useSubscription ? `Pay for uncovered items (${uncoveredTotal.toFixed(2)} ${t('currency')})` : 'Payment Method') : (useSubscription ? `دفع القطع خارج الباقة (${uncoveredTotal.toFixed(2)} ${t('currency')})` : 'طريقة الدفع')}</Text>
-            <View style={s.paymentScrollWrap}>
-              <ScrollView horizontal nestedScrollEnabled={true} showsHorizontalScrollIndicator={false} contentContainerStyle={s.paymentChipsRow}
-                ref={paymentScrollRef}
-              >
-                {paymentMethods.map(pm => (
-                  <TouchableOpacity key={pm.key} onPress={() => setPaymentMethod(pm.key)}
-                    style={[s.paymentChip, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }, paymentMethod === pm.key && { borderColor: colors.primary, backgroundColor: colors.primary + '10' }]}>
-                    <Text style={s.paymentChipIcon}>{pm.icon}</Text>
-                    <Text style={[s.paymentChipLabel, { color: colors.navy[300] }, paymentMethod === pm.key && { color: colors.primary }]}>{isEn ? pm.labelEn : pm.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-              <View style={[s.scrollArrow, I18nManager.isRTL ? { left: 0 } : { right: 0 }]}>
-                <Text style={[s.scrollArrowText, { color: colors.primary }]}>{I18nManager.isRTL ? '‹' : '›'}</Text>
-              </View>
-            </View>
+            <SecTitle
+              icon={<CreditCard size={14} color={b.tintText} />}
+              title={isEn ? (useSubscription ? `Pay for uncovered items (${money(uncoveredTotal)} ${t('currency')})` : 'Payment Method') : (useSubscription ? `دفع القطع خارج الباقة (${money(uncoveredTotal)} ${t('currency')})` : 'طريقة الدفع')}
+            />
+            <ChoiceGrid items={payItems} value={paymentMethod} onChange={setPaymentMethod} />
           </>
         )}
 
         {paymentMethod === 'e_wallet' && (!useSubscription || uncoveredCount > 0) && (
-          <View style={[s.paymentInfoCard, { backgroundColor: colors.cardBg, borderColor: colors.accent + '30' }]}>
-            <Text style={[s.paymentInfoTitle, { color: colors.text }]}>📱 {isEn ? 'Wallet phone number' : 'رقم موبايل المحفظة'}</Text>
-            <TextInput
-              style={[s.walletPhoneInput, { backgroundColor: colors.navy[700], color: colors.text, borderColor: colors.navy[600] }]}
-              value={walletPhone}
-              onChangeText={setWalletPhone}
-              placeholder="01xxxxxxxxx"
-              placeholderTextColor={colors.navy[400]}
-              keyboardType="phone-pad"
-              maxLength={11}
-              textAlign="left"
-            />
-          </View>
+          <Card style={{ marginTop: 10 }}>
+            <Text style={[s.infoTitle, { color: b.ink }]}>{isEn ? 'Wallet phone number' : 'رقم موبايل المحفظة'}</Text>
+            <View style={[s.field, { backgroundColor: b.field, borderColor: b.fieldBorder }]}>
+              <View style={[s.fieldIcon, { backgroundColor: b.iconTile }]}><Smartphone size={15} color={b.accentIcon} /></View>
+              <TextInput
+                style={[s.fieldInput, { color: b.ink }]}
+                value={walletPhone}
+                onChangeText={setWalletPhone}
+                placeholder="01xxxxxxxxx"
+                placeholderTextColor={b.faint}
+                keyboardType="phone-pad"
+                maxLength={11}
+                textAlign="left"
+              />
+            </View>
+          </Card>
         )}
 
         {paymentMethod === 'instapay' && paymentSettings.instapay && (!useSubscription || uncoveredCount > 0) && (
-          <View style={[s.paymentInfoCard, { backgroundColor: colors.cardBg, borderColor: colors.accent + '30' }]}>
-            <Text style={[s.paymentInfoTitle, { color: colors.text }]}>🏦 {isEn ? 'Transfer to InstaPay number' : 'حوّل على رقم الإنستاباي'}</Text>
-            <Text style={[s.paymentInfoNumber, { color: colors.accent }]} selectable>{paymentSettings.instapay}</Text>
-            <Text style={[s.paymentInfoHint, { color: colors.navy[300] }]}>{isEn ? 'Transfer and send receipt screenshot to driver in chat' : 'حوّل المبلغ وأرسل صورة الإيصال للسائق في المحادثة'}</Text>
+          <View style={[s.banner, s.bannerCol, { backgroundColor: b.tint, borderColor: b.tintBorder }]}>
+            <Text style={[s.bannerTitle, { color: b.ink }]}>{isEn ? 'Transfer to InstaPay number' : 'حوّل على رقم الإنستاباي'}</Text>
+            <Text style={[s.instaNumber, { color: b.tintText }]} selectable>{paymentSettings.instapay}</Text>
+            <Text style={[s.bannerSub, { color: b.muted, textAlign: 'center' }]}>{isEn ? 'Transfer and send receipt screenshot to driver in chat' : 'حوّل المبلغ وأرسل صورة الإيصال للسائق في المحادثة'}</Text>
           </View>
         )}
 
-        <Text style={[s.sectionTitle, { color: colors.text }]}>🕐 {isEn ? 'Pickup Time' : 'موعد الاستلام'}</Text>
-        <View style={[s.compactToggle, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
-          <TouchableOpacity onPress={() => setIsScheduled(false)}
-            style={[s.compactToggleOption, !isScheduled && { backgroundColor: colors.primary + '20' }]}>
-            <Text style={[s.compactToggleText, { color: colors.navy[300] }, !isScheduled && { color: colors.primary }]}>🚀 {isEn ? 'Now' : 'الآن'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setIsScheduled(true)}
-            style={[s.compactToggleOption, isScheduled && { backgroundColor: colors.primary + '20' }]}>
-            <Text style={[s.compactToggleText, { color: colors.navy[300] }, isScheduled && { color: colors.primary }]}>🕐 {isEn ? 'Schedule' : 'جدولة'}</Text>
-          </TouchableOpacity>
-        </View>
+        {/* Pickup time */}
+        <SecTitle icon={<Clock size={14} color={b.tintText} />} title={isEn ? 'Pickup Time' : 'موعد الاستلام'} />
+        <Segmented
+          value={isScheduled ? 'later' : 'now'}
+          onChange={k => setIsScheduled(k === 'later')}
+          items={[
+            { key: 'now', label: isEn ? 'Now' : 'الآن', icon: <Zap size={14} color={!isScheduled ? '#fff' : b.muted} /> },
+            { key: 'later', label: isEn ? 'Schedule' : 'جدولة', icon: <CalendarDays size={14} color={isScheduled ? '#fff' : b.muted} /> },
+          ]}
+        />
 
         {isScheduled && (
           <View style={s.schedulePickerRow}>
-            <TouchableOpacity style={[s.schedulePickerBtn, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]} onPress={() => setShowDatePicker(true)}>
-              <Text style={[s.schedulePickerLabel, { color: colors.text }]}>📅 {scheduledDate.toLocaleDateString(isEn ? 'en-US' : 'ar-EG')}</Text>
+            <TouchableOpacity style={[s.schedulePickerBtn, { backgroundColor: b.card, borderColor: b.cardBorder }]} onPress={() => setShowDatePicker(true)} accessibilityRole="button">
+              <CalendarDays size={16} color={b.accentIcon} />
+              <Text style={[s.schedulePickerLabel, { color: b.ink }]}>{dateLabel}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[s.schedulePickerBtn, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]} onPress={() => setShowTimePicker(true)}>
-              <Text style={[s.schedulePickerLabel, { color: colors.text }]}>🕐 {scheduledDate.toLocaleTimeString(isEn ? 'en-US' : 'ar-EG', { hour: '2-digit', minute: '2-digit' })}</Text>
+            <TouchableOpacity style={[s.schedulePickerBtn, { backgroundColor: b.card, borderColor: b.cardBorder }]} onPress={() => setShowTimePicker(true)} accessibilityRole="button">
+              <Clock size={16} color={b.accentIcon} />
+              <Text style={[s.schedulePickerLabel, { color: b.ink }]}>{clock(scheduledDate, isEn)}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -642,256 +686,198 @@ export default function CartScreen() {
           />
         )}
 
-        <TouchableOpacity onPress={() => setShowNotes(!showNotes)} style={[s.notesToggle, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]} activeOpacity={0.7}>
-          <Text style={[s.notesToggleText, { color: colors.navy[300] }]}>📝 {isEn ? 'Notes (optional)' : 'ملاحظات (اختياري)'}</Text>
-          <Text style={{ color: colors.navy[400], fontSize: 12 }}>{showNotes ? '▲' : '▼'}</Text>
-        </TouchableOpacity>
-        {showNotes && (
-          <TextInput style={[s.notesInput, { backgroundColor: colors.cardBg, color: colors.text, borderColor: colors.navy[700] }]} value={notes} onChangeText={setNotes}
-            placeholder={isEn ? 'Any special instructions...' : 'أي تعليمات خاصة...'} placeholderTextColor={colors.navy[400]}
-            multiline numberOfLines={3} textAlignVertical="top" textAlign={isEn ? 'left' : 'right'} />
-        )}
-
-        {/* Coupon Code */}
-        <View style={[s.couponWrap, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
-          {appliedCoupon ? (
-            <View style={s.couponApplied}>
-              <View style={{ flex: 1 }}>
-                <Text style={[s.couponAppliedCode, { color: colors.success }]}>✅ {appliedCoupon.code}</Text>
-                <Text style={[s.couponAppliedAmount, { color: colors.navy[300] }]}>
-                  {isEn ? `Discount: ${couponDiscount.toFixed(2)} EGP` : `خصم: ${couponDiscount.toFixed(2)} ج.م`}
-                </Text>
-              </View>
-              <TouchableOpacity onPress={removeCoupon} style={[s.couponRemoveBtn, { backgroundColor: colors.navy[700] }]}>
-                <Text style={{ color: colors.navy[300], fontSize: 12 }}>✕</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={s.couponRow}>
-              <TextInput
-                style={[s.couponInput, { backgroundColor: colors.navy[700], color: colors.text, borderColor: colors.navy[600] }]}
-                value={couponCode}
-                onChangeText={t => setCouponCode(t.toUpperCase())}
-                placeholder={isEn ? 'Coupon code' : 'كود الخصم'}
-                placeholderTextColor={colors.navy[400]}
-                autoCapitalize="characters"
-                textAlign={isEn ? 'left' : 'right'}
-              />
-              <TouchableOpacity onPress={applyCoupon} disabled={couponLoading || !couponCode.trim()}
-                style={[s.couponApplyBtn, { backgroundColor: couponCode.trim() ? colors.primary : colors.navy[600] }]}>
-                <Text style={s.couponApplyText}>{couponLoading ? '...' : (isEn ? 'Apply' : 'تطبيق')}</Text>
-              </TouchableOpacity>
-            </View>
+        {/* Notes + coupon */}
+        <Card pad={false} style={{ marginTop: 16, overflow: 'hidden' }}>
+          <TouchableOpacity onPress={() => setShowNotes(!showNotes)} style={s.notesToggle} activeOpacity={0.7} accessibilityRole="button">
+            <NotebookPen size={16} color={b.accentIcon} />
+            <Text style={[s.notesToggleText, { color: b.ink2 }]}>{isEn ? 'Notes (optional)' : 'ملاحظات (اختياري)'}</Text>
+            {showNotes ? <ChevronUp size={16} color={b.faint} /> : <ChevronDown size={16} color={b.faint} />}
+          </TouchableOpacity>
+          {showNotes && (
+            <TextInput style={[s.notesInput, { backgroundColor: b.field, color: b.ink, borderColor: b.fieldBorder }]} value={notes} onChangeText={setNotes}
+              placeholder={isEn ? 'Any special instructions...' : 'أي تعليمات خاصة...'} placeholderTextColor={b.faint}
+              multiline numberOfLines={3} textAlignVertical="top" textAlign={isEn ? 'left' : 'right'} />
           )}
-        </View>
+          <View style={[s.couponWrap, { borderTopColor: b.divider }]}>
+            {appliedCoupon ? (
+              <View style={s.couponApplied}>
+                <View style={[s.fieldIcon, { backgroundColor: b.okTint }]}><Ticket size={15} color={b.okText} /></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.couponAppliedCode, { color: b.okText }]}>{appliedCoupon.code}</Text>
+                  <Text style={[s.couponAppliedAmount, { color: b.muted }]}>
+                    {isEn ? `Discount: ${money(couponDiscount)} EGP` : `خصم: ${money(couponDiscount)} ج.م`}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={removeCoupon} hitSlop={HIT} accessibilityRole="button" accessibilityLabel="Remove coupon" style={[s.couponRemoveBtn, { backgroundColor: b.iconTile }]}>
+                  <X size={14} color={b.muted} />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={s.couponRow}>
+                <View style={[s.field, s.couponField, { backgroundColor: b.field, borderColor: couponCode.trim() ? b.primary : b.fieldBorder }]}>
+                  <Ticket size={16} color={b.isDark ? '#FBBF24' : '#D97706'} />
+                  <TextInput
+                    style={[s.fieldInput, s.couponInput, { color: b.ink }]}
+                    value={couponCode}
+                    onChangeText={t => setCouponCode(t.toUpperCase())}
+                    placeholder={isEn ? 'Coupon code' : 'كود الخصم'}
+                    placeholderTextColor={b.faint}
+                    autoCapitalize="characters"
+                    textAlign={isEn ? 'left' : 'right'}
+                  />
+                </View>
+                <TouchableOpacity
+                  onPress={applyCoupon}
+                  disabled={couponLoading || !couponCode.trim()}
+                  accessibilityRole="button"
+                  style={[s.couponApplyBtn, { backgroundColor: couponCode.trim() ? b.primary : b.disabled }]}
+                >
+                  {couponLoading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.couponApplyText}>{isEn ? 'Apply' : 'تطبيق'}</Text>}
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </Card>
 
-        <View style={[s.totalCard, { backgroundColor: colors.cardBg, borderColor: colors.navy[700] }]}>
+        {/* Receipt */}
+        <Card style={{ marginTop: 12 }}>
           {useSubscription ? (
             uncoveredCount > 0 ? (
               <>
-                <View style={s.totalRow}><Text style={[s.breakdownLabel, { color: colors.success }]}>👑 {isEn ? 'Plan items' : 'قطع الباقة'} ({coveredCount})</Text><Text style={[s.breakdownValue, { color: colors.success }]}>{isEn ? 'Free' : 'مجاناً'}</Text></View>
-                <View style={s.totalRow}><Text style={[s.breakdownLabel, { color: colors.navy[400] }]}>📋 {isEn ? 'Uncovered items' : 'قطع خارج الباقة'} ({uncoveredCount})</Text><Text style={[s.breakdownValue, { color: colors.navy[200] }]}>{uncoveredTotal.toFixed(2)} {t('currency')}</Text></View>
-                {fee > 0 && <View style={s.totalRow}><Text style={[s.breakdownLabel, { color: colors.navy[400] }]}>🚚 {isEn ? 'Delivery' : 'التوصيل'}{distanceKm ? ` (${distanceKm} ${isEn ? 'km' : 'كم'})` : ''}</Text><Text style={[s.breakdownValue, { color: colors.navy[200] }]}>{fee.toFixed(2)} {t('currency')}</Text></View>}
-                {couponDiscount > 0 && <View style={s.totalRow}><Text style={[s.breakdownLabel, { color: colors.success }]}>🏷️ {isEn ? 'Coupon' : 'كوبون'} ({appliedCoupon?.code})</Text><Text style={[s.breakdownValue, { color: colors.success }]}>-{couponDiscount.toFixed(2)} {t('currency')}</Text></View>}
-                <View style={[s.totalRow, { borderTopWidth: 1, borderTopColor: colors.navy[700], paddingTop: 8, marginTop: 4 }]}>
-                  <Text style={[s.totalLabel, { color: colors.navy[200] }]}>{isEn ? 'Amount to pay' : 'المبلغ المطلوب'}</Text>
-                  <Text style={[s.totalValue, { color: colors.primary }]}>{orderTotal.toFixed(2)} {t('currency')}</Text>
+                <View style={s.totalRow}><Text style={[s.breakdownLabel, { color: b.okText }]}>{isEn ? 'Plan items' : 'قطع الباقة'} ({coveredCount})</Text><Text style={[s.breakdownValue, { color: b.okText }]}>{isEn ? 'Free' : 'مجاناً'}</Text></View>
+                <View style={s.totalRow}><Text style={[s.breakdownLabel, { color: b.muted }]}>{isEn ? 'Uncovered items' : 'قطع خارج الباقة'} ({uncoveredCount})</Text><Text style={[s.breakdownValue, { color: b.ink2 }]}>{money(uncoveredTotal)} {t('currency')}</Text></View>
+                {fee > 0 && <View style={s.totalRow}><Text style={[s.breakdownLabel, { color: b.muted }]}>{isEn ? 'Delivery' : 'التوصيل'}{distanceKm ? ` (${distanceKm} ${isEn ? 'km' : 'كم'})` : ''}</Text><Text style={[s.breakdownValue, { color: b.ink2 }]}>{money(fee)} {t('currency')}</Text></View>}
+                {couponDiscount > 0 && <View style={s.totalRow}><Text style={[s.breakdownLabel, { color: b.okText }]}>{isEn ? 'Coupon' : 'كوبون'} ({appliedCoupon?.code})</Text><Text style={[s.breakdownValue, { color: b.okText }]}>-{money(couponDiscount)} {t('currency')}</Text></View>}
+                <View style={[s.totalRow, s.totalLine, { borderTopColor: b.raisedBorder }]}>
+                  <Text style={[s.totalLabel, { color: b.ink }]}>{isEn ? 'Amount to pay' : 'المبلغ المطلوب'}</Text>
+                  <Text style={[s.totalValue, { color: b.isDark ? '#38BDF8' : '#0284C7' }]}>{money(orderTotal)} <Text style={[s.totalCur, { color: b.muted }]}>{t('currency')}</Text></Text>
                 </View>
               </>
             ) : (
               <>
-                <View style={s.totalRow}><Text style={[s.totalLabel, { color: colors.navy[200] }]}>{isEn ? 'Total' : 'الإجمالي'}</Text><Text style={[s.totalValue, { color: colors.success }]}>{isEn ? 'Free (Plan)' : 'مجاناً (باقة)'}</Text></View>
-                <Text style={{ fontSize: 11, color: colors.navy[400], textDecorationLine: 'line-through', textAlign: 'left' }}>{totalPrice.toFixed(2)} {t('currency')}</Text>
+                <View style={s.totalRow}><Text style={[s.totalLabel, { color: b.ink }]}>{isEn ? 'Total' : 'الإجمالي'}</Text><Text style={[s.totalValue, { color: b.okText }]}>{isEn ? 'Free (Plan)' : 'مجاناً (باقة)'}</Text></View>
+                <Text style={{ fontSize: 11, color: b.faint, textDecorationLine: 'line-through', textAlign: 'left', fontFamily: F.regular }}>{money(totalPrice)} {t('currency')}</Text>
               </>
             )
           ) : (
             <>
-              <View style={s.totalRow}><Text style={[s.breakdownLabel, { color: colors.navy[400] }]}>{isEn ? 'Subtotal' : 'المجموع'}</Text><Text style={[s.breakdownValue, { color: colors.navy[200] }]}>{totalPrice.toFixed(2)} {t('currency')}</Text></View>
-              {deliveryFee > 0 && <View style={s.totalRow}><Text style={[s.breakdownLabel, { color: colors.navy[400] }]}>🚚 {isEn ? 'Delivery' : 'التوصيل'}{distanceKm ? ` (${distanceKm} ${isEn ? 'km' : 'كم'})` : ''}</Text><Text style={[s.breakdownValue, { color: colors.navy[200] }]}>{deliveryFee.toFixed(2)} {t('currency')}</Text></View>}
-              {couponDiscount > 0 && <View style={s.totalRow}><Text style={[s.breakdownLabel, { color: colors.success }]}>🏷️ {isEn ? 'Coupon' : 'كوبون'} ({appliedCoupon?.code})</Text><Text style={[s.breakdownValue, { color: colors.success }]}>-{couponDiscount.toFixed(2)} {t('currency')}</Text></View>}
-              <View style={[s.totalRow, { borderTopWidth: 1, borderTopColor: colors.navy[700], paddingTop: 8, marginTop: 4 }]}>
-                <Text style={[s.totalLabel, { color: colors.navy[200] }]}>{isEn ? 'Total' : 'الإجمالي'}</Text>
-                <Text style={[s.totalValue, { color: colors.primary }]}>{orderTotal.toFixed(2)} {t('currency')}</Text>
+              <View style={s.totalRow}><Text style={[s.breakdownLabel, { color: b.muted }]}>{isEn ? 'Subtotal' : 'المجموع'}</Text><Text style={[s.breakdownValue, { color: b.ink2 }]}>{money(totalPrice)} {t('currency')}</Text></View>
+              {deliveryFee > 0 && <View style={s.totalRow}><Text style={[s.breakdownLabel, { color: b.muted }]}>{isEn ? 'Delivery' : 'التوصيل'}{distanceKm ? ` (${distanceKm} ${isEn ? 'km' : 'كم'})` : ''}</Text><Text style={[s.breakdownValue, { color: b.ink2 }]}>{money(deliveryFee)} {t('currency')}</Text></View>}
+              {couponDiscount > 0 && <View style={s.totalRow}><Text style={[s.breakdownLabel, { color: b.okText }]}>{isEn ? 'Coupon' : 'كوبون'} ({appliedCoupon?.code})</Text><Text style={[s.breakdownValue, { color: b.okText }]}>-{money(couponDiscount)} {t('currency')}</Text></View>}
+              <View style={[s.totalRow, s.totalLine, { borderTopColor: b.raisedBorder }]}>
+                <Text style={[s.totalLabel, { color: b.ink }]}>{isEn ? 'Total' : 'الإجمالي'}</Text>
+                <Text style={[s.totalValue, { color: b.isDark ? '#38BDF8' : '#0284C7' }]}>{money(orderTotal)} <Text style={[s.totalCur, { color: b.muted }]}>{t('currency')}</Text></Text>
               </View>
             </>
           )}
-        </View>
-
-        <TouchableOpacity style={[s.submitBtn, saving && s.submitDisabled]} onPress={handleSubmit} disabled={saving} activeOpacity={0.8}>
-          <LinearGradient colors={[colors.primary, colors.primaryDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.submitGradient}>
-            <Text style={s.submitText}>{saving ? (isEn ? 'Submitting...' : 'جاري الإرسال...') : (isEn ? 'Confirm Order' : 'تأكيد الطلب')}</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={clearCart} style={s.clearBtn}>
-          <Text style={[s.clearBtnText, { color: colors.danger }]}>🗑 {isEn ? 'Clear cart' : 'تفريغ السلة'}</Text>
-        </TouchableOpacity>
+        </Card>
       </ScrollView>
+
+      {/* Fixed top bar so content never scrolls under the status bar */}
+      <View style={[s.topBar, { paddingTop: insets.top + 8, height: headerH, backgroundColor: b.page, borderBottomColor: b.divider }]}>
+        <IconButton onPress={() => router.back()} label={isEn ? 'Back' : 'رجوع'}>
+          <BackIcon color={b.ink} />
+        </IconButton>
+        <Text style={[s.title, { color: b.ink }]} numberOfLines={1}>{isEn ? 'My Cart' : 'سلتي'}</Text>
+        <View style={[s.countPill, { backgroundColor: b.tint }]}>
+          <Text style={[s.countPillText, { color: b.tintText }]}>{isEn ? `${totalItems} items` : `${totalItems} قطعة`}</Text>
+        </View>
+        <View style={{ flex: 1 }} />
+        <IconButton onPress={clearCart} label={isEn ? 'Clear cart' : 'تفريغ السلة'} style={{ backgroundColor: b.dangerTint, borderColor: b.dangerBorder }}>
+          <Trash2 size={17} color={b.dangerText} />
+        </IconButton>
+      </View>
+
+      <StickyFooter label={isEn ? 'Total' : 'الإجمالي'} total={useSubscription && uncoveredCount === 0 ? (isEn ? 'Free' : 'مجاناً') : money(orderTotal)} currency={useSubscription && uncoveredCount === 0 ? '' : t('currency')} bottomInset={insets.bottom}>
+        <PrimaryButton
+          title={isEn ? 'Confirm Order' : 'تأكيد الطلب'}
+          loadingTitle={isEn ? 'Submitting...' : 'جاري الإرسال...'}
+          loading={saving}
+          onPress={handleSubmit}
+          trailing={<ForwardIcon color="#fff" size={17} />}
+        />
+      </StickyFooter>
       {AlertComponent}
-    </>
+    </View>
   )
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1 },
   scrollContainer: { flex: 1 },
-  content: { padding: 20, paddingTop: 56, paddingBottom: 40 },
-  title: { fontSize: 24, fontWeight: '800', marginBottom: 20 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 12, marginTop: 24 },
+  content: { paddingHorizontal: 16 },
+  topBar: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingBottom: 8, borderBottomWidth: 1 },
+  title: { fontSize: 19, fontFamily: F.display },
+  countPill: { height: 22, borderRadius: 11, paddingHorizontal: 8, justifyContent: 'center' },
+  countPillText: { fontSize: 11, fontFamily: F.bold },
 
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-  emptyIcon: { fontSize: 48, marginBottom: 16 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
-  emptyHint: { fontSize: 14, marginBottom: 24, textAlign: 'center' },
-  emptyBtn: { paddingHorizontal: 32, paddingVertical: 14, borderRadius: 14 },
-  emptyBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  secRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 20, marginBottom: 9, marginHorizontal: 2 },
+  secIcon: { width: 24, height: 24, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  sectionTitle: { fontSize: 15, fontFamily: F.display, flexShrink: 1 },
 
-  cartItem: {
-    flexDirection: 'row', alignItems: 'center',
-    borderRadius: 14, padding: 14, marginBottom: 8, borderWidth: 1,
-  },
-  cartItemName: { fontSize: 14, fontWeight: '600' },
-  cartItemPrice: { fontSize: 12, marginTop: 2 },
-  cartItemActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  qtyBtn: {
-    width: 30, height: 30, borderRadius: 15,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  qtyBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  qtyDisplay: { fontSize: 15, fontWeight: '700', minWidth: 22, textAlign: 'center' },
-  removeBtn: { width: 30, height: 30, borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
-  removeBtnText: { fontSize: 12, fontWeight: '700' },
-  addMoreBtn: { alignItems: 'center', paddingVertical: 12, marginTop: 4 },
-  addMoreText: { fontSize: 14, fontWeight: '600' },
-  addAddressBtn: {
-    borderRadius: 16, padding: 16, alignItems: 'center',
-    borderWidth: 1.5, borderStyle: 'dashed',
-  },
-  addAddressText: { fontSize: 14, fontWeight: '600' },
-  compactAddrCard: {
-    flexDirection: 'row', alignItems: 'center',
-    borderRadius: 12, padding: 12, borderWidth: 1.5, gap: 12,
-  },
-  addrChangeBtn: { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1.5 },
-  addrChangeBtnText: { fontSize: 13, fontWeight: '700' },
-  addressList: { gap: 8 },
-  addressCard: {
-    borderRadius: 12, padding: 12,
-    borderWidth: 1.5,
-  },
-  addressLabel: { fontSize: 14, fontWeight: '600' },
-  addressDetail: { fontSize: 12, marginTop: 4 },
-  addressLandmark: { fontSize: 11, marginTop: 2 },
-  toggleRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    marginTop: 12, paddingVertical: 6,
-  },
-  toggleTrack: { width: 42, height: 24, borderRadius: 12, justifyContent: 'center', padding: 2 },
-  toggleThumb: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#fff' },
-  toggleThumbOn: { alignSelf: 'flex-end' },
-  toggleThumbOff: { alignSelf: 'flex-start' },
-  toggleLabel: { fontSize: 13, fontWeight: '600', flex: 1 },
-  paymentScrollWrap: { position: 'relative' },
-  paymentChipsRow: { gap: 8, paddingVertical: 4, paddingEnd: 24 },
-  scrollArrow: { position: 'absolute', top: 0, bottom: 0, justifyContent: 'center', zIndex: 10 },
-  scrollArrowText: { fontSize: 24, fontWeight: '900' },
-  paymentChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1.5,
-  },
-  paymentChipIcon: { fontSize: 18 },
-  paymentChipLabel: { fontSize: 12, fontWeight: '600' },
-  paymentInfoCard: {
-    borderRadius: 14, padding: 16, marginTop: 12,
-    borderWidth: 1, borderStyle: 'dashed',
-  },
-  paymentInfoTitle: { fontSize: 14, fontWeight: '700', marginBottom: 8 },
-  paymentInfoNumber: { fontSize: 22, fontWeight: 'bold', textAlign: 'center', marginBottom: 8, letterSpacing: 2 },
-  paymentInfoHint: { fontSize: 11, textAlign: 'center', marginTop: 8 },
-  walletPhoneInput: {
-    borderRadius: 12, padding: 14,
-    fontSize: 18, fontWeight: '600', letterSpacing: 1,
-    borderWidth: 1, textAlign: 'center',
-  },
-  outOfZoneBanner: { borderRadius: 12, padding: 12, marginTop: 12, borderWidth: 1 },
-  outOfZoneText: { fontSize: 13, fontWeight: '600', textAlign: 'center' },
-  notesToggle: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    borderRadius: 12, padding: 14, borderWidth: 1, marginTop: 16,
-  },
-  notesToggleText: { fontSize: 13, fontWeight: '600' },
-  subCoverBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    borderRadius: 16, padding: 16, borderWidth: 1.5, marginBottom: 4,
-  },
-  subCoverIcon: { fontSize: 28 },
-  subCoverTitle: { fontSize: 15, fontWeight: '700' },
-  subCoverDetail: { fontSize: 12, marginTop: 4, lineHeight: 18 },
-  subCoverPlan: { fontSize: 11, marginTop: 4 },
-  compactToggle: {
-    flexDirection: 'row', borderRadius: 12, overflow: 'hidden', borderWidth: 1, marginBottom: 12,
-  },
-  compactToggleOption: { flex: 1, paddingVertical: 12, alignItems: 'center' },
-  compactToggleText: { fontSize: 13, fontWeight: '600' },
-  schedulePickerRow: { flexDirection: 'row', gap: 10, marginBottom: 8 },
-  schedulePickerBtn: {
-    flex: 1, borderRadius: 12, paddingVertical: 14,
-    alignItems: 'center', borderWidth: 1,
-  },
-  schedulePickerLabel: { fontSize: 14, fontWeight: '600' },
-  notesInput: {
-    borderRadius: 12, padding: 14,
-    fontSize: 14, borderWidth: 1, minHeight: 70, marginTop: 8,
-  },
-  couponWrap: {
-    borderRadius: 16, padding: 14, marginTop: 16, borderWidth: 1,
-  },
-  couponRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-  },
-  couponInput: {
-    flex: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10,
-    fontSize: 14, fontFamily: 'monospace', borderWidth: 1,
-  },
-  couponApplyBtn: {
-    borderRadius: 12, paddingHorizontal: 18, paddingVertical: 10,
-  },
-  couponApplyText: {
-    color: '#fff', fontSize: 13, fontWeight: '700',
-  },
-  couponApplied: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-  },
-  couponAppliedCode: {
-    fontSize: 14, fontWeight: '700', fontFamily: 'monospace',
-  },
-  couponAppliedAmount: {
-    fontSize: 12, marginTop: 2,
-  },
-  couponRemoveBtn: {
-    width: 28, height: 28, borderRadius: 14,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  totalCard: {
-    borderRadius: 16, padding: 20, marginTop: 16,
-    borderWidth: 1,
-  },
-  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  totalLabel: { fontSize: 16 },
-  totalValue: { fontSize: 24, fontWeight: 'bold' },
-  breakdownLabel: { fontSize: 13 },
-  breakdownValue: { fontSize: 13 },
-  submitBtn: {
-    borderRadius: 16, overflow: 'hidden', marginTop: 20,
-    shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 14, elevation: 10,
-  },
-  submitGradient: { padding: 18, alignItems: 'center' },
-  submitDisabled: { opacity: 0.6 },
-  submitText: { fontSize: 18, fontWeight: '700', color: '#fff' },
-  exhaustedBanner: {
-    borderRadius: 12, padding: 14, marginBottom: 8, borderWidth: 1,
-  },
-  exhaustedText: { fontSize: 13, fontWeight: '600', textAlign: 'center' },
-  clearBtn: { alignItems: 'center', paddingVertical: 16, marginTop: 8 },
-  clearBtnText: { fontSize: 14, fontWeight: '600' },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
+  emptyIcon: { width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
+  emptyTitle: { fontSize: 18, fontFamily: F.display, marginBottom: 6 },
+  emptyHint: { fontSize: 13.5, fontFamily: F.regular, marginBottom: 22, textAlign: 'center' },
+
+  itemRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 11, paddingVertical: 10 },
+  itemImg: { width: 42, height: 42, borderRadius: 12 },
+  cartItemName: { fontSize: 14, fontFamily: F.bold },
+  cartItemPrice: { fontSize: 11, fontFamily: F.medium, marginTop: 2 },
+  cartItemPriceNum: { fontSize: 13, fontFamily: F.display },
+  addMoreBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: SIZE.M, borderRadius: SIZE.rM, borderWidth: 1.5, borderStyle: 'dashed', marginTop: 10 },
+  addMoreText: { fontSize: 13.5, fontFamily: F.bold },
+
+  addrRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10 },
+  pinTile: { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  addrKicker: { fontSize: 10.5, fontFamily: F.bold },
+  addressLabel: { fontSize: 14, fontFamily: F.bold },
+  addressDetail: { fontSize: 11.5, fontFamily: F.regular, marginTop: 1 },
+  addressLandmark: { fontSize: 11, fontFamily: F.regular, marginTop: 1 },
+  changeChip: { height: SIZE.S - 4, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  changeChipText: { fontSize: 12, fontFamily: F.bold },
+  pickTitle: { fontSize: 11.5, fontFamily: F.bold, paddingHorizontal: 12, paddingTop: 10 },
+  pickRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: SIZE.M + 6, paddingHorizontal: 12, paddingVertical: 8 },
+  radio: { width: 18, height: 18, borderRadius: 9, borderWidth: 1.5, backgroundColor: '#fff' },
+  dashedRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: SIZE.M, borderTopWidth: 1 },
+  addAddressText: { fontSize: 13, fontFamily: F.bold },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, minHeight: SIZE.M + 4, paddingHorizontal: 12, borderTopWidth: 1 },
+  toggleLabel: { fontSize: 13, fontFamily: F.semibold, flex: 1 },
+
+  banner: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderRadius: 14, borderWidth: 1, padding: 12, marginTop: 12 },
+  bannerCol: { flexDirection: 'column', alignItems: 'stretch', gap: 4 },
+  bannerTitle: { fontSize: 14, fontFamily: F.bold },
+  bannerSub: { fontSize: 12, fontFamily: F.regular, marginTop: 2, lineHeight: 18 },
+  bannerText: { flex: 1, fontSize: 13, fontFamily: F.semibold, lineHeight: 19 },
+  instaNumber: { fontSize: 22, fontFamily: F.display, textAlign: 'center', letterSpacing: 1.5 },
+  infoTitle: { fontSize: 13, fontFamily: F.bold, marginBottom: 8 },
+
+  field: { flexDirection: 'row', alignItems: 'center', gap: 9, height: SIZE.L, borderRadius: 13, borderWidth: 1, paddingHorizontal: 10 },
+  fieldIcon: { width: 28, height: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  fieldInput: { flex: 1, fontSize: 15, fontFamily: F.medium, paddingVertical: 0 },
+
+  schedulePickerRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  schedulePickerBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, height: SIZE.M, borderRadius: SIZE.rM, borderWidth: 1 },
+  schedulePickerLabel: { fontSize: 13.5, fontFamily: F.semibold },
+
+  notesToggle: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: SIZE.M, paddingHorizontal: 12 },
+  notesToggleText: { flex: 1, fontSize: 13, fontFamily: F.semibold },
+  notesInput: { borderRadius: 12, padding: 12, fontSize: 14, fontFamily: F.regular, borderWidth: 1, minHeight: 70, marginHorizontal: 12, marginBottom: 12 },
+  couponWrap: { padding: 10, borderTopWidth: 1 },
+  couponRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  couponField: { flex: 1, height: SIZE.M },
+  couponInput: { letterSpacing: 1 },
+  couponApplyBtn: { height: SIZE.M, borderRadius: SIZE.rM, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', minWidth: 76 },
+  couponApplyText: { color: '#fff', fontSize: 13.5, fontFamily: F.bold },
+  couponApplied: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  couponAppliedCode: { fontSize: 14, fontFamily: F.bold, letterSpacing: 1 },
+  couponAppliedAmount: { fontSize: 12, fontFamily: F.regular, marginTop: 1 },
+  couponRemoveBtn: { width: 30, height: 30, borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
+
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 3 },
+  totalLine: { borderTopWidth: 1.5, borderStyle: 'dashed', paddingTop: 10, marginTop: 6 },
+  totalLabel: { fontSize: 14, fontFamily: F.bold },
+  totalValue: { fontSize: 21, fontFamily: F.display },
+  totalCur: { fontSize: 11, fontFamily: F.semibold },
+  breakdownLabel: { fontSize: 12.5, fontFamily: F.regular, flexShrink: 1 },
+  breakdownValue: { fontSize: 13, fontFamily: F.semibold },
 })

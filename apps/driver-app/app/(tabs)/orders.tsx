@@ -209,7 +209,9 @@ export default function DriverOrdersScreen() {
           to: customer.fcm_token,
           title: `طلب ${order.order_number}`,
           body: message,
-          sound: 'default',
+          sound: 'order_update.wav',
+          channelId: 'order-updates-v2',
+          priority: 'high',
           data: { type: 'order_update', order_id: orderId, status: newStatus },
         }),
       }).catch(() => {})

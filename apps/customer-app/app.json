@@ -48,7 +48,9 @@
         {
           "sounds": [
             "./assets/sounds/order_update.wav",
-            "./assets/sounds/order_placed.wav"
+            "./assets/sounds/order_placed.wav",
+            "./assets/sounds/message.wav",
+            "./assets/sounds/offer.wav"
           ]
         }
       ],

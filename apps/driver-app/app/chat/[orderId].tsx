@@ -129,7 +129,9 @@ export default function ChatScreen() {
           to: customerData.fcm_token,
           title: `رسالة من ${profile.name ?? 'السائق'}`,
           body: msgBody.length > 100 ? msgBody.slice(0, 100) + '...' : msgBody,
-          sound: 'default',
+          sound: 'message.wav',
+          channelId: 'messages-v2',
+          priority: 'high',
           data: { type: 'chat', order_id: orderId },
         }),
       }).catch(() => {})
