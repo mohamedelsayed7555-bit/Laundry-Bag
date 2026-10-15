@@ -10,6 +10,7 @@ import { useTheme } from '../../src/contexts/ThemeContext'
 import { useLanguage } from '../../src/contexts/LanguageContext'
 import { I18nManager } from 'react-native'
 import { useCustomAlert } from '../../src/components/CustomAlert'
+import { openLegalPage } from '../../src/lib/legal'
 
 export default function LoginScreen() {
   const [isSignUp, setIsSignUp] = useState(false)
@@ -239,6 +240,15 @@ export default function LoginScreen() {
             )}
           </View>
 
+          {isSignUp && (
+            <Text style={[s.legalText, { color: colors.navy[400], textAlign: isRTL ? 'right' : 'left' }]}>
+              {t('legalSignupAgree')}{' '}
+              <Text style={[s.legalLink, { color: colors.primary }]} onPress={() => openLegalPage('terms', locale)}>{t('legalTerms')}</Text>
+              {t('legalAnd')}
+              <Text style={[s.legalLink, { color: colors.primary }]} onPress={() => openLegalPage('privacy', locale)}>{t('legalPrivacy')}</Text>
+            </Text>
+          )}
+
           <TouchableOpacity
             style={[s.button, loading && s.buttonDisabled]}
             onPress={isSignUp ? handleSignUp : handleLogin}
@@ -373,6 +383,8 @@ const s = StyleSheet.create({
   hintText: {
     fontSize: 11, marginTop: 4,
   },
+  legalText: { fontSize: 12, lineHeight: 20 },
+  legalLink: { fontWeight: '700', textDecorationLine: 'underline' },
   serverErrorBox: {
     borderWidth: 1,
     borderRadius: 14, padding: 14, marginBottom: 8,

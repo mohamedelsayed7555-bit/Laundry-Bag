@@ -7,11 +7,11 @@
     "scheme": "cleano",
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
-    "icon": "./assets/icon.jpg",
+    "icon": "./assets/app-icon.png",
     "splash": {
-      "image": "./assets/icon.jpg",
+      "image": "./assets/splash-logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0a0e1a"
+      "backgroundColor": "#e0e3e7"
     },
     "ios": {
       "bundleIdentifier": "com.cleano.customer",
@@ -23,7 +23,8 @@
     "android": {
       "package": "com.cleano.customer",
       "adaptiveIcon": {
-        "backgroundColor": "#0ea5e9"
+        "foregroundImage": "./assets/app-icon.png",
+        "backgroundColor": "#7ECDE6"
       },
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
@@ -31,7 +32,7 @@
         "android.permission.USE_BIOMETRIC",
         "android.permission.USE_FINGERPRINT",
         "android.permission.RECORD_AUDIO"
-      ],
+      ]
     },
     "plugins": [
       "expo-router",
@@ -42,9 +43,25 @@
       "@react-native-community/datetimepicker",
       "expo-localization",
       "expo-updates",
-      ["expo-notifications", {
-        "sounds": ["./assets/sounds/order_update.wav", "./assets/sounds/order_placed.wav"]
-      }]
+      [
+        "expo-notifications",
+        {
+          "sounds": [
+            "./assets/sounds/order_update.wav",
+            "./assets/sounds/order_placed.wav"
+          ]
+        }
+      ],
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-logo.png",
+          "imageWidth": 240,
+          "resizeMode": "contain",
+          "backgroundColor": "#e0e3e7"
+        }
+      ]
     ],
     "extra": {
       "router": {

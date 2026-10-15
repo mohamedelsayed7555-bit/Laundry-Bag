@@ -7,6 +7,7 @@ import * as Notifications from 'expo-notifications'
 import * as Device from 'expo-device'
 import type { Session } from '@supabase/supabase-js'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { saveLastUser } from '../lib/lastUser'
 import type { User } from '../shared/types'
 
 async function isEn() {
@@ -32,6 +33,7 @@ interface AuthContextType extends AuthState {
   refreshProfile: () => Promise<void>
   toggleBiometric: (enable: boolean, email?: string, password?: string) => Promise<boolean>
   signInWithBiometric: () => Promise<{ error: string | null }>
+  biometricEmail: () => Promise<string | null>
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
@@ -122,7 +124,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading: false,
     }))
 
-    if (data) registerPushToken(data.id)
+    if (data.name && data.phone) saveLastUser({ name: data.name, phone: data.phone, email: data.email ?? '' })
+    registerPushToken(data.id)
   }
 
   async function registerPushToken(userId: string) {
@@ -283,9 +286,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // Which account the saved fingerprint credentials belong to, so the UI only offers
+  // fingerprint sign-in to that same person.
+  async function biometricEmail(): Promise<string | null> {
+    try {
+      const savedRaw = await SecureStore.getItemAsync(BIO_CREDS_KEY)
+      return savedRaw ? (JSON.parse(savedRaw).email ?? null) : null
+    } catch {
+      return null
+    }
+  }
+
   const value = useMemo(() => ({
     ...state, signInWithOtp, verifyOtp, signInWithPassword, signUp,
-    signOut, refreshProfile, toggleBiometric, signInWithBiometric,
+    signOut, refreshProfile, toggleBiometric, signInWithBiometric, biometricEmail,
   }), [state])
 
   return (

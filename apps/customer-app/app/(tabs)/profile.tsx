@@ -8,7 +8,8 @@ import { useTheme } from '../../src/contexts/ThemeContext'
 import { useLanguage } from '../../src/contexts/LanguageContext'
 import { useCustomAlert } from '../../src/components/CustomAlert'
 import { supabase } from '../../src/lib/supabase'
-import { ChevronLeft, Edit3, MapPin, Crown, Fingerprint, LogOut, Sun, Moon, Globe } from 'lucide-react-native'
+import { ChevronLeft, Edit3, MapPin, Crown, Fingerprint, LogOut, Sun, Moon, Globe, FileText, ShieldCheck } from 'lucide-react-native'
+import { openLegalPage } from '../../src/lib/legal'
 
 export default function ProfileScreen() {
   const { profile, signOut, biometricEnabled, biometricAvailable, toggleBiometric } = useAuth()
@@ -178,6 +179,9 @@ export default function ProfileScreen() {
             />
           </View>
         )}
+
+        <MenuItem colors={colors} icon={<FileText size={20} color={colors.navy[300]} />} label={t('legalTerms')} onPress={() => openLegalPage('terms', locale)} />
+        <MenuItem colors={colors} icon={<ShieldCheck size={20} color={colors.navy[300]} />} label={t('legalPrivacy')} onPress={() => openLegalPage('privacy', locale)} />
       </Animated.View>
 
       {/* Logout */}

@@ -1,6 +1,9 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+// Legal pages are linked from the app stores and the customer app, so they must open without signing in.
+const PUBLIC_PAGES = ['/terms', '/privacy', '/delete-account']
+
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request: { headers: request.headers } })
 
@@ -28,6 +31,9 @@ export async function middleware(request: NextRequest) {
   const { data: { session } } = await supabase.auth.getSession()
 
   const isLoginPage = request.nextUrl.pathname === '/login'
+  if (PUBLIC_PAGES.includes(request.nextUrl.pathname)) {
+    return response
+  }
 
   if (!session && !isLoginPage) {
     return NextResponse.redirect(new URL('/login', request.url))

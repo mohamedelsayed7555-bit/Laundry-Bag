@@ -1,4 +1,4 @@
-import { Component, type ReactNode } from 'react'
+import { Component, useEffect, type ReactNode } from 'react'
 import { Slot } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { I18nManager, View, Text, TouchableOpacity, StyleSheet } from 'react-native'
@@ -10,6 +10,21 @@ import { LanguageProvider } from '../src/contexts/LanguageContext'
 import { useNotifications } from '../src/hooks/useNotifications'
 import { colors } from '../src/theme'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { useFonts } from 'expo-font'
+import {
+  IBMPlexSansArabic_400Regular,
+  IBMPlexSansArabic_500Medium,
+  IBMPlexSansArabic_600SemiBold,
+  IBMPlexSansArabic_700Bold,
+} from '@expo-google-fonts/ibm-plex-sans-arabic'
+import { Alexandria_600SemiBold, Alexandria_700Bold } from '@expo-google-fonts/alexandria'
+import * as SplashScreen from 'expo-splash-screen'
+
+// Keep the native splash up until fonts and the auth session are ready (index.tsx hides it),
+// so the customer sees one screen instead of a flash of blank and placeholder screens.
+SplashScreen.preventAutoHideAsync().catch(() => {})
+SplashScreen.setOptions?.({ duration: 350, fade: true })
+setTimeout(() => { SplashScreen.hideAsync().catch(() => {}) }, 5000)
 
 AsyncStorage.getItem('@app_language').then(saved => {
   const shouldBeRTL = saved !== 'en'
@@ -58,12 +73,34 @@ function NotificationSetup() {
   return null
 }
 
+function SplashGate() {
+  const { loading } = useAuth()
+  useEffect(() => {
+    if (!loading) SplashScreen.hideAsync().catch(() => {})
+  }, [loading])
+  return null
+}
+
 function ThemedStatusBar() {
   const { isDark } = useTheme()
   return <StatusBar style={isDark ? 'light' : 'dark'} />
 }
 
 export default function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts({
+    IBMPlexSansArabic_400Regular,
+    IBMPlexSansArabic_500Medium,
+    IBMPlexSansArabic_600SemiBold,
+    IBMPlexSansArabic_700Bold,
+    Alexandria_600SemiBold,
+    Alexandria_700Bold,
+  })
+
+  // The native splash is still showing here. If fonts fail, the app still opens with system fonts.
+  if (!fontsLoaded && !fontError) {
+    return null
+  }
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ErrorBoundary>
@@ -71,6 +108,7 @@ export default function RootLayout() {
           <LanguageProvider>
             <AuthProvider>
               <CartProvider>
+                <SplashGate />
                 <NotificationSetup />
                 <ThemedStatusBar />
                 <Slot />
