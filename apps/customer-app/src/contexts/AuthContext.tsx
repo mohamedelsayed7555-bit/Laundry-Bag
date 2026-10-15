@@ -124,7 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading: false,
     }))
 
-    if (data.name && data.phone) saveLastUser({ name: data.name, phone: data.phone, email: data.email ?? '' })
+    if (data.name && data.phone) saveLastUser({ name: data.name, phone: data.phone, email: data.email ?? '', avatarUrl: data.avatar_url ?? null })
     registerPushToken(data.id)
   }
 

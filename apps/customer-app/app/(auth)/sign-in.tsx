@@ -1,33 +1,54 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   View, Text, Image, ScrollView, KeyboardAvoidingView, Platform, Pressable, TouchableOpacity, Animated as RNAnimated,
-  StyleSheet,
+  StyleSheet, Easing,
 } from 'react-native'
+import Svg, { Circle, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg'
 import { LinearGradient } from 'expo-linear-gradient'
 import { StatusBar } from 'expo-status-bar'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Animated, { FadeInDown } from 'react-native-reanimated'
 import * as Haptics from 'expo-haptics'
-import { Fingerprint, KeyRound, Lock, ShieldCheck, Check, User } from 'lucide-react-native'
+import { Fingerprint, KeyRound, Lock, ShieldCheck, Check, User, Phone } from 'lucide-react-native'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { useLanguage } from '../../src/contexts/LanguageContext'
-import { loadLastUser } from '../../src/lib/lastUser'
-import { F, HERO, useAuthTheme, AuthField, PrimaryButton, ErrorLine, RoundButton, BackArrow, LangButton } from '../../src/components/auth/ui'
+import { loadLastUser, loadLastLogin, markLastLogin } from '../../src/lib/lastUser'
+import {
+  F, HeroImage, useAuthTheme, AuthField, PrimaryButton, SecondaryButton, ErrorLine, RoundButton, BackArrow, LangButton, SheetBackdrop,
+} from '../../src/components/auth/ui'
 
 function initialsOf(name: string) {
   return name.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('')
 }
 
+// "today 8:40 PM" / "النهارده 8:40 م", formatted by hand so it doesn't depend on Intl support in Hermes.
+function formatLastLogin(at: number, t: (k: string) => string, en: boolean) {
+  const d = new Date(at)
+  const now = new Date()
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const h = d.getHours()
+  const time = `${h % 12 || 12}:${String(d.getMinutes()).padStart(2, '0')} ${h < 12 ? (en ? 'AM' : 'ص') : (en ? 'PM' : 'م')}`
+  if (at >= startOfToday) return `${t('authToday')} ${time}`
+  if (at >= startOfToday - 86400000) return `${t('authYesterday')} ${time}`
+  return `${d.getDate()}/${d.getMonth() + 1} ${time}`
+}
+
+const AVATAR_RING = 100
+const RING_R = 47
+const RING_C = 2 * Math.PI * RING_R
+
 export default function SignInScreen() {
   const th = useAuthTheme()
-  const { t, isRTL } = useLanguage()
+  const { t, isRTL, locale } = useLanguage()
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const { phone = '' } = useLocalSearchParams<{ phone: string }>()
   const { signInWithPassword, signInWithBiometric, biometricEnabled, biometricAvailable, biometricEmail } = useAuth()
 
   const [knownName, setKnownName] = useState<string | null>(null)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [lastLoginAt, setLastLoginAt] = useState<number | null>(null)
   const [bioOk, setBioOk] = useState(false)
   const [usePassword, setUsePassword] = useState(false)
   const [password, setPassword] = useState('')
@@ -35,13 +56,18 @@ export default function SignInScreen() {
   const [loading, setLoading] = useState(false)
   const shake = useRef(new RNAnimated.Value(0)).current
   const pulse = useRef(new RNAnimated.Value(0)).current
+  const pulse2 = useRef(new RNAnimated.Value(0)).current
+  const scan = useRef(new RNAnimated.Value(0)).current
+  const spin = useRef(new RNAnimated.Value(0)).current
 
   useEffect(() => {
     let alive = true
-    Promise.all([loadLastUser(), biometricEmail()]).then(([last, bioMail]) => {
+    Promise.all([loadLastUser(), biometricEmail(), loadLastLogin(phone)]).then(([last, bioMail, loginAt]) => {
       if (!alive) return
+      setLastLoginAt(loginAt)
       const known = last && last.phone === phone ? last : null
       setKnownName(known?.name ?? null)
+      setAvatarUrl(known?.avatarUrl ?? null)
       setBioOk(!!(biometricEnabled && known && known.email && bioMail && bioMail.toLowerCase() === known.email.toLowerCase()))
     })
     return () => { alive = false }
@@ -49,11 +75,27 @@ export default function SignInScreen() {
 
   const bioMode = bioOk && !usePassword
 
+  // The slow ring around the avatar.
   useEffect(() => {
-    if (!bioMode) return
-    const loop = RNAnimated.loop(RNAnimated.timing(pulse, { toValue: 1, duration: 2000, useNativeDriver: true }))
+    const loop = RNAnimated.loop(RNAnimated.timing(spin, { toValue: 1, duration: 6000, easing: Easing.linear, useNativeDriver: true }))
     loop.start()
     return () => loop.stop()
+  }, [])
+
+  useEffect(() => {
+    if (!bioMode) return
+    const rings = RNAnimated.loop(RNAnimated.timing(pulse, { toValue: 1, duration: 2200, useNativeDriver: true }))
+    const rings2 = RNAnimated.loop(RNAnimated.sequence([
+      RNAnimated.delay(700),
+      RNAnimated.timing(pulse2, { toValue: 1, duration: 2200, useNativeDriver: true }),
+      RNAnimated.timing(pulse2, { toValue: 0, duration: 0, useNativeDriver: true }),
+    ]))
+    const scanning = RNAnimated.loop(RNAnimated.sequence([
+      RNAnimated.timing(scan, { toValue: 1, duration: 1100, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      RNAnimated.timing(scan, { toValue: 0, duration: 1100, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]))
+    rings.start(); rings2.start(); scanning.start()
+    return () => { rings.stop(); rings2.stop(); scanning.stop() }
   }, [bioMode])
 
   function fail(message: string) {
@@ -70,6 +112,7 @@ export default function SignInScreen() {
 
   function succeed() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+    markLastLogin(phone)
     router.replace('/(tabs)/home')
   }
 
@@ -98,7 +141,14 @@ export default function SignInScreen() {
 
   const ringScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.12] })
   const ringOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.9, 0] })
+  const ring2Scale = pulse2.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.12] })
+  const ring2Opacity = pulse2.interpolate({ inputRange: [0, 1], outputRange: [0.9, 0] })
+  const scanY = scan.interpolate({ inputRange: [0, 1], outputRange: [16, 68] })
+  const spinDeg = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] })
   const shakeX = shake.interpolate({ inputRange: [-1, 1], outputRange: [-6, 6] })
+  const footer = lastLoginAt
+    ? `${t('authSecureShort')} · ${t('authLastLogin', { when: formatLastLogin(lastLoginAt, t, locale === 'en') })}`
+    : t('authSecure')
   const align = { textAlign: (isRTL ? 'right' : 'left') as 'right' | 'left' }
 
   return (
@@ -106,8 +156,8 @@ export default function SignInScreen() {
       <StatusBar style="light" />
       <KeyboardAvoidingView style={s.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled" bounces={false} showsVerticalScrollIndicator={false}>
-          <View style={{ height: 250 + insets.top }}>
-            <Image source={HERO} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors />
+          <View style={{ height: 250 + insets.top, overflow: 'hidden' }}>
+            <HeroImage height={250 + insets.top} />
             <LinearGradient
               colors={['rgba(3,9,22,0.55)', 'rgba(3,9,22,0.12)', 'rgba(3,9,22,0.72)']}
               locations={[0, 0.35, 1]}
@@ -126,8 +176,32 @@ export default function SignInScreen() {
           </View>
 
           <Animated.View entering={FadeInDown.duration(600)} style={[s.sheet, { backgroundColor: th.sheet, paddingBottom: insets.bottom + 20 }]}>
+            <SheetBackdrop />
+            <RNAnimated.View pointerEvents="none" style={[s.avatarRing, { transform: [{ rotate: spinDeg }] }]}>
+              <Svg width={AVATAR_RING} height={AVATAR_RING}>
+                <Defs>
+                  <SvgGradient id="avatarRing" x1="0" y1="0" x2="1" y2="1">
+                    <Stop offset="0" stopColor="#38BDF8" stopOpacity="1" />
+                    <Stop offset="1" stopColor={th.primary} stopOpacity="0" />
+                  </SvgGradient>
+                </Defs>
+                <Circle
+                  cx={AVATAR_RING / 2}
+                  cy={AVATAR_RING / 2}
+                  r={RING_R}
+                  stroke="url(#avatarRing)"
+                  strokeWidth={2.5}
+                  strokeLinecap="round"
+                  strokeDasharray={`${RING_C * 0.62} ${RING_C}`}
+                  fill="none"
+                />
+              </Svg>
+            </RNAnimated.View>
             <View style={[s.avatar, { backgroundColor: th.primary, borderColor: th.sheet }]}>
-              {knownName ? <Text style={s.avatarText}>{initialsOf(knownName)}</Text> : <User size={30} color="#fff" />}
+              <LinearGradient colors={['#38BDF8', '#0284C7']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.avatarFill} />
+              {knownName && avatarUrl ? (
+                <Image source={{ uri: avatarUrl }} style={s.avatarImg} onError={() => setAvatarUrl(null)} />
+              ) : knownName ? <Text style={s.avatarText}>{initialsOf(knownName)}</Text> : <User size={30} color="#fff" />}
               {knownName ? (
                 <View style={[s.tick, { borderColor: th.sheet }]}>
                   <Check size={12} color="#fff" />
@@ -136,19 +210,31 @@ export default function SignInScreen() {
             </View>
 
             <View style={s.idRow}>
-              <Text style={[s.idPhone, { color: th.ink2 }]}>{`+20 ${phone.slice(1)}`}</Text>
-              <TouchableOpacity onPress={() => router.back()} hitSlop={8} accessibilityRole="button">
-                <Text style={[s.link, { color: th.primary }]}>{t('authNotYou')}</Text>
-              </TouchableOpacity>
+              <View style={[s.idChip, { backgroundColor: th.isDark ? 'rgba(56,189,248,0.10)' : '#EEF7FE', borderColor: th.isDark ? 'rgba(56,189,248,0.28)' : '#D3EAFB' }]}>
+                <Phone size={13} color={th.primary} />
+                <Text style={[s.idPhone, { color: th.ink }]}>{`+20 ${phone.slice(1)}`}</Text>
+                <TouchableOpacity
+                  onPress={() => router.back()}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  style={[s.notYou, { backgroundColor: th.isDark ? 'rgba(14,165,233,0.2)' : '#DCEFFD' }]}
+                >
+                  <Text style={[s.notYouText, { color: th.isDark ? th.sky : '#0369A1' }]}>{t('authNotYou')}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             {bioMode ? (
               <View style={{ alignItems: 'center' }}>
                 <Pressable onPress={handleBiometric} disabled={loading} accessibilityRole="button" accessibilityLabel={t('authBioCta')} style={s.bioWrap}>
                   <RNAnimated.View style={[s.bioPulse, { borderColor: th.primary, opacity: ringOpacity, transform: [{ scale: ringScale }] }]} />
-                  <View style={[s.bioRing, { borderColor: th.ring }]} />
+                  <RNAnimated.View style={[s.bioRing, { borderColor: th.primary, opacity: ring2Opacity, transform: [{ scale: ring2Scale }] }]} />
                   <View style={[s.bioCore, { backgroundColor: th.primary, shadowColor: th.primary }]}>
-                    <Fingerprint size={46} color="#fff" />
+                    <View style={s.bioClip}>
+                      <LinearGradient colors={['#38BDF8', '#0284C7']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+                      <Fingerprint size={46} color="#fff" />
+                      <RNAnimated.View style={[s.scanLine, { transform: [{ translateY: scanY }] }]} />
+                    </View>
                   </View>
                 </Pressable>
                 <Text style={[s.bioTitle, { color: th.ink }]}>{t('authBioTitle')}</Text>
@@ -161,10 +247,12 @@ export default function SignInScreen() {
                   leading={<Fingerprint size={18} color="#fff" />}
                   style={{ marginTop: 16, alignSelf: 'stretch' }}
                 />
-                <TouchableOpacity onPress={() => { setUsePassword(true); setError(null) }} style={s.textLink} accessibilityRole="button">
-                  <KeyRound size={16} color={th.primary} />
-                  <Text style={[s.link, { color: th.primary }]}>{t('authUsePassword')}</Text>
-                </TouchableOpacity>
+                <SecondaryButton
+                  title={t('authUsePassword')}
+                  icon={<KeyRound size={16} color={th.ink2} />}
+                  onPress={() => { setUsePassword(true); setError(null) }}
+                  style={{ marginTop: 10, alignSelf: 'stretch' }}
+                />
               </View>
             ) : (
               <View>
@@ -193,10 +281,12 @@ export default function SignInScreen() {
                 <PrimaryButton title={t('authSignIn')} onPress={handlePassword} loading={loading} style={{ marginTop: 14 }} />
 
                 {bioOk ? (
-                  <TouchableOpacity onPress={() => { setUsePassword(false); setError(null) }} style={s.textLink} accessibilityRole="button">
-                    <Fingerprint size={16} color={th.primary} />
-                    <Text style={[s.link, { color: th.primary }]}>{t('authBioCta')}</Text>
-                  </TouchableOpacity>
+                  <SecondaryButton
+                    title={t('authBioCta')}
+                    icon={<Fingerprint size={16} color={th.ink2} />}
+                    onPress={() => { setUsePassword(false); setError(null) }}
+                    style={{ marginTop: 10 }}
+                  />
                 ) : biometricAvailable && !biometricEnabled ? (
                   <View style={[s.tip, { backgroundColor: th.soft }]}>
                     <Fingerprint size={22} color={th.primary} />
@@ -208,7 +298,7 @@ export default function SignInScreen() {
 
             <View style={s.secure}>
               <ShieldCheck size={13} color={th.ok} />
-              <Text style={[s.secureText, { color: th.faint }]}>{t('authSecure')}</Text>
+              <Text style={[s.secureText, { color: th.faint }]}>{footer}</Text>
             </View>
           </Animated.View>
         </ScrollView>
@@ -230,14 +320,24 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', elevation: 8, shadowColor: '#1D4ED8', shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 8 },
   },
   avatarText: { color: '#fff', fontSize: 25, fontFamily: F.displaySemi },
+  avatarFill: { ...StyleSheet.absoluteFillObject, borderRadius: 35 },
+  // Centred on the 80px avatar (top -40), 10px larger on every side.
+  avatarRing: { position: 'absolute', top: -50, alignSelf: 'center', width: AVATAR_RING, height: AVATAR_RING },
+  // 80 - 2 * 5 border; falls back to initials if the photo can't load.
+  avatarImg: { width: 70, height: 70, borderRadius: 35 },
   tick: { position: 'absolute', bottom: -2, start: -2, width: 22, height: 22, borderRadius: 11, backgroundColor: '#16A34A', borderWidth: 2.5, alignItems: 'center', justifyContent: 'center' },
-  idRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 },
-  idPhone: { fontSize: 13, fontFamily: F.medium, writingDirection: 'ltr' },
+  idRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 4 },
+  idChip: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 20, borderWidth: 1, paddingVertical: 4, paddingStart: 12, paddingEnd: 5 },
+  idPhone: { fontSize: 13, fontFamily: F.semibold, writingDirection: 'ltr' },
+  notYou: { borderRadius: 14, paddingHorizontal: 10, paddingVertical: 3 },
+  notYouText: { fontSize: 12, fontFamily: F.semibold },
   link: { fontSize: 13, fontFamily: F.semibold },
   bioWrap: { width: 140, height: 140, marginTop: 18, alignItems: 'center', justifyContent: 'center' },
   bioPulse: { position: 'absolute', width: 140, height: 140, borderRadius: 70, borderWidth: 1.5 },
   bioRing: { position: 'absolute', width: 112, height: 112, borderRadius: 56, borderWidth: 1.5 },
-  bioCore: { width: 86, height: 86, borderRadius: 43, alignItems: 'center', justifyContent: 'center', elevation: 8, shadowOpacity: 0.35, shadowRadius: 14, shadowOffset: { width: 0, height: 8 } },
+  bioCore: { width: 86, height: 86, borderRadius: 43, elevation: 8, shadowOpacity: 0.4, shadowRadius: 16, shadowOffset: { width: 0, height: 10 } },
+  bioClip: { flex: 1, borderRadius: 43, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  scanLine: { position: 'absolute', top: 0, left: 14, right: 14, height: 2, borderRadius: 1, backgroundColor: 'rgba(255,255,255,0.85)' },
   bioTitle: { fontSize: 17, fontFamily: F.bold, marginTop: 12 },
   bioSub: { fontSize: 12.5, fontFamily: F.regular, marginTop: 2, textAlign: 'center' },
   textLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 16, minHeight: 44 },

@@ -1,9 +1,11 @@
-import { useState, forwardRef, type ReactNode } from 'react'
+import { useState, useEffect, useRef, useMemo, memo, forwardRef, type ReactNode } from 'react'
 import {
-  View, Text, TextInput, TouchableOpacity, ActivityIndicator, Image, StyleSheet,
+  View, Text, TextInput, TouchableOpacity, ActivityIndicator, Image, StyleSheet, useWindowDimensions,
+  Animated, Easing, AccessibilityInfo, I18nManager,
   type TextInputProps, type StyleProp, type ViewStyle,
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
+import Svg, { Circle } from 'react-native-svg'
 import * as Haptics from 'expo-haptics'
 import { Eye, EyeOff, CircleAlert, CircleCheck, ArrowLeft, ArrowRight, Globe } from 'lucide-react-native'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -23,6 +25,13 @@ export const PHONE_RE = /^01[0-9]{9}$/
 export const HERO = require('../../../assets/auth/hero.webp')
 export const LOGO = require('../../../assets/logo.jpg')
 
+function mix(hex: string, target: string, amount: number) {
+  if (!/^#[0-9a-f]{6}$/i.test(hex)) return hex
+  const ch = (h: string, i: number) => parseInt(h.slice(i, i + 2), 16)
+  const out = [1, 3, 5].map(i => Math.round(ch(hex, i) + (ch(target, i) - ch(hex, i)) * amount))
+  return '#' + out.map(v => v.toString(16).padStart(2, '0')).join('')
+}
+
 function withAlpha(hex: string, alpha: number) {
   if (!/^#[0-9a-f]{6}$/i.test(hex)) return hex
   const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16)
@@ -40,6 +49,8 @@ export function useAuthTheme() {
         field: '#121C31', fieldBorder: '#22304A', iconBg: 'rgba(59,130,246,0.15)', iconFg: '#8EC1FF',
         line: '#22304A', danger: '#F87171', dangerBg: 'rgba(248,113,113,0.12)', ok: '#4ADE80', okBg: 'rgba(34,197,94,0.12)',
         disabled: '#22304A', soft: '#18233A',
+        cardTint: ['#112445', '#0F1A31', '#0E172A'] as const, cardTintAt: [0, 0.26, 0.5] as const,
+        cardEdge: 'rgba(56,189,248,0.35)', dot: '#38BDF8',
       }
     : {
         isDark, primary, ring: withAlpha(primary, 0.16), sky: '#8EC1FF',
@@ -48,6 +59,8 @@ export function useAuthTheme() {
         field: '#FFFFFF', fieldBorder: '#DFE6F0', iconBg: '#EEF4FF', iconFg: primary,
         line: '#E2E8F1', danger: '#DC2626', dangerBg: '#FEE2E2', ok: '#16A34A', okBg: '#ECFDF3',
         disabled: '#C7D3E6', soft: '#F3F6FA',
+        cardTint: ['#EAF4FD', '#F6FAFF', '#FFFFFF'] as const, cardTintAt: [0, 0.22, 0.45] as const,
+        cardEdge: 'rgba(14,165,233,0.28)', dot: '#0EA5E9',
       }
 }
 
@@ -188,6 +201,7 @@ export function PrimaryButton({ title, onPress, loading, disabled, leading, trai
 }) {
   const th = useAuthTheme()
   const inactive = disabled || loading
+  const off = disabled && !loading
   return (
     <TouchableOpacity
       activeOpacity={0.85}
@@ -197,14 +211,84 @@ export function PrimaryButton({ title, onPress, loading, disabled, leading, trai
       accessibilityState={{ disabled: !!inactive, busy: !!loading }}
       style={[
         s.btn,
-        { backgroundColor: disabled && !loading ? th.disabled : th.primary },
-        !disabled && !loading && { shadowColor: th.primary, shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 6 },
+        { backgroundColor: off ? th.disabled : th.primary },
+        !inactive && { shadowColor: th.primary, shadowOpacity: 0.35, shadowRadius: 14, shadowOffset: { width: 0, height: 8 }, elevation: 7 },
         style,
       ]}
     >
+      {!off ? (
+        // The fill lives in its own clipped layer so the button's shadow isn't clipped (iOS).
+        <View style={s.btnFill} pointerEvents="none">
+          <LinearGradient
+            colors={[mix(th.primary, '#ffffff', 0.15), th.primary, mix(th.primary, '#000000', 0.15)]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={StyleSheet.absoluteFill}
+          />
+          {!loading ? <Shine /> : null}
+        </View>
+      ) : null}
       {loading ? <ActivityIndicator color="#fff" size="small" /> : leading}
       <Text style={s.btnText}>{loading && loadingTitle ? loadingTitle : title}</Text>
       {!loading && trailing}
+    </TouchableOpacity>
+  )
+}
+
+// A soft light sweep across the primary button every few seconds. Skipped when the OS asks for reduced motion.
+function Shine() {
+  const [w, setW] = useState(0)
+  const x = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    if (!w) return
+    let loop: Animated.CompositeAnimation | undefined
+    let cancelled = false
+    AccessibilityInfo.isReduceMotionEnabled().then(reduce => {
+      if (reduce || cancelled) return
+      loop = Animated.loop(Animated.sequence([
+        Animated.timing(x, { toValue: 1, duration: 1300, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.delay(1900),
+        Animated.timing(x, { toValue: 0, duration: 0, useNativeDriver: true }),
+      ]))
+      loop.start()
+    }).catch(() => {})
+    return () => { cancelled = true; loop?.stop() }
+  }, [w])
+  // `start: 0` sits on the right in RTL, so the sweep runs the other way there.
+  const dir = I18nManager.isRTL ? -1 : 1
+  const tx = x.interpolate({ inputRange: [0, 1], outputRange: [-w * 0.5 * dir, w * 1.1 * dir] })
+  return (
+    <View style={StyleSheet.absoluteFill} onLayout={e => setW(e.nativeEvent.layout.width)} pointerEvents="none">
+      {w ? (
+        <Animated.View style={{ position: 'absolute', top: 0, bottom: 0, start: 0, width: w * 0.38, transform: [{ translateX: tx }] }}>
+          <LinearGradient
+            colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.32)', 'rgba(255,255,255,0)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
+      ) : null}
+    </View>
+  )
+}
+
+export function SecondaryButton({ title, onPress, icon, style }: {
+  title: string
+  onPress: () => void
+  icon?: ReactNode
+  style?: StyleProp<ViewStyle>
+}) {
+  const th = useAuthTheme()
+  return (
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={() => { tapHaptic(); onPress() }}
+      accessibilityRole="button"
+      style={[s.btn2, { backgroundColor: th.field, borderColor: th.fieldBorder }, style]}
+    >
+      {icon}
+      <Text style={[s.btn2Text, { color: th.ink2 }]}>{title}</Text>
     </TouchableOpacity>
   )
 }
@@ -260,18 +344,81 @@ export function LangButton({ glass }: { glass?: boolean }) {
   )
 }
 
+// The hero photo sized explicitly (not resizeMode="cover") so the woman and the washer stay in
+// frame on every screen shape, instead of the platform picking an arbitrary crop.
+export function HeroImage({ height }: { height: number }) {
+  const { width } = useWindowDimensions()
+  const imgH = Math.max(width * 1.5, height)
+  const imgW = imgH / 1.5
+  const top = Math.min(0, Math.max(height - imgH, height * 0.5 - imgH * 0.42))
+  return (
+    <Image
+      source={HERO}
+      style={{ position: 'absolute', top, left: (width - imgW) / 2, width: imgW, height: imgH }}
+      accessibilityIgnoresInvertColors
+    />
+  )
+}
+
+// Halftone dots on a grid that grow toward (cx, cy) and fade out with distance. Drawn once and memoised.
+export const Halftone = memo(function Halftone({ width, height, cx, cy, color }: {
+  width: number
+  height: number
+  cx: number
+  cy: number
+  color: string
+}) {
+  const dots = useMemo(() => {
+    const step = 14
+    const out: { x: number; y: number; r: number; o: number }[] = []
+    const x0 = cx - Math.floor(cx / step) * step
+    const y0 = cy + 6 - Math.floor((cy + 6) / step) * step
+    for (let y = y0; y < height; y += step) {
+      for (let x = x0; x < width; x += step) {
+        const d = Math.hypot(x - cx, (y - cy) * 1.3)
+        const dia = 3.6 - d / 55
+        if (dia < 0.6) continue
+        out.push({ x, y, r: dia / 2, o: Math.min(0.55, 0.15 + dia / 8) })
+      }
+    }
+    return out
+  }, [width, height, cx, cy])
+  return (
+    <Svg width={width} height={height} pointerEvents="none">
+      {dots.map(d => <Circle key={`${d.x}-${d.y}`} cx={d.x} cy={d.y} r={d.r} fill={color} opacity={d.o} />)}
+    </Svg>
+  )
+})
+
+// The card surface used by the auth sheets: a soft brand tint at the top, a lit top edge, and the
+// halftone dots spreading out from the logo/avatar at the top centre.
+export function SheetBackdrop() {
+  const th = useAuthTheme()
+  const { width } = useWindowDimensions()
+  return (
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, s.backdrop, { borderTopColor: th.cardEdge }]}>
+      <LinearGradient colors={th.cardTint} locations={th.cardTintAt} style={StyleSheet.absoluteFill} />
+      <Halftone width={width} height={150} cx={width / 2} cy={0} color={th.dot} />
+    </View>
+  )
+}
+
+const AMBIENT_H = 380
+
 export function TintBackground() {
   const th = useAuthTheme()
+  // The blurred photo fades into the page colour inside its own box, so there's no hard edge where it ends.
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      <LinearGradient colors={th.tint} style={StyleSheet.absoluteFill} />
-      <Image source={HERO} blurRadius={30} resizeMode="cover" style={[s.ambient, { opacity: th.isDark ? 0.22 : 0.4 }]} />
-      <LinearGradient
-        colors={th.isDark ? ['rgba(10,18,34,0)', '#0A1222'] : ['rgba(255,255,255,0)', '#FFFFFF']}
-        start={{ x: 0, y: 0.15 }}
-        end={{ x: 0, y: 0.75 }}
-        style={StyleSheet.absoluteFill}
-      />
+    <View style={[StyleSheet.absoluteFill, { backgroundColor: th.bg }]} pointerEvents="none">
+      <View style={s.ambientBox}>
+        <LinearGradient colors={th.tint} style={StyleSheet.absoluteFill} />
+        <Image source={HERO} blurRadius={30} resizeMode="cover" style={[s.ambient, { opacity: th.isDark ? 0.22 : 0.4 }]} />
+        <LinearGradient
+          colors={th.isDark ? ['rgba(10,18,34,0)', '#0A1222'] : ['rgba(255,255,255,0)', '#FFFFFF']}
+          locations={[0.2, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+      </View>
     </View>
   )
 }
@@ -295,5 +442,10 @@ const s = StyleSheet.create({
   round: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   lang: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 44, paddingHorizontal: 14, borderRadius: 22 },
   langText: { fontSize: 13, fontFamily: F.semibold },
-  ambient: { position: 'absolute', top: -40, left: -40, right: -40, height: 420 },
+  ambientBox: { position: 'absolute', top: 0, left: 0, right: 0, height: AMBIENT_H, overflow: 'hidden' },
+  ambient: { position: 'absolute', top: -40, left: -40, right: -40, height: AMBIENT_H + 40 },
+  backdrop: { borderTopLeftRadius: 26, borderTopRightRadius: 26, overflow: 'hidden', borderTopWidth: 1 },
+  btnFill: { ...StyleSheet.absoluteFillObject, borderRadius: 14, overflow: 'hidden' },
+  btn2: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 46, borderRadius: 14, borderWidth: 1.5, paddingHorizontal: 16 },
+  btn2Text: { fontSize: 14, fontFamily: F.semibold },
 })
