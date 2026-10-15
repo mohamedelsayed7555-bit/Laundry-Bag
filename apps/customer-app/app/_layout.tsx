@@ -6,7 +6,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext'
 import { CartProvider } from '../src/contexts/CartContext'
 import { ThemeProvider, useTheme } from '../src/contexts/ThemeContext'
-import { LanguageProvider } from '../src/contexts/LanguageContext'
+import { LanguageProvider, useLanguage } from '../src/contexts/LanguageContext'
+import { supabase } from '../src/lib/supabase'
 import { useNotifications } from '../src/hooks/useNotifications'
 import { colors } from '../src/theme'
 import AsyncStorage from '@react-native-async-storage/async-storage'
@@ -69,7 +70,17 @@ const ebStyles = StyleSheet.create({
 
 function NotificationSetup() {
   const { profile } = useAuth()
+  const { locale } = useLanguage()
   useNotifications(profile?.id)
+
+  // Server-sent notifications use this language. Debounced: the saved language loads a moment after start.
+  useEffect(() => {
+    if (!profile?.id) return
+    const id = setTimeout(() => {
+      supabase.from('users').update({ preferred_language: locale }).eq('id', profile.id).then(() => {})
+    }, 1500)
+    return () => clearTimeout(id)
+  }, [profile?.id, locale])
   return null
 }
 

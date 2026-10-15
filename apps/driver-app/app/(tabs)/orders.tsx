@@ -172,7 +172,6 @@ export default function DriverOrdersScreen() {
       await supabase.from('order_status_history').insert({
         order_id: orderId, status: newStatus, changed_by: profile?.id,
       })
-      sendPushToCustomer(orderId, newStatus)
       if (newStatus === 'delivered') {
         showAlert({ title: 'تم التسليم', message: 'تم تسليم الطلب للعميل بنجاح', type: 'success', buttons: [
           { text: 'حسناً', onPress: () => loadOrders() },
@@ -185,38 +184,7 @@ export default function DriverOrdersScreen() {
     }
   }
 
-  async function sendPushToCustomer(orderId: string, newStatus: string) {
-    try {
-      const { data: order } = await supabase.from('orders').select('customer_id, order_number').eq('id', orderId).single()
-      if (!order) return
-      const { data: customer } = await supabase.from('users').select('fcm_token').eq('id', order.customer_id).single()
-      if (!customer?.fcm_token) return
-      const statusMessages: Record<string, string> = {
-        assigned: 'تم تعيين سائق لطلبك',
-        arrived: 'السائق وصل موقعك',
-        picked_up: 'تم استلام ملابسك من السائق',
-        processing: 'ملابسك قيد المعالجة الآن',
-        ready: 'ملابسك جاهزة للتوصيل!',
-        delivering: 'السائق في طريقه إليك',
-        delivered: 'تم توصيل طلبك بنجاح!',
-      }
-      const message = statusMessages[newStatus]
-      if (!message) return
-      fetch('https://exp.host/--/api/v2/push/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: customer.fcm_token,
-          title: `طلب ${order.order_number}`,
-          body: message,
-          sound: 'order_update.wav',
-          channelId: 'order-updates-v2',
-          priority: 'high',
-          data: { type: 'order_update', order_id: orderId, status: newStatus },
-        }),
-      }).catch(() => {})
-    } catch {}
-  }
+  // The customer is notified by the database on every status change.
 
   function openNavigation(loc: any) {
     if (!loc?.lat || !loc?.lng) {
@@ -228,7 +196,9 @@ export default function DriverOrdersScreen() {
   }
 
   function getRelevantLocation(item: any) {
-    const isPickupPhase = ['assigned', 'arrived', 'picked_up'].includes(item.status)
+    // After pickup the driver heads to the laundry (known place) — no customer destination.
+    if (item.status === 'picked_up') return { loc: null, label: '', phase: 'laundry' }
+    const isPickupPhase = ['assigned', 'arrived'].includes(item.status)
     if (isPickupPhase) {
       return { loc: item.pickup_location ?? item.address ?? item.delivery_location, label: '📦 عنوان الاستلام', phase: 'pickup' }
     }
@@ -238,8 +208,9 @@ export default function DriverOrdersScreen() {
   const renderOrder = ({ item, index }: { item: any; index: number }) => {
     const status = statusConfig[item.status] ?? { label: item.status, color: '#999', icon: '❓' }
     const action = nextAction[item.status]
-    const addr = item.address
-    const { loc: relevantLoc, label: locLabel } = getRelevantLocation(item)
+    const { loc: relevantLoc, label: locLabel, phase: locPhase } = getRelevantLocation(item)
+    // On the way to the laundry: no customer address / navigation
+    const addr = locPhase === 'laundry' ? null : item.address
 
     return (
       <Animated.View entering={FadeInRight.duration(400).delay(index * 80)}>

@@ -158,8 +158,21 @@ export default function EditProfileScreen() {
               {
                 text: t('deleteMyAccount'), style: 'destructive', onPress: async () => {
                   if (!profile) return
-                  await supabase.from('users').update({ is_active: false }).eq('id', profile.id)
-                  await supabase.auth.signOut()
+                  // Removes personal data and closes the login (see /delete-account); order history stays without it.
+                  const { error } = await supabase.rpc('delete_my_account')
+                  if (error) {
+                    const activeOrders = error.message?.includes('active_orders')
+                    showAlert({
+                      title: t('error'),
+                      message: activeOrders
+                        ? (locale === 'en' ? 'You have an order in progress. You can delete your account after it is delivered or cancelled.' : 'عندك طلب لسه شغال. تقدر تحذف حسابك بعد ما يتسلّم أو يتلغي.')
+                        : t('updateError'),
+                      type: 'error',
+                    })
+                    return
+                  }
+                  if (biometricEnabled) await toggleBiometric(false)
+                  await supabase.auth.signOut().catch(() => {})
                   router.replace('/')
                 }
               },

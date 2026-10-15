@@ -21,7 +21,7 @@ export default function DriverProfileScreen() {
 
   useEffect(() => {
     if (profile) {
-      supabase.from('orders').select('status, total, rating_driver').eq('driver_id', profile.id).then(({ data }) => {
+      supabase.from('orders').select('status, total, rating_driver').or(`driver_id.eq.${profile.id},pickup_driver_id.eq.${profile.id}`).then(({ data }) => {
         const orders = data ?? []
         const delivered = orders.filter(o => o.status === 'delivered')
         const rated = delivered.filter(o => o.rating_driver != null)

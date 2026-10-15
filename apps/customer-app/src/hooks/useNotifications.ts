@@ -53,7 +53,9 @@ Notifications.setNotificationHandler({
     if (!d.local) {
       // A push that arrives while the app is open: realtime has usually notified already.
       if (d.type === 'order_update' && d.order_id && d.status && !gate(`order:${d.order_id}:${d.status}`, ORDER_WINDOW)) return HIDE
-      if (d.type === 'chat' && d.order_id && (activeChatOrderId === d.order_id || !gate(`chat:${d.order_id}`, CHAT_WINDOW))) return HIDE
+      if ((d.type === 'chat' || d.type === 'message') && d.order_id && (activeChatOrderId === d.order_id || !gate(`chat:${d.order_id}`, CHAT_WINDOW))) return HIDE
+      // The customer just placed this order in the app (which already played the confirmation sound).
+      if (d.type === 'order_placed') return HIDE
     }
     return SHOW
   },
@@ -63,7 +65,7 @@ function openFromNotification(d: any) {
   if (d?.type === 'broadcast') { router.push('/notifications'); return }
   if (d?.type === 'subscription') { router.push('/plans'); return }
   if (!d?.order_id) return
-  if (d.type === 'chat') router.push(`/chat/${d.order_id}`)
+  if (d.type === 'chat' || d.type === 'message') router.push(`/chat/${d.order_id}`)
   else router.push(`/order/${d.order_id}`)
 }
 
@@ -76,7 +78,8 @@ export function useNotifications(userId?: string) {
       if (token) {
         setExpoPushToken(token)
         if (userId) {
-          supabase.from('users').update({ fcm_token: token }).eq('id', userId)
+          // Also removes this device's token from any other account that signed in here before.
+          supabase.rpc('claim_push_token', { p_token: token })
             .then(({ error }) => { if (error) console.warn('Token save failed:', error.message) })
         }
       }

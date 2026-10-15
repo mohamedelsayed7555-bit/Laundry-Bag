@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, Linking, Platform } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { WebView } from 'react-native-webview'
@@ -38,6 +38,20 @@ function buildFullTrackingMapHTML(driverLat: number, driverLng: number, customer
 </body></html>`
 }
 
+// Driver is shown only while coming to the customer
+const TRACK_STATUSES = ['assigned', 'arrived', 'delivering']
+function customerPoint(order: any): { lat?: number; lng?: number } {
+  const pickup = ['assigned', 'arrived'].includes(order?.status)
+  const p = pickup ? (order?.pickup_location ?? order?.delivery_location) : (order?.delivery_location ?? order?.pickup_location)
+  return { lat: p?.lat, lng: p?.lng }
+}
+// Minutes since the driver's last position (null = fresh)
+function staleMinutes(at?: string | null) {
+  if (!at) return null
+  const m = Math.floor((Date.now() - new Date(at).getTime()) / 60000)
+  return m >= 5 ? m : null
+}
+
 const statusLabels: Record<string, { ar: string; en: string }> = {
   assigned: { ar: 'في الطريق للاستلام', en: 'On the way to pick up' },
   arrived: { ar: 'السائق وصل موقعك', en: 'Driver arrived at your location' },
@@ -54,7 +68,8 @@ export default function TrackingScreen() {
   const router = useRouter()
   const mapWebviewRef = useRef<WebView>(null)
   const [order, setOrder] = useState<any>(null)
-  const [driverLoc, setDriverLoc] = useState<{ lat: number; lng: number } | null>(null)
+  const [driverLoc, setDriverLoc] = useState<{ lat: number; lng: number; at?: string | null } | null>(null)
+  const [mapSeed, setMapSeed] = useState<{ lat: number; lng: number } | null>(null)
 
   useEffect(() => {
     loadOrder()
@@ -68,12 +83,18 @@ export default function TrackingScreen() {
   }, [orderId])
 
   useEffect(() => {
-    if (!order?.driver_id || !['assigned', 'arrived', 'picked_up', 'delivering'].includes(order?.status)) {
+    setMapSeed(null)
+    if (!order?.driver_id || !TRACK_STATUSES.includes(order?.status)) {
       setDriverLoc(null)
       return
     }
-    supabase.from('driver_locations').select('lat, lng').eq('driver_id', order.driver_id).single()
-      .then(({ data }) => { if (data) setDriverLoc(data) })
+    supabase.from('driver_locations').select('lat, lng, updated_at').eq('driver_id', order.driver_id).single()
+      .then(({ data }) => {
+        if (data) {
+          setDriverLoc({ lat: data.lat, lng: data.lng, at: data.updated_at })
+          setMapSeed(prev => prev ?? { lat: data.lat, lng: data.lng })
+        }
+      })
 
     const ch = supabase
       .channel(`tracking-loc-${order.driver_id}`)
@@ -82,7 +103,10 @@ export default function TrackingScreen() {
         filter: `driver_id=eq.${order.driver_id}`,
       }, (payload: any) => {
         const loc = payload.new
-        if (loc?.lat && loc?.lng) setDriverLoc({ lat: loc.lat, lng: loc.lng })
+        if (loc?.lat && loc?.lng) {
+          setDriverLoc({ lat: loc.lat, lng: loc.lng, at: loc.updated_at })
+          setMapSeed(prev => prev ?? { lat: loc.lat, lng: loc.lng })
+        }
       })
       .subscribe((status, err) => {
         if (err) console.warn('tracking-loc realtime error:', err.message)
@@ -99,7 +123,7 @@ export default function TrackingScreen() {
   async function loadOrder() {
     const { data } = await supabase
       .from('orders')
-      .select('id, order_number, status, driver_id, delivery_location, driver:users!orders_driver_id_fkey(name, phone)')
+      .select('id, order_number, status, driver_id, pickup_location, delivery_location, driver:users!orders_driver_id_fkey(name, phone)')
       .eq('id', orderId)
       .single()
     setOrder(data)
@@ -113,22 +137,19 @@ export default function TrackingScreen() {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
   }
 
-  function openNavigation() {
-    if (!driverLoc) return
-    const url = Platform.OS === 'ios'
-      ? `maps:?daddr=${driverLoc.lat},${driverLoc.lng}`
-      : `https://www.google.com/maps/dir/?api=1&destination=${driverLoc.lat},${driverLoc.lng}`
-    Linking.openURL(url)
-  }
-
-  const customerLat = order?.delivery_location?.lat
-  const customerLng = order?.delivery_location?.lng
+  const { lat: customerLat, lng: customerLng } = customerPoint(order)
+  const stale = staleMinutes(driverLoc?.at)
   const distanceKm = driverLoc && customerLat && customerLng
     ? getDistance(driverLoc.lat, driverLoc.lng, customerLat, customerLng)
     : null
   const etaMinutes = distanceKm !== null ? Math.max(1, Math.round(distanceKm / 0.5)) : null
 
-  const showMap = driverLoc && ['assigned', 'arrived', 'picked_up', 'delivering'].includes(order?.status)
+  const showMap = !!driverLoc && !!mapSeed && TRACK_STATUSES.includes(order?.status)
+  // Built once per order/phase; later positions go through window.updateDriver
+  const mapHtml = useMemo(
+    () => (mapSeed ? buildFullTrackingMapHTML(mapSeed.lat, mapSeed.lng, customerLat, customerLng, order?.driver?.name) : ''),
+    [mapSeed, customerLat, customerLng, order?.driver?.name],
+  )
 
   return (
     <View style={s.container}>
@@ -146,7 +167,8 @@ export default function TrackingScreen() {
         {showMap ? (
           <WebView
             ref={mapWebviewRef}
-            source={{ html: buildFullTrackingMapHTML(driverLoc.lat, driverLoc.lng, customerLat, customerLng, order?.driver?.name) }}
+            source={{ html: mapHtml }}
+            onLoadEnd={() => driverLoc && mapWebviewRef.current?.injectJavaScript(`window.updateDriver && window.updateDriver(${driverLoc.lat}, ${driverLoc.lng}); true;`)}
             style={s.map}
             javaScriptEnabled
             domStorageEnabled
@@ -192,8 +214,8 @@ export default function TrackingScreen() {
           )}
           {etaMinutes !== null && (
             <View style={s.etaItem}>
-              <Text style={[s.etaValue, { color: colors.primary }]}>{etaMinutes} {isEn ? 'min' : 'دقيقة'}</Text>
-              <Text style={s.etaLabel}>{isEn ? 'ETA' : 'الوقت المتوقع'}</Text>
+              <Text style={[s.etaValue, { color: stale ? colors.navy[300] : colors.primary }]}>~{etaMinutes} {isEn ? 'min' : 'دقيقة'}</Text>
+              <Text style={s.etaLabel}>{stale ? (isEn ? `Updated ${stale} min ago` : `آخر تحديث من ${stale} د`) : (isEn ? 'ETA' : 'الوقت المتوقع')}</Text>
             </View>
           )}
           <View style={s.etaItem}>

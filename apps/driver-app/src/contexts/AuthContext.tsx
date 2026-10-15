@@ -135,7 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         projectId: '9f91156d-9d01-4151-ac7c-31ad246b5aae',
       })
       const token = tokenData.data
-      await supabase.from('users').update({ fcm_token: token }).eq('id', userId)
+      await supabase.rpc('claim_push_token', { p_token: token })
     } catch {}
   }
 
@@ -190,6 +190,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signOut() {
+    // This phone must stop receiving this driver's order notifications.
+    const uid = state.session?.user.id
+    if (uid) {
+      try { await supabase.from('users').update({ fcm_token: null }).eq('id', uid) } catch {}
+    }
     await supabase.auth.signOut()
     setState(s => ({ ...s, session: null, profile: null, loading: false }))
   }

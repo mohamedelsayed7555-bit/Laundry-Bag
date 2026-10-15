@@ -1,7 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react'
-import { Vibration } from 'react-native'
 import { supabase } from '../lib/supabase'
-import { sendLocalNotification, playNotificationSound } from './useNotifications'
 
 export function useRealtimeDriverOrders(driverId: string | undefined, onUpdate: () => void) {
   const onUpdateRef = useRef(onUpdate)
@@ -21,22 +19,14 @@ export function useRealtimeDriverOrders(driverId: string | undefined, onUpdate: 
           const isMyOrder = payload.new.driver_id === driverId
           const wasAssignedToMe = payload.new.driver_id === driverId && payload.old?.driver_id !== driverId
 
-          if (wasAssignedToMe) {
-            sendLocalNotification('طلب جديد! 📦', `تم تعيين طلب جديد رقم ${payload.new.order_number} لك`, 'new-order')
-            playNotificationSound('new-order')
-            Vibration.vibrate([0, 400, 200, 400])
+          // Sound / banner for new and delivery orders: NewOrderAlert (one place, no duplicates)
+          const wasMine = payload.old?.driver_id === driverId
+          if (wasAssignedToMe || (wasMine && !isMyOrder)) {
             stableOnUpdate()
             return
           }
 
           if (isMyOrder) {
-            const newStatus = payload.new.status as string
-            const oldStatus = payload.old?.status as string
-            if (newStatus === 'ready' && oldStatus !== 'ready') {
-              sendLocalNotification('طلب جاهز للتوصيل! 🚗', `الطلب رقم ${payload.new.order_number} جاهز — ابدأ التوصيل`, 'new-order')
-              playNotificationSound('new-order')
-              Vibration.vibrate(400)
-            }
             stableOnUpdate()
           }
         }
@@ -45,12 +35,7 @@ export function useRealtimeDriverOrders(driverId: string | undefined, onUpdate: 
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'orders' },
         (payload) => {
-          if (payload.new.driver_id === driverId) {
-            sendLocalNotification('طلب جديد! 📦', `طلب جديد رقم ${payload.new.order_number}`, 'new-order')
-            playNotificationSound('new-order')
-            Vibration.vibrate([0, 400, 200, 400])
-            stableOnUpdate()
-          }
+          if (payload.new.driver_id === driverId) stableOnUpdate()
         }
       )
       .subscribe((status, err) => {

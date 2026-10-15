@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Linking } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { WebView } from 'react-native-webview'
@@ -13,6 +13,20 @@ import { CANCELLABLE_STATUSES } from '../../src/shared/types'
 import { serverErrorMessage } from '../../src/lib/serverErrors'
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!
+
+// Driver is shown only while coming to the customer
+const TRACK_STATUSES = ['assigned', 'arrived', 'delivering']
+function customerPoint(order: any): { lat?: number; lng?: number } {
+  const pickup = ['assigned', 'arrived'].includes(order?.status)
+  const p = pickup ? (order?.pickup_location ?? order?.delivery_location) : (order?.delivery_location ?? order?.pickup_location)
+  return { lat: p?.lat, lng: p?.lng }
+}
+// Minutes since the driver's last position (null = fresh)
+function staleMinutes(at?: string | null) {
+  if (!at) return null
+  const m = Math.floor((Date.now() - new Date(at).getTime()) / 60000)
+  return m >= 5 ? m : null
+}
 
 function buildTrackingMapHTML(driverLat: number, driverLng: number, customerLat?: number, customerLng?: number) {
   const centerLat = customerLat ? (driverLat + customerLat) / 2 : driverLat
@@ -81,7 +95,8 @@ export default function OrderDetailsScreen() {
   const [ratingDriver, setRatingDriver] = useState(0)
   const [ratingNote, setRatingNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [driverLoc, setDriverLoc] = useState<{ lat: number; lng: number } | null>(null)
+  const [driverLoc, setDriverLoc] = useState<{ lat: number; lng: number; at?: string | null } | null>(null)
+  const [mapSeed, setMapSeed] = useState<{ lat: number; lng: number } | null>(null)
   const [retrying, setRetrying] = useState(false)
   const [showWalletInput, setShowWalletInput] = useState(false)
   const [walletPhone, setWalletPhone] = useState('')
@@ -99,12 +114,18 @@ export default function OrderDetailsScreen() {
   }, [id])
 
   useEffect(() => {
-    if (!order?.driver_id || !['assigned', 'arrived', 'picked_up', 'delivering'].includes(order?.status)) {
+    setMapSeed(null)
+    if (!order?.driver_id || !TRACK_STATUSES.includes(order?.status)) {
       setDriverLoc(null)
       return
     }
-    supabase.from('driver_locations').select('lat, lng').eq('driver_id', order.driver_id).single()
-      .then(({ data }) => { if (data) setDriverLoc(data) })
+    supabase.from('driver_locations').select('lat, lng, updated_at').eq('driver_id', order.driver_id).single()
+      .then(({ data }) => {
+        if (data) {
+          setDriverLoc({ lat: data.lat, lng: data.lng, at: data.updated_at })
+          setMapSeed(prev => prev ?? { lat: data.lat, lng: data.lng })
+        }
+      })
 
     const ch = supabase
       .channel(`driver-loc-${order.driver_id}`)
@@ -113,7 +134,10 @@ export default function OrderDetailsScreen() {
         filter: `driver_id=eq.${order.driver_id}`,
       }, (payload: any) => {
         const loc = payload.new
-        if (loc?.lat && loc?.lng) setDriverLoc({ lat: loc.lat, lng: loc.lng })
+        if (loc?.lat && loc?.lng) {
+          setDriverLoc({ lat: loc.lat, lng: loc.lng, at: loc.updated_at })
+          setMapSeed(prev => prev ?? { lat: loc.lat, lng: loc.lng })
+        }
       })
       .subscribe((status, err) => {
         if (err) console.warn('driver-loc realtime error:', err.message)
@@ -131,7 +155,7 @@ export default function OrderDetailsScreen() {
     if (!profile?.id) return
     const { data } = await supabase
       .from('orders')
-      .select('id, order_number, status, service_type, items_count, total, subtotal, discount, coupon_code, delivery_fee, cancellation_fee, notes, payment_method, payment_status, driver_id, rated_at, rating_service, rating_driver, rating_note, gift_included, created_at, delivery_location, subscription_id, order_type, driver:users!orders_driver_id_fkey(name, phone)')
+      .select('id, order_number, status, service_type, items_count, total, subtotal, discount, coupon_code, delivery_fee, cancellation_fee, notes, payment_method, payment_status, driver_id, rated_at, rating_service, rating_driver, rating_note, gift_included, created_at, pickup_location, delivery_location, subscription_id, order_type, driver:users!orders_driver_id_fkey(name, phone)')
       .eq('id', id)
       .eq('customer_id', profile.id)
       .single()
@@ -233,8 +257,12 @@ export default function OrderDetailsScreen() {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
   }
 
-  const customerLat = order?.delivery_location?.lat
-  const customerLng = order?.delivery_location?.lng
+  const { lat: customerLat, lng: customerLng } = customerPoint(order)
+  const stale = staleMinutes(driverLoc?.at)
+  const mapHtml = useMemo(
+    () => (mapSeed ? buildTrackingMapHTML(mapSeed.lat, mapSeed.lng, customerLat, customerLng) : ''),
+    [mapSeed, customerLat, customerLng],
+  )
   const distanceKm = driverLoc && customerLat && customerLng
     ? getDistance(driverLoc.lat, driverLoc.lng, customerLat, customerLng)
     : null
@@ -292,7 +320,7 @@ export default function OrderDetailsScreen() {
         </View>
       )}
 
-      {driverLoc && ['assigned', 'arrived', 'picked_up', 'delivering'].includes(order.status) && (
+      {driverLoc && mapSeed && TRACK_STATUSES.includes(order.status) && (
         <TouchableOpacity
           style={s.trackingCard}
           activeOpacity={0.8}
@@ -305,7 +333,8 @@ export default function OrderDetailsScreen() {
           <View style={s.mapWrapper}>
             <WebView
               ref={mapWebviewRef}
-              source={{ html: buildTrackingMapHTML(driverLoc.lat, driverLoc.lng, customerLat, customerLng) }}
+              source={{ html: mapHtml }}
+              onLoadEnd={() => driverLoc && mapWebviewRef.current?.injectJavaScript(`window.updateDriver && window.updateDriver(${driverLoc.lat}, ${driverLoc.lng}); true;`)}
               style={s.map}
               javaScriptEnabled
               domStorageEnabled
@@ -324,8 +353,8 @@ export default function OrderDetailsScreen() {
             )}
             {etaMinutes !== null && (
               <View style={s.etaItem}>
-                <Text style={[s.etaValue, { color: colors.primary }]}>{etaMinutes} {isEn ? 'min' : 'د'}</Text>
-                <Text style={s.etaLabel}>{t('etaLabel')}</Text>
+                <Text style={[s.etaValue, { color: stale ? colors.navy[300] : colors.primary }]}>~{etaMinutes} {isEn ? 'min' : 'د'}</Text>
+                <Text style={s.etaLabel}>{stale ? (isEn ? `Updated ${stale} min ago` : `آخر تحديث من ${stale} د`) : t('etaLabel')}</Text>
               </View>
             )}
             <View style={s.etaItem}>

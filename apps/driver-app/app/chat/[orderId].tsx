@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { supabase } from '../../src/lib/supabase'
 import { colors } from '../../src/theme'
-import { playNotificationSound, sendLocalNotification } from '../../src/hooks/useNotifications'
+import { notifyMessage, setActiveChat } from '../../src/hooks/useNotifications'
 
 type Message = {
   id: string
@@ -69,6 +69,13 @@ export default function ChatScreen() {
 
   useEffect(() => { load() }, [load])
 
+  // While this chat is open its messages only get a soft sound, not a banner.
+  useEffect(() => {
+    if (!orderId) return
+    setActiveChat(orderId)
+    return () => setActiveChat(null)
+  }, [orderId])
+
   useEffect(() => {
     if (!profile || !orderId) return
     const channel = supabase
@@ -77,9 +84,7 @@ export default function ChatScreen() {
         const newMsg = payload.new as Message
         setMessages(prev => [...prev, newMsg])
         if (newMsg.sender_id !== profile.id) {
-          playNotificationSound('order-update')
-          Vibration.vibrate(300)
-          sendLocalNotification('رسالة جديدة', newMsg.body, 'messages')
+          notifyMessage({ id: newMsg.id, order_id: orderId, body: newMsg.body })
         }
         if (newMsg.receiver_id === profile.id) {
           supabase.from('messages').update({ read_at: new Date().toISOString() }).eq('id', newMsg.id)
@@ -120,22 +125,7 @@ export default function ChatScreen() {
       body: msgBody,
     })
 
-    const { data: customerData } = await supabase.from('users').select('fcm_token').eq('id', order.customer_id).single()
-    if (customerData?.fcm_token) {
-      fetch('https://exp.host/--/api/v2/push/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: customerData.fcm_token,
-          title: `رسالة من ${profile.name ?? 'السائق'}`,
-          body: msgBody.length > 100 ? msgBody.slice(0, 100) + '...' : msgBody,
-          sound: 'message.wav',
-          channelId: 'messages-v2',
-          priority: 'high',
-          data: { type: 'chat', order_id: orderId },
-        }),
-      }).catch(() => {})
-    }
+    // The database pushes the message to the customer.
 
     setText('')
     setSending(false)

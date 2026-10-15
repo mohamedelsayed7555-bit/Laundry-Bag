@@ -1,17 +1,47 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { Tabs } from 'expo-router'
 import { View, StyleSheet, Platform } from 'react-native'
-import { Home, ClipboardList, PlusCircle, MessageCircle, User } from 'lucide-react-native'
-import { useTheme } from '../../src/contexts/ThemeContext'
+import { LinearGradient } from 'expo-linear-gradient'
+import { Home, ClipboardList, Plus, MessageCircle, User } from 'lucide-react-native'
 import { useLanguage } from '../../src/contexts/LanguageContext'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { supabase } from '../../src/lib/supabase'
+import { useBrand, F, type Brand } from '../../src/components/brand'
 import ContactFAB from '../../src/components/ContactFAB'
 
-function FloatingAddButton({ color, focused, primary, primaryDark }: { color: string; focused: boolean; primary: string; primaryDark: string }) {
+const BRAND_EDGE = ['#38BDF8', '#818CF8', '#0EA5E9'] as const
+
+// Opaque bar with a thin brand-gradient frame and a soft halo (a translucent bar picked up
+// Android's elevation shadow and looked muddy over the page).
+function TabBarFrame({ b }: { b: Brand }) {
   return (
-    <View style={[tb.fabWrap, { backgroundColor: primary, shadowColor: primary }, focused && { backgroundColor: primaryDark, transform: [{ scale: 1.08 }] }]}>
-      <PlusCircle size={28} stroke="#fff" />
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <View style={[tb.halo, { backgroundColor: b.isDark ? 'rgba(56,189,248,0.20)' : 'rgba(14,165,233,0.12)' }]} />
+      <View style={[tb.frame, { backgroundColor: b.card }]}>
+        <LinearGradient colors={BRAND_EDGE} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFill, { borderRadius: 24 }]} />
+        <View style={[tb.inner, { backgroundColor: b.card }]} />
+      </View>
+    </View>
+  )
+}
+
+// Active tab: icon on a soft tinted pill
+function TabIcon({ children, focused, b }: { children: React.ReactNode; focused: boolean; b: Brand }) {
+  return <View style={[tb.iconPill, focused && { backgroundColor: b.tint }]}>{children}</View>
+}
+
+// Centre "new order" button sitting in a ring the colour of the page
+function FloatingAddButton({ focused, b }: { focused: boolean; b: Brand }) {
+  return (
+    <View style={[tb.fabRing, { backgroundColor: b.page }]}>
+      <LinearGradient
+        colors={focused ? ['#0EA5E9', '#0369A1'] : ['#38BDF8', '#0284C7']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={tb.fab}
+      >
+        <Plus size={28} color="#fff" />
+      </LinearGradient>
     </View>
   )
 }
@@ -56,7 +86,7 @@ function useUnreadMessages() {
 }
 
 export default function TabsLayout() {
-  const { colors } = useTheme()
+  const b = useBrand()
   const { t } = useLanguage()
   const unread = useUnreadMessages()
 
@@ -66,13 +96,10 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.navy[400],
-        tabBarStyle: [tb.bar, {
-          backgroundColor: colors.tabBarBg,
-          borderColor: colors.navy[600],
-          flexDirection: 'row-reverse',
-        }],
+        tabBarActiveTintColor: b.tintText,
+        tabBarInactiveTintColor: b.faint,
+        tabBarStyle: [tb.bar, { flexDirection: 'row-reverse' }],
+        tabBarBackground: () => <TabBarFrame b={b} />,
         tabBarLabelStyle: tb.label,
         tabBarItemStyle: { paddingTop: 6 },
       }}
@@ -81,37 +108,37 @@ export default function TabsLayout() {
         name="home"
         options={{
           title: t('tabHome'),
-          tabBarIcon: ({ color, size }) => <Home size={size} color={color} />,
+          tabBarIcon: ({ color, focused }) => <TabIcon focused={focused} b={b}><Home size={22} color={color} /></TabIcon>,
         }}
       />
       <Tabs.Screen
         name="orders"
         options={{
           title: t('tabOrders'),
-          tabBarIcon: ({ color, size }) => <ClipboardList size={size} color={color} />,
+          tabBarIcon: ({ color, focused }) => <TabIcon focused={focused} b={b}><ClipboardList size={22} color={color} /></TabIcon>,
         }}
       />
       <Tabs.Screen
         name="new-order"
         options={{
           title: '',
-          tabBarIcon: ({ color, focused }) => <FloatingAddButton color={color} focused={focused} primary={colors.primary} primaryDark={colors.primaryDark} />,
+          tabBarIcon: ({ focused }) => <FloatingAddButton focused={focused} b={b} />,
         }}
       />
       <Tabs.Screen
         name="messages"
         options={{
           title: t('tabMessages'),
-          tabBarIcon: ({ color, size }) => <MessageCircle size={size} color={color} />,
+          tabBarIcon: ({ color, focused }) => <TabIcon focused={focused} b={b}><MessageCircle size={22} color={color} /></TabIcon>,
           tabBarBadge: unread > 0 ? unread : undefined,
-          tabBarBadgeStyle: { backgroundColor: colors.primary, color: '#fff', fontSize: 10, fontWeight: '700', minWidth: 18, height: 18, lineHeight: 18, borderRadius: 9 },
+          tabBarBadgeStyle: { backgroundColor: '#EF4444', color: '#fff', fontSize: 10, fontFamily: F.bold, minWidth: 18, height: 18, lineHeight: 18, borderRadius: 9 },
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: t('tabProfile'),
-          tabBarIcon: ({ color, size }) => <User size={size} color={color} />,
+          tabBarIcon: ({ color, focused }) => <TabIcon focused={focused} b={b}><User size={22} color={color} /></TabIcon>,
         }}
       />
     </Tabs>
@@ -120,6 +147,7 @@ export default function TabsLayout() {
 }
 
 const tb = StyleSheet.create({
+  // Same position/size as before (other screens offset their bottom bars from it)
   bar: {
     position: 'absolute',
     bottom: Platform.OS === 'ios' ? 24 : 16,
@@ -128,29 +156,40 @@ const tb = StyleSheet.create({
     borderRadius: 24,
     height: 68,
     borderTopWidth: 0,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 24,
-    elevation: 16,
+    backgroundColor: 'transparent',
+    elevation: 0,
+    shadowOpacity: 0,
     paddingBottom: 0,
   },
-  label: {
-    fontSize: 10,
-    fontWeight: '600',
-    marginTop: 2,
+  halo: { position: 'absolute', top: -4, bottom: -4, left: -4, right: -4, borderRadius: 28 },
+  frame: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 24,
+    shadowColor: '#022047',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.16,
+    shadowRadius: 18,
+    elevation: 14,
   },
-  fabWrap: {
-    width: 56,
-    height: 56,
+  inner: { position: 'absolute', top: 1.5, bottom: 1.5, left: 1.5, right: 1.5, borderRadius: 22.5 },
+  iconPill: { width: 44, height: 30, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  label: { fontSize: 10.5, fontFamily: F.bold, marginTop: 1 },
+  fabRing: {
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+    padding: 5,
+    marginTop: -30,
+  },
+  fab: {
+    flex: 1,
     borderRadius: 28,
-    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: -28,
+    justifyContent: 'center',
+    shadowColor: '#0284C7',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.4,
-    shadowRadius: 14,
-    elevation: 12,
+    shadowRadius: 12,
+    elevation: 10,
   },
 })

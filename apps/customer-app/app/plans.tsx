@@ -197,7 +197,7 @@ export default function PlansScreen() {
     scrollRef.current?.scrollTo({ y: settingsY.current, animated: true })
   }
 
-  async function doSubscribe(plan: Plan) {
+  async function doSubscribe(plan: Plan, replacesSubId?: string) {
     if (selectedPayment === 'wallet' && !walletPhone.match(/^01[0-9]{9}$/)) {
       showAlert({ title: locale === 'en' ? 'Notice' : 'تنبيه', message: locale === 'en' ? 'Enter a valid wallet phone number (01xxxxxxxxx)' : 'أدخل رقم موبايل المحفظة بشكل صحيح (01xxxxxxxxx)', type: 'warning' })
       return
@@ -225,6 +225,8 @@ export default function PlansScreen() {
               p_duration: selectedDuration,
               p_payment_method: selectedPayment,
               p_auto_renew: autoRenew,
+              // Upgrade: the server ends this plan only after the new one is activated (payment confirmed).
+              ...(replacesSubId ? { p_replaces: replacesSubId } : {}),
             })
 
             if (error || !newSub) {
@@ -648,10 +650,8 @@ export default function PlansScreen() {
                         { text: isEn ? 'Cancel' : 'تراجع', style: 'cancel' },
                         {
                           text: isEn ? 'Yes, upgrade' : 'نعم، ترقية',
-                          onPress: async () => {
-                            await supabase.from('subscriptions').update({ status: 'upgraded', auto_renew: false }).eq('id', overlappingSub.id)
-                            setActiveSubs(prev => prev.filter(s => s.id !== overlappingSub.id))
-                            doSubscribe(selectedPlanForSubscribe)
+                          onPress: () => {
+                            doSubscribe(selectedPlanForSubscribe, overlappingSub.id)
                           },
                         },
                       ],

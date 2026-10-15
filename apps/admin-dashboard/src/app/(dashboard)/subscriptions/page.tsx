@@ -158,10 +158,13 @@ export default function SubscriptionsPage() {
     if (!error) {
       const planName = plans.find(p => p.id === form.plan_id)?.name ?? 'الباقة'
       const durationText = durationLabels[form.duration] ?? form.duration
-      const notifTitle = form.status === 'active' ? 'تم تفعيل اشتراكك' : 'تم إنشاء اشتراك جديد'
+      // Customer's app language (set by the customer app)
+      const { data: userData } = await supabase.from('users').select('fcm_token, preferred_language').eq('id', form.user_id).single()
+      const en = userData?.preferred_language === 'en'
+      const notifTitle = form.status === 'active' ? (en ? 'Your plan is active' : 'تم تفعيل اشتراكك') : (en ? 'New plan created' : 'تم إنشاء اشتراك جديد')
       const notifBody = form.status === 'active'
-        ? `تم تفعيل اشتراكك في باقة ${planName} (${durationText}). يمكنك الآن إنشاء طلباتك.`
-        : `تم إنشاء اشتراك في باقة ${planName} (${durationText}). في انتظار التفعيل.`
+        ? (en ? `Your ${planName} plan is now active. You can place your orders.` : `تم تفعيل اشتراكك في باقة ${planName} (${durationText}). يمكنك الآن إنشاء طلباتك.`)
+        : (en ? `A ${planName} plan was created for you and is awaiting activation.` : `تم إنشاء اشتراك في باقة ${planName} (${durationText}). في انتظار التفعيل.`)
 
       await supabase.from('notifications').insert({
         user_id: form.user_id,
@@ -172,7 +175,6 @@ export default function SubscriptionsPage() {
         sent_at: new Date().toISOString(),
       })
 
-      const { data: userData } = await supabase.from('users').select('fcm_token').eq('id', form.user_id).single()
       if (userData?.fcm_token) {
         fetch('https://exp.host/--/api/v2/push/send', {
           method: 'POST',
@@ -252,24 +254,27 @@ export default function SubscriptionsPage() {
     }).eq('id', sub.id)
 
     const planName = sub.plans?.name ?? 'الباقة'
+    const { data: userData } = await supabase.from('users').select('fcm_token, preferred_language').eq('id', sub.user_id).single()
+    const en = userData?.preferred_language === 'en'
+    const activeTitle = en ? 'Your plan is active ✅' : 'تم تفعيل اشتراكك ✅'
+    const activeBody = en ? `Your ${planName} plan has been approved and activated. You can place your orders.` : `تم قبول وتفعيل اشتراكك في باقة ${planName}. يمكنك الآن إنشاء طلباتك.`
     await supabase.from('notifications').insert({
       user_id: sub.user_id,
-      title: 'تم تفعيل اشتراكك',
-      body: `تم قبول وتفعيل اشتراكك في باقة ${planName}. يمكنك الآن إنشاء طلباتك.`,
+      title: activeTitle,
+      body: activeBody,
       type: 'system',
       data: { subscription_id: sub.id },
       sent_at: new Date().toISOString(),
     })
 
-    const { data: userData } = await supabase.from('users').select('fcm_token').eq('id', sub.user_id).single()
     if (userData?.fcm_token) {
       fetch('https://exp.host/--/api/v2/push/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           to: userData.fcm_token,
-          title: 'تم تفعيل اشتراكك ✅',
-          body: `تم قبول وتفعيل اشتراكك في باقة ${planName}. يمكنك الآن إنشاء طلباتك.`,
+          title: activeTitle,
+          body: activeBody,
           sound: 'order_update.wav',
           channelId: 'order-updates-v2',
           data: { type: 'subscription', subscription_id: sub.id },

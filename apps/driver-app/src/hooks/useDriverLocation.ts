@@ -10,11 +10,17 @@ const BG_TASK = 'driver-location-bg'
 let _driverId: string | null = null
 
 TaskManager.defineTask(BG_TASK, async ({ data, error }: any) => {
-  if (error || !data?.locations?.length || !_driverId) return
+  if (error || !data?.locations?.length) return
+  // Android may restart this task without the app UI (module state lost): use the saved session.
+  let driverId = _driverId
+  if (!driverId) {
+    try { driverId = (await supabase.auth.getSession()).data.session?.user.id ?? null } catch {}
+  }
+  if (!driverId) return
   const loc = data.locations[data.locations.length - 1]
   try {
     await supabase.from('driver_locations').upsert({
-      driver_id: _driverId,
+      driver_id: driverId,
       lat: loc.coords.latitude,
       lng: loc.coords.longitude,
       heading: loc.coords.heading ?? null,

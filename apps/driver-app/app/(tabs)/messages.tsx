@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { supabase } from '../../src/lib/supabase'
 import { colors } from '../../src/theme'
-import { playNotificationSound, sendLocalNotification } from '../../src/hooks/useNotifications'
+import { notifyMessage } from '../../src/hooks/useNotifications'
 
 type Conversation = {
   order_id: string
@@ -80,7 +80,7 @@ export default function MessagesScreen() {
     if (!profile) return
     const channel = supabase
       .channel('driver-messages')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${profile.id}` }, (payload) => { playNotificationSound('order-update'); Vibration.vibrate(300); sendLocalNotification('رسالة جديدة', (payload.new as any).body ?? '', 'messages'); load() })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${profile.id}` }, (payload) => { notifyMessage(payload.new as any); load() })
       .subscribe((status, err) => {
         if (err) console.warn('driver-messages realtime error:', err.message)
       })

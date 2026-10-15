@@ -156,37 +156,9 @@ export default function OrdersPage() {
     const { error } = await supabase.from('orders').update({ driver_id: driverId, status: newStatus }).eq('id', orderId)
     if (error) { toast('حدث خطأ — جاري التحديث', 'error'); loadOrders(); return }
     await supabase.from('order_status_history').insert({ order_id: orderId, status: newStatus, changed_by: driverId })
-    if (!keepStatus) sendPushToCustomer(orderId, 'assigned')
   }
 
-  async function sendPushToCustomer(orderId: string, newStatus: string) {
-    try {
-      const { data: order } = await supabase.from('orders').select('customer_id, order_number').eq('id', orderId).single()
-      if (!order) return
-      const msgs: Record<string, string> = {
-        assigned: 'تم تعيين سائق لطلبك', arrived: 'السائق وصل موقعك', picked_up: 'تم استلام ملابسك', processing: 'ملابسك قيد المعالجة',
-        ready: 'ملابسك جاهزة للتوصيل!', delivering: 'السائق في طريقه إليك', delivered: 'تم توصيل طلبك بنجاح!', cancelled: 'تم إلغاء طلبك',
-      }
-      if (!msgs[newStatus]) return
-      const title = `طلب ${order.order_number}`
-      const body = msgs[newStatus]
-      await supabase.from('notifications').insert({
-        user_id: order.customer_id,
-        title,
-        body,
-        type: 'order',
-        data: { type: 'order_update', order_id: orderId, status: newStatus },
-        sent_at: new Date().toISOString(),
-      })
-      const { data: customer } = await supabase.from('users').select('fcm_token').eq('id', order.customer_id).single()
-      if (customer?.fcm_token) {
-        fetch('https://exp.host/--/api/v2/push/send', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ to: customer.fcm_token, title, body, sound: 'order_update.wav', channelId: 'order-updates-v2', priority: 'high', data: { type: 'order_update', order_id: orderId, status: newStatus } }),
-        }).catch(() => {})
-      }
-    } catch {}
-  }
+  // Customer notifications (in-app + push) are sent by the database on every status change.
 
   async function advanceStatus(order: any) {
     const isWalkin = order.notes?.includes('[من المحل]')
@@ -204,13 +176,13 @@ export default function OrdersPage() {
     if (error) { toast('حدث خطأ — جاري التحديث', 'error'); loadOrders(); return }
     await supabase.from('order_status_history').insert({ order_id: order.id, status: next })
     logAuditClient('update_order_status', 'order', order.id, { from: order.status, to: next })
-    sendPushToCustomer(order.id, next)
-    if (next === 'ready') {
-      const lat = order.delivery_location?.lat
-      const lng = order.delivery_location?.lng
-      const { data: driverId } = await supabase.rpc('assign_delivery_driver', { p_order_id: order.id, p_lat: lat ? Number(lat) : null, p_lng: lng ? Number(lng) : null })
-      if (driverId) {
-        toast('تم تعيين سائق التوصيل تلقائياً')
+    if (next === 'ready' && !isWalkin) {
+      // The database picks the delivery driver (closest to the laundry, fewest orders) in the same update.
+      const { data: handed } = await supabase.from('orders')
+        .select('delivery_driver_id, driver:users!orders_driver_id_fkey(name)')
+        .eq('id', order.id).single()
+      if (handed?.delivery_driver_id) {
+        toast(`تم تعيين سائق التوصيل تلقائياً: ${(handed.driver as any)?.name ?? ''}`)
       } else {
         toast('لا يوجد سائق متاح للتوصيل — يمكنك التعيين يدوياً', 'error')
       }

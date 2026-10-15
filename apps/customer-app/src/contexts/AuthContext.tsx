@@ -14,7 +14,19 @@ async function isEn() {
   try { return (await AsyncStorage.getItem('@app_language')) === 'en' } catch { return false }
 }
 
+// Old format (e-mail + password readable without a fingerprint); removed on start, the customer turns it on again.
 const BIO_CREDS_KEY = 'bio_credentials'
+// Which account the fingerprint belongs to (not secret).
+const BIO_EMAIL_KEY = 'bio_email'
+// The password, encrypted by a hardware key that only opens after a successful fingerprint/face check.
+const BIO_SECRET_KEY = 'bio_secret'
+function bioSecretOptions(en: boolean): SecureStore.SecureStoreOptions {
+  return {
+    requireAuthentication: true,
+    authenticationPrompt: en ? 'Sign in with biometric' : 'سجّل دخول بالبصمة',
+    keychainAccessible: SecureStore.WHEN_PASSCODE_SET_THIS_DEVICE_ONLY,
+  }
+}
 
 interface AuthState {
   session: Session | null
@@ -93,10 +105,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const compatible = await LocalAuthentication.hasHardwareAsync()
       const enrolled = compatible ? await LocalAuthentication.isEnrolledAsync() : false
-      const saved = await SecureStore.getItemAsync(BIO_CREDS_KEY)
+      if (await SecureStore.getItemAsync(BIO_CREDS_KEY)) await SecureStore.deleteItemAsync(BIO_CREDS_KEY)
+      const secure = SecureStore.canUseBiometricAuthentication()
+      const saved = secure ? await SecureStore.getItemAsync(BIO_EMAIL_KEY) : null
       setState(s => ({
         ...s,
-        biometricAvailable: compatible && enrolled,
+        biometricAvailable: compatible && enrolled && secure,
         biometricEnabled: !!(compatible && enrolled && saved),
       }))
     } catch {
@@ -231,6 +245,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signOut() {
+    // This device must stop receiving this account's notifications.
+    const uid = state.session?.user.id
+    if (uid) {
+      try { await supabase.from('users').update({ fcm_token: null }).eq('id', uid) } catch {}
+    }
     await supabase.auth.signOut()
     setState(s => ({ ...s, session: null, profile: null, loading: false }))
   }
@@ -247,15 +266,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) return false
-        await SecureStore.setItemAsync(BIO_CREDS_KEY, JSON.stringify({ email, password }))
+        await SecureStore.setItemAsync(BIO_SECRET_KEY, password, bioSecretOptions(await isEn()))
+        await SecureStore.setItemAsync(BIO_EMAIL_KEY, email)
         setState(s => ({ ...s, biometricEnabled: true }))
         return true
       } catch {
+        await SecureStore.deleteItemAsync(BIO_SECRET_KEY).catch(() => {})
+        await SecureStore.deleteItemAsync(BIO_EMAIL_KEY).catch(() => {})
         return false
       }
     } else {
       try {
-        await SecureStore.deleteItemAsync(BIO_CREDS_KEY)
+        await SecureStore.deleteItemAsync(BIO_SECRET_KEY)
+        await SecureStore.deleteItemAsync(BIO_EMAIL_KEY)
+        await SecureStore.deleteItemAsync(BIO_CREDS_KEY).catch(() => {})
         setState(s => ({ ...s, biometricEnabled: false }))
         return true
       } catch {
@@ -267,18 +291,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function signInWithBiometric(): Promise<{ error: string | null }> {
     try {
       const en = await isEn()
-      const savedRaw = await SecureStore.getItemAsync(BIO_CREDS_KEY)
-      if (!savedRaw) return { error: en ? 'Biometric not enabled' : 'البصمة غير مفعّلة' }
+      const email = await SecureStore.getItemAsync(BIO_EMAIL_KEY)
+      if (!email) return { error: en ? 'Biometric not enabled' : 'البصمة غير مفعّلة' }
 
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: en ? 'Sign in with biometric' : 'سجّل دخول بالبصمة',
-        cancelLabel: en ? 'Cancel' : 'إلغاء',
-        disableDeviceFallback: false,
-      })
-
-      if (!result.success) return { error: en ? 'Biometric verification failed' : 'فشل التحقق بالبصمة' }
-
-      const { email, password } = JSON.parse(savedRaw)
+      // The OS shows the fingerprint/face prompt; the password can only be decrypted after it succeeds.
+      let password: string | null = null
+      try {
+        password = await SecureStore.getItemAsync(BIO_SECRET_KEY, bioSecretOptions(en))
+      } catch {
+        return { error: en ? 'Biometric verification failed' : 'فشل التحقق بالبصمة' }
+      }
+      if (!password) {
+        // The key was invalidated (e.g. a new fingerprint was added): sign in with the password and turn it on again.
+        await SecureStore.deleteItemAsync(BIO_EMAIL_KEY).catch(() => {})
+        await SecureStore.deleteItemAsync(BIO_SECRET_KEY).catch(() => {})
+        setState(s => ({ ...s, biometricEnabled: false }))
+        return { error: en ? 'Please sign in with your password, then turn on biometric again' : 'ادخل بكلمة السر وفعّل البصمة تاني' }
+      }
       return signInWithPassword(email, password)
     } catch {
       const en = await isEn()
@@ -290,8 +319,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // fingerprint sign-in to that same person.
   async function biometricEmail(): Promise<string | null> {
     try {
-      const savedRaw = await SecureStore.getItemAsync(BIO_CREDS_KEY)
-      return savedRaw ? (JSON.parse(savedRaw).email ?? null) : null
+      return await SecureStore.getItemAsync(BIO_EMAIL_KEY)
     } catch {
       return null
     }

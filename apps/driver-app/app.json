@@ -50,7 +50,8 @@
         {
           "sounds": [
             "./assets/sounds/new_order.wav",
-            "./assets/sounds/order_update.wav"
+            "./assets/sounds/order_update.wav",
+            "./assets/sounds/message.wav"
           ]
         }
       ]

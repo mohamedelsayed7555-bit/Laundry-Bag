@@ -4,7 +4,7 @@ import Animated, { useSharedValue, useAnimatedStyle, withSpring, withRepeat, wit
 import { useRouter } from 'expo-router'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { playNotificationSound } from '../hooks/useNotifications'
+import { playNotificationSound, setAssignHandler, gate, ASSIGN_WINDOW } from '../hooks/useNotifications'
 import { colors } from '../theme'
 
 type AlertData = {
@@ -15,6 +15,7 @@ type AlertData = {
   customerName: string
   isScheduled: boolean
   scheduledAt: string | null
+  phase: 'pickup' | 'delivery'
 }
 
 export default function NewOrderAlert() {
@@ -48,32 +49,50 @@ export default function NewOrderAlert() {
   useEffect(() => {
     if (!profile?.id) return
 
+    // Shown once per order/phase, whether realtime or the push arrives first.
+    const announce = (orderId: string, phase: 'pickup' | 'delivery') => {
+      if (!gate(`assign:${orderId}:${phase}`, ASSIGN_WINDOW)) return
+      supabase.from('orders')
+        .select('id, order_number, items_count, total, is_scheduled, scheduled_at, customer:users!orders_customer_id_fkey(name)')
+        .eq('id', orderId)
+        .single()
+        .then(({ data }) => {
+          if (data) {
+            showAlert({
+              orderId: data.id,
+              orderNumber: data.order_number,
+              itemsCount: data.items_count,
+              total: data.total,
+              customerName: (data.customer as any)?.name ?? 'عميل',
+              isScheduled: data.is_scheduled,
+              scheduledAt: data.scheduled_at,
+              phase,
+            })
+          }
+        })
+    }
+    setAssignHandler(announce)
+
     const channel = supabase
       .channel('new-order-alert')
       .on(
         'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'orders' },
+        (payload) => {
+          if (payload.new.driver_id === profile.id) announce(payload.new.id, 'pickup')
+        }
+      )
+      .on(
+        'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'orders' },
         (payload) => {
-          const isNewAssignment = payload.new.driver_id === profile.id && payload.old.driver_id !== profile.id
-          const isDeliveryAssignment = payload.new.delivery_driver_id === profile.id && payload.old.delivery_driver_id !== profile.id
-          if (isNewAssignment || isDeliveryAssignment) {
-            supabase.from('orders')
-              .select('id, order_number, items_count, total, is_scheduled, scheduled_at, customer:users!orders_customer_id_fkey(name)')
-              .eq('id', payload.new.id)
-              .single()
-              .then(({ data }) => {
-                if (data) {
-                  showAlert({
-                    orderId: data.id,
-                    orderNumber: data.order_number,
-                    itemsCount: data.items_count,
-                    total: data.total,
-                    customerName: (data.customer as any)?.name ?? 'عميل',
-                    isScheduled: data.is_scheduled,
-                    scheduledAt: data.scheduled_at,
-                  })
-                }
-              })
+          if (payload.new.driver_id !== profile.id) return
+          const deliveryPhase = ['ready', 'delivering'].includes(payload.new.status)
+          if (payload.old.driver_id !== profile.id) {
+            announce(payload.new.id, deliveryPhase ? 'delivery' : 'pickup')
+          } else if (payload.new.status === 'ready' && payload.old.status !== 'ready') {
+            // Same driver also delivers it
+            announce(payload.new.id, 'delivery')
           }
         }
       )
@@ -81,7 +100,7 @@ export default function NewOrderAlert() {
         if (err) console.warn('new-order-alert realtime error:', err.message)
       })
 
-    return () => { supabase.removeChannel(channel) }
+    return () => { setAssignHandler(null); supabase.removeChannel(channel) }
   }, [profile?.id, showAlert])
 
   const animStyle = useAnimatedStyle(() => ({
@@ -95,7 +114,7 @@ export default function NewOrderAlert() {
       <View style={s.card}>
         <View style={s.header}>
           <Text style={s.bellIcon}>🔔</Text>
-          <Text style={s.title}>طلب جديد!</Text>
+          <Text style={s.title}>{alert.phase === 'delivery' ? 'مطلوب توصيل!' : 'طلب جديد!'}</Text>
           <TouchableOpacity onPress={dismissAlert} style={s.closeBtn}>
             <Text style={s.closeBtnText}>✕</Text>
           </TouchableOpacity>

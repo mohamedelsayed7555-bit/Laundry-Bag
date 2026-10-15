@@ -12,21 +12,27 @@ Deno.serve(async (req: Request) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  // Auth: accept service_role JWT or CRON_SECRET
-  // verify_jwt is false so Supabase gateway lets the request through
   const cronSecret = Deno.env.get("CRON_SECRET");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const rawAuth = req.headers.get("authorization")?.replace("Bearer ", "");
-  const authHeader = req.headers.get("x-cron-secret") || rawAuth;
+  const rawAuth = req.headers.get("authorization");
+  const authHeader = req.headers.get("x-cron-secret") || rawAuth?.replace("Bearer ", "");
 
-  const isAuthorized = authHeader && (
-    authHeader === cronSecret ||
-    authHeader === serviceRoleKey ||
-    rawAuth === serviceRoleKey
-  );
+  console.log("Auth check:", {
+    hasCronSecret: !!cronSecret,
+    hasServiceRoleKey: !!serviceRoleKey,
+    hasAuthHeader: !!authHeader,
+    authHeaderLen: authHeader?.length,
+    serviceRoleKeyLen: serviceRoleKey?.length,
+    rawAuthPrefix: rawAuth?.substring(0, 20),
+    matchesCron: authHeader === cronSecret,
+    matchesServiceRole: authHeader === serviceRoleKey,
+  });
 
-  if (!isAuthorized) {
-    console.log("Auth failed - headers received:", [...req.headers.keys()].join(", "));
+  if (!authHeader || (authHeader !== cronSecret && authHeader !== serviceRoleKey)) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   const supabase = createClient(
@@ -51,109 +57,62 @@ Deno.serve(async (req: Request) => {
   }
 
   // --- Activate scheduled orders ---
+  // Each order goes back to "pending"; the database trigger (auto_assign_on_status) picks the driver
+  // closest to the customer with the fewest orders, and the triggers notify the driver and customer.
   let activatedCount = 0;
   const ids: string[] = [];
   if (dueOrders && dueOrders.length > 0) {
-    ids.push(...dueOrders.map((o) => o.id));
+    for (const order of dueOrders) {
+      const { data: updated, error: updateError } = await supabase
+        .from("orders")
+        .update({ status: "pending" })
+        .eq("id", order.id)
+        .eq("status", "scheduled")
+        .select("status, driver_id")
+        .single();
+      if (updateError || !updated) continue;
 
-    // Find least-busy active driver (same logic as the DB trigger)
-    const { data: drivers } = await supabase
-      .from("users")
-      .select("id")
-      .eq("role", "driver")
-      .eq("is_active", true);
+      ids.push(order.id);
+      activatedCount++;
+      const assigned = !!updated.driver_id;
+      await supabase.from("order_status_history").insert({
+        order_id: order.id,
+        status: updated.status,
+        note: assigned
+          ? "تم تفعيل الطلب المجدول وتعيين سائق تلقائياً"
+          : "تم تفعيل الطلب المجدول تلقائياً",
+      });
 
-    let driver: { id: string } | null = null;
-    if (drivers && drivers.length > 0) {
-      // Count active orders per driver and pick the least busy
-      const counts = await Promise.all(
-        drivers.map(async (d) => {
-          const { count } = await supabase
-            .from("orders")
-            .select("id", { count: "exact", head: true })
-            .eq("driver_id", d.id)
-            .not("status", "in", '("delivered","cancelled","refunded")');
-          return { id: d.id, count: count ?? 0 };
-        })
-      );
-      counts.sort((a, b) => a.count - b.count);
-      driver = { id: counts[0].id };
-    }
-
-    // If we have a driver, assign directly; otherwise set to pending
-    const newStatus = driver ? "assigned" : "pending";
-
-    const updatePayload: Record<string, unknown> = { status: newStatus };
-    if (driver) updatePayload.driver_id = driver.id;
-
-    const { error: updateError } = await supabase
-      .from("orders")
-      .update(updatePayload)
-      .in("id", ids);
-
-    if (!updateError) {
-      activatedCount = ids.length;
-      for (const order of dueOrders) {
-        await supabase.from("order_status_history").insert({
-          order_id: order.id,
-          status: newStatus,
-          note: driver
-            ? "تم تفعيل الطلب المجدول وتعيين سائق تلقائياً"
-            : "تم تفعيل الطلب المجدول تلقائياً",
-        });
-      }
-
-      for (const order of dueOrders) {
-        // Notify customer
+      // With a driver the customer already gets "driver assigned"; without one, say the order is active.
+      if (!assigned) {
         const { data: user } = await supabase
           .from("users")
-          .select("fcm_token")
+          .select("fcm_token, preferred_language")
           .eq("id", order.customer_id)
           .single();
-
         if (user?.fcm_token) {
+          const en = user.preferred_language === "en";
+          const num = String(order.order_number ?? "").replace(/^#+/, "");
           await fetch("https://exp.host/--/api/v2/push/send", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               to: user.fcm_token,
-              title: "تم تفعيل طلبك المجدول",
-              body: `الطلب #${order.order_number} أصبح نشطاً الآن`,
-              sound: "default",
-              data: { type: "order_activated", order_id: order.id },
+              title: en ? "Your scheduled order is active" : "تم تفعيل طلبك المجدول",
+              body: en ? `Order #${num} is now active` : `الطلب #${num} أصبح نشطاً الآن`,
+              sound: "order_update.wav",
+              channelId: "order-updates-v2",
+              priority: "high",
+              data: { type: "order_update", order_id: order.id, status: updated.status },
             }),
           }).catch(() => {});
-        }
-
-        // Notify driver
-        if (driver) {
-          const { data: driverUser } = await supabase
-            .from("users")
-            .select("fcm_token")
-            .eq("id", driver.id)
-            .single();
-
-          if (driverUser?.fcm_token) {
-            await fetch("https://exp.host/--/api/v2/push/send", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                to: driverUser.fcm_token,
-                title: "طلب جديد! 🔔",
-                body: `تم تعيين الطلب #${order.order_number} لك`,
-                sound: "new_order.wav",
-                channelId: "new-order",
-                priority: "high",
-                data: { type: "new_order", order_id: order.id },
-              }),
-            }).catch(() => {});
-          }
         }
       }
     }
   }
 
   // --- Cancel stale unpaid orders (pending payment > 24 hours) ---
+  // (the customer is notified by the database trigger on the status change)
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { data: staleOrders } = await supabase
     .from("orders")
@@ -182,6 +141,7 @@ Deno.serve(async (req: Request) => {
   }
 
   // --- Cancel orphaned pending orders (no driver assigned after 48 hours) ---
+  // (the customer is notified by the database trigger on the status change)
   const orphanCutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
   const { data: orphanedOrders } = await supabase
     .from("orders")
@@ -204,21 +164,6 @@ Deno.serve(async (req: Request) => {
         status: "cancelled",
         note: "إلغاء تلقائي — لم يتم تعيين سائق خلال 48 ساعة",
       });
-
-      const { data: user } = await supabase.from("users").select("fcm_token").eq("id", o.customer_id).single();
-      if (user?.fcm_token) {
-        await fetch("https://exp.host/--/api/v2/push/send", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            to: user.fcm_token,
-            title: "تم إلغاء طلبك",
-            body: `الطلب #${o.order_number} تم إلغاؤه تلقائياً لعدم توفر سائق. يمكنك إعادة الطلب.`,
-            sound: "default",
-            data: { type: "order_cancelled", order_id: o.id },
-          }),
-        }).catch(() => {});
-      }
     }
     orphanedCount = orphanIds.length;
   }

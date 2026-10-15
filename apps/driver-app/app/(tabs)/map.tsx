@@ -61,12 +61,14 @@ export default function MapScreen() {
     if (!profile) return
     const { data } = await supabase
       .from('orders')
-      .select('id, order_number, status, total, delivery_location, customer:users!orders_customer_id_fkey(name, phone), address:addresses(label, building, floor, apartment, landmark, lat, lng)')
+      .select('id, order_number, status, total, pickup_location, delivery_location, customer:users!orders_customer_id_fkey(name, phone), address:addresses(label, building, floor, apartment, landmark, lat, lng)')
       .eq('driver_id', profile.id)
-      .in('status', ['assigned', 'arrived', 'picked_up', 'ready', 'delivering'])
+      .in('status', ['assigned', 'arrived', 'ready', 'delivering'])
     const mapped = (data ?? []).map((o: any) => {
-      if (o.address?.lat && o.address?.lng) return o
-      const dl = o.delivery_location
+      // Pickup: the customer's pickup address. Delivery: the delivery address (may be different).
+      const pickupPhase = ['assigned', 'arrived'].includes(o.status)
+      if (pickupPhase && o.address?.lat && o.address?.lng && !o.pickup_location?.lat) return o
+      const dl = pickupPhase ? (o.pickup_location ?? o.delivery_location) : (o.delivery_location ?? o.pickup_location)
       if (dl?.lat && dl?.lng) {
         return { ...o, address: { lat: dl.lat, lng: dl.lng, label: dl.address || dl.label || 'موقع التوصيل', building: null, floor: null, apartment: null, landmark: null } }
       }
