@@ -10,7 +10,6 @@ import { haversineKm } from '../src/utils/distance'
 import { useCart } from '../src/contexts/CartContext'
 import { useCustomAlert } from '../src/components/CustomAlert'
 import { playNotificationSound } from '../src/hooks/useNotifications'
-import AsyncStorage from '@react-native-async-storage/async-storage'
 import { supabase } from '../src/lib/supabase'
 import { SkeletonPage } from '../src/components/Skeleton'
 import { serverErrorMessage } from '../src/lib/serverErrors'
@@ -328,12 +327,7 @@ export default function CartScreen() {
       return
     }
 
-    let giftRequested = false
-    try {
-      giftRequested = (await AsyncStorage.getItem('@gift_eligible')) === 'true'
-    } catch {}
-
-    // Prices, delivery fee, plan coverage and coupon are all computed on the server.
+    // Prices, delivery fee, plan coverage, coupon and the welcome gift are all decided on the server.
     const { data: placed, error } = await supabase.rpc('place_order', {
       p: {
         items: cart.map((i: any) => ({ name: i.name, service_type: i.service_type, quantity: i.quantity })),
@@ -344,7 +338,6 @@ export default function CartScreen() {
         is_scheduled: isScheduled,
         scheduled_at: isScheduled ? scheduledDate.toISOString() : null,
         coupon_code: appliedCoupon?.code ?? null,
-        gift: giftRequested,
       },
     })
 
@@ -352,10 +345,6 @@ export default function CartScreen() {
       setSaving(false)
       showAlert({ title: isEn ? 'Error' : 'خطأ', message: serverErrorMessage(error?.message, isEn), type: 'error' })
       return
-    }
-
-    if (giftRequested) {
-      AsyncStorage.removeItem('@gift_eligible').catch(() => {})
     }
 
     const orderData = { id: placed.id as string }

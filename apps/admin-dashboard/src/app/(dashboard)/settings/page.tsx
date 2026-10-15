@@ -38,6 +38,8 @@ export default function SettingsPage() {
   const [savingBag, setSavingBag] = useState(false)
   const [welcomeGiftEnabled, setWelcomeGiftEnabled] = useState(true)
   const [savingGift, setSavingGift] = useState(false)
+  const [giftDays, setGiftDays] = useState('30')
+  const [savingGiftDays, setSavingGiftDays] = useState(false)
   const [brandColor, setBrandColor] = useState('#00c966')
   const [savingBrand, setSavingBrand] = useState(false)
   const [contactInfo, setContactInfo] = useState({ whatsapp: '', phone: '', facebook: '', instagram: '', tiktok: '', address: '', google_maps: '' })
@@ -106,6 +108,8 @@ export default function SettingsPage() {
     if (bagS && typeof bagS.value === 'object') setBagOffer({ ...bagOffer, ...bagS.value })
     const giftS = data?.find(s => s.key === 'welcome_gift_enabled')
     if (giftS) setWelcomeGiftEnabled(String(giftS.value) === 'true')
+    const giftDaysS = data?.find(s => s.key === 'welcome_gift_days')
+    if (giftDaysS) setGiftDays(String(giftDaysS.value))
     const contactS = data?.find(s => s.key === 'contact_info')
     if (contactS && typeof contactS.value === 'object') setContactInfo(prev => ({ ...prev, ...contactS.value as any }))
     const oh = data?.find(s => s.key === 'open_hour')
@@ -230,6 +234,23 @@ export default function SettingsPage() {
     setSavingGift(false)
     loadSettings()
     toast(newVal ? 'تم تفعيل الهدية الترحيبية' : 'تم إيقاف الهدية الترحيبية')
+  }
+
+  async function handleSaveGiftDays() {
+    const days = parseInt(giftDays, 10)
+    if (!Number.isFinite(days) || days < 1 || days > 365) {
+      toast('اكتب عدد أيام من 1 لـ 365', 'error')
+      return
+    }
+    setSavingGiftDays(true)
+    const existing = settings.find(s => s.key === 'welcome_gift_days')
+    const { error } = existing
+      ? await supabase.from('settings').update({ value: days }).eq('id', existing.id)
+      : await supabase.from('settings').insert({ key: 'welcome_gift_days', value: days, description: 'مدة الهدية الترحيبية بالأيام من تاريخ التسجيل' })
+    setSavingGiftDays(false)
+    if (error) { toast('حصل خطأ في الحفظ', 'error'); return }
+    loadSettings()
+    toast('تم حفظ مدة الهدية')
   }
 
   async function handleSaveBrandColor() {
@@ -534,6 +555,18 @@ export default function SettingsPage() {
               <button onClick={handleToggleWelcomeGift} disabled={savingGift}
                 className={`relative w-12 h-6 rounded-full transition-colors ${welcomeGiftEnabled ? 'bg-primary-500' : 'bg-gray-300'}`}>
                 <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${welcomeGiftEnabled ? 'left-0.5' : 'left-[26px]'}`} />
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-4 p-4 mt-3 bg-surface-muted/50 rounded-xl">
+              <div className="flex-1 min-w-[200px]">
+                <p className="text-sm font-medium text-gray-700">مدة الهدية (بالأيام)</p>
+                <p className="text-xs text-gray-400">العميل لازم يعمل أول طلب خلال المدة دي من تاريخ تسجيله علشان ياخد الهدية. الطلب الملغي مبيتحسبش.</p>
+              </div>
+              <input type="number" min={1} max={365} value={giftDays} onChange={e => setGiftDays(e.target.value)}
+                className="w-24 px-3 py-2 rounded-xl border border-gray-200 text-sm text-center" />
+              <button onClick={handleSaveGiftDays} disabled={savingGiftDays}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary-500 text-white text-sm font-medium disabled:opacity-60">
+                <Save size={14} /> {savingGiftDays ? 'جاري الحفظ...' : 'حفظ'}
               </button>
             </div>
           </div>

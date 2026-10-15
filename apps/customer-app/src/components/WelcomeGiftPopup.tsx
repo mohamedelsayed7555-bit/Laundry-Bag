@@ -13,7 +13,6 @@ const giftItems = [
   { emoji: '🧺', ar: 'كيس غسيل قماش بالوجو', en: 'Branded Laundry Bag' },
   { emoji: '🧴', ar: 'عينة معطر ملابس فاخر', en: 'Premium Fabric Softener Sample' },
   { emoji: '🧼', ar: 'عينات مساحيق غسيل', en: 'Detergent Samples Pack' },
-  { emoji: '🏷️', ar: 'كوبون خصم 20% على طلبك التاني', en: '20% Off Coupon for 2nd Order' },
 ]
 
 interface Props {
@@ -26,6 +25,7 @@ export default function WelcomeGiftPopup({ userId, onOrderNow }: Props) {
   const { locale } = useLanguage()
   const isEn = locale === 'en'
   const [visible, setVisible] = useState(false)
+  const [daysLeft, setDaysLeft] = useState<number | null>(null)
   const scaleAnim = useRef(new Animated.Value(0.7)).current
   const opacityAnim = useRef(new Animated.Value(0)).current
   const bounceAnim = useRef(new Animated.Value(0)).current
@@ -40,19 +40,10 @@ export default function WelcomeGiftPopup({ userId, onOrderNow }: Props) {
       const dismissed = await AsyncStorage.getItem(GIFT_DISMISSED_KEY)
       if (dismissed) return
 
-      const { data: giftSetting } = await supabase
-        .from('settings')
-        .select('value')
-        .eq('key', 'welcome_gift_enabled')
-        .single()
-      if (giftSetting && String(giftSetting.value) !== 'true') return
-
-      const { count } = await supabase
-        .from('orders')
-        .select('id', { count: 'exact', head: true })
-        .eq('customer_id', userId!)
-
-      if ((count ?? 0) === 0) {
+      // Same rules the server uses when it adds the gift to the order (enabled, no orders yet, still valid).
+      const { data } = await supabase.rpc('my_welcome_gift')
+      if (data?.eligible) {
+        setDaysLeft(typeof data.days_left === 'number' ? data.days_left : null)
         setTimeout(() => setVisible(true), 1500)
       }
     } catch {}
@@ -80,8 +71,8 @@ export default function WelcomeGiftPopup({ userId, onOrderNow }: Props) {
   }
 
   async function handleOrderNow() {
+    // The server adds the gift to the first order on its own, so nothing else to remember here.
     await AsyncStorage.setItem(GIFT_DISMISSED_KEY, 'true')
-    await AsyncStorage.setItem('@gift_eligible', 'true')
     setVisible(false)
     onOrderNow()
   }
@@ -120,7 +111,9 @@ export default function WelcomeGiftPopup({ userId, onOrderNow }: Props) {
           {/* Limited badge */}
           <View style={[s.limitedBadge, { backgroundColor: '#ef444420', borderColor: '#ef444440' }]}>
             <Text style={s.limitedText}>
-              {isEn ? '⏰ Limited time offer — First month only!' : '⏰ عرض لفترة محدودة — أول شهر فقط!'}
+              {daysLeft != null
+                ? (isEn ? `⏰ Valid for ${daysLeft} more day${daysLeft === 1 ? '' : 's'}` : `⏰ الهدية متاحة لمدة ${daysLeft} ${daysLeft >= 3 && daysLeft <= 10 ? 'أيام' : 'يوم'} كمان`)
+                : (isEn ? '⏰ Limited time offer' : '⏰ عرض لفترة محدودة')}
             </Text>
           </View>
 
