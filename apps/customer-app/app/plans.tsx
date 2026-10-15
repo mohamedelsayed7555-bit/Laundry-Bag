@@ -247,7 +247,7 @@ export default function PlansScreen() {
               if (payError || payData?.error) {
                 showAlert({ title: locale === 'en' ? 'Error' : 'خطأ', message: payData?.error || (locale === 'en' ? 'Payment failed' : 'فشل في بدء الدفع'), type: 'error' })
               } else if (payData?.iframe_url) {
-                router.push({ pathname: '/payment', params: { url: payData.iframe_url } })
+                router.push({ pathname: '/payment', params: { url: payData.iframe_url, kind: 'subscription' } })
               }
             } else {
               setSubscribing(false)
@@ -322,7 +322,7 @@ export default function PlansScreen() {
                   if (payError || payData?.error) {
                     showAlert({ title: isEn ? 'Error' : 'خطأ', message: payData?.error || (isEn ? 'Payment failed' : 'فشل في بدء الدفع'), type: 'error' })
                   } else if (payData?.iframe_url) {
-                    router.push({ pathname: '/payment', params: { url: payData.iframe_url } })
+                    router.push({ pathname: '/payment', params: { url: payData.iframe_url, kind: 'subscription' } })
                   }
                 }}
               >

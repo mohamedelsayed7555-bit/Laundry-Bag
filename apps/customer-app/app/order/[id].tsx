@@ -11,6 +11,10 @@ import { supabase } from '../../src/lib/supabase'
 import { SkeletonPage } from '../../src/components/Skeleton'
 import { CANCELLABLE_STATUSES } from '../../src/shared/types'
 import { serverErrorMessage } from '../../src/lib/serverErrors'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Hourglass, CalendarDays, Car, MapPin, Package, WashingMachine, CircleCheck, Truck, PartyPopper, CircleX, RotateCcw, ChevronDown, ChevronUp, Phone, MessageCircle, Wallet, CreditCard, Banknote, Landmark, Pencil, Gift, Check, type LucideIcon } from 'lucide-react-native'
+import { useBrand, Card, IconButton, BackIcon, FlowLines, Segments, Pill, money, F, SIZE, cardShadow } from '../../src/components/brand'
+import { SecondaryButton } from '../../src/components/auth/ui'
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!
 
@@ -239,7 +243,7 @@ export default function OrderDetailsScreen() {
       const data = await res.json()
       setRetrying(false)
       if (data.iframe_url) {
-        router.push({ pathname: '/payment', params: { url: data.iframe_url } })
+        router.push({ pathname: '/payment', params: { url: data.iframe_url, kind: 'order', id: order.id } })
       } else {
         showAlert({ title: t('error'), message: data.error || t('connectionError'), type: 'error' })
       }
@@ -269,6 +273,9 @@ export default function OrderDetailsScreen() {
   const etaMinutes = distanceKm !== null ? Math.max(1, Math.round(distanceKm / 0.5)) : null
 
   const s = getStyles(colors)
+  const b = useBrand()
+  const insets = useSafeAreaInsets()
+  const [showSteps, setShowSteps] = useState(false)
 
   if (loading) return <SkeletonPage />
   if (!order) return <View style={s.container}><Text style={s.loadingText}>{t('orderNotFound')}</Text></View>
@@ -277,109 +284,171 @@ export default function OrderDetailsScreen() {
   const canCancel = CANCELLABLE_STATUSES.includes(order.status)
   const canRate = order.status === 'delivered' && !order.rated_at
 
+  const STATUS_ICON: Record<string, LucideIcon> = {
+    pending: Hourglass, scheduled: CalendarDays, assigned: Car, arrived: MapPin, picked_up: Package,
+    processing: WashingMachine, ready: CircleCheck, delivering: Truck, delivered: PartyPopper, cancelled: CircleX, refunded: RotateCcw,
+  }
+  const StatusIcon = STATUS_ICON[order.status] ?? Hourglass
+  const currentStep = status.step
+  const nextKey = steps.find(k => statusConfig[k].step === currentStep + 1)
+  const PM_ICON: Record<string, LucideIcon> = { cash: Banknote, visa: CreditCard, e_wallet: Wallet, wallet: Wallet, instapay: Landmark }
+  const PayIcon = PM_ICON[order.payment_method] ?? Wallet
+  const payLabel = ({ cash: t('pmCash'), visa: t('pmVisa'), e_wallet: t('pmWallet'), instapay: t('pmInstapay'), wallet: t('pmWallet') } as Record<string, string>)[order.payment_method] ?? order.payment_method
+  const payStatus = ({ confirmed: t('payStatusConfirmed'), refunded: t('payStatusRefunded'), failed: t('payStatusFailed'), pending: t('payStatusPending') } as Record<string, string>)[order.payment_status] ?? t('payStatusPending')
+  const payTone = order.payment_status === 'confirmed' ? 'ok' : order.payment_status === 'failed' ? 'danger' : order.payment_status === 'refunded' ? 'info' : 'warn'
+  const cur = t('currency')
+  const itemsValue = Number(order.subtotal ?? (Number(order.total) - Number(order.delivery_fee || 0) + Number(order.discount || 0)))
+  const showMap = !!driverLoc && !!mapSeed && TRACK_STATUSES.includes(order.status)
+  const dateText = new Date(order.created_at).toLocaleDateString(isEn ? 'en-US' : 'ar-EG', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+
   return (
     <>
-    <ScrollView style={s.container} contentContainerStyle={s.content}>
-      <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
-        <Text style={s.backText}>{t('goBack')}</Text>
-      </TouchableOpacity>
+    <ScrollView style={[s.container, { backgroundColor: b.page }]} contentContainerStyle={[s.content, { paddingTop: insets.top + 10, paddingHorizontal: 16 }]}>
+      <FlowLines height={280} />
 
-      <View style={s.headerCard}>
-        <Text style={s.orderNumber}>{order.order_number}</Text>
-        <View style={[s.statusBadge, { backgroundColor: status.color + '20' }]}>
-          <Text style={{ fontSize: 16 }}>{status.icon}</Text>
-          <Text style={[s.statusLabel, { color: status.color }]}>{status.label}</Text>
+      {/* Header */}
+      <View style={n.header}>
+        <IconButton onPress={() => router.back()} label={t('goBack')}><BackIcon color={b.ink} /></IconButton>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={[n.title, { color: b.ink }]} numberOfLines={1}>{isEn ? 'Order' : 'طلب'} {'\u2066'}#{String(order.order_number ?? '').replace(/^#+/, '')}{'\u2069'}</Text>
+          <Text style={[n.date, { color: b.muted }]}>{dateText}</Text>
         </View>
-        {order.gift_included && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f59e0b20', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, marginTop: 8, alignSelf: 'center' }}>
-            <Text style={{ fontSize: 14, color: '#f59e0b', fontWeight: '600' }}>🎁 {isEn ? 'Includes Welcome Gift' : 'يشمل هدية ترحيبية'}</Text>
-          </View>
-        )}
+        <View style={[n.statusPill, { backgroundColor: status.color + '22' }]}>
+          <StatusIcon size={13} color={status.color} />
+          <Text style={[n.statusPillText, { color: status.color }]} numberOfLines={1}>{status.label}</Text>
+        </View>
       </View>
 
-      {order.status !== 'cancelled' && (
-        <View style={s.timelineCard}>
-          <Text style={s.sectionTitle}>{t('trackOrder')}</Text>
-          {steps.map((stepKey, i) => {
-            const stepStatus = statusConfig[stepKey]
-            const currentStep = statusConfig[order.status]?.step ?? 0
-            const isDone = currentStep >= stepStatus.step
-            const isCurrent = order.status === stepKey
-            return (
-              <View key={stepKey} style={s.timelineRow}>
-                <View style={s.timelineLeft}>
-                  <View style={[s.dot, isDone && s.dotDone, isCurrent && s.dotCurrent]} />
-                  {i < steps.length - 1 && <View style={[s.line, isDone && s.lineDone]} />}
-                </View>
-                <Text style={[s.timelineLabel, isDone && s.timelineLabelDone, isCurrent && s.timelineLabelCurrent]}>
-                  {stepStatus.icon} {stepStatus.label}
-                </Text>
-              </View>
-            )
-          })}
+      {order.gift_included && (
+        <View style={[n.gift, { backgroundColor: b.isDark ? 'rgba(245,158,11,0.14)' : '#FFF4D6' }]}>
+          <Gift size={14} color={b.isDark ? '#FBBF24' : '#B45309'} />
+          <Text style={[n.giftText, { color: b.isDark ? '#FBBF24' : '#B45309' }]}>{isEn ? 'Includes Welcome Gift' : 'يشمل هدية ترحيبية'}</Text>
         </View>
       )}
 
-      {driverLoc && mapSeed && TRACK_STATUSES.includes(order.status) && (
-        <TouchableOpacity
-          style={s.trackingCard}
-          activeOpacity={0.8}
-          onPress={() => router.push(`/tracking/${order.id}`)}
-        >
-          <View style={s.trackingHeader}>
-            <Text style={s.sectionTitle}>{t('trackDriver')}</Text>
-            <Text style={s.expandHint}>{t('tapToExpand')}</Text>
-          </View>
-          <View style={s.mapWrapper}>
-            <WebView
-              ref={mapWebviewRef}
-              source={{ html: mapHtml }}
-              onLoadEnd={() => driverLoc && mapWebviewRef.current?.injectJavaScript(`window.updateDriver && window.updateDriver(${driverLoc.lat}, ${driverLoc.lng}); true;`)}
-              style={s.map}
-              javaScriptEnabled
-              domStorageEnabled
-              startInLoadingState
-              originWhitelist={['*']}
-              scrollEnabled={false}
-              nestedScrollEnabled
-            />
-          </View>
-          <View style={s.etaRow}>
-            {distanceKm !== null && (
-              <View style={s.etaItem}>
-                <Text style={s.etaValue}>{distanceKm < 1 ? `${Math.round(distanceKm * 1000)} ${isEn ? 'm' : 'م'}` : `${distanceKm.toFixed(1)} ${isEn ? 'km' : 'كم'}`}</Text>
-                <Text style={s.etaLabel}>{t('distanceLabel')}</Text>
-              </View>
-            )}
-            {etaMinutes !== null && (
-              <View style={s.etaItem}>
-                <Text style={[s.etaValue, { color: stale ? colors.navy[300] : colors.primary }]}>~{etaMinutes} {isEn ? 'min' : 'د'}</Text>
-                <Text style={s.etaLabel}>{stale ? (isEn ? `Updated ${stale} min ago` : `آخر تحديث من ${stale} د`) : t('etaLabel')}</Text>
-              </View>
-            )}
-            <View style={s.etaItem}>
-              <Text style={s.etaValue}>{statusConfig[order.status]?.icon}</Text>
-              <Text style={s.etaLabel}>{statusConfig[order.status]?.label}</Text>
+      {/* Progress */}
+      {currentStep >= 0 && (
+        <Card style={n.card}>
+          <Text style={[n.eyebrow, { color: b.muted }]}>{t('trackOrder')} · {currentStep + 1} {isEn ? 'of' : 'من'} {steps.length}</Text>
+          <View style={{ marginVertical: 10 }}><Segments total={steps.length} done={currentStep} current /></View>
+          <View style={n.nowRow}>
+            <View style={[n.nowIcon, { backgroundColor: status.color + '22' }]}><StatusIcon size={19} color={status.color} /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={[n.nowTitle, { color: b.ink }]}>{status.label}</Text>
+              {nextKey ? <Text style={[n.nowSub, { color: b.muted }]}>{isEn ? 'Next' : 'التالي'}: {statusConfig[nextKey].label}</Text> : null}
             </View>
           </View>
-        </TouchableOpacity>
+          {showSteps && (
+            <View style={{ marginTop: 10 }}>
+              {steps.map((k, i) => {
+                const st = statusConfig[k]
+                const Ico = STATUS_ICON[k] ?? Hourglass
+                const done = currentStep > st.step
+                const isCur = currentStep === st.step
+                return (
+                  <View key={k} style={n.stepRow}>
+                    <View style={{ alignItems: 'center' }}>
+                      <View style={[n.stepDot, { backgroundColor: done ? '#0EA5E9' : isCur ? '#818CF8' : b.iconTile }]}>
+                        <Ico size={14} color={done || isCur ? '#fff' : b.faint} />
+                      </View>
+                      {i < steps.length - 1 && <View style={[n.stepLine, { backgroundColor: done ? '#0EA5E9' : b.divider }]} />}
+                    </View>
+                    <Text style={[n.stepText, { color: done || isCur ? b.ink : b.faint }]}>{st.label}</Text>
+                  </View>
+                )
+              })}
+            </View>
+          )}
+          <TouchableOpacity style={[n.more, { borderTopColor: b.divider }]} onPress={() => setShowSteps(v => !v)} accessibilityRole="button">
+            <Text style={[n.moreText, { color: b.tintText }]}>{showSteps ? (isEn ? 'Hide steps' : 'إخفاء المراحل') : (isEn ? 'Show all steps' : 'عرض كل المراحل')}</Text>
+            {showSteps ? <ChevronUp size={16} color={b.tintText} /> : <ChevronDown size={16} color={b.tintText} />}
+          </TouchableOpacity>
+        </Card>
       )}
 
-      <View style={s.detailsCard}>
-        <Text style={s.sectionTitle}>{t('orderInfo')}</Text>
-        <DetailRow colors={colors} label={t('service')} value={serviceLabel[order.service_type] ?? order.service_type} />
-        <DetailRow colors={colors} label={t('itemsCount')} value={String(order.items_count)} />
-        {order.delivery_fee > 0 && <DetailRow colors={colors} label={t('deliveryFee')} value={`${Number(order.delivery_fee).toFixed(2)} ${t('currency')}`} />}
-        {order.discount > 0 && <DetailRow colors={colors} label={`🏷️ ${isEn ? 'Coupon' : 'كوبون'}${order.coupon_code ? ` (${order.coupon_code})` : ''}`} value={`-${Number(order.discount).toFixed(2)} ${t('currency')}`} />}
-        <DetailRow colors={colors} label={t('total')} value={`${order.total?.toFixed(2)} ${t('currency')}`} highlight />
-        <DetailRow colors={colors} label={t('paymentMethodLabel')} value={({ cash: t('pmCash'), visa: t('pmVisa'), e_wallet: t('pmWallet'), instapay: t('pmInstapay'), wallet: t('pmWallet') } as Record<string, string>)[order.payment_method] ?? order.payment_method} />
-        <DetailRow colors={colors} label={t('paymentStatusLabel')} value={({ confirmed: t('payStatusConfirmed'), refunded: t('payStatusRefunded'), failed: t('payStatusFailed'), pending: t('payStatusPending') } as Record<string, string>)[order.payment_status] ?? t('payStatusPending')} warn={order.payment_status === 'failed'} />
-        {order.status === 'cancelled' && order.cancellation_fee > 0 && (
-          <DetailRow colors={colors} label={t('cancellationFee')} value={`${Number(order.cancellation_fee).toFixed(2)} ${t('currency')}`} highlight />
+      {/* Map + driver */}
+      {order.driver && (
+        <Card style={n.card}>
+          {showMap && (
+            <TouchableOpacity activeOpacity={0.85} onPress={() => router.push(`/tracking/${order.id}`)} style={n.mapWrap}>
+              <WebView
+                ref={mapWebviewRef}
+                source={{ html: mapHtml }}
+                onLoadEnd={() => driverLoc && mapWebviewRef.current?.injectJavaScript(`window.updateDriver && window.updateDriver(${driverLoc.lat}, ${driverLoc.lng}); true;`)}
+                style={{ flex: 1 }}
+                javaScriptEnabled
+                domStorageEnabled
+                startInLoadingState
+                originWhitelist={['*']}
+                scrollEnabled={false}
+                nestedScrollEnabled
+                pointerEvents="none"
+              />
+              <View style={[n.mapChip, { backgroundColor: b.card }]}>
+                <MapPin size={12} color={b.tintText} />
+                <Text style={[n.mapChipText, { color: b.ink }]}>{t('tapToExpand')}</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+          <View style={[n.driverRow, showMap && { marginTop: 10 }]}>
+            <View style={n.avatar}><Text style={n.avatarText}>{order.driver.name?.[0] ?? '؟'}</Text></View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={[n.driverName, { color: b.ink }]} numberOfLines={1}>{order.driver.name}</Text>
+              <Text style={[n.driverSub, { color: b.muted }]} numberOfLines={1}>{t('theDriver')}</Text>
+            </View>
+            {order.driver.phone ? (
+              <IconButton tone="tint" label={isEn ? 'Call driver' : 'اتصل بالسائق'} onPress={() => Linking.openURL(`tel:${order.driver.phone}`)}>
+                <Phone size={17} color={b.okText} />
+              </IconButton>
+            ) : null}
+            <IconButton tone="tint" label={t('chatWithDriver')} onPress={() => router.push(`/chat/${order.id}`)}>
+              <MessageCircle size={17} color={b.tintText} />
+            </IconButton>
+          </View>
+          {showMap && distanceKm !== null && (
+            <View style={n.stats}>
+              <View style={[n.stat, { backgroundColor: b.iconTile }]}>
+                <Text style={[n.statValue, { color: b.ink }]}>{distanceKm < 1 ? `${Math.round(distanceKm * 1000)} ${isEn ? 'm' : 'م'}` : `${distanceKm.toFixed(1)} ${isEn ? 'km' : 'كم'}`}</Text>
+                <Text style={[n.statLabel, { color: b.muted }]}>{t('distanceLabel')}</Text>
+              </View>
+              {etaMinutes !== null && (
+                <View style={[n.stat, { backgroundColor: b.iconTile }]}>
+                  <Text style={[n.statValue, { color: stale ? b.muted : b.ink }]}>~{etaMinutes} {isEn ? 'min' : 'د'}</Text>
+                  <Text style={[n.statLabel, { color: b.muted }]}>{stale ? (isEn ? `Updated ${stale} min ago` : `آخر تحديث من ${stale} د`) : t('etaLabel')}</Text>
+                </View>
+              )}
+            </View>
+          )}
+        </Card>
+      )}
+
+      {/* Receipt */}
+      <Card style={n.card}>
+        <Text style={[n.eyebrow, { color: b.muted }]}>{t('orderInfo')}</Text>
+        <View style={n.line}>
+          <Text style={[n.lineLabel, { color: b.ink2 }]}>{serviceLabel[order.service_type] ?? order.service_type} · {order.items_count} {isEn ? 'items' : 'قطع'}</Text>
+          <Text style={[n.lineValue, { color: b.ink }]}>{money(itemsValue)} {cur}</Text>
+        </View>
+        {order.delivery_fee > 0 && (
+          <View style={n.line}><Text style={[n.lineLabel, { color: b.ink2 }]}>{t('deliveryFee')}</Text><Text style={[n.lineValue, { color: b.ink }]}>{money(order.delivery_fee)} {cur}</Text></View>
         )}
-        <DetailRow colors={colors} label={t('date')} value={new Date(order.created_at).toLocaleDateString(isEn ? 'en-US' : 'ar-EG', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })} />
-        {order.notes && <DetailRow colors={colors} label={t('notesLabel')} value={order.notes} />}
-      </View>
+        {order.discount > 0 && (
+          <View style={n.line}><Text style={[n.lineLabel, { color: b.ink2 }]}>{isEn ? 'Coupon' : 'كوبون'}{order.coupon_code ? ` (${order.coupon_code})` : ''}</Text><Text style={[n.lineValue, { color: b.okText }]}>-{money(order.discount)} {cur}</Text></View>
+        )}
+        {order.status === 'cancelled' && order.cancellation_fee > 0 && (
+          <View style={n.line}><Text style={[n.lineLabel, { color: b.ink2 }]}>{t('cancellationFee')}</Text><Text style={[n.lineValue, { color: b.dangerText }]}>{money(order.cancellation_fee)} {cur}</Text></View>
+        )}
+        <View style={[n.line, n.totalLine, { borderTopColor: b.cardBorder }]}>
+          <Text style={[n.totalLabel, { color: b.ink }]}>{t('total')}</Text>
+          <Text style={[n.totalValue, { color: b.accentIcon }]}>{money(order.total)} {cur}</Text>
+        </View>
+        <View style={[n.payRow, { backgroundColor: b.iconTile }]}>
+          <PayIcon size={16} color={b.accentIcon} />
+          <Text style={[n.payText, { color: b.ink }]} numberOfLines={1}>{payLabel}</Text>
+          <Pill tone={payTone as any} label={payStatus} icon={order.payment_status === 'confirmed' ? <Check size={11} color={b.okText} /> : undefined} />
+        </View>
+        {order.notes ? <Text style={[n.notes, { color: b.muted }]}>{t('notesLabel')}: {order.notes}</Text> : null}
+      </Card>
 
       {showWalletInput && (
         <View style={{ backgroundColor: colors.navy[800], borderRadius: 16, padding: 16, marginBottom: 12 }}>
@@ -431,28 +500,7 @@ export default function OrderDetailsScreen() {
       )}
 
       {['pending', 'assigned', 'arrived'].includes(order.status) && (
-        <TouchableOpacity style={s.editBtn} onPress={() => router.push(`/edit-order/${order.id}`)}>
-          <Text style={s.editBtnText}>{t('editOrder')}</Text>
-        </TouchableOpacity>
-      )}
-
-      {order.driver && (
-        <View style={s.detailsCard}>
-          <Text style={s.sectionTitle}>{t('theDriver')}</Text>
-          <View style={s.driverInfoRow}>
-            <View style={s.driverInfoLeft}>
-              <Text style={s.driverInfoName}>{order.driver.name}</Text>
-              {order.driver.phone && (
-                <TouchableOpacity onPress={() => Linking.openURL(`tel:${order.driver.phone}`)}>
-                  <Text style={s.driverInfoPhone}>{order.driver.phone} 📞</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-          <TouchableOpacity style={s.chatBtn} onPress={() => router.push(`/chat/${order.id}`)}>
-            <Text style={s.chatBtnText}>{t('chatWithDriver')}</Text>
-          </TouchableOpacity>
-        </View>
+        <SecondaryButton title={t('editOrder')} icon={<Pencil size={16} color={b.ink} />} onPress={() => router.push(`/edit-order/${order.id}`)} style={{ marginBottom: 6 }} />
       )}
 
       {order.rated_at && (
@@ -518,8 +566,8 @@ export default function OrderDetailsScreen() {
       )}
 
       {canCancel && (
-        <TouchableOpacity style={s.cancelBtn} onPress={handleCancel}>
-          <Text style={s.cancelText}>{t('cancelOrder')}</Text>
+        <TouchableOpacity style={n.cancelLink} onPress={handleCancel} accessibilityRole="button">
+          <Text style={[n.cancelLinkText, { color: b.dangerText }]}>{t('cancelOrder')}</Text>
         </TouchableOpacity>
       )}
 
@@ -534,6 +582,51 @@ export default function OrderDetailsScreen() {
     </>
   )
 }
+
+const n = StyleSheet.create({
+  header: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+  title: { fontSize: 18, fontFamily: F.display },
+  date: { fontSize: 11.5, fontFamily: F.regular, marginTop: 1 },
+  statusPill: { flexDirection: 'row', alignItems: 'center', gap: 5, height: SIZE.S - 4, paddingHorizontal: 10, borderRadius: 13, maxWidth: 150 },
+  statusPillText: { fontSize: 11.5, fontFamily: F.bold },
+  gift: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', height: 28, paddingHorizontal: 12, borderRadius: 14, marginBottom: 10 },
+  giftText: { fontSize: 12, fontFamily: F.bold },
+  card: { marginBottom: 12, padding: 14 },
+  eyebrow: { fontSize: 11, fontFamily: F.bold },
+  nowRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  nowIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  nowTitle: { fontSize: 15, fontFamily: F.display },
+  nowSub: { fontSize: 12, fontFamily: F.regular, marginTop: 1 },
+  stepRow: { flexDirection: 'row', gap: 10 },
+  stepDot: { width: 28, height: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  stepLine: { width: 2, height: 14 },
+  stepText: { flex: 1, fontSize: 13, fontFamily: F.bold, paddingTop: 4 },
+  more: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, borderTopWidth: 1, marginTop: 12, paddingTop: 10 },
+  moreText: { fontSize: 12.5, fontFamily: F.bold },
+  mapWrap: { height: 160, borderRadius: 14, overflow: 'hidden' },
+  mapChip: { position: 'absolute', top: 8, right: 8, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, height: 24, borderRadius: 9 },
+  mapChipText: { fontSize: 10.5, fontFamily: F.bold },
+  driverRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#0EA5E9', alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: '#fff', fontSize: 16, fontFamily: F.display },
+  driverName: { fontSize: 14, fontFamily: F.bold },
+  driverSub: { fontSize: 11.5, fontFamily: F.regular },
+  stats: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  stat: { flex: 1, borderRadius: 12, paddingVertical: 7, paddingHorizontal: 10 },
+  statValue: { fontSize: 14.5, fontFamily: F.display },
+  statLabel: { fontSize: 10.5, fontFamily: F.regular },
+  line: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6 },
+  lineLabel: { fontSize: 13, fontFamily: F.medium, flexShrink: 1 },
+  lineValue: { fontSize: 13, fontFamily: F.bold },
+  totalLine: { borderTopWidth: 1, borderStyle: 'dashed', marginTop: 4, paddingTop: 10 },
+  totalLabel: { fontSize: 14, fontFamily: F.display },
+  totalValue: { fontSize: 19, fontFamily: F.display },
+  payRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, paddingHorizontal: 10, height: SIZE.M, marginTop: 8 },
+  payText: { flex: 1, fontSize: 13, fontFamily: F.bold },
+  notes: { fontSize: 12, fontFamily: F.regular, marginTop: 8 },
+  cancelLink: { alignSelf: 'center', paddingVertical: 10, paddingHorizontal: 20, marginTop: 4 },
+  cancelLinkText: { fontSize: 13.5, fontFamily: F.bold },
+})
 
 function DetailRow({ label, value, highlight, warn, colors: c }: { label: string; value: string; highlight?: boolean; warn?: boolean; colors: any }) {
   return (

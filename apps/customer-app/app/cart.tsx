@@ -385,7 +385,7 @@ export default function CartScreen() {
         setSaving(false)
         if (paymentData.iframe_url) {
           clearCart()
-          router.push({ pathname: '/payment', params: { url: paymentData.iframe_url } })
+          router.push({ pathname: '/payment', params: { url: paymentData.iframe_url, kind: 'order', id: orderData.id } })
         } else if (paymentData.error) {
           showAlert({ title: isEn ? 'Error' : 'خطأ', message: paymentData.error, type: 'error', onConfirm: () => router.replace(`/order/${orderData.id}`) })
         }

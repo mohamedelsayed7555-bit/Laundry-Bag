@@ -125,7 +125,7 @@ export default function BagOrderScreen() {
         const paymentData = await res.json()
         setSaving(false)
         if (paymentData.iframe_url) {
-          router.push({ pathname: '/payment', params: { url: paymentData.iframe_url } })
+          router.push({ pathname: '/payment', params: { url: paymentData.iframe_url, kind: 'order', id: data.id } })
         } else if (paymentData.error) {
           showAlert({ title: t('error'), message: paymentData.error, type: 'error', onConfirm: () => router.replace(`/order/${data.id}`) })
         }

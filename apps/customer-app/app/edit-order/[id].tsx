@@ -200,7 +200,7 @@ export default function EditOrderScreen() {
         const paymentData = await res.json()
         setSaving(false)
         if (paymentData.iframe_url) {
-          router.push({ pathname: '/payment', params: { url: paymentData.iframe_url } })
+          router.push({ pathname: '/payment', params: { url: paymentData.iframe_url, kind: 'order', id } })
         } else if (paymentData.error) {
           showAlert({ title: isEn ? 'Error' : 'خطأ', message: paymentData.error, type: 'error', onConfirm: () => router.back() })
         }
