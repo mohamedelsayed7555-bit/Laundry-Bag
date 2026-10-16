@@ -10,6 +10,7 @@ import { LanguageProvider } from '@/lib/language-context'
 import { ActionsProvider } from '@/lib/actions-context'
 import { motion } from 'framer-motion'
 import RealtimeNotifier from '@/components/layout/RealtimeNotifier'
+import RouteGuard from '@/components/layout/RouteGuard'
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; errorMsg: string }> {
   state = { hasError: false, errorMsg: '' }
@@ -71,7 +72,7 @@ export default function DashboardLayout({
                   className="p-3 sm:p-4 lg:p-6"
                 >
                   <ErrorBoundary>
-                    {children}
+                    <RouteGuard>{children}</RouteGuard>
                   </ErrorBoundary>
                 </motion.main>
               </div>
