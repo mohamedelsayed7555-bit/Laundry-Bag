@@ -16,6 +16,22 @@ export async function POST(request: NextRequest) {
   const body = await request.json()
   const { name, phone, email, role, tier, vehicle_type, vehicle_number } = body
 
+  // The role came straight from the request body, so any staff account could have
+  // created an admin here. Only a super_admin may hand out privileged roles, and
+  // only known roles are accepted at all.
+  const ALLOWED_ROLES = ['customer', 'driver', 'manager', 'accountant', 'admin', 'super_admin']
+  const PRIVILEGED_ROLES = ['admin', 'super_admin']
+  const wanted = role || 'customer'
+  if (!ALLOWED_ROLES.includes(wanted)) {
+    return NextResponse.json({ error: 'دور غير معروف' }, { status: 400 })
+  }
+  if (PRIVILEGED_ROLES.includes(wanted) && auth.role !== 'super_admin') {
+    return NextResponse.json({ error: 'فقط الـ Super Admin يمكنه إنشاء حسابات بهذا الدور' }, { status: 403 })
+  }
+  if (['manager', 'accountant'].includes(wanted) && !PRIVILEGED_ROLES.includes(auth.role)) {
+    return NextResponse.json({ error: 'غير مصرح — صلاحيات غير كافية' }, { status: 403 })
+  }
+
   if (email) {
     const { data: existing } = await supabaseAdmin.from('users').select('id').eq('email', email).maybeSingle()
     if (existing) {
@@ -39,15 +55,15 @@ export async function POST(request: NextRequest) {
     email: email || `${Date.now()}@cleano.temp`,
     password,
     email_confirm: true,
-    user_metadata: { name, role: role || 'customer' },
-    app_metadata: { role: role || 'customer' },
+    user_metadata: { name, role: wanted },
+    app_metadata: { role: wanted },
   })
 
   if (authError) {
     return NextResponse.json({ error: authError.message }, { status: 400 })
   }
 
-  const updates: Record<string, any> = { name, role: role || 'customer' }
+  const updates: Record<string, any> = { name, role: wanted }
   if (phone) updates.phone = phone
   if (tier) updates.tier = tier
   if (vehicle_type) updates.vehicle_type = vehicle_type
