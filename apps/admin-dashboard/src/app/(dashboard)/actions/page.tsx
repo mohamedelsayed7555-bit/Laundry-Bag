@@ -147,7 +147,7 @@ export default function ActionsPage() {
     { key: 'total_paid', label: 'المبلغ', render: (r: any) => `${Number(r.total_paid).toFixed(2)} ج.م` },
     { key: 'created_at', label: 'التاريخ', render: (r: any) => new Date(r.created_at).toLocaleDateString('ar-EG') },
     { key: 'actions', label: 'إجراء', render: (r: any) => (
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <button onClick={() => confirmSub(r.id)} className="flex items-center gap-1 px-3 py-1.5 bg-primary-500 text-white rounded-lg text-xs font-medium hover:bg-primary-600 transition-colors">
           <CheckCircle size={14} /> تفعيل
         </button>
@@ -165,7 +165,7 @@ export default function ActionsPage() {
         <p className="text-sm text-gray-400 mt-1">كل الإجراءات المعلقة في مكان واحد</p>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="تأكيد دفع" value={counts.pendingPayments} icon={CreditCard} color="orange" index={0} />
         <StatCard label="استرداد" value={counts.pendingRefunds} icon={Undo2} color="red" index={1} />
         <StatCard label="بدون سائق" value={counts.unassignedOrders} icon={Truck} color="blue" index={2} />

@@ -1,8 +1,11 @@
-name: Activate Scheduled Orders
+name: Activate Scheduled Orders (manual fallback)
+
+# The database now does this every 5 minutes (pg_cron -> public.run_order_housekeeping),
+# so the automatic schedule here is off: it only duplicated the work and, on a private
+# repo, would have used far more than the free Actions minutes.
+# Kept as a manual fallback — run it from the Actions tab if pg_cron is ever unavailable.
 
 on:
-  schedule:
-    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 jobs:

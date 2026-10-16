@@ -85,7 +85,7 @@ export function useNotifications(userId?: string) {
             .then(({ error }) => { if (error) console.warn('Token save failed:', error.message) })
         }
       }
-    })
+    }).catch(err => console.warn('Push registration failed:', err?.message ?? err))
 
     if (!userId) return
 

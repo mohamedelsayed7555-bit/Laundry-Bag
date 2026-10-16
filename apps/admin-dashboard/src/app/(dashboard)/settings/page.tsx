@@ -412,7 +412,7 @@ export default function SettingsPage() {
                 </button>
               </div>
               {workHours.enabled && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1.5">ساعة الفتح</label>
                     <input type="time" value={workHours.open} onChange={e => setWorkHours({ ...workHours, open: e.target.value })}
@@ -558,7 +558,7 @@ export default function SettingsPage() {
               </button>
             </div>
             <div className="flex flex-wrap items-center gap-4 p-4 mt-3 bg-surface-muted/50 rounded-xl">
-              <div className="flex-1 min-w-[200px]">
+              <div className="flex-1 min-w-0 sm:min-w-[200px]">
                 <p className="text-sm font-medium text-gray-700">مدة الهدية (بالأيام)</p>
                 <p className="text-xs text-gray-400">العميل لازم يعمل أول طلب خلال المدة دي من تاريخ تسجيله علشان ياخد الهدية. الطلب الملغي مبيتحسبش.</p>
               </div>
@@ -584,7 +584,7 @@ export default function SettingsPage() {
                 <p className="text-xs text-gray-400 mt-0.5">اللون الأساسي اللي هيظهر في تطبيق العميل — الأزرار والعناصر الرئيسية</p>
               </div>
             </div>
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
               {brandColors.map(c => (
                 <button key={c.hex} onClick={() => setBrandColor(c.hex)}
                   className={`relative flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${brandColor === c.hex ? 'border-gray-800 shadow-lg scale-105' : 'border-transparent hover:border-gray-200'}`}>

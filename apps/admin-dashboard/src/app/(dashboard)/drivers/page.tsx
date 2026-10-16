@@ -124,7 +124,7 @@ export default function DriversPage() {
     { key: 'vehicle_type', label: 'المركبة', render: (item: any) => vehicleLabel[item.vehicle_type] ?? item.vehicle_type ?? '—' },
     { key: 'is_active', label: 'الحالة', render: (item: any) => <Badge variant={item.is_active ? 'success' : 'danger'}>{item.is_active ? 'متاح' : 'غير متاح'}</Badge> },
     { key: 'actions', label: '', render: (item: any) => (
-      <div className="flex gap-1">
+      <div className="flex flex-wrap gap-1">
         <Tooltip content="عرض التفاصيل"><button onClick={() => setDetailItem(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Eye size={14} className="text-gray-400" /></button></Tooltip>
         {hasPermission('drivers.edit') && <Tooltip content="تعديل"><button onClick={() => openEdit(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Edit2 size={14} className="text-gray-400" /></button></Tooltip>}
         {hasPermission('drivers.edit') && <Tooltip content={item.is_active ? 'تعطيل' : 'تفعيل'}><button onClick={() => toggleActive(item.id, item.is_active)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Power size={14} className={item.is_active ? 'text-red-400' : 'text-green-500'} /></button></Tooltip>}
@@ -177,7 +177,7 @@ export default function DriversPage() {
         )}
       </motion.div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="إجمالي السائقين" value={totalCount} icon={Truck} color="blue" index={0} />
         <StatCard label="متاح" value={activeDrivers} icon={CheckCircle} color="green" index={1} />
         <StatCard label="في مهمة" value={0} icon={Clock} color="orange" index={2} />

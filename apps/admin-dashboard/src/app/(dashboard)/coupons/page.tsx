@@ -296,7 +296,7 @@ export default function CouponsPage() {
       {/* Delete Confirm Modal */}
       <Modal open={!!deleteConfirm} onClose={() => setDeleteConfirm(null)} title="حذف الكوبون">
         <p className="text-gray-600 text-sm mb-4">هل أنت متأكد من حذف الكوبون <strong>{deleteConfirm?.code}</strong>؟ لا يمكن التراجع.</p>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button onClick={() => handleDelete(deleteConfirm.id)} className="flex-1 bg-red-500 text-white py-2.5 rounded-xl text-sm font-medium hover:bg-red-600 transition-colors">حذف</button>
           <button onClick={() => setDeleteConfirm(null)} className="flex-1 bg-gray-100 text-gray-600 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors">إلغاء</button>
         </div>

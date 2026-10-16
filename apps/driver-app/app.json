@@ -7,11 +7,11 @@
     "scheme": "cleano-driver",
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
-    "icon": "./assets/icon.jpg",
+    "icon": "./assets/icon.png",
     "splash": {
-      "image": "./assets/icon.jpg",
-      "resizeMode": "contain",
-      "backgroundColor": "#00af5f"
+      "image": "./assets/splash.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#0A1119"
     },
     "ios": {
       "bundleIdentifier": "com.cleano.driver",
@@ -24,7 +24,8 @@
       "package": "com.cleano.driver",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
-        "backgroundColor": "#00af5f"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#00A352"
       },
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",

@@ -239,7 +239,7 @@ export default function FinancePage() {
       const canConfirm = item.payment_status === 'pending' && !isCancelled
       const canRefund = item.payment_status === 'confirmed' && ['visa', 'e_wallet', 'wallet', 'instapay', 'cash'].includes(item.payment_method) && ['pending', 'assigned', 'arrived', 'picked_up', 'cancelled'].includes(item.status)
       return (
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           {canConfirm && (
             <Tooltip content="تأكيد استلام المبلغ">
               <button onClick={() => setConfirmModal({ type: 'pay', id: item.id, amount: item._amount, orderNumber: item.order_number })} className="text-[11px] bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg font-medium hover:bg-emerald-100 transition-colors">
@@ -296,7 +296,7 @@ export default function FinancePage() {
       {/* Date filters */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.05 }} className="flex flex-wrap items-center gap-3">
         <Calendar size={16} className="text-gray-400" />
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           {presets.map(p => (
             <button key={p.key} onClick={() => setPreset(p.key)}
               className={`px-3 py-2 rounded-lg text-[11px] font-medium transition-all ${preset === p.key ? 'bg-navy-900 text-white shadow-premium-md' : 'bg-white text-gray-500 hover:bg-surface-muted border border-surface-border/60'}`}>
@@ -324,7 +324,7 @@ export default function FinancePage() {
 
       {/* Source + Payment filters */}
       <div className="flex flex-wrap gap-4">
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           {([['all', 'الكل'], ['orders', '🧺 الطلبات'], ['subscriptions', '👑 الاشتراكات']] as [SourceFilter, string][]).map(([key, label]) => (
             <button key={key} onClick={() => setSourceFilter(key)}
               className={`px-3 py-2 rounded-lg text-[11px] font-medium transition-all ${sourceFilter === key ? 'bg-navy-900 text-white shadow-premium-md' : 'bg-white text-gray-500 hover:bg-surface-muted border border-surface-border/60'}`}>
@@ -332,7 +332,7 @@ export default function FinancePage() {
             </button>
           ))}
         </div>
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           {[{ key: 'all', label: 'الكل' }, { key: 'pending', label: 'غير مدفوع' }, { key: 'confirmed', label: 'مدفوع' }, { key: 'refunded', label: 'مسترد' }].map(f => (
             <button key={f.key} onClick={() => setPayFilter(f.key)}
               className={`px-3 py-2 rounded-lg text-[11px] font-medium transition-all ${payFilter === f.key ? 'bg-navy-900 text-white shadow-premium-md' : 'bg-white text-gray-500 hover:bg-surface-muted border border-surface-border/60'}`}>
@@ -362,7 +362,7 @@ export default function FinancePage() {
                 ? 'هل أنت متأكد من تأكيد استلام هذا المبلغ؟'
                 : 'هل أنت متأكد من استرداد هذا المبلغ؟ سيتم خصمه من الإيرادات.'}
             </p>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
               <button onClick={() => setConfirmModal(null)}
                 className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition-colors">
                 إلغاء

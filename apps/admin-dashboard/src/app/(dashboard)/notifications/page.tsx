@@ -274,7 +274,7 @@ export default function NotificationsPage() {
           {/* Target */}
           <div>
             <label className="text-xs font-medium text-gray-500 mb-2 block">الفئة المستهدفة</label>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {targetOptions.map(opt => {
                 const Icon = opt.icon
                 return (
@@ -361,7 +361,7 @@ export default function NotificationsPage() {
           </h3>
           <p className="text-xs text-gray-400">اكتب العنوان والرسالة أعلاه ثم اضغط هنا لإرسالها عبر واتساب للعملاء المستهدفين</p>
 
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <button
               onClick={loadWaCustomers}
               disabled={loadingWa || !title.trim() || !body.trim()}
