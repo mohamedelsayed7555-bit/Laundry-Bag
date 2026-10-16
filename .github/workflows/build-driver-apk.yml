@@ -49,3 +49,5 @@ jobs:
         with:
           name: driver-app-apk
           path: apps/driver-app/android/app/build/outputs/apk/release/*.apk
+          retention-days: 7
+          compression-level: 0

@@ -49,3 +49,5 @@ jobs:
         with:
           name: customer-app-apk
           path: apps/customer-app/android/app/build/outputs/apk/release/*.apk
+          retention-days: 7
+          compression-level: 0
