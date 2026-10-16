@@ -44,7 +44,7 @@ const services = [
   { key: 'accessories', label: 'منتجات وإكسسوارات', labelEn: 'Accessories & Products' },
 ]
 
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://kjqtrmedkvqfofwymoni.supabase.co'
 
 export default function CartScreen() {
   const { profile } = useAuth()

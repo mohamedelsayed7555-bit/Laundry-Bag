@@ -11,7 +11,7 @@ import { supabase } from '../../src/lib/supabase'
 import { serverErrorMessage } from '../../src/lib/serverErrors'
 import { useLanguage } from '../../src/contexts/LanguageContext'
 
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://kjqtrmedkvqfofwymoni.supabase.co'
 
 const servicesMap = [
   { key: 'wash', icon: '👔', label: 'غسيل', labelEn: 'Wash' },

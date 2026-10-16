@@ -49,7 +49,18 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const password = Math.random().toString(36).slice(-10) + 'A1!'
+  // An admin may set an initial password (so it can be handed to the customer to
+  // log in with); otherwise a random one is generated. Either way the value is
+  // returned to the caller to show once, since the account is unusable until
+  // someone knows it.
+  let password = typeof body.password === 'string' ? body.password.trim() : ''
+  if (password) {
+    if (password.length < 8) {
+      return NextResponse.json({ error: 'كلمة المرور يجب أن تكون 8 أحرف على الأقل' }, { status: 400 })
+    }
+  } else {
+    password = Math.random().toString(36).slice(-10) + 'A1!'
+  }
 
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
     email: email || `${Date.now()}@cleano.temp`,
@@ -60,7 +71,9 @@ export async function POST(request: NextRequest) {
   })
 
   if (authError) {
-    return NextResponse.json({ error: authError.message }, { status: 400 })
+    let msg = authError.message
+    if (/password/i.test(msg)) msg = 'كلمة المرور ضعيفة — لازم تحتوي على حروف كبيرة وصغيرة وأرقام ورموز'
+    return NextResponse.json({ error: msg }, { status: 400 })
   }
 
   const updates: Record<string, any> = { name, role: wanted }

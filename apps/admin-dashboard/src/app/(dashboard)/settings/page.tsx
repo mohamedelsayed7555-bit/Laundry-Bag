@@ -143,7 +143,14 @@ export default function SettingsPage() {
     try {
       for (const s of settings) {
         let val: any = s.key === 'org_name' ? orgName : s.key === 'org_phone' ? orgPhone : (editValues[s.id] ?? s.value)
-        if (typeof val === 'string' && !isNaN(Number(val)) && val.trim() !== '') val = Number(val)
+        if (typeof val === 'string' && !isNaN(Number(val)) && val.trim() !== '') {
+          // Keep phone/account-like values as text — a leading zero (e.g. an InstaPay
+          // or mobile number) or a very long digit string must not be turned into a
+          // Number, which would drop the leading 0 and lose precision.
+          const t = val.trim()
+          const phoneLike = /^0\d/.test(t) || /^\d{12,}$/.test(t)
+          if (!phoneLike) val = Number(t)
+        }
         const { error } = await supabase.from('settings').update({ value: val }).eq('id', s.id)
         if (error) console.error('Save error for', s.key, ':', error.message, error.details, error.code)
       }
@@ -506,7 +513,16 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1.5">الحد الأقصى للقطع</label>
-                  <input type="number" min={1} value={bagOffer.max_items} onChange={e => setBagOffer({ ...bagOffer, max_items: +e.target.value })} className={inputClass} />
+                  <input type="number" min={1} value={bagOffer.max_items} onChange={e => {
+                    const n = +e.target.value
+                    // The piece count also appears inside the subtitle text that customers
+                    // actually read; keep that number in sync so editing one field is enough.
+                    setBagOffer(prev => ({
+                      ...prev,
+                      max_items: n,
+                      subtitle: prev.subtitle.replace(/\d+(?=\s*(?:قطعة|قطع|pieces?|items?))/i, String(n)),
+                    }))
+                  }} className={inputClass} />
                 </div>
               </div>
 

@@ -10,7 +10,7 @@ import {
   ClipboardList,
   Users,
   Truck,
-  Navigation,
+  Navigation2,
   MapPin,
   DollarSign,
   BarChart3,
@@ -48,7 +48,7 @@ function useNavGroups(badges: Record<string, number>) {
       items: [
         { label: t.sidebar.customers, href: '/customers', icon: Users, badge: 0 },
         { label: t.sidebar.drivers, href: '/drivers', icon: Truck, badge: 0 },
-        { label: 'تتبع السائقين', href: '/live', icon: Navigation, badge: 0 },
+        { label: 'تتبع السائقين', href: '/live', icon: Navigation2, badge: 0 },
         { label: t.sidebar.branches, href: '/branches', icon: MapPin, badge: 0 },
       ],
     },

@@ -13,6 +13,7 @@ import { PageSkeleton } from '@/components/ui/Skeleton'
 import { ORDER_STATUS_LABELS } from '@cleano/shared-types'
 
 type ActionTab = 'payments' | 'refunds' | 'unassigned' | 'subs'
+type ConfirmType = 'payment' | 'refund' | 'subActivate' | 'subReject'
 
 export default function ActionsPage() {
   const { counts, refresh } = useActions()
@@ -20,6 +21,18 @@ export default function ActionsPage() {
   const [tab, setTab] = useState<ActionTab>('payments')
   const [rows, setRows] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  // Every task-center action asks for confirmation before it runs.
+  const [confirmAction, setConfirmAction] = useState<{ type: ConfirmType; id: string; title: string; amount?: number } | null>(null)
+
+  function runConfirm() {
+    if (!confirmAction) return
+    const { type, id } = confirmAction
+    setConfirmAction(null)
+    if (type === 'payment') confirmPayment(id)
+    else if (type === 'refund') markRefunded(id)
+    else if (type === 'subActivate') confirmSub(id)
+    else if (type === 'subReject') rejectSub(id)
+  }
 
   useEffect(() => { loadTab() }, [tab])
 
@@ -112,7 +125,7 @@ export default function ActionsPage() {
     { key: 'status', label: 'الحالة', render: (r: any) => <Badge variant="warning">{ORDER_STATUS_LABELS[r.status as keyof typeof ORDER_STATUS_LABELS] ?? r.status}</Badge> },
     { key: 'created_at', label: 'التاريخ', render: (r: any) => new Date(r.created_at).toLocaleDateString('ar-EG') },
     { key: 'actions', label: 'إجراء', render: (r: any) => (
-      <button onClick={() => confirmPayment(r.id)} className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-500 text-white rounded-lg text-xs font-medium hover:bg-primary-600 transition-colors">
+      <button onClick={() => setConfirmAction({ type: 'payment', id: r.id, title: `طلب ${r.order_number}`, amount: Number(r.total) })} className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-500 text-white rounded-lg text-xs font-medium hover:bg-primary-600 transition-colors">
         <CheckCircle size={14} /> تأكيد
       </button>
     )},
@@ -128,7 +141,11 @@ export default function ActionsPage() {
     { key: 'payment_method', label: 'طريقة الدفع', render: (r: any) => <Badge variant="info">{r.payment_method}</Badge> },
     { key: 'created_at', label: 'التاريخ', render: (r: any) => new Date(r.created_at).toLocaleDateString('ar-EG') },
     { key: 'actions', label: 'إجراء', render: (r: any) => (
-      <button onClick={() => markRefunded(r.id)} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600 transition-colors">
+      <button onClick={() => {
+        const driverArr = ['arrived', 'picked_up'].includes(r.status) || Number(r.cancellation_fee) > 0
+        const amt = driverArr ? Number(r.total) - (Number(r.delivery_fee) || 0) : Number(r.total)
+        setConfirmAction({ type: 'refund', id: r.id, title: `طلب ${r.order_number}`, amount: amt })
+      }} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600 transition-colors">
         <Undo2 size={14} /> استرداد
       </button>
     )},
@@ -148,10 +165,10 @@ export default function ActionsPage() {
     { key: 'created_at', label: 'التاريخ', render: (r: any) => new Date(r.created_at).toLocaleDateString('ar-EG') },
     { key: 'actions', label: 'إجراء', render: (r: any) => (
       <div className="flex flex-wrap gap-2">
-        <button onClick={() => confirmSub(r.id)} className="flex items-center gap-1 px-3 py-1.5 bg-primary-500 text-white rounded-lg text-xs font-medium hover:bg-primary-600 transition-colors">
+        <button onClick={() => setConfirmAction({ type: 'subActivate', id: r.id, title: r.plan?.name ?? 'اشتراك', amount: Number(r.total_paid) })} className="flex items-center gap-1 px-3 py-1.5 bg-primary-500 text-white rounded-lg text-xs font-medium hover:bg-primary-600 transition-colors">
           <CheckCircle size={14} /> تفعيل
         </button>
-        <button onClick={() => rejectSub(r.id)} className="flex items-center gap-1 px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600 transition-colors">
+        <button onClick={() => setConfirmAction({ type: 'subReject', id: r.id, title: r.plan?.name ?? 'اشتراك' })} className="flex items-center gap-1 px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600 transition-colors">
           <XCircle size={14} /> رفض
         </button>
       </div>
@@ -204,6 +221,37 @@ export default function ActionsPage() {
       ) : (
         <DataTable columns={columns} data={rows} />
       )}
+
+      {confirmAction && (() => {
+        const meta = {
+          payment: { heading: 'تأكيد الدفع', question: 'متأكد إنك عايز تأكد استلام الدفع للطلب ده؟', btn: 'تأكيد الدفع', danger: false },
+          refund: { heading: 'تأكيد الاسترداد', question: 'متأكد إنك عايز تسترجع المبلغ ده؟ هيتخصم من الإيرادات.', btn: 'استرداد', danger: true },
+          subActivate: { heading: 'تفعيل الاشتراك', question: 'متأكد إنك عايز تفعّل الاشتراك ده؟', btn: 'تفعيل', danger: false },
+          subReject: { heading: 'رفض الاشتراك', question: 'متأكد إنك عايز ترفض الاشتراك ده؟', btn: 'رفض', danger: true },
+        }[confirmAction.type]
+        return (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setConfirmAction(null)}>
+            <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl" onClick={e => e.stopPropagation()}>
+              <h3 className="text-lg font-bold text-gray-800 mb-2 text-center">{meta.heading}</h3>
+              <p className="text-sm text-gray-500 text-center mb-1">{confirmAction.title}</p>
+              {typeof confirmAction.amount === 'number' && (
+                <p className="text-center text-2xl font-bold text-gray-800 mb-4">{confirmAction.amount.toFixed(2)} ج.م</p>
+              )}
+              <p className="text-xs text-gray-400 text-center mb-5">{meta.question}</p>
+              <div className="flex flex-wrap gap-3">
+                <button onClick={() => setConfirmAction(null)}
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition-colors">
+                  إلغاء
+                </button>
+                <button onClick={runConfirm}
+                  className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-colors ${meta.danger ? 'bg-red-500 hover:bg-red-600' : 'bg-primary-500 hover:bg-primary-600'}`}>
+                  {meta.btn}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

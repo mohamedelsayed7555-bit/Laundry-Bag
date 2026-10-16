@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Truck, Phone, RefreshCw, MapPin, Loader2, Package, Navigation } from 'lucide-react'
+import { Truck, Phone, RefreshCw, MapPin, Loader2, Package, Navigation2 } from 'lucide-react'
 
 type Driver = {
   id: string
@@ -236,7 +236,7 @@ export default function LiveDriversPage() {
                         className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 grid place-items-center hover:bg-blue-100 transition-colors"
                         title="فتح في خرائط جوجل"
                       >
-                        <Navigation size={14} />
+                        <Navigation2 size={14} />
                       </a>
                     )}
                   </span>

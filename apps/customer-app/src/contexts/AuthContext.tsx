@@ -193,7 +193,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: phoneTaken } = await supabase.rpc('is_phone_registered', { p_phone: phone.trim() })
     if (phoneTaken) return { error: en ? 'Phone number already registered' : 'رقم الموبايل مسجل بالفعل' }
 
-    const { error, data } = await supabase.auth.signUp({ email, password })
+    // Email is optional for customers. Supabase still needs an address as the login
+    // identity, so when it's blank we derive a stable, unique one from the phone
+    // (the phone is already guaranteed unique just above). Sign-in maps phone -> this.
+    const authEmail = email.trim() || `${phone.trim()}@cleano.temp`
+
+    const { error, data } = await supabase.auth.signUp({ email: authEmail, password })
     if (error) {
       let msg = error.message
       if (msg.includes('Password should contain'))
@@ -210,7 +215,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (data.user) {
       await supabase.from('users').upsert({
         id: data.user.id,
-        email,
+        email: authEmail,
         name,
         phone,
         role: 'customer',

@@ -418,6 +418,7 @@ export default {
   authFullName: 'اسمك بالكامل',
   authFullNamePh: 'مثال: أحمد محمود',
   authEmail: 'الإيميل',
+  authEmailOptional: 'الإيميل (اختياري)',
   authNameRequired: 'اكتب اسمك',
   authEmailInvalid: 'الإيميل مش صحيح',
   authRuleLength: '8 حروف',

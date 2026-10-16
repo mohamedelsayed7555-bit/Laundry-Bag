@@ -14,7 +14,7 @@ import { MapPin, Package, Truck, Plus, CreditCard, Banknote, Wallet, Landmark, S
 import { useBrand, Card, ChoiceGrid, StickyFooter, IconButton, BackIcon, SoftWaves, money, cardShadow, F, SIZE, HIT, type Choice } from '../src/components/brand'
 import { PrimaryButton } from '../src/components/auth/ui'
 
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://kjqtrmedkvqfofwymoni.supabase.co'
 
 const PAYMENT_METHODS = [
   { key: 'cash', icon: '💵', labelKey: 'pmCash' },

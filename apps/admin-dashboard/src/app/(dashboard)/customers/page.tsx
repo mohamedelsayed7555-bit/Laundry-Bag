@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase'
 import DataTable from '@/components/ui/DataTable'
 import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
-import { Search, Plus, Edit2, Power, Users } from 'lucide-react'
+import { Search, Plus, Edit2, Power, Users, KeyRound } from 'lucide-react'
 import { TableSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import Tooltip from '@/components/ui/Tooltip'
@@ -21,7 +21,10 @@ export default function CustomersPage() {
   const [showAdd, setShowAdd] = useState(false)
   const [editItem, setEditItem] = useState<any>(null)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ name: '', phone: '', email: '', tier: 'bronze' })
+  const [form, setForm] = useState({ name: '', phone: '', email: '', tier: 'bronze', password: '' })
+  const [createdCreds, setCreatedCreds] = useState<{ name: string; phone: string; password: string } | null>(null)
+  const [resetItem, setResetItem] = useState<any>(null)
+  const [resetPw, setResetPw] = useState('')
   const [page, setPage] = useState(0)
   const [totalCount, setTotalCount] = useState(0)
   const { toast } = useToast()
@@ -52,7 +55,12 @@ export default function CustomersPage() {
     })
     const result = await res.json()
     setSaving(false)
-    if (result.success) { setShowAdd(false); setForm({ name: '', phone: '', email: '', tier: 'bronze' }); loadCustomers(); toast('تم إضافة العميل بنجاح') }
+    if (result.success) {
+      const creds = { name: form.name, phone: form.phone, password: result.password as string }
+      setShowAdd(false); setForm({ name: '', phone: '', email: '', tier: 'bronze', password: '' }); loadCustomers(); toast('تم إضافة العميل بنجاح')
+      // Show the login credentials once — the account can't be used without them.
+      if (result.password) setCreatedCreds(creds)
+    }
     else { toast(result.error ?? 'حدث خطأ أثناء الإضافة', 'error') }
   }
 
@@ -83,8 +91,31 @@ export default function CustomersPage() {
   }
 
   function openEdit(item: any) {
-    setForm({ name: item.name, phone: item.phone ?? '', email: item.email ?? '', tier: item.tier ?? 'bronze' })
+    setForm({ name: item.name, phone: item.phone ?? '', email: item.email ?? '', tier: item.tier ?? 'bronze', password: '' })
     setEditItem(item)
+  }
+
+  // Reset a customer's password: set a new one (typed or generated) and show it once,
+  // since the stored password is hashed and can never be read back.
+  async function handleReset(e: React.FormEvent) {
+    e.preventDefault()
+    if (!resetItem) return
+    const pw = resetPw.trim() || (Math.random().toString(36).slice(-10) + 'A1!')
+    if (pw.length < 8) { toast('كلمة المرور يجب أن تكون 8 أحرف على الأقل', 'error'); return }
+    setSaving(true)
+    const res = await fetch('/api/update-user', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: resetItem.id, password: pw }),
+    })
+    const result = await res.json()
+    setSaving(false)
+    if (result.success) {
+      const creds = { name: resetItem.name, phone: resetItem.phone ?? '', password: pw }
+      setResetItem(null); setResetPw('')
+      toast('تم تغيير كلمة المرور')
+      setCreatedCreds(creds)
+    } else { toast(result.error ?? 'حدث خطأ أثناء تغيير كلمة المرور', 'error') }
   }
 
   const filtered = useMemo(() => customers.filter(c => {
@@ -115,6 +146,7 @@ export default function CustomersPage() {
     { key: 'actions', label: '', render: (item: any) => (
       <div className="flex flex-wrap gap-1">
         {hasPermission('customers.edit') && <Tooltip content="تعديل"><button onClick={() => openEdit(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Edit2 size={14} className="text-gray-400 hover:text-gray-600" /></button></Tooltip>}
+        {hasPermission('customers.edit') && <Tooltip content="إعادة تعيين كلمة المرور"><button onClick={() => { setResetItem(item); setResetPw('') }} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><KeyRound size={14} className="text-gray-400 hover:text-primary-600" /></button></Tooltip>}
         {hasPermission('customers.edit') && <Tooltip content={item.is_active ? 'تعطيل' : 'تفعيل'}><button onClick={() => toggleActive(item.id, item.is_active)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Power size={14} className={item.is_active ? 'text-red-400' : 'text-green-500'} /></button></Tooltip>}
       </div>
     )},
@@ -155,7 +187,7 @@ export default function CustomersPage() {
           <p className="text-sm text-gray-400 mt-0.5">{totalCount} عميل</p>
         </div>
         {hasPermission('customers.create') && (
-          <button onClick={() => { setForm({ name: '', phone: '', email: '', tier: 'bronze' }); setShowAdd(true) }}
+          <button onClick={() => { setForm({ name: '', phone: '', email: '', tier: 'bronze', password: '' }); setShowAdd(true) }}
             className="flex items-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:shadow-glow-green transition-all duration-300">
             <Plus size={16} /> عميل جديد
           </button>
@@ -195,6 +227,11 @@ export default function CustomersPage() {
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="عميل جديد">
         <form onSubmit={handleAdd} className="space-y-4">
           {formFields}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">كلمة المرور للدخول</label>
+            <input type="text" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} dir="ltr" className={inputClass} placeholder="اتركها فارغة ليتم توليدها تلقائياً" />
+            <p className="text-[11px] text-gray-400 mt-1">العميل بيسجّل دخول التطبيق برقم موبايله + كلمة المرور دي. هتظهرلك بعد الحفظ عشان تبعتهاله.</p>
+          </div>
           <button type="submit" disabled={saving}
             className="w-full bg-gradient-to-l from-primary-500 to-primary-600 text-white p-3 rounded-xl font-semibold hover:shadow-glow-green disabled:opacity-50 transition-all">
             {saving ? 'جاري الحفظ...' : 'إضافة العميل'}
@@ -210,6 +247,49 @@ export default function CustomersPage() {
             {saving ? 'جاري الحفظ...' : 'حفظ التعديلات'}
           </button>
         </form>
+      </Modal>
+
+      <Modal open={!!resetItem} onClose={() => { setResetItem(null); setResetPw('') }} title="إعادة تعيين كلمة المرور">
+        <form onSubmit={handleReset} className="space-y-4">
+          <p className="text-sm text-gray-500 leading-6">عميل: <b className="text-gray-800">{resetItem?.name}</b>. هيتعمل كلمة مرور جديدة وتظهرلك عشان تبعتها — القديمة مش هتشتغل بعد كده.</p>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">كلمة المرور الجديدة</label>
+            <input type="text" value={resetPw} onChange={e => setResetPw(e.target.value)} dir="ltr" className={inputClass} placeholder="اتركها فارغة ليتم توليدها تلقائياً" />
+          </div>
+          <button type="submit" disabled={saving}
+            className="w-full bg-gradient-to-l from-primary-500 to-primary-600 text-white p-3 rounded-xl font-semibold hover:shadow-glow-green disabled:opacity-50 transition-all">
+            {saving ? 'جاري الحفظ...' : 'تعيين كلمة المرور'}
+          </button>
+        </form>
+      </Modal>
+
+      <Modal open={!!createdCreds} onClose={() => setCreatedCreds(null)} title="بيانات دخول العميل">
+        {createdCreds && (() => {
+          const text = `بيانات الدخول لتطبيق Laundry Bag:\nرقم الموبايل: ${createdCreds.phone}\nكلمة المرور: ${createdCreds.password}`
+          const waPhone = createdCreds.phone.replace(/\s|-/g, '').replace(/^0/, '20')
+          const waText = encodeURIComponent(`أهلاً ${createdCreds.name} 👋\n${text}`)
+          return (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-500 leading-6">احفظ البيانات دي وابعتها للعميل — <b className="text-gray-700">مش هتظهر تاني</b>. يسجّل دخول التطبيق برقم موبايله وكلمة المرور.</p>
+              <div className="bg-surface-muted rounded-xl p-4 space-y-2 text-sm">
+                <div className="flex justify-between gap-3"><span className="text-gray-400">الاسم</span><b className="text-gray-800">{createdCreds.name}</b></div>
+                <div className="flex justify-between gap-3"><span className="text-gray-400">رقم الموبايل</span><b className="text-gray-800" dir="ltr">{createdCreds.phone}</b></div>
+                <div className="flex justify-between gap-3"><span className="text-gray-400">كلمة المرور</span><b className="text-gray-800" dir="ltr">{createdCreds.password}</b></div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => navigator.clipboard?.writeText(text).then(() => toast('تم نسخ البيانات')).catch(() => toast('تعذّر النسخ', 'error'))}
+                  className="flex-1 bg-surface-muted hover:bg-surface-border/60 text-gray-700 p-3 rounded-xl text-sm font-semibold transition-all">
+                  نسخ البيانات
+                </button>
+                <a href={`https://wa.me/${waPhone}?text=${waText}`} target="_blank" rel="noreferrer"
+                  className="flex-1 text-center bg-gradient-to-l from-primary-500 to-primary-600 text-white p-3 rounded-xl text-sm font-semibold hover:shadow-glow-green transition-all">
+                  إرسال واتساب
+                </a>
+              </div>
+            </div>
+          )
+        })()}
       </Modal>
     </div>
     </PermissionGate>

@@ -17,7 +17,7 @@ import { Hourglass, CalendarDays, Car, MapPin, Package, WashingMachine, CircleCh
 import { useBrand, Card, IconButton, BackIcon, FlowLines, Segments, Pill, money, F, SIZE, cardShadow } from '../../src/components/brand'
 import { PrimaryButton, SecondaryButton } from '../../src/components/auth/ui'
 
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://kjqtrmedkvqfofwymoni.supabase.co'
 
 // Driver is shown only while coming to the customer
 const TRACK_STATUSES = ['assigned', 'arrived', 'delivering']

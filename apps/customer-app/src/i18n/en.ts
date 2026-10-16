@@ -500,6 +500,7 @@ export default {
   authFullName: 'Full name',
   authFullNamePh: 'e.g. Ahmed Mahmoud',
   authEmail: 'Email',
+  authEmailOptional: 'Email (optional)',
   authNameRequired: 'Enter your name',
   authEmailInvalid: 'That email doesn’t look right',
   authRuleLength: '8 characters',

@@ -18,6 +18,9 @@
       "supportsTablet": false,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
+      },
+      "runtimeVersion": {
+        "policy": "appVersion"
       }
     },
     "android": {
@@ -33,7 +36,8 @@
         "android.permission.USE_BIOMETRIC",
         "android.permission.USE_FINGERPRINT",
         "android.permission.RECORD_AUDIO"
-      ]
+      ],
+      "runtimeVersion": "1.0.0"
     },
     "plugins": [
       "expo-router",
@@ -74,6 +78,9 @@
         "projectId": "278296f6-7a0c-4237-97ae-326fab30b0c6"
       }
     },
-    "owner": "mohameddhassan12s-team"
+    "owner": "mohameddhassan12s-team",
+    "updates": {
+      "url": "https://u.expo.dev/278296f6-7a0c-4237-97ae-326fab30b0c6"
+    }
   }
 }

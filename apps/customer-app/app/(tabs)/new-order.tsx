@@ -33,7 +33,7 @@ const SERVICE_IMG: Record<string, any> = {
   accessories: require('../../assets/services/shop.webp'),
 }
 
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://kjqtrmedkvqfofwymoni.supabase.co'
 
 // Matches the absolute tab bar in app/(tabs)/_layout.tsx (bottom 16 / 24 on iOS, height 68). The centre
 // + button pokes ~28px above the bar, so the checkout bar sits above that with a small gap.

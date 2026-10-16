@@ -52,7 +52,8 @@ export default function SignUpScreen() {
   async function handleCreate() {
     const next: typeof errors = {}
     if (name.trim().length < 2) next.name = t('authNameRequired')
-    if (!EMAIL_RE.test(email.trim())) next.email = t('authEmailInvalid')
+    // Email is optional — only reject it when the customer typed something invalid.
+    if (email.trim() && !EMAIL_RE.test(email.trim())) next.email = t('authEmailInvalid')
     if (passed < rules.length) next.password = t('authPasswordWeak')
     if (!agreed) next.agree = t('authAgreeRequired')
     setErrors(next)
@@ -122,7 +123,7 @@ export default function SignUpScreen() {
               />
               <AuthField
                 ref={emailRef}
-                label={t('authEmail')}
+                label={t('authEmailOptional')}
                 icon={Mail}
                 ltr
                 value={email}
@@ -134,7 +135,7 @@ export default function SignUpScreen() {
                 textContentType="emailAddress"
                 returnKeyType="next"
                 onSubmitEditing={() => passwordRef.current?.focus()}
-                valid={EMAIL_RE.test(email.trim())}
+                valid={!!email.trim() && EMAIL_RE.test(email.trim())}
                 error={errors.email}
               />
               <AuthField
