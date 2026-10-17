@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native'
+import { useState, useEffect, useMemo } from 'react'
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Image } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { TriangleAlert, Shirt, Plus, Minus } from 'lucide-react-native'
-import { useBrand, Card, Stepper, IconButton, BackIcon, FlowLines, money, F, SIZE } from '../../src/components/brand'
+import { TriangleAlert, Shirt, Plus, Minus, Check } from 'lucide-react-native'
+import { useBrand, Card, Chip, Stepper, IconButton, BackIcon, FlowLines, money, F, SIZE, HIT } from '../../src/components/brand'
 import { PrimaryButton, SecondaryButton } from '../../src/components/auth/ui'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
@@ -14,12 +14,24 @@ import { useLanguage } from '../../src/contexts/LanguageContext'
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://kjqtrmedkvqfofwymoni.supabase.co'
 
 const servicesMap = [
-  { key: 'wash', icon: '👔', label: 'غسيل', labelEn: 'Wash' },
-  { key: 'dry_clean', icon: '🧹', label: 'تنظيف جاف', labelEn: 'Dry Clean' },
-  { key: 'iron', icon: '👕', label: 'كي فقط', labelEn: 'Iron Only' },
-  { key: 'wash_iron', icon: '✨', label: 'غسيل وكي', labelEn: 'Wash & Iron' },
-  { key: 'housekeeping', icon: '🏠', label: 'تنظيف منازل', labelEn: 'House Keeping' },
+  { key: 'wash', label: 'غسيل', labelEn: 'Wash' },
+  { key: 'dry_clean', label: 'تنظيف جاف', labelEn: 'Dry Clean' },
+  { key: 'iron', label: 'كي فقط', labelEn: 'Iron Only' },
+  { key: 'wash_iron', label: 'غسيل وكي', labelEn: 'Wash & Iron' },
+  { key: 'housekeeping', label: 'تنظيف منازل', labelEn: 'House Keeping' },
+  { key: 'carpet', label: 'سجاد وبطاطين', labelEn: 'Carpets & Blankets' },
+  { key: 'accessories', label: 'منتجات وإكسسوارات', labelEn: 'Accessories & Products' },
 ]
+
+const SERVICE_IMG: Record<string, any> = {
+  wash: require('../../assets/services/wash.webp'),
+  dry_clean: require('../../assets/services/dry.webp'),
+  iron: require('../../assets/services/iron.webp'),
+  wash_iron: require('../../assets/services/washiron.webp'),
+  housekeeping: require('../../assets/services/home.webp'),
+  carpet: require('../../assets/services/carpet.webp'),
+  accessories: require('../../assets/services/shop.webp'),
+}
 
 type OrderItem = { name: string; service_type: string; quantity: number; price: number }
 
@@ -37,29 +49,30 @@ export default function EditOrderScreen() {
   const [saving, setSaving] = useState(false)
   const [cart, setCart] = useState<OrderItem[]>([])
   const [prices, setPrices] = useState<any[]>([])
-  const [itemTypes, setItemTypes] = useState<string[]>([])
-  const [selectedItemType, setSelectedItemType] = useState('')
+  const [categories, setCategories] = useState<any[]>([])
   const [selectedService, setSelectedService] = useState('')
-  const [itemQty, setItemQty] = useState(1)
+  const [activeCatId, setActiveCatId] = useState<string | null>(null)
 
   useEffect(() => {
     loadData()
   }, [id])
 
   async function loadData() {
-    const [orderRes, pricesRes] = await Promise.all([
+    const [orderRes, pricesRes, catsRes] = await Promise.all([
       supabase.from('orders').select('id, order_number, status, items, items_count, subtotal, total, discount, delivery_fee, subscription_id, service_type, payment_method, payment_status').eq('id', id).eq('customer_id', profile!.id).single(),
-      supabase.from('prices').select('id, item_type, service_type, price').eq('is_active', true).limit(200),
+      supabase.from('prices').select('id, item_type, service_type, price, category_id').eq('is_active', true).limit(200),
+      supabase.from('categories').select('id, name, icon, sort_order').eq('is_active', true).order('sort_order'),
     ])
 
     if (orderRes.data) {
       setOrder(orderRes.data)
       setCart(orderRes.data.items ?? [])
+      // Start on the order's own service so its items are front and centre.
+      const svc = orderRes.data.service_type || (orderRes.data.items ?? [])[0]?.service_type || ''
+      if (svc) setSelectedService(svc)
     }
-    if (pricesRes.data) {
-      setPrices(pricesRes.data)
-      setItemTypes([...new Set(pricesRes.data.map((p: any) => p.item_type))] as string[])
-    }
+    if (pricesRes.data) setPrices(pricesRes.data)
+    if (catsRes.data) setCategories(catsRes.data)
     setLoading(false)
   }
 
@@ -67,10 +80,29 @@ export default function EditOrderScreen() {
     return prices.find(p => p.item_type === itemType && p.service_type === serviceType)?.price ?? 0
   }
 
-  const availableServices = () => {
-    if (!selectedItemType) return []
-    return servicesMap.filter(s => prices.some(p => p.item_type === selectedItemType && p.service_type === s.key))
-  }
+  // Services that actually have prices, and the categories/items for the chosen service —
+  // mirrors the new-order screen so editing feels like the same flow.
+  const availableServicesForScreen = useMemo(() => {
+    const keys = new Set(prices.map(p => p.service_type))
+    return servicesMap.filter(s => keys.has(s.key))
+  }, [prices])
+
+  const categoriesWithItems = useMemo(() => {
+    if (!selectedService) return [] as { id: string; name: string; icon: string | null; itemTypes: string[] }[]
+    return categories
+      .map(cat => ({
+        id: cat.id as string,
+        name: cat.name as string,
+        icon: (cat.icon ?? null) as string | null,
+        itemTypes: [...new Set(prices.filter(p => p.category_id === cat.id && p.service_type === selectedService).map((p: any) => p.item_type))] as string[],
+      }))
+      .filter(c => c.itemTypes.length > 0)
+  }, [selectedService, categories, prices])
+
+  useEffect(() => {
+    if (categoriesWithItems.length === 0) { setActiveCatId(null); return }
+    setActiveCatId(prev => (prev && categoriesWithItems.some(c => c.id === prev)) ? prev : categoriesWithItems[0].id)
+  }, [categoriesWithItems])
 
   const serviceLabel = (key: string) => {
     const svc = servicesMap.find(s => s.key === key)
@@ -78,22 +110,18 @@ export default function EditOrderScreen() {
   }
   const itemName = (name: string) => isEn ? (t(`item:${name}`) !== `item:${name}` ? t(`item:${name}`) : name) : name
 
-  const addToCart = () => {
-    if (!selectedItemType || !selectedService) return
-    const unitPrice = getPrice(selectedItemType, selectedService)
-    if (unitPrice === 0) return
-
-    const existing = cart.findIndex(c => c.name === selectedItemType && c.service_type === selectedService)
-    if (existing >= 0) {
-      const updated = [...cart]
-      updated[existing] = { ...updated[existing], quantity: updated[existing].quantity + itemQty }
-      setCart(updated)
-    } else {
-      setCart([...cart, { name: selectedItemType, service_type: selectedService, quantity: itemQty, price: unitPrice }])
-    }
-    setSelectedItemType('')
-    setSelectedService('')
-    setItemQty(1)
+  const addItemInline = (itemType: string) => {
+    const unitPrice = getPrice(itemType, selectedService)
+    if (!selectedService || unitPrice === 0) return
+    setCart(prev => {
+      const existing = prev.findIndex(c => c.name === itemType && c.service_type === selectedService)
+      if (existing >= 0) {
+        const updated = [...prev]
+        updated[existing] = { ...updated[existing], quantity: updated[existing].quantity + 1 }
+        return updated
+      }
+      return [...prev, { name: itemType, service_type: selectedService, quantity: 1, price: unitPrice }]
+    })
   }
 
   const removeFromCart = (index: number) => setCart(cart.filter((_, i) => i !== index))
@@ -279,64 +307,96 @@ export default function EditOrderScreen() {
           ))}
         </Card>
 
-        {/* Add a new item */}
-        <Card style={n.card}>
-          <Text style={[n.eyebrow, { color: b.muted }]}>{isEn ? 'Add New Item' : 'إضافة قطعة جديدة'}</Text>
+        {/* Service type */}
+        <View style={n.secRow}>
+          <View style={[n.secDot, { backgroundColor: b.primary }]} />
+          <Text style={[n.secTitle, { color: b.ink }]}>{isEn ? 'Service type' : 'نوع الخدمة'}</Text>
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={n.bleed} contentContainerStyle={n.svcRow}>
+          {availableServicesForScreen.map(svc => {
+            const on = selectedService === svc.key
+            const name = isEn ? svc.labelEn : svc.label
+            return (
+              <TouchableOpacity
+                key={svc.key}
+                onPress={() => setSelectedService(svc.key)}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityState={{ selected: on }}
+                accessibilityLabel={name}
+                style={n.svcCol}
+              >
+                <View style={[n.svcPhoto, { borderColor: on ? b.primary : 'transparent', backgroundColor: b.iconTile }]}>
+                  {SERVICE_IMG[svc.key] ? <Image source={SERVICE_IMG[svc.key]} style={n.svcImg} resizeMode="cover" /> : null}
+                </View>
+                {on ? (
+                  <View style={[n.svcCheck, { backgroundColor: b.primary, borderColor: b.page }]}>
+                    <Check size={11} color="#fff" />
+                  </View>
+                ) : null}
+                <Text style={[n.svcName, { color: on ? b.primary : b.ink2 }]} numberOfLines={2}>{name}</Text>
+              </TouchableOpacity>
+            )
+          })}
+        </ScrollView>
 
-          <Text style={[n.label, { color: b.ink2 }]}>{isEn ? 'Item Type' : 'نوع القطعة'}</Text>
-          <View style={n.grid}>
-            {itemTypes.map(type => {
-              const on = selectedItemType === type
-              return (
-                <TouchableOpacity
-                  key={type}
-                  onPress={() => { setSelectedItemType(type); setSelectedService('') }}
-                  activeOpacity={0.8}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: on }}
-                  style={[n.tile, { backgroundColor: on ? b.tint : b.card, borderColor: on ? 'transparent' : b.cardBorder }]}
-                >
-                  <View style={[n.tileDot, { backgroundColor: on ? b.tintText : b.faint }]} />
-                  <Text style={[n.tileText, { color: on ? b.tintText : b.ink2 }]} numberOfLines={1}>{itemName(type)}</Text>
-                </TouchableOpacity>
-              )
-            })}
-          </View>
-
-          {selectedItemType ? (
-            <>
-              <Text style={[n.label, { color: b.ink2 }]}>{isEn ? 'Service Type' : 'نوع الخدمة'}</Text>
-              <View style={n.grid}>
-                {servicesMap.filter(svc => getPrice(selectedItemType, svc.key) > 0).map(svc => {
-                  const on = selectedService === svc.key
+        {/* Choose item */}
+        {selectedService && categoriesWithItems.length > 0 && (
+          <>
+            <View style={n.secRow}>
+              <View style={[n.secDot, { backgroundColor: b.primary }]} />
+              <Text style={[n.secTitle, { color: b.ink }]}>{isEn ? 'Choose item' : 'اختر القطعة'}</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={n.bleed} contentContainerStyle={n.catRow}>
+              {categoriesWithItems.map(cat => (
+                <Chip
+                  key={cat.id}
+                  label={cat.name}
+                  active={activeCatId === cat.id}
+                  onPress={() => setActiveCatId(cat.id)}
+                  icon={cat.icon ? <Text style={n.catEmoji}>{cat.icon}</Text> : undefined}
+                />
+              ))}
+            </ScrollView>
+            {categoriesWithItems.filter(cat => cat.id === activeCatId).map(cat => (
+              <Card key={cat.id} pad={false} style={n.itemsCard}>
+                {cat.itemTypes.map((itemType, idx) => {
+                  const price = getPrice(itemType, selectedService)
+                  const inCartIdx = cart.findIndex(c => c.name === itemType && c.service_type === selectedService)
+                  const inCart = inCartIdx >= 0 ? cart[inCartIdx] : null
                   return (
-                    <TouchableOpacity
-                      key={svc.key}
-                      onPress={() => setSelectedService(svc.key)}
-                      activeOpacity={0.8}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: on }}
-                      style={[n.svcTile, { backgroundColor: on ? b.tint : b.card, borderColor: on ? 'transparent' : b.cardBorder }]}
-                    >
-                      <Text style={[n.tileText, { color: on ? b.tintText : b.ink2 }]} numberOfLines={1}>{isEn ? svc.labelEn : svc.label}</Text>
-                      <Text style={[n.svcPrice, { color: on ? b.tintText : b.muted }]}>{money(getPrice(selectedItemType, svc.key))} {cur}</Text>
-                    </TouchableOpacity>
+                    <View key={itemType} style={[n.pickRow, idx > 0 && { borderTopWidth: 1, borderTopColor: b.divider }, inCart ? { backgroundColor: b.isDark ? 'rgba(14,165,233,0.08)' : '#F0F8FF' } : null]}>
+                      <View style={n.pickBody}>
+                        <Text style={[n.pickName, { color: b.ink }]} numberOfLines={1}>{itemName(itemType)}</Text>
+                        <Text style={[n.pickPrice, { color: b.muted }]} numberOfLines={1}>
+                          <Text style={[n.pickPriceNum, { color: b.isDark ? '#38BDF8' : '#0284C7' }]}>{money(price)}</Text> {cur} · {isEn ? 'per piece' : 'لكل قطعة'}
+                        </Text>
+                      </View>
+                      {inCart ? (
+                        <Stepper
+                          qty={inCart.quantity}
+                          onMinus={() => updateQty(inCartIdx, -1)}
+                          onPlus={() => updateQty(inCartIdx, 1)}
+                          onRemove={() => removeFromCart(inCartIdx)}
+                        />
+                      ) : (
+                        <TouchableOpacity
+                          onPress={() => addItemInline(itemType)}
+                          hitSlop={HIT}
+                          accessibilityRole="button"
+                          accessibilityLabel={`+ ${itemName(itemType)}`}
+                          style={[n.plusBtn, { backgroundColor: b.primary }]}
+                        >
+                          <Plus size={18} color="#fff" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   )
                 })}
-              </View>
-            </>
-          ) : null}
-
-          {selectedService ? (
-            <View style={n.addRow}>
-              <Stepper qty={itemQty} onMinus={() => setItemQty(Math.max(1, itemQty - 1))} onPlus={() => setItemQty(itemQty + 1)} />
-              <TouchableOpacity style={[n.addBtn, { backgroundColor: b.tint }]} onPress={addToCart} activeOpacity={0.8} accessibilityRole="button">
-                <Plus size={16} color={b.tintText} />
-                <Text style={[n.addBtnText, { color: b.tintText }]}>{isEn ? 'Add' : 'أضف'}</Text>
-              </TouchableOpacity>
-            </View>
-          ) : null}
-        </Card>
+              </Card>
+            ))}
+          </>
+        )}
 
         <View style={{ height: 8 }} />
       </ScrollView>
@@ -408,4 +468,23 @@ const n = StyleSheet.create({
   totalValue: { fontSize: 19, fontFamily: F.display },
   blockIcon: { width: 70, height: 70, borderRadius: 35, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
   blockText: { fontSize: 14.5, fontFamily: F.semibold, textAlign: 'center', lineHeight: 24 },
+  secRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 18, marginBottom: 10, marginHorizontal: 2 },
+  secDot: { width: 9, height: 9, borderRadius: 5 },
+  secTitle: { fontFamily: F.display, fontSize: 16 },
+  bleed: { marginHorizontal: -16 },
+  svcRow: { gap: 10, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 2 },
+  svcCol: { width: 76, alignItems: 'center' },
+  svcPhoto: { width: 76, height: 76, borderRadius: 18, borderWidth: 2, overflow: 'hidden' },
+  svcImg: { width: '100%', height: '100%' },
+  svcCheck: { position: 'absolute', top: -4, start: -4, width: 20, height: 20, borderRadius: 10, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  svcName: { fontSize: 11.5, fontFamily: F.semibold, lineHeight: 16, textAlign: 'center', marginTop: 6 },
+  catRow: { gap: 7, paddingHorizontal: 16, paddingVertical: 2 },
+  catEmoji: { fontSize: 13 },
+  itemsCard: { marginTop: 12, overflow: 'hidden' },
+  pickRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 58, paddingHorizontal: 12, paddingVertical: 9 },
+  pickBody: { flex: 1, minWidth: 0 },
+  pickName: { fontSize: 14, fontFamily: F.bold, flexShrink: 1 },
+  pickPrice: { fontSize: 11.5, fontFamily: F.medium, marginTop: 2 },
+  pickPriceNum: { fontSize: 13.5, fontFamily: F.display },
+  plusBtn: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
 })
