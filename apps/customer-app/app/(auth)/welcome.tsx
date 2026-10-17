@@ -185,7 +185,7 @@ export default function WelcomeScreen() {
               </View>
             )}
 
-            <Text style={[s.label, { color: th.ink2, textAlign: isRTL ? 'right' : 'left' }]}>{t('authPhoneLabel')}</Text>
+            <Text style={[s.label, { color: th.ink, textAlign: isRTL ? 'right' : 'left' }]}>{t('authPhoneLabel')}</Text>
             <PhoneField
               value={phone}
               onChangeText={v => { setPhone(v); if (error) setError(null) }}

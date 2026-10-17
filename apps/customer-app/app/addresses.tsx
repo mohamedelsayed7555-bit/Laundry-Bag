@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, type ReactNode } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Modal, ActivityIndicator, Platform, ScrollView, KeyboardAvoidingView, Image, useWindowDimensions } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useRouter, useLocalSearchParams } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
 import { MapPin, LocateFixed, Tag, Building2, Layers, DoorOpen, Flag, NotebookPen, Pencil, Star, Trash2, Check, Plus } from 'lucide-react-native'
 import { useAuth } from '../src/contexts/AuthContext'
@@ -112,6 +112,10 @@ export default function AddressesScreen() {
   const { t, isRTL } = useLanguage()
   const { profile } = useAuth()
   const router = useRouter()
+  // Opened right after sign-up (?onboarding=1) to capture the first delivery address.
+  const { onboarding } = useLocalSearchParams<{ onboarding?: string }>()
+  const isOnboarding = onboarding === '1'
+  const onboardOpened = useRef(false)
   const { showAlert, AlertComponent } = useCustomAlert()
   const [addresses, setAddresses] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -145,6 +149,15 @@ export default function AddressesScreen() {
   }
 
   useEffect(() => { loadAddresses() }, [profile])
+
+  // First-run: drop the new customer straight into adding their delivery address
+  // (map + "use my location"), once, only when they have none yet.
+  useEffect(() => {
+    if (isOnboarding && !loading && addresses.length === 0 && !onboardOpened.current) {
+      onboardOpened.current = true
+      openAdd()
+    }
+  }, [isOnboarding, loading, addresses.length])
 
   async function loadAddresses() {
     if (!profile) return
@@ -243,6 +256,8 @@ export default function AddressesScreen() {
       return
     }
     setShowModal(false)
+    // Onboarding: first address saved — continue to the home screen.
+    if (isOnboarding) { router.replace('/(tabs)/home'); return }
     loadAddresses()
   }
 
@@ -277,7 +292,7 @@ export default function AddressesScreen() {
         <DotsBackdrop height={240} />
 
         <View style={st.headerRow}>
-          <IconButton onPress={() => router.back()} label={t('back')}>
+          <IconButton onPress={() => isOnboarding ? router.replace('/(tabs)/home') : router.back()} label={t('back')}>
             <BackIcon color={b.ink} />
           </IconButton>
           <Text style={[st.title, { color: b.ink }]} numberOfLines={1}>{t('myAddressesTitle')}</Text>
@@ -292,6 +307,12 @@ export default function AddressesScreen() {
           </TouchableOpacity>
         </View>
 
+        {isOnboarding ? (
+          <Text style={{ color: b.muted, fontFamily: F.regular, fontSize: 13.5, textAlign: 'center', marginTop: -2, marginBottom: 14, paddingHorizontal: 20, lineHeight: 21 }}>
+            {t('onboardLocationSub')}
+          </Text>
+        ) : null}
+
         {loading ? (
           <Text style={[st.emptyText, { color: b.muted }]}>{t('loading')}</Text>
         ) : addresses.length === 0 ? (
@@ -301,6 +322,11 @@ export default function AddressesScreen() {
             </View>
             <Text style={[st.emptyText, { color: b.muted }]}>{t('noAddresses')}</Text>
             <PrimaryButton title={t('addAddressBtn')} onPress={openAdd} leading={<Plus size={18} color="#fff" />} style={{ marginTop: 16, alignSelf: 'stretch' }} />
+            {isOnboarding ? (
+              <TouchableOpacity onPress={() => router.replace('/(tabs)/home')} hitSlop={HIT} accessibilityRole="button" style={{ marginTop: 14 }}>
+                <Text style={{ color: b.muted, fontFamily: F.medium, fontSize: 14 }}>{t('later')}</Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
         ) : (
           <View style={{ gap: 12 }}>

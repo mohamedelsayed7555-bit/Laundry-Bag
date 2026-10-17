@@ -14,7 +14,7 @@ import { playNotificationSound } from '../src/hooks/useNotifications'
 import { supabase } from '../src/lib/supabase'
 import { SkeletonPage } from '../src/components/Skeleton'
 import { serverErrorMessage } from '../src/lib/serverErrors'
-import { useBrand, Card, Stepper, ChoiceGrid, Segmented, StickyFooter, IconButton, BackIcon, ForwardIcon, money, clock, F, SIZE, HIT, type Choice } from '../src/components/brand'
+import { useBrand, Card, Stepper, ChoiceGrid, Segmented, StickyFooter, PulseHighlight, IconButton, BackIcon, ForwardIcon, money, clock, F, SIZE, HIT, type Choice } from '../src/components/brand'
 import { PrimaryButton } from '../src/components/auth/ui'
 
 const SERVICE_IMG: Record<string, any> = {
@@ -209,6 +209,8 @@ export default function CartScreen() {
   const useSubscription = activeSubs.length > 0 && subRemaining > 0 && coveredCount > 0
   const actualCovered = useSubscription ? Math.min(coveredCount, subRemaining) : 0
   const overflowCount = useSubscription ? Math.max(0, coveredCount - subRemaining) : 0
+  // Nudge the next step: set a pickup address, then move to confirming the order.
+  const nextStep: 'address' | 'cta' = !selectedAddress ? 'address' : 'cta'
   const overflowTotal = useMemo(() => {
     if (overflowCount <= 0) return 0
     let remaining = overflowCount
@@ -541,6 +543,7 @@ export default function CartScreen() {
 
         {/* Addresses */}
         <SecTitle icon={<MapPin size={14} color={b.tintText} />} title={isEn ? 'Pickup Address' : 'عنوان الاستلام'} />
+        <PulseHighlight active={nextStep === 'address'} radius={14}>
         <Card pad={false} style={{ overflow: 'hidden' }}>
           {selectedAddress && !showPickupPicker
             ? <AddrRow addr={selectedAddress} onChange={() => setShowPickupPicker(true)} />
@@ -567,6 +570,7 @@ export default function CartScreen() {
             </View>
           )}
         </Card>
+        </PulseHighlight>
 
         {outOfZone && distanceKm !== null && (
           <View style={[s.banner, { backgroundColor: b.dangerTint, borderColor: b.dangerBorder }]}>
@@ -787,13 +791,15 @@ export default function CartScreen() {
       </View>
 
       <StickyFooter label={isEn ? 'Total' : 'الإجمالي'} total={useSubscription && uncoveredCount === 0 ? (isEn ? 'Free' : 'مجاناً') : money(orderTotal)} currency={useSubscription && uncoveredCount === 0 ? '' : t('currency')} bottomInset={insets.bottom}>
-        <PrimaryButton
-          title={isEn ? 'Confirm Order' : 'تأكيد الطلب'}
-          loadingTitle={isEn ? 'Submitting...' : 'جاري الإرسال...'}
-          loading={saving}
-          onPress={handleSubmit}
-          trailing={<ForwardIcon color="#fff" size={17} />}
-        />
+        <PulseHighlight active={nextStep === 'cta'} radius={14}>
+          <PrimaryButton
+            title={isEn ? 'Confirm Order' : 'تأكيد الطلب'}
+            loadingTitle={isEn ? 'Submitting...' : 'جاري الإرسال...'}
+            loading={saving}
+            onPress={handleSubmit}
+            trailing={<ForwardIcon color="#fff" size={17} />}
+          />
+        </PulseHighlight>
       </StickyFooter>
       {AlertComponent}
     </View>

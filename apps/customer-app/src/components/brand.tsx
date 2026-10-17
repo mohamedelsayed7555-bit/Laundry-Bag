@@ -213,6 +213,38 @@ export function Divider({ style }: { style?: StyleProp<ViewStyle> }) {
   return <View style={[{ height: StyleSheet.hairlineWidth * 2, backgroundColor: b.divider }, style]} />
 }
 
+// A soft, slowly-pulsing glow drawn behind its child to draw the eye to the next step
+// in a flow. It only animates while `active`; otherwise it renders the child untouched.
+export function PulseHighlight({ active, children, radius = 16, style }: {
+  active?: boolean
+  children: ReactNode
+  radius?: number
+  style?: StyleProp<ViewStyle>
+}) {
+  const b = useBrand()
+  const pulse = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    if (!active) return
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(pulse, { toValue: 1, duration: 1100, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 0, duration: 1100, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+    ]))
+    loop.start()
+    return () => loop.stop()
+  }, [active, pulse])
+  return (
+    <View style={[{ position: 'relative' }, style]}>
+      {active ? (
+        <Animated.View
+          pointerEvents="none"
+          style={{ position: 'absolute', top: -5, left: -5, right: -5, bottom: -5, borderRadius: radius + 5, backgroundColor: b.primary, opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.07, 0.3] }) }}
+        />
+      ) : null}
+      {children}
+    </View>
+  )
+}
+
 // Segmented progress bar (e.g. 8 order stages). Fills from the start side.
 export function Segments({ total, done, current }: { total: number; done: number; current?: boolean }) {
   const b = useBrand()

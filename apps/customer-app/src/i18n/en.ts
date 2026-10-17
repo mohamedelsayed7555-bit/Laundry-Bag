@@ -423,6 +423,7 @@ export default {
 
   // Addresses
   myAddressesTitle: 'My Addresses',
+  onboardLocationSub: 'Set your delivery location so we can reach you faster 🚗',
   addAddress: '+ Add',
   addAddressBtn: 'Add Address',
   noAddresses: 'No saved addresses',

@@ -70,7 +70,10 @@ export default function SignUpScreen() {
       return
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
-    router.replace('/(tabs)/home')
+    // Send new customers through a one-time location step to set their first delivery
+    // address (skippable). It finishes on the home screen, so the welcome-gift popup
+    // there never overlaps with it.
+    router.replace({ pathname: '/addresses', params: { onboarding: '1' } })
   }
 
   const align = { textAlign: (isRTL ? 'right' : 'left') as 'right' | 'left' }

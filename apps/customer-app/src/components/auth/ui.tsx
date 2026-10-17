@@ -110,7 +110,7 @@ export const AuthField = forwardRef<TextInput, FieldProps>(function AuthField(
             <Icon size={16} color={error ? th.danger : focused ? '#fff' : th.iconFg} />
           </View>
           <View style={s.fieldBody}>
-            <Text style={[s.fieldLabel, { color: error ? th.danger : focused ? th.primary : th.muted, textAlign: isRTL ? 'right' : 'left' }]}>{label}</Text>
+            <Text style={[s.fieldLabel, { color: error ? th.danger : focused ? th.primary : th.ink2, textAlign: isRTL ? 'right' : 'left' }]}>{label}</Text>
             <TextInput
               ref={ref}
               {...input}
@@ -153,35 +153,52 @@ export function PhoneField({ value, onChangeText, error, autoFocus, onSubmitEdit
   const th = useAuthTheme()
   const [focused, setFocused] = useState(false)
   const borderColor = error ? th.danger : focused ? th.primary : th.fieldBorder
+  // A gentle looping glow around the field, to catch the eye on first open. It is only
+  // rendered while idle; focusing (or an error) shows the normal ring instead.
+  const pulse = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(pulse, { toValue: 1, duration: 1200, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 0, duration: 1200, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+    ]))
+    loop.start()
+    return () => loop.stop()
+  }, [pulse])
+  const glowOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.07, 0.3] })
   return (
     <View>
-      <View style={[s.fieldRing, { backgroundColor: error ? th.dangerBg : focused ? th.ring : 'transparent' }]}>
-        <View style={[s.phone, { backgroundColor: th.field, borderColor, borderWidth: focused || error ? 1.5 : 1 }]}>
-          <View style={[s.cc, { backgroundColor: th.soft, borderColor: th.line }]}>
-            <View style={s.flag}>
-              <View style={{ flex: 1, backgroundColor: '#CE1126' }} />
-              <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />
-              <View style={{ flex: 1, backgroundColor: '#000000' }} />
+      <View style={s.phoneWrap}>
+        {!focused && !error ? (
+          <Animated.View pointerEvents="none" style={[s.phoneGlow, { backgroundColor: th.primary, opacity: glowOpacity }]} />
+        ) : null}
+        <View style={[s.fieldRing, { backgroundColor: error ? th.dangerBg : focused ? th.ring : 'transparent' }]}>
+          <View style={[s.phone, { backgroundColor: th.field, borderColor, borderWidth: focused || error ? 1.5 : 1 }]}>
+            <View style={[s.cc, { backgroundColor: th.soft, borderColor: th.line }]}>
+              <View style={s.flag}>
+                <View style={{ flex: 1, backgroundColor: '#CE1126' }} />
+                <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />
+                <View style={{ flex: 1, backgroundColor: '#000000' }} />
+              </View>
+              <Text style={[s.ccText, { color: th.ink }]}>+20</Text>
             </View>
-            <Text style={[s.ccText, { color: th.ink }]}>+20</Text>
+            <TextInput
+              value={value}
+              onChangeText={t => onChangeText(t.replace(/[^0-9]/g, '').slice(0, 11))}
+              keyboardType="phone-pad"
+              textContentType="telephoneNumber"
+              autoComplete="tel"
+              autoFocus={autoFocus}
+              placeholder="01X XXXX XXXX"
+              placeholderTextColor={th.faint}
+              selectionColor={th.primary}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              onSubmitEditing={onSubmitEditing}
+              returnKeyType="done"
+              style={[s.phoneInput, { color: th.ink }]}
+              accessibilityLabel="Mobile number"
+            />
           </View>
-          <TextInput
-            value={value}
-            onChangeText={t => onChangeText(t.replace(/[^0-9]/g, '').slice(0, 11))}
-            keyboardType="phone-pad"
-            textContentType="telephoneNumber"
-            autoComplete="tel"
-            autoFocus={autoFocus}
-            placeholder="01X XXXX XXXX"
-            placeholderTextColor={th.faint}
-            selectionColor={th.primary}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            onSubmitEditing={onSubmitEditing}
-            returnKeyType="done"
-            style={[s.phoneInput, { color: th.ink }]}
-            accessibilityLabel="Mobile number"
-          />
         </View>
       </View>
       <ErrorLine message={error} />
@@ -427,10 +444,12 @@ const s = StyleSheet.create({
   errRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 7, paddingHorizontal: 2 },
   errText: { flex: 1, fontSize: 12, lineHeight: 18, fontFamily: F.medium },
   fieldRing: { borderRadius: 16, padding: 3, margin: -3 },
+  phoneWrap: { position: 'relative' },
+  phoneGlow: { position: 'absolute', top: -5, left: -5, right: -5, bottom: -5, borderRadius: 20 },
   field: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 50, borderRadius: 13, paddingHorizontal: 11, paddingVertical: 6 },
   fieldIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   fieldBody: { flex: 1 },
-  fieldLabel: { fontSize: 11, fontFamily: F.medium },
+  fieldLabel: { fontSize: 12.5, fontFamily: F.semibold },
   fieldInput: { fontSize: 15, fontFamily: F.medium, paddingVertical: 2, paddingHorizontal: 0, margin: 0 },
   phone: { flexDirection: 'row', direction: 'ltr', alignItems: 'center', height: 50, borderRadius: 13, overflow: 'hidden' },
   cc: { flexDirection: 'row', alignItems: 'center', gap: 7, height: '100%', paddingHorizontal: 12, borderRightWidth: 1 },

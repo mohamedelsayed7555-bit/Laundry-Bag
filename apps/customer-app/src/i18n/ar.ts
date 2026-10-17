@@ -341,6 +341,7 @@ export default {
 
   // Addresses
   myAddressesTitle: 'عناويني',
+  onboardLocationSub: 'حدد موقع التسليم عشان نوصّلك أسرع 🚗',
   addAddress: '+ إضافة',
   addAddressBtn: 'إضافة عنوان',
   noAddresses: 'لا توجد عناوين محفوظة',

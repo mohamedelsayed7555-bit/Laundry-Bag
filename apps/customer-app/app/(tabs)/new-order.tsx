@@ -11,7 +11,7 @@ import { useLanguage } from '../../src/contexts/LanguageContext'
 import { useCustomAlert } from '../../src/components/CustomAlert'
 import { SkeletonPage } from '../../src/components/Skeleton'
 import { supabase } from '../../src/lib/supabase'
-import { useBrand, Card, Chip, Pill, Stepper, DotsBackdrop, ForwardIcon, money, cardShadow, F, SIZE, HIT, type Brand } from '../../src/components/brand'
+import { useBrand, Card, Chip, Pill, Stepper, PulseHighlight, DotsBackdrop, ForwardIcon, money, cardShadow, F, SIZE, HIT, type Brand } from '../../src/components/brand'
 
 const services = [
   { key: 'wash', icon: '👔', label: 'غسيل', labelEn: 'Wash' },
@@ -223,6 +223,8 @@ export default function NewOrderScreen() {
   const barInk = b.isDark ? '#E8EEF7' : b.ink
   const barMuted = b.isDark ? '#9FB6D6' : b.muted
   const inCartTint = b.isDark ? 'rgba(14,165,233,0.08)' : '#F0F8FF'
+  // Which step to nudge next: pick a service, then add an item, then go to checkout.
+  const nextStep: 'service' | 'items' | 'cta' = !selectedService ? 'service' : totalItems === 0 ? 'items' : 'cta'
 
   return (
     <>
@@ -326,6 +328,7 @@ export default function NewOrderScreen() {
         ) : null}
 
         <StepTitle n={2} title={locale === 'en' ? 'Service type' : 'نوع الخدمة'} b={b} />
+        <PulseHighlight active={nextStep === 'service'} radius={14}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.bleed} contentContainerStyle={s.svcRow}>
           {availableServicesForScreen.map(svc => {
             const on = selectedService === svc.key
@@ -360,9 +363,10 @@ export default function NewOrderScreen() {
             )
           })}
         </ScrollView>
+        </PulseHighlight>
 
         {selectedService && categoriesWithItems.length > 0 && (
-          <>
+          <PulseHighlight active={nextStep === 'items'} radius={14}>
             <StepTitle n={3} title={locale === 'en' ? 'Choose item' : 'اختر القطعة'} b={b} />
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.bleed} contentContainerStyle={s.catRow}>
               {categoriesWithItems.map(cat => (
@@ -425,13 +429,14 @@ export default function NewOrderScreen() {
                 })}
               </Card>
             ))}
-          </>
+          </PulseHighlight>
         )}
       </ScrollView>
 
       {cart.length > 0 && (
         <Animated.View style={[s.floatingBar, { bottom: BAR_BOTTOM }, barAnimStyle]}>
           <View style={[s.barRing, { backgroundColor: b.isDark ? 'rgba(14,165,233,0.10)' : 'rgba(14,165,233,0.08)' }]}>
+            <PulseHighlight active={nextStep === 'cta'} radius={16}>
             <TouchableOpacity
               style={[s.barShell, { backgroundColor: b.isDark ? '#142848' : '#FFFFFF', shadowColor: b.isDark ? '#000' : '#10284F' }]}
               activeOpacity={0.9}
@@ -468,6 +473,7 @@ export default function NewOrderScreen() {
                 <ForwardIcon color="#fff" size={16} />
               </View>
             </TouchableOpacity>
+            </PulseHighlight>
           </View>
         </Animated.View>
       )}

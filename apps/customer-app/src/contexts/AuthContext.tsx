@@ -198,7 +198,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // (the phone is already guaranteed unique just above). Sign-in maps phone -> this.
     const authEmail = email.trim() || `${phone.trim()}@cleano.temp`
 
-    const { error, data } = await supabase.auth.signUp({ email: authEmail, password })
+    // Pass name/phone as sign-up metadata so the handle_new_user trigger writes the
+    // real values into public.users at creation time. Otherwise the row is created
+    // with defaults ("مستخدم جديد", no phone), fetchProfile loads those first, and the
+    // correct values only show after a re-login. The upsert below stays as a backstop.
+    const { error, data } = await supabase.auth.signUp({
+      email: authEmail,
+      password,
+      options: { data: { name: name.trim(), phone: phone.trim() } },
+    })
     if (error) {
       let msg = error.message
       if (msg.includes('Password should contain'))
