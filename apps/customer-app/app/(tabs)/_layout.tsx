@@ -151,8 +151,8 @@ const tb = StyleSheet.create({
   bar: {
     position: 'absolute',
     bottom: Platform.OS === 'ios' ? 24 : 16,
-    left: 16,
-    right: 16,
+    left: 24,
+    right: 24,
     borderRadius: 24,
     height: 68,
     borderTopWidth: 0,

@@ -18,6 +18,14 @@
       "supportsTablet": false,
       "runtimeVersion": {
         "policy": "appVersion"
+      },
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "نستخدم موقعك لإظهاره للعميل أثناء التوصيل.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "نستخدم موقعك في الخلفية لتتبع التوصيل وإظهار موقعك للعميل أثناء انشغالك بطلب.",
+        "NSFaceIDUsageDescription": "نستخدم Face ID لتسجيل دخولك بسرعة وأمان.",
+        "UIBackgroundModes": [
+          "location"
+        ]
       }
     },
     "android": {
@@ -32,11 +40,6 @@
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_BACKGROUND_LOCATION",
         "android.permission.USE_BIOMETRIC",
-        "android.permission.USE_FINGERPRINT",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_BACKGROUND_LOCATION",
-        "android.permission.USE_BIOMETRIC",
         "android.permission.USE_FINGERPRINT"
       ],
       "runtimeVersion": "1.0.0"
@@ -45,7 +48,14 @@
       "expo-router",
       "expo-secure-store",
       "expo-local-authentication",
-      "expo-location",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "نستخدم موقعك في الخلفية لتتبع التوصيل وإظهار موقعك للعميل.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
       "expo-updates",
       [
         "expo-notifications",

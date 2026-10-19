@@ -264,7 +264,7 @@ export function useStickyHeader(useNative = true) {
 export function StickyBar({ scrollY, title, onBack, right, threshold = 72 }: {
   scrollY: Animated.Value
   title: string
-  onBack: () => void
+  onBack?: () => void // omit on tab screens (no back button)
   right?: ReactNode
   threshold?: number
 }) {
@@ -280,8 +280,12 @@ export function StickyBar({ scrollY, title, onBack, right, threshold = 72 }: {
         opacity: scrollY.interpolate({ inputRange: [threshold - 28, threshold], outputRange: [0, 1], extrapolate: 'clamp' }),
       }]}
     >
-      <IconButton onPress={onBack} label="Back"><BackIcon color={b.ink} /></IconButton>
-      <Text style={[stickyBarStyle.title, { color: b.ink }]} numberOfLines={1}>{title}</Text>
+      {onBack ? (
+        <IconButton onPress={onBack} label="Back"><BackIcon color={b.ink} /></IconButton>
+      ) : (
+        <View style={{ width: SIZE.ICON }} />
+      )}
+      <Text style={[stickyBarStyle.title, { color: b.ink, textAlign: onBack ? 'left' : 'center' }]} numberOfLines={1}>{title}</Text>
       {right ?? <View style={{ width: SIZE.ICON }} />}
     </Animated.View>
   )

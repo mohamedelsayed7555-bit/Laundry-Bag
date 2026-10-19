@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Linking, AppState, Image, ScrollView } from 'react-native'
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Linking, AppState, Image, ScrollView, Animated as RNAnimated } from 'react-native'
 import { useRouter } from 'expo-router'
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated'
 import { useAuth } from '../../src/contexts/AuthContext'
@@ -10,7 +10,7 @@ import { SkeletonOrderCard } from '../../src/components/Skeleton'
 import {
   Phone, MessageCircle, Clock, Hourglass, Car, MapPin, Package, RefreshCw, CircleCheck, Bike, CircleX, Coins,
 } from 'lucide-react-native'
-import { useBrand, Card, Divider, Segments, Segmented, Chip, Pill, IconButton, FlowLines, F, money, shortDate, type Brand } from '../../src/components/brand'
+import { useBrand, Card, Divider, Segments, Segmented, Chip, Pill, IconButton, FlowLines, F, money, shortDate, StickyBar, useStickyHeader, type Brand } from '../../src/components/brand'
 import { PrimaryButton } from '../../src/components/auth/ui'
 
 const statusFlow = ['pending', 'assigned', 'arrived', 'picked_up', 'processing', 'ready', 'delivering', 'delivered']
@@ -250,18 +250,22 @@ export default function OrdersScreen() {
   )
 
   const showList = !loading && filteredOrders.length > 0
+  const { scrollY, onScroll } = useStickyHeader(true)
 
   return (
     <View style={[s.container, { backgroundColor: b.page }]}>
-      <FlatList
+      <StickyBar scrollY={scrollY} title={t('myOrders')} />
+      <RNAnimated.FlatList
         data={showList ? filteredOrders : []}
         renderItem={renderOrder}
-        keyExtractor={item => item.id}
+        keyExtractor={(item: any) => item.id}
         ListHeaderComponent={header}
         ListEmptyComponent={empty}
         contentContainerStyle={{ gap: 10, paddingBottom: 100 }}
         refreshControl={showList ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={b.primary} /> : undefined}
         showsVerticalScrollIndicator={false}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
       />
     </View>
   )

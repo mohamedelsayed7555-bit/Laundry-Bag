@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, RefreshControl, Modal, TextInput, Dimensions, NativeScrollEvent, NativeSyntheticEvent, I18nManager, AppState, Linking } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, RefreshControl, Modal, TextInput, Dimensions, NativeScrollEvent, NativeSyntheticEvent, I18nManager, AppState, Linking, Animated as RNAnimated } from 'react-native'
 import { useRouter } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
 import Animated, { FadeInLeft, FadeInRight } from 'react-native-reanimated'
@@ -18,7 +18,7 @@ import WelcomeGiftPopup from '../../src/components/WelcomeGiftPopup'
 import RatingSheet from '../../src/components/RatingSheet'
 import {
   useBrand, SIZE, F, HIT, DotsBackdrop, SectionTitle, Segments, Pill, IconButton, ForwardChevron, ForwardIcon,
-  cardShadow, money, shortDate,
+  cardShadow, money, shortDate, StickyBar, useStickyHeader,
 } from '../../src/components/brand'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
@@ -436,14 +436,19 @@ export default function HomeScreen() {
 
   const priceFrom = (key: string) => minPrices[key] != null ? `${t('priceFrom')} ${money(minPrices[key])} ${t('currency')}` : ''
 
+  const { scrollY, onScroll: onStickyScroll } = useStickyHeader(true)
+
   return (
     <>
-    <ScrollView
+    <StickyBar scrollY={scrollY} title={profile?.name ?? 'الرئيسية'} />
+    <RNAnimated.ScrollView
       style={[s.container, { backgroundColor: b.page }]}
       contentContainerStyle={[s.content, { paddingTop: insets.top + 12 }]}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={b.primary} colors={[b.primary]} />}
+      onScroll={onStickyScroll}
+      scrollEventThrottle={16}
     >
       <DotsBackdrop height={230 + insets.top} />
 
@@ -629,7 +634,7 @@ export default function HomeScreen() {
       )}
 
       <View style={{ height: 100 }} />
-    </ScrollView>
+    </RNAnimated.ScrollView>
 
     <RatingSheet
       visible={!!ratingOrder}

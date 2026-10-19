@@ -17,7 +17,11 @@
       "bundleIdentifier": "com.cleano.customer",
       "supportsTablet": false,
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationWhenInUseUsageDescription": "نستخدم موقعك لتحديد عنوان الاستلام والتسليم وتتبع طلبك.",
+        "NSCameraUsageDescription": "نحتاج الكاميرا لالتقاط صورة لملفك الشخصي.",
+        "NSPhotoLibraryUsageDescription": "نحتاج الوصول لصورك لاختيار صورة ملفك الشخصي.",
+        "NSFaceIDUsageDescription": "نستخدم Face ID لتسجيل دخولك بسرعة وأمان."
       },
       "runtimeVersion": {
         "policy": "appVersion"
@@ -34,8 +38,7 @@
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.USE_BIOMETRIC",
-        "android.permission.USE_FINGERPRINT",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.USE_FINGERPRINT"
       ],
       "runtimeVersion": "1.0.0"
     },
@@ -67,6 +70,12 @@
           "imageWidth": 240,
           "resizeMode": "contain",
           "backgroundColor": "#e0e3e7"
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": false
         }
       ]
     ],
