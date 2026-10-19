@@ -141,7 +141,12 @@ Deno.serve(async (req: Request) => {
         redirection_url: callbackUrl,
       }),
     });
-    const { token: paymentKey } = await paymentKeyRes.json();
+    const paymentKeyData = await paymentKeyRes.json();
+    const paymentKey = paymentKeyData.token;
+    if (!paymentKey) {
+      console.log("Paymob payment_key failed:", JSON.stringify(paymentKeyData));
+      throw new Error("فشل إنشاء مفتاح الدفع: " + JSON.stringify(paymentKeyData).slice(0, 300));
+    }
 
     // Record the Paymob order and the exact amount the callback must see.
     if (entityType === "order") {
@@ -168,17 +173,28 @@ Deno.serve(async (req: Request) => {
         }),
       });
       const walletPayData = await walletPayRes.json();
+      console.log("Paymob wallet pay response:", JSON.stringify(walletPayData));
+      // Different Paymob wallet integrations put the redirect under different keys.
+      const walletRedirect = walletPayData.redirect_url
+        || walletPayData.iframe_redirection_url
+        || walletPayData.redirection_url
+        || walletPayData?.data?.redirect_url;
 
-      if (walletPayData.redirect_url) {
+      if (walletRedirect) {
         return new Response(JSON.stringify({
           type: "wallet",
-          iframe_url: walletPayData.redirect_url,
+          iframe_url: walletRedirect,
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       } else {
+        const detail = walletPayData.message
+          || walletPayData.detail
+          || walletPayData?.data?.message
+          || (Array.isArray(walletPayData?.errors) ? JSON.stringify(walletPayData.errors) : null)
+          || JSON.stringify(walletPayData).slice(0, 300);
         return new Response(JSON.stringify({
-          error: walletPayData.message || "فشل في بدء الدفع بالمحفظة",
+          error: "فشل في بدء الدفع بالمحفظة: " + detail,
         }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },

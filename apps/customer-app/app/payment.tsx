@@ -91,18 +91,11 @@ export default function PaymentScreen() {
             ) : (
               <PrimaryButton
                 title={isEn ? 'Try again' : 'حاول تاني'}
-                onPress={() => { setResult('pending'); setLoading(true); setAttempt(a => a + 1) }}
-              />
-            )}
-            {ok ? (
-              <SecondaryButton title={isEn ? 'Home' : 'الرئيسية'} onPress={() => router.replace('/(tabs)/home')} />
-            ) : (
-              <SecondaryButton
-                title={isSub ? (isEn ? 'View my plan' : 'عرض باقتي') : (isEn ? 'View my order' : 'عرض طلبي')}
-                icon={isSub ? <Crown size={17} color={b.ink} /> : <ClipboardList size={17} color={b.ink} />}
+                leading={isSub ? <Crown size={18} color="#fff" /> : <ClipboardList size={18} color="#fff" />}
                 onPress={openTarget}
               />
             )}
+            <SecondaryButton title={isEn ? 'Home' : 'الرئيسية'} onPress={() => router.replace('/(tabs)/home')} />
           </View>
         </View>
       </View>
