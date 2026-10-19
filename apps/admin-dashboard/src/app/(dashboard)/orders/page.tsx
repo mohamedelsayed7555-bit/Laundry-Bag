@@ -52,14 +52,16 @@ export default function OrdersPage() {
   const [drivers, setDrivers] = useState<any[]>([])
   const [customers, setCustomers] = useState<any[]>([])
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ customer_id: '', service_type: 'wash', items_count: 1, notes: '', total: '' as any, order_type: 'delivery' as 'delivery' | 'walkin', walkin_name: '', walkin_phone: '' })
+  const [form, setForm] = useState({ customer_id: '', notes: '', order_type: 'delivery' as 'delivery' | 'walkin', walkin_name: '', walkin_phone: '' })
   const [messages, setMessages] = useState<any[]>([])
   const [msgsLoading, setMsgsLoading] = useState(false)
   const [cancelModal, setCancelModal] = useState<{ id: string; orderNumber: string } | null>(null)
   const [cancelReason, setCancelReason] = useState('')
   const [cancelledByFilter, setCancelledByFilter] = useState<'all' | 'admin' | 'customer'>('all')
   const [deliveryFeeSetting, setDeliveryFeeSetting] = useState(0)
-  const [avgPrices, setAvgPrices] = useState<Record<string, number>>({})
+  const [prices, setPrices] = useState<{ item_type: string; service_type: string; price: number }[]>([])
+  const [orderItems, setOrderItems] = useState<{ name: string; service_type: string; quantity: number; price: number }[]>([])
+  const [pick, setPick] = useState<{ item_type: string; service_type: string; quantity: number }>({ item_type: '', service_type: '', quantity: 1 })
   const [page, setPage] = useState(0)
   const [totalCount, setTotalCount] = useState(0)
   const [payFilter, setPayFilter] = useState('all')
@@ -83,14 +85,8 @@ export default function OrdersPage() {
     supabase.from('settings').select('value').eq('key', 'delivery_fee').single().then(({ data }) => {
       if (data) setDeliveryFeeSetting(Number(data.value) || 0)
     })
-    supabase.from('prices').select('service_type, price').eq('is_active', true).then(({ data }) => {
-      if (data) {
-        const grouped: Record<string, number[]> = {}
-        data.forEach((p: any) => { (grouped[p.service_type] ??= []).push(Number(p.price)) })
-        const avgs: Record<string, number> = {}
-        for (const [k, v] of Object.entries(grouped)) { avgs[k] = Math.round(v.reduce((a, b) => a + b, 0) / v.length) }
-        setAvgPrices(avgs)
-      }
+    supabase.from('prices').select('item_type, service_type, price').eq('is_active', true).then(({ data }) => {
+      if (data) setPrices(data.map((p: any) => ({ item_type: p.item_type, service_type: p.service_type, price: Number(p.price) })))
     })
     const ch = supabase.channel('orders-rt')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => debouncedLoadOrders())
@@ -275,12 +271,44 @@ export default function OrdersPage() {
     loadOrders()
   }
 
+  // Itemised order builder (dashboard-created orders): distinct item types, the services
+  // priced for a chosen item, and the running totals.
+  const itemTypes = useMemo(() => [...new Set(prices.map(p => p.item_type))], [prices])
+  const servicesForItem = (itemType: string) => prices.filter(p => p.item_type === itemType)
+  const orderSubtotal = orderItems.reduce((sum, i) => sum + i.price * i.quantity, 0)
+  const orderCount = orderItems.reduce((sum, i) => sum + i.quantity, 0)
+
+  function addPickToOrder() {
+    if (!pick.item_type || !pick.service_type) { toast('اختر نوع القطعة ونوع الخدمة', 'error'); return }
+    const row = prices.find(p => p.item_type === pick.item_type && p.service_type === pick.service_type)
+    if (!row) { toast('لا يوجد سعر لهذه القطعة والخدمة', 'error'); return }
+    const qty = Math.max(1, pick.quantity || 1)
+    setOrderItems(prev => {
+      const idx = prev.findIndex(i => i.name === pick.item_type && i.service_type === pick.service_type)
+      if (idx >= 0) {
+        const next = [...prev]
+        next[idx] = { ...next[idx], quantity: next[idx].quantity + qty }
+        return next
+      }
+      return [...prev, { name: pick.item_type, service_type: pick.service_type, quantity: qty, price: row.price }]
+    })
+    setPick({ item_type: '', service_type: '', quantity: 1 })
+  }
+
+  function updateOrderItemQty(i: number, delta: number) {
+    setOrderItems(prev => prev.map((it, idx) => idx === i ? { ...it, quantity: Math.max(1, it.quantity + delta) } : it))
+  }
+  function removeOrderItem(i: number) {
+    setOrderItems(prev => prev.filter((_, idx) => idx !== i))
+  }
+
   async function handleAddOrder(e: React.FormEvent) {
     e.preventDefault()
     const isWalkin = form.order_type === 'walkin'
     if (isWalkin && !isValidEgyptianPhone(form.walkin_phone)) { toast('رقم الموبايل غير صحيح — يجب أن يبدأ بـ 01 ويكون 11 رقم', 'error'); return }
+    if (orderItems.length === 0) { toast('أضف قطعة واحدة على الأقل', 'error'); return }
     setSaving(true)
-    const total = form.total || 0
+    const total = orderSubtotal
 
     let customerId = form.customer_id
 
@@ -296,8 +324,9 @@ export default function OrdersPage() {
     }
 
     const { error } = await supabase.from('orders').insert({
-      customer_id: customerId, service_type: form.service_type,
-      items_count: form.items_count, notes: isWalkin ? `[من المحل] ${form.walkin_name} - ${form.walkin_phone}${form.notes ? '\n' + form.notes : ''}` : (form.notes || null),
+      customer_id: customerId, service_type: orderItems[0].service_type,
+      items: orderItems, items_count: orderCount,
+      notes: isWalkin ? `[من المحل] ${form.walkin_name} - ${form.walkin_phone}${form.notes ? '\n' + form.notes : ''}` : (form.notes || null),
       status: isWalkin ? 'processing' : 'pending',
       payment_status: 'pending', payment_method: 'cash',
       subtotal: total, delivery_fee: isWalkin ? 0 : deliveryFeeSetting, total: isWalkin ? total : total + deliveryFeeSetting, delivery_location: {},
@@ -305,7 +334,8 @@ export default function OrdersPage() {
     setSaving(false)
     if (!error) {
       setShowAdd(false)
-      setForm({ customer_id: '', service_type: 'wash', items_count: 1, notes: '', total: 0, order_type: 'delivery', walkin_name: '', walkin_phone: '' })
+      setForm({ customer_id: '', notes: '', order_type: 'delivery', walkin_name: '', walkin_phone: '' })
+      setOrderItems([]); setPick({ item_type: '', service_type: '', quantity: 1 })
       loadOrders(); toast(isWalkin ? 'تم إضافة طلب من المحل' : 'تم إضافة الطلب')
     } else { console.error('Order insert error:', error); toast('حدث خطأ', 'error') }
   }
@@ -725,32 +755,60 @@ export default function OrdersPage() {
             </div>
           </>
           )}
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">الخدمة <span className="text-red-400">*</span></label>
-            <select value={form.service_type} onChange={e => {
-              const st = e.target.value
-              const avg = avgPrices[st] ?? 0
-              setForm({ ...form, service_type: st, total: avg ? avg * form.items_count : form.total })
-            }} required className={inputClass}>
-              <option value="wash">غسيل</option><option value="iron">كوي</option>
-              <option value="wash_iron">غسيل وكوي</option><option value="dry_clean">تنظيف جاف</option>
-              <option value="housekeeping">تنظيف منازل</option>
-              <option value="carpet">سجاد وبطاطين</option>
-              <option value="accessories">منتجات وإكسسوارات</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">عدد القطع <span className="text-red-400">*</span></label>
-            <input type="number" min={1} value={form.items_count} onChange={e => {
-              const count = +e.target.value || 1
-              const avg = avgPrices[form.service_type] ?? 0
-              setForm({ ...form, items_count: count, total: avg ? avg * count : form.total })
-            }} required className={inputClass} />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">المبلغ (ج.م) <span className="text-red-400">*</span></label>
-            <input type="number" min={0} step="0.01" value={form.total} onChange={e => setForm({ ...form, total: e.target.value === '' ? '' as any : +e.target.value })} required className={inputClass} placeholder="0.00" />
-            {avgPrices[form.service_type] && <p className="text-[10px] text-gray-400 mt-1">محسوب تلقائي (متوسط {avgPrices[form.service_type]} ج.م × {form.items_count} قطعة) — يمكنك تعديله</p>}
+          <div className="border border-surface-border rounded-xl p-3 space-y-3 bg-surface-muted/20">
+            <label className="block text-xs font-semibold text-gray-600">القطع <span className="text-red-400">*</span></label>
+
+            {orderItems.length > 0 && (
+              <div className="space-y-1.5">
+                {orderItems.map((it, i) => (
+                  <div key={i} className="flex items-center gap-2 bg-white border border-surface-border/60 rounded-lg px-2.5 py-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-medium text-gray-800 truncate">{it.name}</span>
+                        <span className="text-[10px] text-gray-400 bg-surface-muted px-1.5 py-0.5 rounded">{SERVICE_TYPE_LABELS[it.service_type as ServiceType] ?? it.service_type}</span>
+                      </div>
+                      <span className="text-[11px] text-gray-400">{it.price} ج.م × {it.quantity} = {(it.price * it.quantity).toFixed(2)} ج.م</span>
+                    </div>
+                    <div className="flex items-center gap-1 flex-none">
+                      <button type="button" onClick={() => updateOrderItemQty(i, -1)} className="w-7 h-7 rounded-lg bg-surface-muted text-gray-600 hover:bg-surface-border flex items-center justify-center">−</button>
+                      <span className="w-6 text-center text-sm font-semibold">{it.quantity}</span>
+                      <button type="button" onClick={() => updateOrderItemQty(i, 1)} className="w-7 h-7 rounded-lg bg-primary-500 text-white hover:bg-primary-600 flex items-center justify-center">+</button>
+                      <button type="button" onClick={() => removeOrderItem(i)} className="w-7 h-7 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 flex items-center justify-center">×</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] text-gray-400 mb-1">نوع القطعة</label>
+                  <select value={pick.item_type} onChange={e => setPick({ ...pick, item_type: e.target.value, service_type: '' })} className={inputClass}>
+                    <option value="">اختر القطعة...</option>
+                    {itemTypes.map(it => <option key={it} value={it}>{it}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] text-gray-400 mb-1">نوع الخدمة</label>
+                  <select value={pick.service_type} onChange={e => setPick({ ...pick, service_type: e.target.value })} disabled={!pick.item_type} className={inputClass + ' disabled:opacity-50'}>
+                    <option value="">اختر الخدمة...</option>
+                    {servicesForItem(pick.item_type).map(p => <option key={p.service_type} value={p.service_type}>{(SERVICE_TYPE_LABELS[p.service_type as ServiceType] ?? p.service_type)} — {p.price} ج.م</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <input type="number" min={1} value={pick.quantity} onChange={e => setPick({ ...pick, quantity: Math.max(1, +e.target.value || 1) })} className={inputClass + ' w-24'} aria-label="العدد" />
+                <button type="button" onClick={addPickToOrder} className="flex-1 bg-primary-50 text-primary-600 border border-primary-200 rounded-xl text-sm font-semibold hover:bg-primary-100 transition-colors">+ أضف للطلب</button>
+              </div>
+            </div>
+
+            {orderItems.length > 0 && (
+              <div className="flex items-center justify-between pt-2 border-t border-surface-border/60 text-sm">
+                <span className="text-gray-500">{orderCount} قطعة{form.order_type === 'delivery' && deliveryFeeSetting > 0 ? ` + توصيل ${deliveryFeeSetting} ج.م` : ''}</span>
+                <span className="font-bold text-gray-800">الإجمالي: {(orderSubtotal + (form.order_type === 'delivery' ? deliveryFeeSetting : 0)).toFixed(2)} ج.م</span>
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">ملاحظات</label>
