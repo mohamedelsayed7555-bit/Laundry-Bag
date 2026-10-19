@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Image, ActivityIndicator } from 'react-native'
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Image, ActivityIndicator, Animated } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Camera, UserRound, Phone, Mail, Lock, KeyRound, ShieldCheck, ChevronDown, ChevronUp, Check, Trash2 } from 'lucide-react-native'
-import { useBrand, Card, IconButton, BackIcon, FlowLines, F, SIZE } from '../src/components/brand'
+import { useBrand, Card, IconButton, BackIcon, FlowLines, F, SIZE, useStickyHeader, StickyBar } from '../src/components/brand'
 import { PrimaryButton } from '../src/components/auth/ui'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../src/contexts/AuthContext'
@@ -17,6 +17,7 @@ export default function EditProfileScreen() {
   const { t, locale } = useLanguage()
   const b = useBrand()
   const insets = useSafeAreaInsets()
+  const { scrollY, onScroll } = useStickyHeader()
   const { profile, refreshProfile, toggleBiometric, biometricEnabled } = useAuth()
   const router = useRouter()
   const { showAlert, AlertComponent } = useCustomAlert()
@@ -194,7 +195,7 @@ export default function EditProfileScreen() {
 
   return (
     <>
-    <ScrollView style={[s.container, { backgroundColor: b.page }]} contentContainerStyle={[s.content, { paddingTop: insets.top + 10 }]} keyboardShouldPersistTaps="handled">
+    <Animated.ScrollView style={[s.container, { backgroundColor: b.page }]} contentContainerStyle={[s.content, { paddingTop: insets.top + 10 }]} keyboardShouldPersistTaps="handled" onScroll={onScroll} scrollEventThrottle={16}>
       <FlowLines height={260} />
       <View style={s.headerRow}>
         <IconButton onPress={() => router.back()} label={t('back')}>
@@ -313,7 +314,8 @@ export default function EditProfileScreen() {
       </TouchableOpacity>
 
       <View style={{ height: 40 }} />
-    </ScrollView>
+    </Animated.ScrollView>
+    <StickyBar scrollY={scrollY} title={t('editProfileTitle')} onBack={() => router.back()} />
     {AlertComponent}
     </>
   )

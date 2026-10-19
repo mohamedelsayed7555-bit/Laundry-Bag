@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Image } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Image, Animated } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { TriangleAlert, Shirt, Plus, Minus, Check } from 'lucide-react-native'
-import { useBrand, Card, Chip, Stepper, IconButton, BackIcon, FlowLines, money, F, SIZE, HIT } from '../../src/components/brand'
+import { useBrand, Card, Chip, Stepper, IconButton, BackIcon, FlowLines, money, F, SIZE, HIT, useStickyHeader, StickyBar } from '../../src/components/brand'
 import { PrimaryButton, SecondaryButton } from '../../src/components/auth/ui'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
@@ -38,6 +38,7 @@ type OrderItem = { name: string; service_type: string; quantity: number; price: 
 export default function EditOrderScreen() {
   const b = useBrand()
   const insets = useSafeAreaInsets()
+  const { scrollY, onScroll } = useStickyHeader()
   const { t, locale } = useLanguage()
   const isEn = locale === 'en'
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -276,7 +277,12 @@ export default function EditOrderScreen() {
   return (
     <>
     <View style={[n.container, { backgroundColor: b.page }]}>
-      <ScrollView contentContainerStyle={[n.content, { paddingTop: insets.top + 10 }]} keyboardShouldPersistTaps="handled">
+      <Animated.ScrollView
+        contentContainerStyle={[n.content, { paddingTop: insets.top + 10 }]}
+        keyboardShouldPersistTaps="handled"
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+      >
         <FlowLines height={260} />
 
         <View style={n.header}>
@@ -399,7 +405,9 @@ export default function EditOrderScreen() {
         )}
 
         <View style={{ height: 8 }} />
-      </ScrollView>
+      </Animated.ScrollView>
+
+      <StickyBar scrollY={scrollY} title={isEn ? 'Edit Order' : 'تعديل الطلب'} onBack={() => router.back()} />
 
       {/* Total + save */}
       <View style={[n.foot, { backgroundColor: b.card, borderTopColor: b.cardBorder, paddingBottom: Math.max(insets.bottom, 10) + 10 }]}>

@@ -11,7 +11,7 @@ import { SkeletonPage } from '../src/components/Skeleton'
 import { serverErrorMessage } from '../src/lib/serverErrors'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { MapPin, Package, Truck, Plus, CreditCard, Banknote, Wallet, Landmark, Smartphone, ShoppingBag } from 'lucide-react-native'
-import { useBrand, Card, ChoiceGrid, StickyFooter, IconButton, BackIcon, SoftWaves, money, cardShadow, F, SIZE, HIT, type Choice } from '../src/components/brand'
+import { useBrand, Card, ChoiceGrid, StickyFooter, IconButton, BackIcon, SoftWaves, money, cardShadow, F, SIZE, HIT, useStickyHeader, StickyBar, type Choice } from '../src/components/brand'
 import { PrimaryButton } from '../src/components/auth/ui'
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://kjqtrmedkvqfofwymoni.supabase.co'
@@ -27,6 +27,7 @@ export default function BagOrderScreen() {
   const { profile } = useAuth()
   const router = useRouter()
   const { showAlert, AlertComponent } = useCustomAlert()
+  const { scrollY, onScroll } = useStickyHeader(false)
   const { t, locale } = useLanguage()
   const b = useBrand()
   const insets = useSafeAreaInsets()
@@ -182,6 +183,8 @@ export default function BagOrderScreen() {
         contentContainerStyle={[s.content, { paddingTop: insets.top + 12, paddingBottom: 120 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={b.primary} colors={[b.primary]} />}
       >
         <SoftWaves height={520} crest={300} />
@@ -348,6 +351,8 @@ export default function BagOrderScreen() {
           </Card>
         </Animated.View>
       </ScrollView>
+
+      <StickyBar scrollY={scrollY} title={t('bagTitle')} onBack={() => router.back()} />
 
       <StickyFooter label={t('total')} total={money(bagOffer.daily_price)} currency={t('currency')} bottomInset={insets.bottom}>
         <PrimaryButton

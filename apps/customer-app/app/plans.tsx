@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Refres
 import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { User, Users, Home, Crown, Package, Sparkles, Check, Zap, CircleCheck, TriangleAlert, Hourglass, CreditCard, Wallet, Landmark, Smartphone, Settings2, RefreshCw } from 'lucide-react-native'
-import { useBrand, Card, Chip, Pill, ChoiceGrid, IconButton, BackIcon, FlowLines, money, F, SIZE, type Choice } from '../src/components/brand'
+import { useBrand, Card, Chip, Pill, ChoiceGrid, IconButton, BackIcon, FlowLines, money, F, SIZE, useStickyHeader, StickyBar, type Choice } from '../src/components/brand'
 import { PrimaryButton } from '../src/components/auth/ui'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../src/contexts/AuthContext'
@@ -68,6 +68,7 @@ export default function PlansScreen() {
   const planName = (name: string) => locale === 'en' ? (t(`plan:${name}` as any) !== `plan:${name}` ? t(`plan:${name}` as any) : name) : name
   const router = useRouter()
   const { showAlert, AlertComponent } = useCustomAlert()
+  const { scrollY, onScroll } = useStickyHeader(false)
   const b = useBrand()
   const insets = useSafeAreaInsets()
   const [plans, setPlans] = useState<Plan[]>([])
@@ -285,7 +286,7 @@ export default function PlansScreen() {
 
   return (
     <>
-    <ScrollView ref={scrollRef} style={[s.container, { backgroundColor: b.page }]} contentContainerStyle={[s.content, { paddingTop: insets.top + 10 }]} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={b.primary} colors={[b.primary]} />}>
+    <ScrollView ref={scrollRef} style={[s.container, { backgroundColor: b.page }]} contentContainerStyle={[s.content, { paddingTop: insets.top + 10 }]} keyboardShouldPersistTaps="handled" onScroll={onScroll} scrollEventThrottle={16} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={b.primary} colors={[b.primary]} />}>
       <FlowLines height={280} />
       <View style={s.headerRow}>
         <IconButton onPress={() => router.back()} label={t('back')}>
@@ -666,6 +667,7 @@ export default function PlansScreen() {
 
       <View style={{ height: 40 }} />
     </ScrollView>
+    <StickyBar scrollY={scrollY} title={t('subscriptionPlans')} onBack={() => router.back()} />
     {AlertComponent}
     </>
   )

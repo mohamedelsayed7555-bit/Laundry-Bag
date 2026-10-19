@@ -6,6 +6,7 @@ import {
   type StyleProp, type ViewStyle, type TextStyle,
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg'
 import { ChevronLeft, ChevronRight, ArrowLeft, ArrowRight, Check } from 'lucide-react-native'
 import { useLanguage } from '../contexts/LanguageContext'
@@ -244,6 +245,52 @@ export function PulseHighlight({ active, children, radius = 16, style }: {
     </View>
   )
 }
+
+// Shared sticky header used across the long screens so they feel like one app. Pair it with
+// useStickyHeader on an Animated.ScrollView: the compact bar (back + title + optional right)
+// stays transparent at the top and fades in with a hairline divider once the page's own large
+// title scrolls past `threshold`, so nothing is covered while you're at the top.
+// Pass useNative=false on a plain (non-Animated) ScrollView/FlatList that can't use the native
+// driver (e.g. one that also needs a typed ref for scrollTo); the fade then runs on the JS thread.
+export function useStickyHeader(useNative = true) {
+  const scrollY = useRef(new Animated.Value(0)).current
+  const onScroll = useMemo(
+    () => Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: useNative }),
+    [scrollY, useNative],
+  )
+  return { scrollY, onScroll }
+}
+
+export function StickyBar({ scrollY, title, onBack, right, threshold = 72 }: {
+  scrollY: Animated.Value
+  title: string
+  onBack: () => void
+  right?: ReactNode
+  threshold?: number
+}) {
+  const b = useBrand()
+  const insets = useSafeAreaInsets()
+  return (
+    <Animated.View
+      pointerEvents="box-none"
+      style={[stickyBarStyle.bar, {
+        paddingTop: insets.top + 6,
+        backgroundColor: b.page,
+        borderBottomColor: b.divider,
+        opacity: scrollY.interpolate({ inputRange: [threshold - 28, threshold], outputRange: [0, 1], extrapolate: 'clamp' }),
+      }]}
+    >
+      <IconButton onPress={onBack} label="Back"><BackIcon color={b.ink} /></IconButton>
+      <Text style={[stickyBarStyle.title, { color: b.ink }]} numberOfLines={1}>{title}</Text>
+      {right ?? <View style={{ width: SIZE.ICON }} />}
+    </Animated.View>
+  )
+}
+
+const stickyBarStyle = StyleSheet.create({
+  bar: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingBottom: 9, borderBottomWidth: StyleSheet.hairlineWidth * 2 },
+  title: { flex: 1, fontSize: 15, fontFamily: F.display },
+})
 
 // Segmented progress bar (e.g. 8 order stages). Fills from the start side.
 export function Segments({ total, done, current }: { total: number; done: number; current?: boolean }) {

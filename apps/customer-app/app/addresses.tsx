@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, type ReactNode } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Modal, ActivityIndicator, Platform, ScrollView, KeyboardAvoidingView, Image, useWindowDimensions } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Modal, ActivityIndicator, Platform, ScrollView, KeyboardAvoidingView, Image, useWindowDimensions, Animated } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
 import { MapPin, LocateFixed, Tag, Building2, Layers, DoorOpen, Flag, NotebookPen, Pencil, Star, Trash2, Check, Plus } from 'lucide-react-native'
@@ -9,7 +9,7 @@ import { supabase } from '../src/lib/supabase'
 import { useLanguage } from '../src/contexts/LanguageContext'
 import { WebView } from 'react-native-webview'
 import * as Location from 'expo-location'
-import { useBrand, IconButton, BackIcon, Pill, Halftone, F, SIZE, HIT, DotsBackdrop, cardShadow, type Brand } from '../src/components/brand'
+import { useBrand, IconButton, BackIcon, Pill, Halftone, F, SIZE, HIT, DotsBackdrop, cardShadow, useStickyHeader, StickyBar, type Brand } from '../src/components/brand'
 import { PrimaryButton, SecondaryButton, ErrorLine } from '../src/components/auth/ui'
 
 const CAIRO = { latitude: 30.0444, longitude: 31.2357 }
@@ -117,6 +117,7 @@ export default function AddressesScreen() {
   const isOnboarding = onboarding === '1'
   const onboardOpened = useRef(false)
   const { showAlert, AlertComponent } = useCustomAlert()
+  const { scrollY, onScroll } = useStickyHeader()
   const [addresses, setAddresses] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -288,7 +289,7 @@ export default function AddressesScreen() {
   return (
     <>
     <View style={[st.container, { backgroundColor: b.page }]}>
-      <ScrollView contentContainerStyle={st.content} showsVerticalScrollIndicator={false}>
+      <Animated.ScrollView contentContainerStyle={st.content} showsVerticalScrollIndicator={false} onScroll={onScroll} scrollEventThrottle={16}>
         <DotsBackdrop height={240} />
 
         <View style={st.headerRow}>
@@ -378,7 +379,9 @@ export default function AddressesScreen() {
             })}
           </View>
         )}
-      </ScrollView>
+      </Animated.ScrollView>
+
+      <StickyBar scrollY={scrollY} title={t('myAddressesTitle')} onBack={() => isOnboarding ? router.replace('/(tabs)/home') : router.back()} />
 
       <Modal visible={showModal} animationType="slide" transparent>
         <KeyboardAvoidingView style={st.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>

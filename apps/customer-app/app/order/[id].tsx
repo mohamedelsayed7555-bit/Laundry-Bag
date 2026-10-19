@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useMemo } from 'react'
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Linking } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Linking, Animated } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { WebView } from 'react-native-webview'
 import { useAuth } from '../../src/contexts/AuthContext'
@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Path } from 'react-native-svg'
 import RatingSheet from '../../src/components/RatingSheet'
 import { Hourglass, CalendarDays, Car, MapPin, Package, WashingMachine, CircleCheck, Truck, PartyPopper, CircleX, RotateCcw, Smartphone, Star, TriangleAlert, ChevronDown, ChevronUp, Phone, MessageCircle, Wallet, CreditCard, Banknote, Landmark, Pencil, Gift, Check, type LucideIcon } from 'lucide-react-native'
-import { useBrand, Card, IconButton, BackIcon, FlowLines, Segments, Pill, money, F, SIZE, cardShadow } from '../../src/components/brand'
+import { useBrand, Card, IconButton, BackIcon, FlowLines, Segments, Pill, money, F, SIZE, cardShadow, useStickyHeader, StickyBar } from '../../src/components/brand'
 import { PrimaryButton, SecondaryButton } from '../../src/components/auth/ui'
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://kjqtrmedkvqfofwymoni.supabase.co'
@@ -274,6 +274,7 @@ export default function OrderDetailsScreen() {
 
   const b = useBrand()
   const insets = useSafeAreaInsets()
+  const { scrollY, onScroll } = useStickyHeader()
   const [showSteps, setShowSteps] = useState(false)
 
   if (loading) return <SkeletonPage />
@@ -302,7 +303,12 @@ export default function OrderDetailsScreen() {
 
   return (
     <>
-    <ScrollView style={[n.container, { backgroundColor: b.page }]} contentContainerStyle={[n.content, { paddingTop: insets.top + 10, paddingHorizontal: 16 }]}>
+    <Animated.ScrollView
+      style={[n.container, { backgroundColor: b.page }]}
+      contentContainerStyle={[n.content, { paddingTop: insets.top + 10, paddingHorizontal: 16 }]}
+      onScroll={onScroll}
+      scrollEventThrottle={16}
+    >
       <FlowLines height={280} />
 
       {/* Header */}
@@ -553,7 +559,20 @@ export default function OrderDetailsScreen() {
       )}
 
       <View style={{ height: 24 }} />
-    </ScrollView>
+    </Animated.ScrollView>
+
+    <StickyBar
+      scrollY={scrollY}
+      onBack={() => router.back()}
+      title={`${isEn ? 'Order' : 'طلب'} ⁦#${String(order.order_number ?? '').replace(/^#+/, '')}⁩`}
+      right={
+        <View style={[n.statusPill, { backgroundColor: status.color + '22' }]}>
+          <StatusIcon size={13} color={status.color} />
+          <Text style={[n.statusPillText, { color: status.color }]} numberOfLines={1}>{status.label}</Text>
+        </View>
+      }
+    />
+
     {AlertComponent}
     </>
   )
