@@ -35,10 +35,10 @@ export default function CustomersPage() {
 
   async function loadCustomers() {
     const { data, count } = await supabase.from('users')
-      .select('id, name, phone, email, customer_code, tier, points, is_active, created_at', { count: 'exact' })
+      .select('id, name, phone, email, customer_code, tier, points, is_active, created_at, orders:orders!orders_customer_id_fkey(count)', { count: 'exact' })
       .eq('role', 'customer').order('created_at', { ascending: false })
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
-    setCustomers(data ?? [])
+    setCustomers((data ?? []).map((c: any) => ({ ...c, orders_count: c.orders?.[0]?.count ?? 0 })))
     setTotalCount(count ?? 0)
     setLoading(false)
   }
@@ -142,6 +142,9 @@ export default function CustomersPage() {
     { key: 'email', label: 'البريد', render: (item: any) => item.email ?? <span className="text-gray-300">—</span> },
     { key: 'tier', label: 'المستوى', render: (item: any) => <Badge variant={tierVariant(item.tier)}>{tierLabel[item.tier] ?? item.tier}</Badge> },
     { key: 'points', label: 'النقاط', render: (item: any) => <span className="font-semibold">{item.points}</span> },
+    { key: 'orders_count', label: 'الطلبات', render: (item: any) => (
+      <span className="inline-flex items-center justify-center min-w-[28px] h-6 px-2 rounded-lg bg-primary-50 text-primary-600 text-xs font-bold">{item.orders_count ?? 0}</span>
+    )},
     { key: 'is_active', label: 'الحالة', render: (item: any) => <Badge variant={item.is_active ? 'success' : 'danger'}>{item.is_active ? 'نشط' : 'معطل'}</Badge> },
     { key: 'actions', label: '', render: (item: any) => (
       <div className="flex flex-wrap gap-1">
