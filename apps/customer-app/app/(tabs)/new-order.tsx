@@ -150,6 +150,14 @@ export default function NewOrderScreen() {
       setDataLoading(false)
       if (params.service) setSelectedService(params.service)
     })
+    // Keep the service picker in sync when the dashboard toggles a service / price.
+    // Services/prices are both covered — the trigger disables prices too, so either feed works.
+    const channel = supabase
+      .channel('new-order-catalog')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'services' }, () => loadData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'prices' }, () => loadData())
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
   }, [profile])
 
   useEffect(() => {

@@ -87,6 +87,8 @@ export default function PlansScreen() {
   const [walletPhone, setWalletPhone] = useState('')
   const [refreshing, setRefreshing] = useState(false)
   const [serviceFilter, setServiceFilter] = useState('all')
+  // Active service codes from the dashboard. null = not loaded yet / fallback = show all.
+  const [activeServices, setActiveServices] = useState<Set<string> | null>(null)
   const [instapayNumber, setInstapayNumber] = useState('')
   const [selectedPlanForSubscribe, setSelectedPlanForSubscribe] = useState<Plan | null>(null)
   const scrollRef = useRef<ScrollView>(null)
@@ -94,6 +96,12 @@ export default function PlansScreen() {
 
   useEffect(() => {
     loadData()
+    // Reflect dashboard service enable/disable without a manual refresh.
+    const channel = supabase
+      .channel('plans-services')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'services' }, () => loadData())
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
   }, [profile])
 
   useEffect(() => {
@@ -132,7 +140,12 @@ export default function PlansScreen() {
       profile ? supabase.from('subscriptions').select('*, plans(name, covered_services, includes_all_services)')
         .eq('user_id', profile.id).in('status', ['active', 'pending'])
         .order('created_at', { ascending: false }) : null,
+      supabase.from('services').select('code').eq('is_active', true),
     ])
+    const svcRes = results[3]
+    if (svcRes && !svcRes.error && svcRes.data) {
+      setActiveServices(new Set(svcRes.data.map((r: any) => r.code)))
+    }
 
     const settingsData = results[0]?.data
     if (settingsData) {
@@ -459,10 +472,13 @@ export default function PlansScreen() {
       >
         {[
           { key: 'all', label: 'الكل', labelEn: 'All' },
-          { key: 'clothes', label: 'ملابس', labelEn: 'Clothes' },
-          { key: 'carpet', label: 'سجاد وبطاطين', labelEn: 'Carpets' },
-          { key: 'housekeeping', label: 'تنظيف منازل', labelEn: 'House Keeping' },
-        ].map(f => (
+          { key: 'clothes', label: 'ملابس', labelEn: 'Clothes', requires: ['wash', 'iron', 'wash_iron', 'dry_clean'] },
+          { key: 'carpet', label: 'سجاد وبطاطين', labelEn: 'Carpets', requires: ['carpet'] },
+          { key: 'housekeeping', label: 'تنظيف منازل', labelEn: 'House Keeping', requires: ['housekeeping'] },
+        ].filter(f => {
+          if (!activeServices || !f.requires) return true // show while loading or offline
+          return f.requires.some(code => activeServices.has(code))
+        }).map(f => (
           <Chip key={f.key} label={isEn ? f.labelEn : f.label} active={serviceFilter === f.key} onPress={() => setServiceFilter(f.key)} />
         ))}
       </ScrollView>
@@ -506,7 +522,15 @@ export default function PlansScreen() {
         const fullPrice = plan.monthly_price * durationObj.months
         const tierColor = tierColors[plan.tier] ?? b.primary
         const isCurrentPlan = activeSubs.some(s => s.plan_id === plan.id)
-        const pCovered = plan.covered_services ?? []
+        // Hide any service the dashboard has disabled from the plan's covered list.
+        const rawCovered = plan.covered_services ?? []
+        const pCovered = activeServices ? rawCovered.filter(s => activeServices.has(s)) : rawCovered
+        // A fully-emptied plan (every covered service is now disabled, and it's not an "all services" plan)
+        // is unusable — drop it from the grid rather than show an empty card. The user's own active
+        // subscription still renders at the top via a separate list.
+        if (!plan.includes_all_services && rawCovered.length > 0 && pCovered.length === 0 && !isCurrentPlan) {
+          return null
+        }
         const sameTypeSub = activeSubs.find(s => {
           if (s.plan_id === plan.id) return false
           const sPlan = (s as any).plans ?? {}

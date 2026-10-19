@@ -255,7 +255,7 @@ export default {
   bagOrderNow: 'اطلب الشنطة الآن',
   bagOrderSuccess: 'تم طلب شنطة Laundry Bag',
   bagInstapayTitle: 'حوّل على رقم الإنستاباي',
-  bagInstapayHint: 'حوّل المبلغ وأرسل صورة الإيصال للسائق في المحادثة',
+  bagInstapayHint: 'حوّل المبلغ قبل وصول السائق واحتفظ بإيصال التحويل — سيتم تأكيد الدفع عند الاستلام',
   bagBuilding: 'مبنى',
   bagFloor: 'ط',
 

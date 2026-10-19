@@ -246,6 +246,9 @@ export default function HomeScreen() {
   const [ratingSubmitting, setRatingSubmitting] = useState(false)
   const [defaultAddress, setDefaultAddress] = useState<{ label: string } | null | undefined>(undefined)
   const [minPrices, setMinPrices] = useState<Record<string, number>>({})
+  // Active service codes from the DB (dashboard → prices → services tab controls this).
+  // Starts as null so we don't flash an "all hidden" state before the first fetch.
+  const [activeServices, setActiveServices] = useState<Set<string> | null>(null)
   const shownRatingIds = useRef(new Set<string>())
 
   // Extra fields for the live order card and the order list (service, pieces, driver).
@@ -279,6 +282,15 @@ export default function HomeScreen() {
     setMinPrices(mins)
   }, [])
 
+  // Which service types are currently enabled by the dashboard. If the table or
+  // network isn't reachable (old builds, offline), fall back to "show everything"
+  // so the home never looks broken.
+  const loadActiveServices = useCallback(async () => {
+    const { data, error } = await supabase.from('services').select('code').eq('is_active', true)
+    if (error || !data) { setActiveServices(null); return }
+    setActiveServices(new Set(data.map(r => r.code)))
+  }, [])
+
   const onRefresh = useCallback(async () => {
     if (!profile) return
     setRefreshing(true)
@@ -296,9 +308,10 @@ export default function HomeScreen() {
       loadBagOffer(),
       loadDefaultAddress(),
       loadMinPrices(),
+      loadActiveServices(),
     ])
     setRefreshing(false)
-  }, [profile, loadBagOffer, loadDefaultAddress, loadMinPrices])
+  }, [profile, loadBagOffer, loadDefaultAddress, loadMinPrices, loadActiveServices])
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
@@ -378,6 +391,7 @@ export default function HomeScreen() {
       checkUnratedOrder(),
       loadDefaultAddress(),
       loadMinPrices(),
+      loadActiveServices(),
     ])
 
     const channel = supabase
@@ -386,6 +400,9 @@ export default function HomeScreen() {
         event: 'UPDATE', schema: 'public', table: 'settings',
         filter: 'key=eq.bag_offer',
       }, () => loadBagOffer())
+      // Dashboard enables/disables a service → refresh the home tiles immediately.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'services' },
+        () => { loadActiveServices(); loadMinPrices() })
       .subscribe((status, err) => {
         if (err) console.warn('home-settings realtime error:', err.message)
       })
@@ -403,7 +420,7 @@ export default function HomeScreen() {
     return t('goodEvening')
   }
 
-  const services = [
+  const allServices = [
     { label: t('wash'), en: 'WASH', key: 'wash' },
     { label: t('dryClean'), en: 'DRY CLEAN', key: 'dry_clean' },
     { label: t('ironOnly'), en: 'IRON', key: 'iron' },
@@ -411,6 +428,10 @@ export default function HomeScreen() {
     { label: t('housekeeping'), en: 'HOME', key: 'housekeeping' },
     { label: t('carpet') || 'سجاد وبطاطين', en: 'CARPETS', key: 'carpet' },
   ]
+  // Null (not yet loaded, or offline fallback) = show everything so the home never
+  // flashes empty on first render. Once the set loads, hide anything the dashboard disabled.
+  const services = activeServices ? allServices.filter(s => activeServices.has(s.key)) : allServices
+  const accessoriesEnabled = activeServices ? activeServices.has('accessories') : true
   const accessoriesLabel = en ? 'Accessories & Products' : 'منتجات وإكسسوارات'
   // The small kicker shows the other language: English words on the Arabic UI, Arabic on the English UI.
   const AR_NAMES: Record<string, string> = { wash: 'غسيل', dry_clean: 'تنظيف جاف', iron: 'كي فقط', wash_iron: 'غسيل وكي', housekeeping: 'تنظيف منازل', carpet: 'سجاد وبطاطين', accessories: 'منتجات' }
@@ -563,6 +584,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </Animated.View>
         ))}
+        {accessoriesEnabled && (
         <TouchableOpacity
           activeOpacity={0.85}
           accessibilityRole="button"
@@ -578,6 +600,7 @@ export default function HomeScreen() {
             {priceFrom('accessories') ? <Text style={s.tilePrice}>{priceFrom('accessories')}</Text> : null}
           </View>
         </TouchableOpacity>
+        )}
       </View>
 
       {/* Recent Orders */}

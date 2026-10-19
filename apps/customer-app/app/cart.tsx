@@ -644,7 +644,7 @@ export default function CartScreen() {
           <View style={[s.banner, s.bannerCol, { backgroundColor: b.tint, borderColor: b.tintBorder }]}>
             <Text style={[s.bannerTitle, { color: b.ink }]}>{isEn ? 'Transfer to InstaPay number' : 'حوّل على رقم الإنستاباي'}</Text>
             <Text style={[s.instaNumber, { color: b.tintText }]} selectable>{paymentSettings.instapay}</Text>
-            <Text style={[s.bannerSub, { color: b.muted, textAlign: 'center' }]}>{isEn ? 'Transfer and send receipt screenshot to driver in chat' : 'حوّل المبلغ وأرسل صورة الإيصال للسائق في المحادثة'}</Text>
+            <Text style={[s.bannerSub, { color: b.muted, textAlign: 'center' }]}>{isEn ? 'Transfer before the driver arrives and keep the receipt — payment is confirmed on pickup' : 'حوّل المبلغ قبل وصول السائق واحتفظ بإيصال التحويل — سيتم تأكيد الدفع عند الاستلام'}</Text>
           </View>
         )}
 

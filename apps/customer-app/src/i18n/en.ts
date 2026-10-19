@@ -176,7 +176,7 @@ export default {
   bagOrderNow: 'Order Bag Now',
   bagOrderSuccess: 'Laundry Bag order placed',
   bagInstapayTitle: 'Transfer to InstaPay number',
-  bagInstapayHint: 'Transfer the amount and send the receipt to the driver in chat',
+  bagInstapayHint: 'Transfer before the driver arrives and keep the receipt — payment is confirmed on pickup',
   bagBuilding: 'Bldg',
   bagFloor: 'F',
 
