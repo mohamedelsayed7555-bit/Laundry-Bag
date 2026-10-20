@@ -41,27 +41,26 @@ export default function ReportsPage() {
   }
 
   async function load() {
-    let query = supabase.from('orders').select('status, service_type, total, created_at')
+    // Aggregated in the database (report_stats). This used to pull every order row in range —
+    // with the default "all" preset that means the whole table — and reduce in JS, which
+    // PostgREST truncates at max-rows without an error, quietly shrinking every figure here.
     const { from, to } = getDateRange()
-    if (from) query = query.gte('created_at', from)
-    if (to) query = query.lte('created_at', to)
 
-    const [orders, customers, drivers] = await Promise.all([
-      query,
+    const [statsRes, customers, drivers] = await Promise.all([
+      supabase.rpc('report_stats', { p_from: from, p_to: to }),
       supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'customer'),
       supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'driver'),
     ])
 
-    const orderData = orders.data ?? []
-    const totalRevenue = orderData.filter(o => o.status !== 'cancelled' && o.status !== 'refunded').reduce((s, o) => s + (o.total ?? 0), 0)
-    const ordersByStatus: Record<string, number> = {}
-    const ordersByService: Record<string, number> = {}
-    orderData.forEach(o => {
-      ordersByStatus[o.status] = (ordersByStatus[o.status] ?? 0) + 1
-      ordersByService[o.service_type] = (ordersByService[o.service_type] ?? 0) + 1
+    const d = (statsRes.error ? null : statsRes.data) as any
+    setStats({
+      totalOrders: Number(d?.totalOrders) || 0,
+      totalRevenue: Number(d?.totalRevenue) || 0,
+      totalCustomers: customers.count ?? 0,
+      totalDrivers: drivers.count ?? 0,
+      ordersByStatus: d?.ordersByStatus ?? {},
+      ordersByService: d?.ordersByService ?? {},
     })
-
-    setStats({ totalOrders: orderData.length, totalRevenue, totalCustomers: customers.count ?? 0, totalDrivers: drivers.count ?? 0, ordersByStatus, ordersByService })
     setLoading(false)
   }
 

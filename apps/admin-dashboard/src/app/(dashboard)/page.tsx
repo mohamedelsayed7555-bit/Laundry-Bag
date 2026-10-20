@@ -95,30 +95,25 @@ export default function DashboardPage() {
   }, [])
 
   async function loadDashboard() {
-    const [orders, customers, drivers, recent, subs] = await Promise.all([
-      supabase.from('orders').select('id, total, status, payment_status, created_at', { count: 'exact' }),
-      supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'customer'),
-      supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'driver'),
+    // Stats are aggregated in the database (dashboard_stats). This used to download every
+    // order row and reduce in JS, which PostgREST silently truncates at its max-rows cap —
+    // revenue/active/delivered-today would have started under-reporting without any error.
+    const [statsRes, recent] = await Promise.all([
+      supabase.rpc('dashboard_stats'),
       supabase.from('orders').select('*, customer:users!orders_customer_id_fkey(name, customer_code)').order('created_at', { ascending: false }).limit(7),
-      supabase.from('subscriptions').select('total_paid, status').not('status', 'in', '("pending","cancelled")'),
     ])
 
-    const allOrders = orders.data ?? []
-    const paidOrders = allOrders.filter(o => o.payment_status === 'confirmed' && !['cancelled', 'refunded'].includes(o.status))
-    const ordersRevenue = paidOrders.reduce((sum, o) => sum + (o.total ?? 0), 0)
-    const subsRevenue = (subs.data ?? []).reduce((sum: number, s: any) => sum + (Number(s.total_paid) || 0), 0)
-    const active = allOrders.filter(o => !['delivered', 'cancelled', 'refunded'].includes(o.status)).length
-    const todayStr = new Date().toISOString().split('T')[0]
-    const deliveredToday = allOrders.filter(o => o.status === 'delivered' && o.created_at?.startsWith(todayStr)).length
-
-    setStats({
-      totalRevenue: ordersRevenue + subsRevenue,
-      totalOrders: orders.count ?? 0,
-      totalCustomers: customers.count ?? 0,
-      totalDrivers: drivers.count ?? 0,
-      activeOrders: active,
-      deliveredToday,
-    })
+    if (!statsRes.error && statsRes.data) {
+      const d = statsRes.data as Record<string, number>
+      setStats({
+        totalRevenue: Number(d.totalRevenue) || 0,
+        totalOrders: Number(d.totalOrders) || 0,
+        totalCustomers: Number(d.totalCustomers) || 0,
+        totalDrivers: Number(d.totalDrivers) || 0,
+        activeOrders: Number(d.activeOrders) || 0,
+        deliveredToday: Number(d.deliveredToday) || 0,
+      })
+    }
 
     setRecentOrders(recent.data ?? [])
     setLoading(false)
