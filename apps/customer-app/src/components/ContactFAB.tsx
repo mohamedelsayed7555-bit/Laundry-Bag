@@ -121,6 +121,12 @@ export default function ContactFAB() {
     closeSheet()
   }
 
+  // The new-order screen floats a checkout bar above the tab bar (see BAR_BOTTOM/BAR_H there:
+  // 16 + 68 + 28 + 6 = 118, height 56, so its top edge is at 174). Resting at 150 the FAB
+  // overlapped it and covered the piece count, so lift it clear on that screen only.
+  const pathname = usePathname()
+  const fabBottom = pathname?.includes('new-order') ? 186 : 150
+
   const hasAny = contact && (contact.whatsapp || contact.phone || contact.facebook || contact.instagram || contact.tiktok || contact.address)
   if (!hasAny) return null
 
@@ -130,12 +136,6 @@ export default function ContactFAB() {
   if (contact.tiktok) socials.push({ key: 'tt', label: isEn ? 'TikTok' : 'تيك توك', bg: ['#111111', '#111111'], logo: <TikTokLogo />, url: contact.tiktok })
 
   const close = closeSheet
-
-  // The new-order screen floats a checkout bar above the tab bar (see BAR_BOTTOM/BAR_H there:
-  // 16 + 68 + 28 + 6 = 118, height 56, so its top edge is at 174). Resting at 150 the FAB
-  // overlapped it and covered the piece count, so lift it clear on that screen only.
-  const pathname = usePathname()
-  const fabBottom = pathname?.includes('new-order') ? 186 : 150
 
   return (
     <>

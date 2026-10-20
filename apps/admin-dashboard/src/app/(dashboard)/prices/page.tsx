@@ -7,7 +7,7 @@ import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
 import { SERVICE_TYPE_LABELS } from '@cleano/shared-types'
 import type { ServiceType } from '@cleano/shared-types'
-import { Plus, Edit2, Power, Tag, Layers, Sparkles, AlertTriangle } from 'lucide-react'
+import { Plus, Edit2, Power, Tag, Layers, Sparkles, AlertTriangle, Users, Crown, ArrowLeft } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useToast } from '@/components/ui/Toast'
 import Tooltip from '@/components/ui/Tooltip'
@@ -374,67 +374,81 @@ export default function PricesPage() {
       <Modal open={!!svcImpact} onClose={() => setSvcImpact(null)} title={svcImpact?.svc?.is_active ? 'تعطيل الخدمة' : 'تفعيل الخدمة'}>
         {svcImpact && (
           svcImpact.loading ? (
-            <div className="flex items-center justify-center h-24">
-              <div className="w-6 h-6 border-3 border-primary-500 border-t-transparent rounded-full animate-spin" />
+            <div className="flex flex-col items-center justify-center h-32 gap-3">
+              <div className="w-7 h-7 border-[3px] border-primary-500 border-t-transparent rounded-full animate-spin" />
+              <p className="text-xs text-gray-400">جاري حساب الأثر...</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className={`flex items-start gap-3 rounded-xl p-3 ${svcImpact.svc.is_active ? 'bg-red-50 border border-red-200' : 'bg-green-50 border border-green-200'}`}>
-                <AlertTriangle size={18} className={`shrink-0 mt-0.5 ${svcImpact.svc.is_active ? 'text-red-500' : 'text-green-600'}`} />
-                <p className={`text-sm leading-relaxed ${svcImpact.svc.is_active ? 'text-red-700' : 'text-green-700'}`}>
-                  {svcImpact.svc.is_active
-                    ? <>سيتم تعطيل <strong>{svcImpact.svc.name_ar}</strong> وإخفاؤها من تطبيق العميل.</>
-                    : <>سيتم تفعيل <strong>{svcImpact.svc.name_ar}</strong> وإظهارها في تطبيق العميل.</>}
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-gray-400 uppercase">الأثر</p>
-
-                <div className="flex items-center justify-between text-sm py-2 border-b border-surface-border">
-                  <span className="text-gray-500">الأسعار المرتبطة</span>
-                  <span className="font-semibold text-gray-800">{svcImpact.priceCount}</span>
+            <div className="space-y-5">
+              {/* Service identity */}
+              <div className={`flex items-center gap-4 p-4 rounded-2xl border ${svcImpact.svc.is_active ? 'bg-gradient-to-l from-red-50 to-orange-50/40 border-red-100' : 'bg-gradient-to-l from-green-50 to-emerald-50/40 border-green-100'}`}>
+                <div className="w-14 h-14 rounded-2xl bg-white shadow-premium flex items-center justify-center text-3xl shrink-0">
+                  {svcImpact.svc.icon}
                 </div>
-
-                <div className="flex items-center justify-between text-sm py-2 border-b border-surface-border">
-                  <span className="text-gray-500">الباقات المتأثرة</span>
-                  <span className="font-semibold text-gray-800">{svcImpact.plans.length}</span>
+                <div className="min-w-0 flex-1">
+                  <h4 className="font-bold text-navy-800 truncate">{svcImpact.svc.name_ar}</h4>
+                  <p className="text-[11px] text-gray-400 font-mono mt-0.5">{svcImpact.svc.code}</p>
                 </div>
-
-                <div className="flex items-center justify-between text-sm py-2">
-                  <span className="text-gray-500">اشتراكات نشطة متأثرة</span>
-                  <span className={`font-semibold ${svcImpact.subsAffected > 0 && svcImpact.svc.is_active ? 'text-red-600' : 'text-gray-800'}`}>
-                    {svcImpact.subsAffected}
-                  </span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Badge variant={svcImpact.svc.is_active ? 'success' : 'danger'}>
+                    {svcImpact.svc.is_active ? 'نشطة' : 'معطلة'}
+                  </Badge>
+                  <ArrowLeft size={14} className="text-gray-300" />
+                  <Badge variant={svcImpact.svc.is_active ? 'danger' : 'success'}>
+                    {svcImpact.svc.is_active ? 'معطلة' : 'نشطة'}
+                  </Badge>
                 </div>
               </div>
 
+              {/* Impact numbers */}
+              <div className="grid grid-cols-3 gap-2.5">
+                {[
+                  { icon: Tag, label: 'سعر', value: svcImpact.priceCount, alert: false },
+                  { icon: Crown, label: 'باقة', value: svcImpact.plans.length, alert: false },
+                  { icon: Users, label: 'اشتراك نشط', value: svcImpact.subsAffected, alert: svcImpact.subsAffected > 0 && svcImpact.svc.is_active },
+                ].map(({ icon: Icon, label, value, alert }) => (
+                  <div key={label} className={`rounded-2xl p-3.5 border text-center ${alert ? 'bg-red-50 border-red-200' : 'bg-surface-muted border-surface-border/60'}`}>
+                    <Icon size={15} className={`mx-auto mb-1.5 ${alert ? 'text-red-500' : 'text-gray-400'}`} />
+                    <p className={`text-2xl font-bold leading-none ${alert ? 'text-red-600' : 'text-navy-800'}`}>{value}</p>
+                    <p className="text-[10.5px] text-gray-400 mt-1.5">{label}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Affected plans */}
               {svcImpact.plans.length > 0 && (
-                <div className="rounded-xl bg-surface-muted p-3 space-y-1.5">
-                  {svcImpact.plans.map((p: any) => (
-                    <div key={p.name} className="flex items-center justify-between gap-2 text-xs">
-                      <span className="text-gray-700 font-medium truncate">{p.name}</span>
-                      {p.emptied
-                        ? <Badge variant="danger">ستصبح بلا خدمات</Badge>
-                        : <span className="text-gray-400 shrink-0">{p.activeSubs} مشترك</span>}
-                    </div>
-                  ))}
+                <div>
+                  <p className="text-[10.5px] font-semibold text-gray-400 uppercase tracking-wide mb-2">الباقات المتأثرة</p>
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                    {svcImpact.plans.map((pl: any) => (
+                      <div key={pl.name} className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 border ${pl.emptied ? 'bg-red-50 border-red-200' : 'bg-surface-muted border-surface-border/60'}`}>
+                        <span className={`text-xs font-medium truncate ${pl.emptied ? 'text-red-700' : 'text-gray-700'}`}>{pl.name}</span>
+                        {pl.emptied
+                          ? <Badge variant="danger">ستصبح بلا خدمات</Badge>
+                          : <span className="text-[11px] text-gray-400 shrink-0 whitespace-nowrap">{pl.activeSubs} مشترك</span>}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
+              {/* Paying-customer warning */}
               {svcImpact.svc.is_active && svcImpact.subsAffected > 0 && (
-                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3 leading-relaxed">
-                  فيه عملاء دافعين على باقات بتشمل الخدمة دي. التعطيل مش بيعدّل سعر اشتراكهم ولا بيبعتلهم إشعار — راجع معاهم قبل ما تكمل.
-                </p>
+                <div className="flex items-start gap-2.5 rounded-2xl bg-amber-50 border border-amber-200 p-3.5">
+                  <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
+                  <p className="text-[11.5px] text-amber-800 leading-relaxed">
+                    فيه عملاء دافعين على باقات بتشمل الخدمة دي. التعطيل مش بيعدّل سعر اشتراكهم ولا بيبعتلهم إشعار — راجع معاهم قبل ما تكمل.
+                  </p>
+                </div>
               )}
 
-              <div className="flex gap-2">
+              <div className="flex gap-2.5 pt-1">
                 <button onClick={() => setSvcImpact(null)}
-                  className="flex-1 border border-surface-border text-gray-600 p-3 rounded-xl font-semibold hover:bg-surface-muted transition-all">
+                  className="flex-1 border border-surface-border text-gray-600 py-3 rounded-xl text-sm font-semibold hover:bg-surface-muted transition-colors">
                   إلغاء
                 </button>
                 <button onClick={confirmServiceToggle} disabled={saving}
-                  className={`flex-1 text-white p-3 rounded-xl font-semibold disabled:opacity-50 transition-all ${svcImpact.svc.is_active ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}>
+                  className={`flex-1 text-white py-3 rounded-xl text-sm font-semibold disabled:opacity-50 transition-all shadow-premium ${svcImpact.svc.is_active ? 'bg-gradient-to-l from-red-500 to-red-600 hover:shadow-lg' : 'bg-gradient-to-l from-green-500 to-emerald-600 hover:shadow-lg'}`}>
                   {saving ? 'جاري الحفظ...' : svcImpact.svc.is_active ? 'تأكيد التعطيل' : 'تأكيد التفعيل'}
                 </button>
               </div>

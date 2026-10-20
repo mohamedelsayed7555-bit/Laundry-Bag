@@ -5,15 +5,12 @@ import { supabase } from '@/lib/supabase'
 import DataTable from '@/components/ui/DataTable'
 import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
-import { SERVICE_TYPE_LABELS } from '@cleano/shared-types'
-import type { ServiceType } from '@cleano/shared-types'
 import { Plus, Edit2, Power, Trash2, Copy } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useToast } from '@/components/ui/Toast'
 import PermissionGate from '@/components/ui/PermissionGate'
 import { useAuth } from '@/lib/auth-context'
 
-const allServices = Object.keys(SERVICE_TYPE_LABELS) as ServiceType[]
 
 interface CouponForm {
   code: string
@@ -23,14 +20,13 @@ interface CouponForm {
   min_order_amount: number
   max_uses: number | null
   per_user_limit: number
-  services: string[] | null
   expires_at: string
 }
 
 const emptyForm: CouponForm = {
   code: '', type: 'percentage', value: 10, max_discount: null,
   min_order_amount: 0, max_uses: null, per_user_limit: 1,
-  services: null, expires_at: '',
+  expires_at: '',
 }
 
 export default function CouponsPage() {
@@ -64,7 +60,6 @@ export default function CouponsPage() {
       min_order_amount: form.min_order_amount || 0,
       max_uses: form.max_uses || null,
       per_user_limit: form.per_user_limit || 1,
-      services: form.services && form.services.length > 0 ? form.services : null,
       expires_at: form.expires_at || null,
       is_active: true,
     }
@@ -86,7 +81,6 @@ export default function CouponsPage() {
       min_order_amount: form.min_order_amount || 0,
       max_uses: form.max_uses || null,
       per_user_limit: form.per_user_limit || 1,
-      services: form.services && form.services.length > 0 ? form.services : null,
       expires_at: form.expires_at || null,
     }
     const { error } = await supabase.from('coupons').update(payload).eq('id', editItem.id)
@@ -116,7 +110,6 @@ export default function CouponsPage() {
       min_order_amount: item.min_order_amount || 0,
       max_uses: item.max_uses,
       per_user_limit: item.per_user_limit || 1,
-      services: item.services,
       expires_at: item.expires_at ? item.expires_at.split('T')[0] : '',
     })
     setEditItem(item)
@@ -225,22 +218,6 @@ export default function CouponsPage() {
           <label className="block text-xs text-gray-500 mb-1">تاريخ الانتهاء</label>
           <input type="date" value={form.expires_at} onChange={e => setForm(f => ({ ...f, expires_at: e.target.value }))}
             className="w-full border rounded-xl px-3 py-2 text-sm" />
-        </div>
-      </div>
-      <div>
-        <label className="block text-xs text-gray-500 mb-1">خدمات محددة (اتركها فاضية = كل الخدمات)</label>
-        <div className="flex flex-wrap gap-2 mt-1">
-          {allServices.map(s => (
-            <button key={s} type="button"
-              onClick={() => setForm(f => {
-                const current = f.services ?? []
-                const next = current.includes(s) ? current.filter(x => x !== s) : [...current, s]
-                return { ...f, services: next.length > 0 ? next : null }
-              })}
-              className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${(form.services ?? []).includes(s) ? 'bg-primary-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-              {SERVICE_TYPE_LABELS[s]}
-            </button>
-          ))}
         </div>
       </div>
     </div>
