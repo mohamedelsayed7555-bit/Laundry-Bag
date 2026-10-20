@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import Modal from '@/components/ui/Modal'
 import Badge from '@/components/ui/Badge'
-import { Crown, Plus, Edit2, Power, Users, Zap, Star, Gem } from 'lucide-react'
+import { Crown, Plus, Edit2, Power, Users, Zap, Star, Gem, AlertTriangle } from 'lucide-react'
 import { PageSkeleton } from '@/components/ui/Skeleton'
 import { motion } from 'framer-motion'
 import { useToast } from '@/components/ui/Toast'
@@ -59,19 +59,32 @@ export default function PlansPage() {
   const [editPlan, setEditPlan] = useState<Plan | null>(null)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(emptyForm)
+  const [disabledServices, setDisabledServices] = useState<Set<string>>(new Set())
   const { toast } = useToast()
   const { hasPermission } = useAuth()
 
   useEffect(() => { loadData() }, [])
 
   async function loadData() {
-    const [p, s] = await Promise.all([
+    const [p, s, svc] = await Promise.all([
       supabase.from('plans').select('id, name, description, tier, items_per_month, includes_all_services, covered_services, monthly_price, quarterly_price, biannual_price, annual_price, is_active').order('monthly_price'),
       supabase.from('subscriptions').select('*, user:users!subscriptions_user_id_fkey(name), plan:plans!subscriptions_plan_id_fkey(name)').eq('status', 'active'),
+      supabase.from('services').select('code').eq('is_active', false),
     ])
     setPlans((p.data ?? []) as any)
     setSubs(s.data ?? [])
+    if (!svc.error && svc.data) setDisabledServices(new Set(svc.data.map((r: any) => r.code)))
     setLoading(false)
+  }
+
+  // A plan still listed as "active" can be hollow: every service it covers has been
+  // disabled from the services tab, so it sells nothing. Surface that on the card.
+  function serviceHealth(plan: Plan) {
+    const covered = plan.covered_services ?? []
+    if (plan.includes_all_services || covered.length === 0 || disabledServices.size === 0) return null
+    const off = covered.filter(c => disabledServices.has(c))
+    if (off.length === 0) return null
+    return { off, empty: off.length === covered.length }
   }
 
   function openEdit(plan: Plan) {
@@ -261,6 +274,7 @@ export default function PlansPage() {
           const cfg = tierConfig[plan.tier] || tierConfig.individual
           const Icon = cfg.icon
           const activeSubs = subsCount(plan.id)
+          const health = serviceHealth(plan)
 
           return (
             <motion.div
@@ -327,6 +341,22 @@ export default function PlansPage() {
                       {plan.is_active ? 'مفعّلة' : 'معطّلة'}
                     </Badge>
                   </div>
+
+                  {health && (
+                    <div className={`flex items-start gap-2 rounded-xl px-3 py-2 mt-1 ${health.empty ? 'bg-red-50 border border-red-200' : 'bg-amber-50 border border-amber-200'}`}>
+                      <AlertTriangle size={14} className={`shrink-0 mt-0.5 ${health.empty ? 'text-red-500' : 'text-amber-500'}`} />
+                      <div className="text-[11px] leading-relaxed">
+                        <p className={`font-semibold ${health.empty ? 'text-red-700' : 'text-amber-700'}`}>
+                          {health.empty ? 'كل خدماتها معطّلة' : `${health.off.length} من خدماتها معطّلة`}
+                        </p>
+                        <p className={health.empty ? 'text-red-600' : 'text-amber-600'}>
+                          {health.off.map(c => serviceLabelsMap[c] ?? c).join('، ')}
+                          {health.empty && ' — الباقة مش بتقدّم أي خدمة دلوقتي'}
+                          {!health.empty && activeSubs > 0 && ` · ${activeSubs} مشترك متأثر`}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Pricing tiers */}

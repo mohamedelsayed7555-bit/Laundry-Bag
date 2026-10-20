@@ -169,17 +169,21 @@ export default function DriverOrdersScreen() {
     if (error) {
       showAlert({ title: 'خطأ', message: 'حدث خطأ أثناء تحديث الحالة', type: 'error' })
     } else {
+      // Reflect the new status right away: the list is sorted by status, so waiting on the
+      // refetch would leave the order sitting in its old position behind the alert.
+      setOrders(prev => prev.map(o => (o.id === orderId ? { ...o, status: newStatus } : o)))
       await supabase.from('order_status_history').insert({
         order_id: orderId, status: newStatus, changed_by: profile?.id,
       })
+      // force: we just changed this data ourselves, so the 10s read throttle must not skip it.
       if (newStatus === 'delivered') {
         showAlert({ title: 'تم التسليم', message: 'تم تسليم الطلب للعميل بنجاح', type: 'success', buttons: [
-          { text: 'حسناً', onPress: () => loadOrders() },
+          { text: 'حسناً', onPress: () => loadOrders(true) },
         ] })
       } else {
         const statusMsg = statusConfig[newStatus]?.label ?? newStatus
         showAlert({ title: 'تم', message: `تم تحديث الحالة: ${statusMsg}`, type: 'success' })
-        loadOrders()
+        loadOrders(true)
       }
     }
   }

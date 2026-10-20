@@ -7,7 +7,7 @@ import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
 import { SERVICE_TYPE_LABELS } from '@cleano/shared-types'
 import type { ServiceType } from '@cleano/shared-types'
-import { Plus, Edit2, Power, Tag, Layers, Sparkles } from 'lucide-react'
+import { Plus, Edit2, Power, Tag, Layers, Sparkles, AlertTriangle } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useToast } from '@/components/ui/Toast'
 import Tooltip from '@/components/ui/Tooltip'
@@ -33,6 +33,7 @@ export default function PricesPage() {
   const [editCat, setEditCat] = useState<any>(null)
   const [editSvc, setEditSvc] = useState<any>(null)
   const [svcForm, setSvcForm] = useState({ name_ar: '', icon: '🧺', sort_order: 0 })
+  const [svcImpact, setSvcImpact] = useState<any>(null)
   const { toast } = useToast()
   const { hasPermission } = useAuth()
 
@@ -81,7 +82,9 @@ export default function PricesPage() {
   }
 
   async function toggleActive(id: string, current: boolean) {
-    await supabase.from('prices').update({ is_active: !current }).eq('id', id)
+    // Record that this row was switched by hand, so re-enabling its whole service later
+    // doesn't silently bring back a price the admin deliberately retired.
+    await supabase.from('prices').update({ is_active: !current, manually_disabled: current }).eq('id', id)
     loadData()
     toast(current ? 'تم تعطيل السعر' : 'تم تفعيل السعر')
   }
@@ -117,15 +120,43 @@ export default function PricesPage() {
   }
 
   // --- Services CRUD ---
-  async function toggleServiceActive(code: string, current: boolean) {
-    const confirmMsg = current
-      ? 'تعطيل هذه الخدمة سيعطل جميع الأسعار المرتبطة بها. متابعة؟'
-      : 'تفعيل هذه الخدمة سيُعيد تفعيل جميع الأسعار المرتبطة بها. متابعة؟'
-    if (!window.confirm(confirmMsg)) return
-    const { error } = await supabase.from('services').update({ is_active: !current }).eq('code', code)
+  // Disabling a service cascades to its prices (DB trigger) and silently shrinks every plan
+  // that covers it — including plans customers are already paying for. Show that blast radius
+  // before the admin commits, instead of a generic "are you sure".
+  async function openServiceToggle(svc: any) {
+    setSvcImpact({ svc, loading: true, priceCount: 0, plans: [], subsAffected: 0 })
+    const [pricesRes, plansRes] = await Promise.all([
+      supabase.from('prices').select('id', { count: 'exact', head: true }).eq('service_type', svc.code),
+      supabase.from('plans')
+        .select('id, name, covered_services, includes_all_services, subscriptions:subscriptions!subscriptions_plan_id_fkey(id, status)')
+        .eq('is_active', true),
+    ])
+    const plans = (plansRes.data ?? [])
+      .filter((p: any) => !p.includes_all_services && (p.covered_services ?? []).includes(svc.code))
+      .map((p: any) => {
+        const covered: string[] = p.covered_services ?? []
+        const activeSubs = (p.subscriptions ?? []).filter((s: any) => s.status === 'active').length
+        return { name: p.name, emptied: covered.length === 1, activeSubs }
+      })
+    setSvcImpact({
+      svc,
+      loading: false,
+      priceCount: pricesRes.count ?? 0,
+      plans,
+      subsAffected: plans.reduce((n: number, p: any) => n + p.activeSubs, 0),
+    })
+  }
+
+  async function confirmServiceToggle() {
+    if (!svcImpact) return
+    const { svc } = svcImpact
+    setSaving(true)
+    const { error } = await supabase.from('services').update({ is_active: !svc.is_active }).eq('code', svc.code)
+    setSaving(false)
     if (error) { toast(error.message, 'error'); return }
+    setSvcImpact(null)
     loadData()
-    toast(current ? 'تم تعطيل الخدمة وكل أسعارها' : 'تم تفعيل الخدمة وكل أسعارها')
+    toast(svc.is_active ? 'تم تعطيل الخدمة وكل أسعارها' : 'تم تفعيل الخدمة وكل أسعارها')
   }
 
   async function handleEditSvc(e: React.FormEvent) {
@@ -182,7 +213,7 @@ export default function PricesPage() {
     { key: 'actions', label: '', render: (item: any) => (
       <div className="flex gap-1">
         {hasPermission('prices.edit') && <Tooltip content="تعديل"><button onClick={() => { setSvcForm({ name_ar: item.name_ar, icon: item.icon, sort_order: item.sort_order }); setEditSvc(item) }} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Edit2 size={14} className="text-gray-400" /></button></Tooltip>}
-        {hasPermission('prices.edit') && <Tooltip content={item.is_active ? 'تعطيل الخدمة (يعطل كل أسعارها)' : 'تفعيل الخدمة (يُعيد تفعيل كل أسعارها)'}><button onClick={() => toggleServiceActive(item.code, item.is_active)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Power size={14} className={item.is_active ? 'text-red-400' : 'text-green-500'} /></button></Tooltip>}
+        {hasPermission('prices.edit') && <Tooltip content={item.is_active ? 'تعطيل الخدمة (يعطل كل أسعارها)' : 'تفعيل الخدمة (يُعيد تفعيل كل أسعارها)'}><button onClick={() => openServiceToggle(item)} className="p-1.5 hover:bg-surface-muted rounded-lg transition-colors"><Power size={14} className={item.is_active ? 'text-red-400' : 'text-green-500'} /></button></Tooltip>}
       </div>
     )},
   ]
@@ -337,6 +368,79 @@ export default function PricesPage() {
             {saving ? 'جاري الحفظ...' : 'حفظ التعديلات'}
           </button>
         </form>
+      </Modal>
+
+      {/* Service enable/disable — impact preview */}
+      <Modal open={!!svcImpact} onClose={() => setSvcImpact(null)} title={svcImpact?.svc?.is_active ? 'تعطيل الخدمة' : 'تفعيل الخدمة'}>
+        {svcImpact && (
+          svcImpact.loading ? (
+            <div className="flex items-center justify-center h-24">
+              <div className="w-6 h-6 border-3 border-primary-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className={`flex items-start gap-3 rounded-xl p-3 ${svcImpact.svc.is_active ? 'bg-red-50 border border-red-200' : 'bg-green-50 border border-green-200'}`}>
+                <AlertTriangle size={18} className={`shrink-0 mt-0.5 ${svcImpact.svc.is_active ? 'text-red-500' : 'text-green-600'}`} />
+                <p className={`text-sm leading-relaxed ${svcImpact.svc.is_active ? 'text-red-700' : 'text-green-700'}`}>
+                  {svcImpact.svc.is_active
+                    ? <>سيتم تعطيل <strong>{svcImpact.svc.name_ar}</strong> وإخفاؤها من تطبيق العميل.</>
+                    : <>سيتم تفعيل <strong>{svcImpact.svc.name_ar}</strong> وإظهارها في تطبيق العميل.</>}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-gray-400 uppercase">الأثر</p>
+
+                <div className="flex items-center justify-between text-sm py-2 border-b border-surface-border">
+                  <span className="text-gray-500">الأسعار المرتبطة</span>
+                  <span className="font-semibold text-gray-800">{svcImpact.priceCount}</span>
+                </div>
+
+                <div className="flex items-center justify-between text-sm py-2 border-b border-surface-border">
+                  <span className="text-gray-500">الباقات المتأثرة</span>
+                  <span className="font-semibold text-gray-800">{svcImpact.plans.length}</span>
+                </div>
+
+                <div className="flex items-center justify-between text-sm py-2">
+                  <span className="text-gray-500">اشتراكات نشطة متأثرة</span>
+                  <span className={`font-semibold ${svcImpact.subsAffected > 0 && svcImpact.svc.is_active ? 'text-red-600' : 'text-gray-800'}`}>
+                    {svcImpact.subsAffected}
+                  </span>
+                </div>
+              </div>
+
+              {svcImpact.plans.length > 0 && (
+                <div className="rounded-xl bg-surface-muted p-3 space-y-1.5">
+                  {svcImpact.plans.map((p: any) => (
+                    <div key={p.name} className="flex items-center justify-between gap-2 text-xs">
+                      <span className="text-gray-700 font-medium truncate">{p.name}</span>
+                      {p.emptied
+                        ? <Badge variant="danger">ستصبح بلا خدمات</Badge>
+                        : <span className="text-gray-400 shrink-0">{p.activeSubs} مشترك</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {svcImpact.svc.is_active && svcImpact.subsAffected > 0 && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3 leading-relaxed">
+                  فيه عملاء دافعين على باقات بتشمل الخدمة دي. التعطيل مش بيعدّل سعر اشتراكهم ولا بيبعتلهم إشعار — راجع معاهم قبل ما تكمل.
+                </p>
+              )}
+
+              <div className="flex gap-2">
+                <button onClick={() => setSvcImpact(null)}
+                  className="flex-1 border border-surface-border text-gray-600 p-3 rounded-xl font-semibold hover:bg-surface-muted transition-all">
+                  إلغاء
+                </button>
+                <button onClick={confirmServiceToggle} disabled={saving}
+                  className={`flex-1 text-white p-3 rounded-xl font-semibold disabled:opacity-50 transition-all ${svcImpact.svc.is_active ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}>
+                  {saving ? 'جاري الحفظ...' : svcImpact.svc.is_active ? 'تأكيد التعطيل' : 'تأكيد التفعيل'}
+                </button>
+              </div>
+            </div>
+          )
+        )}
       </Modal>
 
       {/* Service Modal */}

@@ -285,7 +285,7 @@ export function StickyBar({ scrollY, title, onBack, right, threshold = 72 }: {
       ) : (
         <View style={{ width: SIZE.ICON }} />
       )}
-      <Text style={[stickyBarStyle.title, { color: b.ink, textAlign: onBack ? 'left' : 'center' }]} numberOfLines={1}>{title}</Text>
+      <Text style={[stickyBarStyle.title, { color: b.ink, textAlign: onBack ? 'auto' : 'center' }]} numberOfLines={1}>{title}</Text>
       {right ?? <View style={{ width: SIZE.ICON }} />}
     </Animated.View>
   )

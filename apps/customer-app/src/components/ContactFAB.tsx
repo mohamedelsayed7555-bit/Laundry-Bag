@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Path, Rect, Circle } from 'react-native-svg'
 import { Headset, Phone, MapPin, X } from 'lucide-react-native'
+import { usePathname } from 'expo-router'
 import { useLanguage } from '../contexts/LanguageContext'
 import { supabase } from '../lib/supabase'
 import { useBrand, ForwardChevron, F, SIZE, HIT } from './brand'
@@ -130,9 +131,15 @@ export default function ContactFAB() {
 
   const close = closeSheet
 
+  // The new-order screen floats a checkout bar above the tab bar (see BAR_BOTTOM/BAR_H there:
+  // 16 + 68 + 28 + 6 = 118, height 56, so its top edge is at 174). Resting at 150 the FAB
+  // overlapped it and covered the piece count, so lift it clear on that screen only.
+  const pathname = usePathname()
+  const fabBottom = pathname?.includes('new-order') ? 186 : 150
+
   return (
     <>
-      <Animated.View style={[s.fabContainer, animStyle]}>
+      <Animated.View style={[s.fabContainer, { bottom: fabBottom }, animStyle]}>
         <TouchableOpacity
           onPress={() => { pulseIn(); setVisible(true) }}
           activeOpacity={0.85}
@@ -231,7 +238,7 @@ export default function ContactFAB() {
 }
 
 const s = StyleSheet.create({
-  fabContainer: { position: 'absolute', bottom: 150, left: 16, zIndex: 999 },
+  fabContainer: { position: 'absolute', left: 16, zIndex: 999 },
   fabHalo: {
     width: 60, height: 60, borderRadius: 30, padding: 5, backgroundColor: 'rgba(56,189,248,0.16)',
     shadowColor: '#0284C7', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.45, shadowRadius: 14, elevation: 10,
