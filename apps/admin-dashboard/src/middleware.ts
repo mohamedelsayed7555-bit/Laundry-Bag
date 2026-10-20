@@ -28,18 +28,21 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const { data: { session } } = await supabase.auth.getSession()
+  // getUser() verifies the token with the Auth server; getSession() trusts the cookie as-is.
+  // This gate only decides redirects (RLS and requireAdmin do the real enforcement), but a
+  // forged cookie shouldn't be able to render the shell either.
+  const { data: { user } } = await supabase.auth.getUser()
 
   const isLoginPage = request.nextUrl.pathname === '/login'
   if (PUBLIC_PAGES.includes(request.nextUrl.pathname)) {
     return response
   }
 
-  if (!session && !isLoginPage) {
+  if (!user && !isLoginPage) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  if (session && isLoginPage) {
+  if (user && isLoginPage) {
     return NextResponse.redirect(new URL('/', request.url))
   }
 

@@ -16,12 +16,15 @@ export async function requireAdmin(req: NextRequest): Promise<{ userId: string; 
     { cookies: { getAll() { return req.cookies.getAll() }, setAll() {} } }
   )
 
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) {
+  // getUser() revalidates the JWT against the Auth server. getSession() only decodes whatever
+  // is in the cookie WITHOUT verifying its signature, so a hand-crafted cookie carrying a known
+  // admin's uuid would have passed this check and been trusted for the service-role lookup below.
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) {
     return NextResponse.json({ error: 'غير مصرح — سجل الدخول أولاً' }, { status: 401 })
   }
 
-  const { data: profile } = await supabaseAdmin.from('users').select('role, is_active').eq('id', session.user.id).single()
+  const { data: profile } = await supabaseAdmin.from('users').select('role, is_active').eq('id', user.id).single()
   if (!profile || !ADMIN_ROLES.includes(profile.role)) {
     return NextResponse.json({ error: 'غير مصرح — صلاحيات غير كافية' }, { status: 403 })
   }
@@ -29,7 +32,7 @@ export async function requireAdmin(req: NextRequest): Promise<{ userId: string; 
     return NextResponse.json({ error: 'الحساب معطل' }, { status: 403 })
   }
 
-  return { userId: session.user.id, role: profile.role }
+  return { userId: user.id, role: profile.role }
 }
 
 export async function logAudit(userId: string, action: string, entityType: string, entityId: string, details?: Record<string, unknown>) {
