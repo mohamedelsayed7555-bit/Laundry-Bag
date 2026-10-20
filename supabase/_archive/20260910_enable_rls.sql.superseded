@@ -1,0 +1,199 @@
+-- Enable RLS on all tables with admin bypass
+-- Run this in Supabase SQL Editor
+-- IMPORTANT: service_role key bypasses RLS automatically (edge functions)
+-- Admin/super_admin users need explicit policies since dashboard uses anon key
+
+-- ============================================
+-- HELPER: check if current user is admin
+-- ============================================
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.users
+    WHERE id = auth.uid()
+    AND role IN ('admin', 'super_admin')
+    AND is_active = true
+  );
+$$;
+
+-- ============================================
+-- HELPER: check if current user is driver
+-- ============================================
+CREATE OR REPLACE FUNCTION public.is_driver()
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.users
+    WHERE id = auth.uid()
+    AND role = 'driver'
+    AND is_active = true
+  );
+$$;
+
+-- ============================================
+-- ORDERS
+-- ============================================
+ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "admin_full_orders" ON orders
+  FOR ALL USING (public.is_admin());
+
+CREATE POLICY "customers_read_own_orders" ON orders
+  FOR SELECT USING (auth.uid() = customer_id);
+
+CREATE POLICY "drivers_read_assigned_orders" ON orders
+  FOR SELECT USING (auth.uid() = driver_id);
+
+CREATE POLICY "customers_insert_orders" ON orders
+  FOR INSERT WITH CHECK (auth.uid() = customer_id);
+
+CREATE POLICY "customers_update_own_orders" ON orders
+  FOR UPDATE USING (auth.uid() = customer_id);
+
+CREATE POLICY "drivers_update_assigned_orders" ON orders
+  FOR UPDATE USING (auth.uid() = driver_id);
+
+-- ============================================
+-- MESSAGES
+-- ============================================
+ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "admin_full_messages" ON messages
+  FOR ALL USING (public.is_admin());
+
+CREATE POLICY "users_read_own_messages" ON messages
+  FOR SELECT USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
+
+CREATE POLICY "users_insert_messages" ON messages
+  FOR INSERT WITH CHECK (auth.uid() = sender_id);
+
+CREATE POLICY "users_update_received_messages" ON messages
+  FOR UPDATE USING (auth.uid() = receiver_id);
+
+-- ============================================
+-- SUBSCRIPTIONS
+-- ============================================
+ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "admin_full_subscriptions" ON subscriptions
+  FOR ALL USING (public.is_admin());
+
+CREATE POLICY "users_read_own_subscriptions" ON subscriptions
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "users_insert_own_subscriptions" ON subscriptions
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "users_update_own_subscriptions" ON subscriptions
+  FOR UPDATE USING (auth.uid() = user_id);
+
+-- ============================================
+-- NOTIFICATIONS
+-- ============================================
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "admin_full_notifications" ON notifications
+  FOR ALL USING (public.is_admin());
+
+CREATE POLICY "users_read_own_notifications" ON notifications
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "users_update_own_notifications" ON notifications
+  FOR UPDATE USING (auth.uid() = user_id);
+
+-- Admin and edge functions insert notifications for users
+-- (edge functions use service_role which bypasses RLS)
+
+-- ============================================
+-- USERS (profile)
+-- ============================================
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "admin_full_users" ON users
+  FOR ALL USING (public.is_admin());
+
+CREATE POLICY "users_read_own_profile" ON users
+  FOR SELECT USING (auth.uid() = id);
+
+CREATE POLICY "users_read_basic_info" ON users
+  FOR SELECT USING (true);
+
+CREATE POLICY "users_update_own_profile" ON users
+  FOR UPDATE USING (auth.uid() = id);
+
+-- ============================================
+-- ADDRESSES
+-- ============================================
+ALTER TABLE addresses ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "admin_read_addresses" ON addresses
+  FOR SELECT USING (public.is_admin());
+
+CREATE POLICY "users_read_own_addresses" ON addresses
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "users_insert_own_addresses" ON addresses
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "users_update_own_addresses" ON addresses
+  FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "users_delete_own_addresses" ON addresses
+  FOR DELETE USING (auth.uid() = user_id);
+
+-- ============================================
+-- ORDER_STATUS_HISTORY
+-- ============================================
+ALTER TABLE order_status_history ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "admin_full_status_history" ON order_status_history
+  FOR ALL USING (public.is_admin());
+
+CREATE POLICY "authenticated_read_status_history" ON order_status_history
+  FOR SELECT USING (auth.role() = 'authenticated');
+
+CREATE POLICY "drivers_insert_status_history" ON order_status_history
+  FOR INSERT WITH CHECK (auth.uid() = changed_by);
+
+-- ============================================
+-- PRICES
+-- ============================================
+ALTER TABLE prices ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "admin_full_prices" ON prices
+  FOR ALL USING (public.is_admin());
+
+CREATE POLICY "anyone_read_prices" ON prices
+  FOR SELECT USING (true);
+
+-- ============================================
+-- PLANS
+-- ============================================
+ALTER TABLE plans ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "admin_full_plans" ON plans
+  FOR ALL USING (public.is_admin());
+
+CREATE POLICY "anyone_read_plans" ON plans
+  FOR SELECT USING (true);
+
+-- ============================================
+-- AUDIT_LOGS
+-- ============================================
+ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "admin_full_audit_logs" ON audit_logs
+  FOR ALL USING (public.is_admin());
+
+CREATE POLICY "authenticated_insert_audit_logs" ON audit_logs
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "authenticated_read_audit_logs" ON audit_logs
+  FOR SELECT USING (auth.role() = 'authenticated');
