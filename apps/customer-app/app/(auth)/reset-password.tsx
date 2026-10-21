@@ -36,27 +36,51 @@ export default function ResetPasswordScreen() {
 
   useEffect(() => {
     let alive = true
+    let settled = false
+
+    function finish(valid: boolean) {
+      if (!alive || settled) return
+      settled = true
+      setLinkValid(valid)
+      setReady(true)
+    }
+
     async function openLink() {
-      // Already holding a recovery session (e.g. the screen was re-mounted).
-      const { data: existing } = await supabase.auth.getSession()
-      if (existing.session) { if (alive) { setLinkValid(true); setReady(true) } ; return }
-      if (!url) return
+      // The link may arrive as a fragment (#access_token=…) or as ?code=… depending on
+      // the flow, and useURL() can be null when the app was already running — so the
+      // initial URL is checked too.
+      const incoming = url ?? (await Linking.getInitialURL())
 
-      const fragment = url.split('#')[1] ?? url.split('?')[1] ?? ''
-      const params = new URLSearchParams(fragment)
-      const access_token = params.get('access_token')
-      const refresh_token = params.get('refresh_token')
+      if (incoming) {
+        const fragment = incoming.split('#')[1] ?? ''
+        const params = new URLSearchParams(fragment)
+        const access_token = params.get('access_token')
+        const refresh_token = params.get('refresh_token')
 
-      if (!access_token || !refresh_token) {
-        if (alive) { setLinkValid(false); setReady(true) }
-        return
+        if (access_token && refresh_token) {
+          const { error } = await supabase.auth.setSession({ access_token, refresh_token })
+          finish(!error)
+          return
+        }
+
+        const query = incoming.split('?')[1]?.split('#')[0] ?? ''
+        const code = new URLSearchParams(query).get('code')
+        if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code)
+          finish(!error)
+          return
+        }
       }
 
-      const { error } = await supabase.auth.setSession({ access_token, refresh_token })
-      if (alive) { setLinkValid(!error); setReady(true) }
+      // Already holding a recovery session (e.g. the screen was re-mounted).
+      const { data } = await supabase.auth.getSession()
+      finish(!!data.session)
     }
+
     openLink()
-    return () => { alive = false }
+    // Whatever happens, the screen must stop spinning and say something.
+    const bail = setTimeout(() => finish(false), 8000)
+    return () => { alive = false; clearTimeout(bail) }
   }, [url])
 
   const rules = useMemo(() => [

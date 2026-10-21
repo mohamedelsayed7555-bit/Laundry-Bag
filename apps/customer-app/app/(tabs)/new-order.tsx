@@ -236,14 +236,19 @@ export default function NewOrderScreen() {
 
   return (
     <>
+      {/* The title stays put while the list scrolls under it, so it is always clear
+          which screen this is and how far down the steps you are. */}
+      <View style={[s.header, { paddingTop: insets.top + 14, backgroundColor: b.page, borderBottomColor: b.divider }]}>
+        <Text style={[s.title, { color: b.ink }]}>{t('newOrder')}</Text>
+      </View>
+
       <ScrollView
         style={[s.container, { backgroundColor: b.page }]}
-        contentContainerStyle={[s.content, { paddingTop: insets.top + 14, paddingBottom: BAR_BOTTOM + BAR_H + 24 }]}
+        contentContainerStyle={[s.content, { paddingTop: 12, paddingBottom: BAR_BOTTOM + BAR_H + 24 }]}
         keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={b.primary} colors={[b.primary]} />}
       >
-        <DotsBackdrop height={insets.top + 190} />
-        <Text style={[s.title, { color: b.ink }]}>{t('newOrder')}</Text>
+        <DotsBackdrop height={190} />
 
         {closed && (
           <View style={[s.banner, { backgroundColor: b.warnTint, borderColor: 'rgba(245,158,11,0.32)' }]}>
@@ -494,7 +499,8 @@ export default function NewOrderScreen() {
 const s = StyleSheet.create({
   container: { flex: 1 },
   content: { paddingHorizontal: 16 },
-  title: { fontFamily: F.display, fontSize: 22, marginBottom: 6 },
+  header: { paddingHorizontal: 16, paddingBottom: 10, borderBottomWidth: StyleSheet.hairlineWidth, zIndex: 5 },
+  title: { fontFamily: F.display, fontSize: 22 },
 
   stepRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 20, marginBottom: 10, marginHorizontal: 2 },
   stepDot: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },

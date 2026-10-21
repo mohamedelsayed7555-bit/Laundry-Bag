@@ -308,6 +308,9 @@ export function Segments({ total, done, current }: { total: number; done: number
   )
 }
 
+// The row keeps the same order in both languages: minus on the left, plus on the
+// right. React Native mirrors a flex row under RTL, which flipped the two and made
+// the control read differently depending on the app language.
 export function Stepper({ qty, onMinus, onPlus, onRemove, disabled }: { qty: number; onMinus: () => void; onPlus: () => void; onRemove?: () => void; disabled?: boolean }) {
   const b = useBrand()
   return (
@@ -537,7 +540,7 @@ const s = StyleSheet.create({
   segs: { flex: 1, flexDirection: 'row', gap: 3 },
   seg: { flex: 1, height: 4, borderRadius: 2 },
   stepWrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  stepper: { flexDirection: 'row', alignItems: 'center', gap: 2, padding: 2, borderRadius: 11, borderWidth: 1 },
+  stepper: { flexDirection: 'row', alignItems: 'center', gap: 2, padding: 2, borderRadius: 11, borderWidth: 1, direction: 'ltr' },
   stepBtn: { width: SIZE.STEP, height: SIZE.STEP, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   stepGlyph: { fontSize: 16, fontFamily: F.bold, lineHeight: 20 },
   stepQty: { minWidth: 24, textAlign: 'center', fontSize: 14, fontFamily: F.display },

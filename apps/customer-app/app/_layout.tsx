@@ -11,6 +11,7 @@ import { supabase } from '../src/lib/supabase'
 import { useNotifications } from '../src/hooks/useNotifications'
 import { colors } from '../src/theme'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import RNRestart from 'react-native-restart'
 import { useFonts } from 'expo-font'
 import {
   IBMPlexSansArabic_400Regular,
@@ -27,12 +28,24 @@ SplashScreen.preventAutoHideAsync().catch(() => {})
 SplashScreen.setOptions?.({ duration: 350, fade: true })
 setTimeout(() => { SplashScreen.hideAsync().catch(() => {}) }, 5000)
 
-AsyncStorage.getItem('@app_language').then(saved => {
+AsyncStorage.getItem('@app_language').then(async saved => {
   const shouldBeRTL = saved !== 'en'
   I18nManager.allowRTL(shouldBeRTL)
-  if (I18nManager.isRTL !== shouldBeRTL) {
-    I18nManager.forceRTL(shouldBeRTL)
-  }
+  if (I18nManager.isRTL === shouldBeRTL) return
+
+  // forceRTL only takes effect once the Activity is recreated, and this runs after the
+  // first render — so the very first launch after install showed Arabic text inside a
+  // left-to-right layout until the customer killed the app and reopened it.
+  I18nManager.forceRTL(shouldBeRTL)
+
+  // A device that refuses to persist the flag would otherwise restart for ever, so the
+  // restart is attempted once per direction. If it does not take, the app simply carries
+  // on as it did before — one wrong-looking launch, never a loop.
+  const key = `@rtl_restart_${shouldBeRTL ? 'rtl' : 'ltr'}`
+  const alreadyTried = await AsyncStorage.getItem(key).catch(() => '1')
+  if (alreadyTried || __DEV__) return
+  await AsyncStorage.setItem(key, '1').catch(() => {})
+  RNRestart.restart()
 }).catch(() => {
   I18nManager.allowRTL(true)
   I18nManager.forceRTL(true)

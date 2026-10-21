@@ -573,8 +573,11 @@ export default function HomeScreen() {
               onPress={() => router.push({ pathname: '/(tabs)/new-order', params: { service: svc.key } })}
               style={s.tile}
             >
-              <Image source={SERVICE_IMAGES[svc.key]} style={StyleSheet.absoluteFill} resizeMode="cover" />
-              <LinearGradient colors={['rgba(5,12,26,0)', 'rgba(5,12,26,0.88)']} locations={[0.25, 1]} style={StyleSheet.absoluteFill} />
+              {/* These tiles are wide and the photos are wide, so "cover" showed the
+                  whole scene and the subject came out tiny. Scaling up crops it the way
+                  the square tiles on the new-order screen already do. */}
+              <Image source={SERVICE_IMAGES[svc.key]} style={[StyleSheet.absoluteFill, s.tileImg]} resizeMode="cover" />
+              <LinearGradient colors={['rgba(5,12,26,0)', 'rgba(5,12,26,0.82)']} locations={[0.38, 1]} style={StyleSheet.absoluteFill} />
               <View style={s.tileArrow}>{I18nManager.isRTL ? <ArrowUpLeft size={13} color="#fff" /> : <ArrowUpRight size={13} color="#fff" />}</View>
               <View style={s.tileText}>
                 <Text style={s.kicker} numberOfLines={1}>{en ? AR_NAMES[svc.key] : svc.en}</Text>
@@ -592,7 +595,7 @@ export default function HomeScreen() {
           style={[s.tile, s.tileWide]}
         >
           <Image source={require('../../assets/services/shop-wide.webp')} style={StyleSheet.absoluteFill} resizeMode="cover" />
-          <LinearGradient colors={['rgba(5,12,26,0)', 'rgba(5,12,26,0.88)']} locations={[0.2, 1]} style={StyleSheet.absoluteFill} />
+          <LinearGradient colors={['rgba(5,12,26,0)', 'rgba(5,12,26,0.82)']} locations={[0.32, 1]} style={StyleSheet.absoluteFill} />
           <View style={s.tileArrow}>{I18nManager.isRTL ? <ArrowUpLeft size={13} color="#fff" /> : <ArrowUpRight size={13} color="#fff" />}</View>
           <View style={s.tileText}>
             <Text style={s.kicker}>{en ? AR_NAMES.accessories : 'SHOP'}</Text>
@@ -701,6 +704,7 @@ const s = StyleSheet.create({
 
   tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   tile: { height: 116, borderRadius: 18, overflow: 'hidden', backgroundColor: '#0F1A2E' },
+  tileImg: { transform: [{ scale: 1.45 }] },
   tileWide: { width: '100%', height: 124 },
   tileArrow: { position: 'absolute', top: 8, end: 8, width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.18)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
   tileText: { position: 'absolute', start: 11, end: 11, bottom: 9 },

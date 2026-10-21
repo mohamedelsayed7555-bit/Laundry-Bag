@@ -121,11 +121,13 @@ export default function ContactFAB() {
     closeSheet()
   }
 
-  // The new-order screen floats a checkout bar above the tab bar (see BAR_BOTTOM/BAR_H there:
-  // 16 + 68 + 28 + 6 = 118, height 56, so its top edge is at 174). Resting at 150 the FAB
-  // overlapped it and covered the piece count, so lift it clear on that screen only.
+  // On the new-order screen the button sat over the item rows and the quantity
+  // controls. Lifting it only moved the collision, so it is hidden there instead —
+  // that screen is for building an order, not for asking a question.
   const pathname = usePathname()
-  const fabBottom = pathname?.includes('new-order') ? 186 : 150
+  if (pathname?.includes('new-order')) return null
+
+  const fabBottom = 150
 
   const hasAny = contact && (contact.whatsapp || contact.phone || contact.facebook || contact.instagram || contact.tiktok || contact.address)
   if (!hasAny) return null
