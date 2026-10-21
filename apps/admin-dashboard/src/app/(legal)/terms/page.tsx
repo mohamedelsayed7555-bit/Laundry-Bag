@@ -14,8 +14,8 @@ const AR: Section[] = [
   { heading: '3. حسابك', body: [
     'لازم تكون بياناتك صحيحة: الاسم ورقم الموبايل والإيميل والعنوان. كل رقم موبايل ليه حساب واحد بس.',
     'انت مسؤول عن الحفاظ على كلمة السر، وعن أي استخدام لحسابك. لازم يكون سنك 18 سنة أو أكتر عشان تعمل حساب.',
-    'تقدر تدخل بحساب جوجل بدل كلمة السر. في الحالة دي استخدامك لحساب جوجل خاضع كمان لشروط جوجل وسياسة الخصوصية بتاعتها، واحنا مش مسؤولين عن أي قيد أو إيقاف يحصل من ناحيتها لحسابك عندهم.',
-    'لو دخلت بجوجل، حسابك عندنا مالوش كلمة سر، وبترجعه من جوجل نفسها. ولو بتستخدم كلمة سر، لينك الاسترجاع بيروح لإيميلك المسجّل هو بس.',
+    'تقدر تدخل بحساب جوجل أو Apple بدل كلمة السر. في الحالة دي استخدامك للحساب ده خاضع كمان لشروط المزوّد وسياسة الخصوصية بتاعته، واحنا مش مسؤولين عن أي قيد أو إيقاف يحصل من ناحيته لحسابك عنده.',
+    'لو دخلت بجوجل أو Apple، حسابك عندنا مالوش كلمة سر، وبترجعه من عندهم. ولو بتستخدم كلمة سر، لينك الاسترجاع بيروح لإيميلك المسجّل هو بس.',
     'موظفينا مايقدروش يشوفوا كلمة سرك ولا يحددوها. أي كود استرجاع بيصدره الدعم بيبقى لمرة واحدة ولمدة قصيرة ومسجّل باسم اللي أصدره، وإنت اللي بتحدد كلمة السر الجديدة.',
   ] },
   { heading: '4. الأسعار والدفع', body: [
@@ -63,8 +63,8 @@ const EN: Section[] = [
   { heading: '3. Your account', body: [
     'Your details must be accurate: name, mobile number, email and address. Each mobile number can have only one account.',
     'You are responsible for keeping your password safe and for any activity on your account. You must be 18 or older to create an account.',
-    'You may sign in with a Google account instead of a password. Your use of that account is also governed by Google’s own terms and privacy policy, and we are not responsible for any restriction or suspension Google applies to it.',
-    'If you sign in with Google, your account with us has no password and you recover it through Google. If you use a password, the recovery link is sent only to the email registered on your account.',
+    'You may sign in with a Google or Apple account instead of a password. Your use of that account is also governed by that provider’s own terms and privacy policy, and we are not responsible for any restriction or suspension it applies to your account with them.',
+    'If you sign in with Google or Apple, your account with us has no password and you recover it through them. If you use a password, the recovery link is sent only to the email registered on your account.',
     'Our staff cannot see or set your password. Any recovery code issued by support is single-use, short-lived and recorded against the member of staff who issued it; you choose the new password yourself.',
   ] },
   { heading: '4. Prices and payment', body: [

@@ -12,6 +12,7 @@ import { useCart } from '../src/contexts/CartContext'
 import { useCustomAlert } from '../src/components/CustomAlert'
 import { playNotificationSound } from '../src/hooks/useNotifications'
 import { supabase } from '../src/lib/supabase'
+import { usePaymentMethods, noteFor } from '../src/lib/paymentMethods'
 import { SkeletonPage } from '../src/components/Skeleton'
 import { serverErrorMessage } from '../src/lib/serverErrors'
 import { useBrand, Card, Stepper, ChoiceGrid, Segmented, StickyFooter, PulseHighlight, IconButton, BackIcon, ForwardIcon, money, clock, F, SIZE, HIT, type Choice } from '../src/components/brand'
@@ -27,12 +28,6 @@ const SERVICE_IMG: Record<string, any> = {
   accessories: require('../assets/services/shop.webp'),
 }
 
-const paymentMethods = [
-  { key: 'cash', icon: '💵', label: 'كاش', labelEn: 'Cash' },
-  { key: 'visa', icon: '💳', label: 'فيزا / ماستركارد', labelEn: 'Visa / Mastercard' },
-  { key: 'e_wallet', icon: '📱', label: 'محفظة إلكترونية', labelEn: 'E-Wallet' },
-  { key: 'instapay', icon: '🏦', label: 'إنستاباي', labelEn: 'InstaPay' },
-]
 
 const services = [
   { key: 'wash', label: 'غسيل', labelEn: 'Wash' },
@@ -56,6 +51,8 @@ export default function CartScreen() {
   const insets = useSafeAreaInsets()
 
   const [paymentMethod, setPaymentMethod] = useState('cash')
+  // The dashboard decides what is on offer; a method switched off disappears here.
+  const { methods: paymentMethods } = usePaymentMethods(paymentMethod, setPaymentMethod)
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [isScheduled, setIsScheduled] = useState(false)
@@ -415,14 +412,14 @@ export default function CartScreen() {
   const addrDetails = (a: any) => [a.building && `${isEn ? 'Bldg' : 'مبنى'} ${a.building}`, a.floor && `${isEn ? 'Floor' : 'ط'}${a.floor}`, a.apartment && `${isEn ? 'Apt' : 'ش'}${a.apartment}`].filter(Boolean).join(' · ')
   const dateLabel = `${scheduledDate.getDate()}/${scheduledDate.getMonth() + 1}/${scheduledDate.getFullYear()}`
   const payItems: Choice[] = paymentMethods.map(pm => ({
-    key: pm.key,
-    label: isEn ? pm.labelEn : pm.label,
+    key: pm.code,
+    label: isEn ? pm.label_en : pm.label_ar,
     icon: (() => {
-      const on = paymentMethod === pm.key
+      const on = paymentMethod === pm.code
       const c = on ? '#fff' : b.accentIcon
-      if (pm.key === 'cash') return <Banknote size={15} color={c} />
-      if (pm.key === 'visa') return <CreditCard size={15} color={c} />
-      if (pm.key === 'e_wallet') return <Wallet size={15} color={c} />
+      if (pm.code === 'cash') return <Banknote size={15} color={c} />
+      if (pm.code === 'visa') return <CreditCard size={15} color={c} />
+      if (pm.code === 'e_wallet') return <Wallet size={15} color={c} />
       return <Landmark size={15} color={c} />
     })(),
   }))
@@ -618,6 +615,11 @@ export default function CartScreen() {
               title={isEn ? (useSubscription ? `Pay for uncovered items (${money(uncoveredTotal)} ${t('currency')})` : 'Payment Method') : (useSubscription ? `دفع القطع خارج الباقة (${money(uncoveredTotal)} ${t('currency')})` : 'طريقة الدفع')}
             />
             <ChoiceGrid items={payItems} value={paymentMethod} onChange={setPaymentMethod} />
+            {noteFor(paymentMethods, paymentMethod, isEn) ? (
+              <Text style={{ fontSize: 12, lineHeight: 19, color: b.muted, marginTop: 8, paddingHorizontal: 2, textAlign: I18nManager.isRTL ? 'right' : 'left' }}>
+                {noteFor(paymentMethods, paymentMethod, isEn)}
+              </Text>
+            ) : null}
           </>
         )}
 

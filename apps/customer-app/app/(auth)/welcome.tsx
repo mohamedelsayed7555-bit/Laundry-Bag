@@ -15,7 +15,7 @@ import { supabase } from '../../src/lib/supabase'
 import { openLegalPage } from '../../src/lib/legal'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { loadLastUser } from '../../src/lib/lastUser'
-import { F, HeroImage, LOGO, PHONE_RE, useAuthTheme, PhoneField, PrimaryButton, SecondaryButton, ForwardArrow, LangButton, SheetBackdrop, tapHaptic, GoogleButton, OrDivider } from '../../src/components/auth/ui'
+import { F, HeroImage, LOGO, PHONE_RE, useAuthTheme, PhoneField, PrimaryButton, SecondaryButton, ForwardArrow, LangButton, SheetBackdrop, tapHaptic, GoogleButton, AppleButton, SocialRow, OrDivider } from '../../src/components/auth/ui'
 
 const SUPPORT_WHATSAPP_INTL = '201002438847'
 
@@ -35,7 +35,8 @@ export default function WelcomeScreen() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [googleBusy, setGoogleBusy] = useState(false)
-  const { signInWithGoogle, googleAvailable, signInWithBiometric, biometricEnabled, biometricEmail } = useAuth()
+  const [appleBusy, setAppleBusy] = useState(false)
+  const { signInWithGoogle, googleAvailable, signInWithApple, appleAvailable, signInWithBiometric, biometricEnabled, biometricEmail } = useAuth()
   // Someone who already turned the fingerprint on should not have to type his number
   // again just to reach it; it only shows when it can actually sign this device in.
   const [bioUser, setBioUser] = useState<{ name: string; phone: string } | null>(null)
@@ -92,6 +93,22 @@ export default function WelcomeScreen() {
     Keyboard.dismiss()
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
     router.replace('/(tabs)/home')
+  }
+
+  async function handleApple() {
+    setError(null)
+    setAppleBusy(true)
+    const { error: err, cancelled, needsProfile } = await signInWithApple()
+    setAppleBusy(false)
+    if (cancelled) return
+    if (err) {
+      setError(err)
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {})
+      return
+    }
+    Keyboard.dismiss()
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+    router.replace(needsProfile ? '/(auth)/complete-profile' : '/(tabs)/home')
   }
 
   async function handleGoogle() {
@@ -237,13 +254,14 @@ export default function WelcomeScreen() {
 
             {googleAvailable ? (
               <>
-                <GoogleButton
-                  title={t('authContinueGoogle')}
-                  onPress={handleGoogle}
-                  loading={googleBusy}
-                  disabled={loading}
-                  style={{ marginTop: 14 }}
-                />
+                {appleAvailable ? (
+                  <SocialRow>
+                    <GoogleButton title={t('authContinueGoogle')} onPress={handleGoogle} loading={googleBusy} disabled={loading || appleBusy} compact style={{ marginTop: 14 }} />
+                    <AppleButton title={t('authContinueApple')} onPress={handleApple} loading={appleBusy} disabled={loading || googleBusy} compact style={{ marginTop: 14 }} />
+                  </SocialRow>
+                ) : (
+                  <GoogleButton title={t('authContinueGoogle')} onPress={handleGoogle} loading={googleBusy} disabled={loading} style={{ marginTop: 14 }} />
+                )}
                 <OrDivider label={t('authOr')} />
               </>
             ) : null}

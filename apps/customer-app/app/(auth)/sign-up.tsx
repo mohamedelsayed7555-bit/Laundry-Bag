@@ -13,7 +13,7 @@ import { useLanguage } from '../../src/contexts/LanguageContext'
 import { supabase } from '../../src/lib/supabase'
 import { openLegalPage } from '../../src/lib/legal'
 import { suggestEmail } from '../../src/lib/emailTypo'
-import { F, useAuthTheme, AuthField, PrimaryButton, ErrorLine, RoundButton, BackArrow, TintBackground, ForwardArrow, GoogleButton, OrDivider } from '../../src/components/auth/ui'
+import { F, useAuthTheme, AuthField, PrimaryButton, ErrorLine, RoundButton, BackArrow, TintBackground, ForwardArrow, GoogleButton, AppleButton, SocialRow, OrDivider } from '../../src/components/auth/ui'
 
 const GIFT_IMAGE = require('../../assets/auth/gift.webp')
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -24,7 +24,7 @@ export default function SignUpScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const { phone = '' } = useLocalSearchParams<{ phone: string }>()
-  const { signUp, signInWithGoogle, googleAvailable } = useAuth()
+  const { signUp, signInWithGoogle, googleAvailable, signInWithApple, appleAvailable } = useAuth()
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -33,6 +33,7 @@ export default function SignUpScreen() {
   const [errors, setErrors] = useState<{ name?: string; email?: string; password?: string; agree?: string; server?: string }>({})
   const [loading, setLoading] = useState(false)
   const [googleBusy, setGoogleBusy] = useState(false)
+  const [appleBusy, setAppleBusy] = useState(false)
   const [giftEnabled, setGiftEnabled] = useState(false)
   // A mistyped domain is silent until the day he needs to recover the account.
   const emailSuggestion = useMemo(() => suggestEmail(email), [email])
@@ -57,6 +58,20 @@ export default function SignUpScreen() {
     setGoogleBusy(true)
     const { error, cancelled, needsProfile } = await signInWithGoogle()
     setGoogleBusy(false)
+    if (cancelled) return
+    if (error) {
+      setErrors({ server: error })
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {})
+      return
+    }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+    router.replace(needsProfile ? '/(auth)/complete-profile' : '/(tabs)/home')
+  }
+
+  async function handleApple() {
+    setAppleBusy(true)
+    const { error, cancelled, needsProfile } = await signInWithApple()
+    setAppleBusy(false)
     if (cancelled) return
     if (error) {
       setErrors({ server: error })
@@ -132,13 +147,14 @@ export default function SignUpScreen() {
 
             {googleAvailable ? (
               <>
-                <GoogleButton
-                  title={t('authContinueGoogle')}
-                  onPress={handleGoogle}
-                  loading={googleBusy}
-                  disabled={loading}
-                  style={{ marginTop: 16 }}
-                />
+                {appleAvailable ? (
+                  <SocialRow>
+                    <GoogleButton title={t('authContinueGoogle')} onPress={handleGoogle} loading={googleBusy} disabled={loading || appleBusy} compact style={{ marginTop: 16 }} />
+                    <AppleButton title={t('authContinueApple')} onPress={handleApple} loading={appleBusy} disabled={loading || googleBusy} compact style={{ marginTop: 16 }} />
+                  </SocialRow>
+                ) : (
+                  <GoogleButton title={t('authContinueGoogle')} onPress={handleGoogle} loading={googleBusy} disabled={loading} style={{ marginTop: 16 }} />
+                )}
                 <OrDivider label={t('authOr')} />
               </>
             ) : null}

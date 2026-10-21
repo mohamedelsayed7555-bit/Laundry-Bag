@@ -2,17 +2,19 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Settings, Save, Plus, Trash2, UserCircle, Mail, Lock, Camera, Eye, EyeOff, Check, Users, CreditCard, Clock, ShoppingBag, Palette, Phone } from 'lucide-react'
+import { Settings, Save, Plus, Trash2, UserCircle, Mail, Lock, Camera, Eye, EyeOff, Check, Users, CreditCard, Clock, ShoppingBag, Palette, Phone, Wallet } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Modal from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/Toast'
 import UsersTab from '@/components/settings/UsersTab'
+import PaymentMethodsTab from '@/components/settings/PaymentMethodsTab'
 import PermissionGate from '@/components/ui/PermissionGate'
 
 const tabs = [
   { key: 'general', label: 'عام', icon: Settings },
   { key: 'bag_offer', label: 'عرض الشنطة', icon: ShoppingBag },
   { key: 'subscriptions', label: 'الاشتراكات', icon: CreditCard },
+  { key: 'payments', label: 'وسائل الدفع', icon: Wallet },
   { key: 'brand', label: 'الألوان', icon: Palette },
   { key: 'contact', label: 'التواصل', icon: Phone },
   { key: 'users', label: 'المستخدمين', icon: Users },
@@ -755,6 +757,8 @@ export default function SettingsPage() {
       )}
 
       {/* Users Tab */}
+      {activeTab === 'payments' && <PaymentMethodsTab />}
+
       {activeTab === 'users' && <UsersTab />}
 
       {/* Profile Tab */}

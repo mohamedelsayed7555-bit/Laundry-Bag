@@ -9,7 +9,9 @@ const AR: Section[] = [
   ] },
   { heading: '2. البيانات اللي بنجمعها', body: [
     'بيانات الحساب: الاسم، ورقم الموبايل، والإيميل، والصورة الشخصية لو رفعتها. كلمة السر بتتخزن مشفّرة، ومحدش عندنا يقدر يشوفها.',
-    'الدخول بجوجل: لو اخترت تدخل بحساب جوجل، بنستقبل من جوجل اسمك وإيميلك وصورتك ومعرّف حسابك. إحنا مش بنستقبل ولا بنخزن كلمة سر جوجل خالص، والحساب ده مالوش كلمة سر عندنا أصلاً. بنسألك عن رقم موبايلك لأن جوجل مابتديهولناش، وإحنا محتاجينه نستلم منك ونسلّمك.',
+    'الدخول بجوجل أو Apple: لو اخترت تدخل بحساب جوجل أو Apple، بنستقبل منهم اسمك وإيميلك ومعرّف حسابك (وصورتك من جوجل). إحنا مش بنستقبل ولا بنخزن كلمة سر الحساب ده خالص، والحساب مالوش كلمة سر عندنا أصلاً.',
+    'لو استخدمت ميزة Apple في إخفاء البريد، بيوصلنا عنوان بديل بتتحكم فيه إنت من إعدادات حسابك في Apple، واحنا بنتعامل معاه زي أي بريد تاني.',
+    'في الحالتين بنسألك عن رقم موبايلك لأن جوجل وApple مابيديهولناش، وإحنا محتاجينه نستلم منك ونسلّمك.',
     'العناوين والموقع: العناوين اللي بتحفظها، وموقعك على الخريطة لما تختار عنوان. بنستخدمهم في تحديد مكان الاستلام وحساب رسوم التوصيل.',
     'الطلبات: القطع والخدمات والأسعار، ومواعيد الاستلام والتسليم، والتقييمات، والرسايل بينك وبين المندوب.',
     'الدفع: طريقة الدفع وحالته. بيانات الكارت أو المحفظة بتدخلها مباشرة عند Paymob، وإحنا مش بنشوفها ولا بنخزنها.',
@@ -24,7 +26,7 @@ const AR: Section[] = [
   { heading: '4. مين بيشوف بياناتك', body: [
     'المندوب: بيشوف اسمك ورقمك وعنوانك بس، وده للطلبات المتعيّنة ليه.',
     'Paymob: لمعالجة الدفع الأونلاين.',
-    'Google: لما تختار الدخول بحساب جوجل، وده للتحقق من هويتك بس.',
+    'Google و Apple: لما تختار الدخول بحساب منهم، وده للتحقق من هويتك بس.',
     'Supabase: الاستضافة وقاعدة البيانات اللي بيتحفظ عليها حسابك وطلباتك.',
     'Brevo: إرسال الإيميلات، زي رسالة استرجاع الحساب وتأكيد البريد.',
     'Expo: إرسال إشعارات التطبيق لجهازك.',
@@ -33,7 +35,7 @@ const AR: Section[] = [
   ] },
   { heading: '5. استرجاع حسابك', body: [
     'لو نسيت كلمة السر، لينك الاسترجاع بيروح لإيميلك المسجّل هو بس، ومينفعش يتوجّه لأي إيميل تاني.',
-    'ولو بتدخل بجوجل، مفيش كلمة سر من الأساس — بترجع حسابك من جوجل نفسها.',
+    'ولو بتدخل بجوجل أو Apple، مفيش كلمة سر من الأساس — بترجع حسابك من عندهم.',
     'موظفينا مايقدروش يشوفوا كلمة سرك ولا يحددوها. لو مش قادر توصل لإيميلك، الدعم يقدر يصدرلك كود لمرة واحدة بينتهي بعد مدة قصيرة، وبيتسجّل باسم الموظف اللي أصدره — وإنت لوحدك اللي بتحدد كلمة السر الجديدة من التطبيق.',
     'وفي كل الحالات بيوصلك إشعار أول ما كلمة سرك تتغير.',
   ] },
@@ -66,7 +68,9 @@ const EN: Section[] = [
   ] },
   { heading: '2. Data we collect', body: [
     'Account details: name, mobile number, email, and a profile photo if you upload one. Passwords are stored hashed and nobody here can read them.',
-    'Signing in with Google: if you choose Google, we receive your name, email, profile picture and account identifier from Google. We never receive or store your Google password, and such an account has no password with us at all. We ask for your mobile number because Google does not give it to us and we need it to collect and deliver your order.',
+    'Signing in with Google or Apple: if you choose either, we receive your name, email and account identifier from them (and your profile picture from Google). We never receive or store the password of that account, and such an account has no password with us at all.',
+    'If you use Apple’s Hide My Email, we receive a relay address that you control from your Apple account settings; we treat it like any other email address.',
+    'In both cases we ask for your mobile number, because neither Google nor Apple provides one and we need it to collect and deliver your order.',
     'Addresses and location: the addresses you save and your location on the map when you pick one. We use them to set the pickup point and calculate the delivery fee.',
     'Orders: items, services and prices, pickup and delivery times, ratings, and messages between you and the driver.',
     'Payments: payment method and status. Card or wallet details are entered directly with Paymob; we never see or store them.',
@@ -81,7 +85,7 @@ const EN: Section[] = [
   { heading: '4. Who can see your data', body: [
     'Drivers: only your name, number and address, for orders assigned to them.',
     'Paymob: to process online payments.',
-    'Google: when you choose to sign in with Google, for identity verification only.',
+    'Google and Apple: when you choose to sign in with either, for identity verification only.',
     'Supabase: hosting and the database where your account and orders are stored.',
     'Brevo: email delivery, for account recovery and email confirmation messages.',
     'Expo: delivering app notifications to your device.',
@@ -90,7 +94,7 @@ const EN: Section[] = [
   ] },
   { heading: '5. Recovering your account', body: [
     'If you forget your password, the recovery link goes only to the email registered on your account, and it cannot be redirected anywhere else.',
-    'If you sign in with Google there is no password at all — you recover through Google.',
+    'If you sign in with Google or Apple there is no password at all — you recover through them.',
     'Our staff cannot see or set your password. If you cannot reach your email, support can issue a single-use code that expires after a short time and is recorded against the member of staff who issued it; you alone choose the new password, inside the app.',
     'You are notified whenever your password changes.',
   ] },

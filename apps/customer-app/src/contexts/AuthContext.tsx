@@ -9,6 +9,7 @@ import type { Session } from '@supabase/supabase-js'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { saveLastUser } from '../lib/lastUser'
 import { clearGoogleSession, googleConfigured, signInWithGoogleNative, signInWithGoogleSilently } from '../lib/googleAuth'
+import { appleAuthAvailable, signInWithAppleNative } from '../lib/appleAuth'
 import type { User } from '../shared/types'
 
 async function isEn() {
@@ -47,6 +48,8 @@ interface AuthContextType extends AuthState {
   signUp: (email: string, password: string, name: string, phone: string) => Promise<{ error: string | null }>
   signInWithGoogle: () => Promise<{ error: string | null; cancelled?: boolean; needsProfile?: boolean }>
   googleAvailable: boolean
+  signInWithApple: () => Promise<{ error: string | null; cancelled?: boolean; needsProfile?: boolean }>
+  appleAvailable: boolean
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
   toggleBiometric: (enable: boolean, email?: string, password?: string) => Promise<boolean>
@@ -57,6 +60,10 @@ interface AuthContextType extends AuthState {
 const AuthContext = createContext<AuthContextType | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  // iOS only, and only where the OS actually offers it.
+  const [appleAvailable, setAppleAvailable] = useState(false)
+  useEffect(() => { appleAuthAvailable().then(setAppleAvailable) }, [])
+
   const [state, setState] = useState<AuthState>({
     session: null,
     profile: null,
@@ -304,6 +311,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null, needsProfile: !row?.phone }
   }
 
+  /**
+   * Apple requires this next to Google (guideline 4.8). Like Google it creates an
+   * account with no password, and the phone number is still collected on the next
+   * screen because Apple does not supply one either.
+   */
+  async function signInWithApple(): Promise<{ error: string | null; cancelled?: boolean; needsProfile?: boolean }> {
+    const en = await isEn()
+    const res = await signInWithAppleNative(en)
+    if (res.cancelled) return { error: null, cancelled: true }
+    if (res.error || !res.idToken) return { error: res.error ?? (en ? 'Apple sign-in failed' : 'تعذّر الدخول بـ Apple') }
+
+    const { data, error } = await supabase.auth.signInWithIdToken({ provider: 'apple', token: res.idToken })
+    if (error || !data.user) {
+      if (/already|exists|duplicate|unique/i.test(error?.message ?? '')) {
+        return {
+          error: en
+            ? 'This email already has an account. Sign in with your password instead.'
+            : 'الإيميل ده عليه حساب بالفعل. ادخل بكلمة السر بدل كده.',
+        }
+      }
+      return { error: en ? 'Could not sign in with this account' : 'تعذّر الدخول بالحساب ده' }
+    }
+
+    // Apple hands over the name once, on the first authorisation only. If we do not
+    // store it now it is gone for good, and the customer has to type it himself.
+    if (res.fullName) {
+      await supabase.from('users')
+        .update({ name: res.fullName })
+        .eq('id', data.user.id)
+        .is('name', null)
+        .then(() => {}, () => {})
+    }
+
+    const { data: row } = await supabase
+      .from('users')
+      .select('phone, is_active, role')
+      .eq('id', data.user.id)
+      .maybeSingle()
+
+    if (row && (row.is_active === false || row.role !== 'customer')) {
+      await supabase.auth.signOut()
+      return { error: en ? 'This account cannot sign in here' : 'الحساب ده مش مسموح له بالدخول من هنا' }
+    }
+
+    return { error: null, needsProfile: !row?.phone }
+  }
+
   async function signOut() {
     // The Google account stays cached on purpose: the fingerprint shortcut re-signs in
     // silently with it. A manual "Continue with Google" always shows the picker anyway,
@@ -425,8 +479,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => ({
     ...state, signInWithPassword, signUp, signInWithGoogle, googleAvailable: googleConfigured,
+    signInWithApple, appleAvailable,
     signOut, refreshProfile, toggleBiometric, signInWithBiometric, biometricEmail,
-  }), [state])
+  }), [state, appleAvailable])
 
   return (
     <AuthContext.Provider value={value}>

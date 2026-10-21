@@ -331,11 +331,13 @@ function GoogleG({ size = 18 }: { size?: number }) {
  * The same button on sign-in and sign-up on purpose: Google decides whether this is
  * a new or a returning customer, so there is nothing for him to choose here.
  */
-export function GoogleButton({ title, onPress, loading, disabled, style }: {
+export function GoogleButton({ title, onPress, loading, disabled, compact, style }: {
   title: string
   onPress: () => void
   loading?: boolean
   disabled?: boolean
+  /** Icon only, sized to sit beside another provider instead of stacking. */
+  compact?: boolean
   style?: StyleProp<ViewStyle>
 }) {
   const th = useAuthTheme()
@@ -347,16 +349,69 @@ export function GoogleButton({ title, onPress, loading, disabled, style }: {
       disabled={off}
       accessibilityRole="button"
       accessibilityState={{ disabled: !!off, busy: !!loading }}
+      accessibilityLabel={title}
       style={[
         s.google,
+        compact && s.googleCompact,
         { backgroundColor: th.isDark ? '#1B2740' : '#FFFFFF', borderColor: th.isDark ? '#30405E' : '#DADCE0', opacity: off ? 0.6 : 1 },
         style,
       ]}
     >
-      {loading ? <ActivityIndicator size="small" color={th.ink2} /> : <GoogleG size={19} />}
-      <Text style={[s.googleText, { color: th.isDark ? '#E8EDF6' : '#3C4043' }]} maxFontSizeMultiplier={1.3}>{title}</Text>
+      {loading ? <ActivityIndicator size="small" color={th.ink2} /> : <GoogleG size={compact ? 22 : 19} />}
+      {compact ? null : (
+        <Text style={[s.googleText, { color: th.isDark ? '#E8EDF6' : '#3C4043' }]} maxFontSizeMultiplier={1.3}>{title}</Text>
+      )}
     </TouchableOpacity>
   )
+}
+
+/**
+ * Sign in with Apple, in Apple's own black-on-white form. Apple's Human Interface
+ * Guidelines require the mark and wording to be theirs, so this is deliberately not
+ * styled like the rest of the buttons.
+ */
+export function AppleButton({ title, onPress, loading, disabled, compact, style }: {
+  title: string
+  onPress: () => void
+  loading?: boolean
+  disabled?: boolean
+  compact?: boolean
+  style?: StyleProp<ViewStyle>
+}) {
+  const th = useAuthTheme()
+  const off = loading || disabled
+  const fg = th.isDark ? '#000' : '#fff'
+  return (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={() => { if (off) return; tapHaptic(); onPress() }}
+      disabled={off}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !!off, busy: !!loading }}
+      accessibilityLabel={title}
+      style={[s.google, compact && s.googleCompact, { backgroundColor: th.isDark ? '#fff' : '#000', borderColor: th.isDark ? '#fff' : '#000', opacity: off ? 0.6 : 1 }, style]}
+    >
+      {loading ? <ActivityIndicator size="small" color={fg} /> : (
+        <Svg width={compact ? 19 : 17} height={compact ? 23 : 20} viewBox="0 0 814 1000">
+          <Path
+            fill={fg}
+            d="M788 340c-5 4-147 84-147 262 0 206 181 279 186 281-1 4-29 99-95 196-59 85-121 170-215 170s-118-55-227-55c-106 0-144 57-230 57S60 1000 0 849c0 0-73-176-73-347 0-275 179-421 355-421 93 0 171 61 230 61 56 0 143-65 249-65 40 0 183 4 277 123zM524 155c44-52 75-124 75-196 0-10-1-20-3-28-71 3-156 48-207 107-40 45-78 117-78 190 0 11 2 22 3 26 4 1 11 2 18 2 64 0 145-43 192-101z"
+          />
+        </Svg>
+      )}
+      {compact ? null : (
+        <Text style={[s.googleText, { color: fg }]} maxFontSizeMultiplier={1.3}>{title}</Text>
+      )}
+    </TouchableOpacity>
+  )
+}
+
+/**
+ * Both providers on one row, as icons. Stacking two full-width buttons pushed the phone
+ * field off the first screen; side by side they cost one row and read as a pair.
+ */
+export function SocialRow({ children }: { children: ReactNode }) {
+  return <View style={s.socialRow}>{children}</View>
 }
 
 /** "──── or ────" between the Google button and the form. */
@@ -530,6 +585,8 @@ const s = StyleSheet.create({
   btn2Text: { fontSize: 14, fontFamily: F.semibold },
   google: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, minHeight: 50, borderRadius: 14, borderWidth: 1.5, paddingHorizontal: 18 },
   googleText: { fontSize: 15, fontFamily: F.semibold },
+  googleCompact: { flex: 1, gap: 0, paddingHorizontal: 0 },
+  socialRow: { flexDirection: 'row', gap: 10 },
   hint: { fontSize: 11.5, lineHeight: 17, fontFamily: F.regular, marginTop: 5, paddingHorizontal: 2 },
   orRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 14 },
   orLine: { flex: 1, height: 1 },

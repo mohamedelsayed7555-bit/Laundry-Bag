@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase'
 import DataTable from '@/components/ui/DataTable'
 import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
-import { Search, Plus, Edit2, Power, Users, KeyRound } from 'lucide-react'
+import { Search, Plus, Edit2, Power, Users, KeyRound, TrendingUp} from 'lucide-react'
 import { TableSkeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import Tooltip from '@/components/ui/Tooltip'
@@ -18,6 +18,8 @@ export default function CustomersPage() {
   const [customers, setCustomers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  // Customers who moved up a tier in the last 30 days — the ones worth a thank-you.
+  const [onlyUpgraded, setOnlyUpgraded] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
   const [editItem, setEditItem] = useState<any>(null)
   const [saving, setSaving] = useState(false)
@@ -34,7 +36,7 @@ export default function CustomersPage() {
 
   async function loadCustomers() {
     const { data, count } = await supabase.from('users')
-      .select('id, name, phone, email, customer_code, tier, points, is_active, created_at, orders:orders!orders_customer_id_fkey(count)', { count: 'exact' })
+      .select('id, name, phone, email, customer_code, tier, points, tier_changed_at, is_active, created_at, orders:orders!orders_customer_id_fkey(count)', { count: 'exact' })
       .eq('role', 'customer').order('created_at', { ascending: false })
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
     setCustomers((data ?? []).map((c: any) => ({ ...c, orders_count: c.orders?.[0]?.count ?? 0 })))
@@ -116,10 +118,20 @@ export default function CustomersPage() {
   }
 
   const filtered = useMemo(() => customers.filter(c => {
+    if (onlyUpgraded) {
+      if (!c.tier_changed_at) return false
+      const days = (Date.now() - new Date(c.tier_changed_at).getTime()) / 86400000
+      if (days > 30) return false
+    }
     if (!search) return true
     const s = search.toLowerCase()
     return c.name?.toLowerCase().includes(s) || c.phone?.includes(s) || c.customer_code?.toLowerCase().includes(s)
-  }), [customers, search])
+  }), [customers, search, onlyUpgraded])
+
+  const upgradedCount = useMemo(() => customers.filter((c: any) => {
+    if (!c.tier_changed_at) return false
+    return (Date.now() - new Date(c.tier_changed_at).getTime()) / 86400000 <= 30
+  }).length, [customers])
 
   const tierVariant = (tier: string) => {
     const map: Record<string, 'success' | 'warning' | 'info' | 'purple'> = { bronze: 'warning', silver: 'info', gold: 'success', platinum: 'purple' }
@@ -194,10 +206,32 @@ export default function CustomersPage() {
         )}
       </motion.div>
 
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className="relative max-w-md">
-        <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input type="text" placeholder="بحث بالاسم أو الكود أو الهاتف..." value={search} onChange={e => setSearch(e.target.value)}
-          className="w-full pr-10 pl-4 py-2.5 bg-white border border-surface-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all" />
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className="flex flex-wrap items-center gap-3">
+        <div className="relative max-w-md flex-1 min-w-[220px]">
+          <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input type="text" placeholder="بحث بالاسم أو الكود أو الهاتف..." value={search} onChange={e => setSearch(e.target.value)}
+            className="w-full pr-10 pl-4 py-2.5 bg-white border border-surface-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all" />
+        </div>
+
+        {/* Nothing is sent automatically — this just rounds up who moved up, so they can
+            be thanked by hand. */}
+        <button
+          type="button"
+          onClick={() => setOnlyUpgraded(v => !v)}
+          className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-all ${
+            onlyUpgraded
+              ? 'border-primary-500/40 bg-primary-50 text-primary-700'
+              : 'border-surface-border/60 bg-white text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <TrendingUp size={15} />
+          ترقّوا مؤخراً
+          {upgradedCount > 0 && (
+            <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+              onlyUpgraded ? 'bg-primary-500 text-white' : 'bg-amber-100 text-amber-700'
+            }`}>{upgradedCount}</span>
+          )}
+        </button>
       </motion.div>
 
       {loading ? <TableSkeleton rows={5} cols={5} />

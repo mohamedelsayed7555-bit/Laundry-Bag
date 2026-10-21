@@ -16,7 +16,7 @@ import { useLanguage } from '../../src/contexts/LanguageContext'
 import { loadLastUser, loadLastLogin, markLastLogin } from '../../src/lib/lastUser'
 import {
   F, HeroImage, useAuthTheme, AuthField, PrimaryButton, SecondaryButton, ErrorLine, RoundButton, BackArrow, LangButton, SheetBackdrop,
-  GoogleButton, OrDivider,
+  GoogleButton, AppleButton, SocialRow, OrDivider,
 } from '../../src/components/auth/ui'
 
 function initialsOf(name: string) {
@@ -45,7 +45,7 @@ export default function SignInScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const { phone = '' } = useLocalSearchParams<{ phone: string }>()
-  const { signInWithPassword, signInWithBiometric, signInWithGoogle, googleAvailable, biometricEnabled, biometricAvailable, biometricEmail } = useAuth()
+  const { signInWithPassword, signInWithBiometric, signInWithGoogle, googleAvailable, signInWithApple, appleAvailable, biometricEnabled, biometricAvailable, biometricEmail } = useAuth()
 
   const [knownName, setKnownName] = useState<string | null>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
@@ -56,6 +56,7 @@ export default function SignInScreen() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [googleBusy, setGoogleBusy] = useState(false)
+  const [appleBusy, setAppleBusy] = useState(false)
   const shake = useRef(new RNAnimated.Value(0)).current
   const pulse = useRef(new RNAnimated.Value(0)).current
   const pulse2 = useRef(new RNAnimated.Value(0)).current
@@ -139,6 +140,18 @@ export default function SignInScreen() {
     setGoogleBusy(true)
     const { error: err, cancelled, needsProfile } = await signInWithGoogle()
     setGoogleBusy(false)
+    if (cancelled) return
+    if (err) { fail(err); return }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+    if (needsProfile) { router.replace('/(auth)/complete-profile'); return }
+    succeed()
+  }
+
+  async function handleApple() {
+    setError(null)
+    setAppleBusy(true)
+    const { error: err, cancelled, needsProfile } = await signInWithApple()
+    setAppleBusy(false)
     if (cancelled) return
     if (err) { fail(err); return }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
@@ -304,7 +317,14 @@ export default function SignInScreen() {
                 {googleAvailable ? (
                   <>
                     <OrDivider label={t('authOr')} />
-                    <GoogleButton title={t('authContinueGoogle')} onPress={handleGoogle} loading={googleBusy} disabled={loading} />
+                    {appleAvailable ? (
+                      <SocialRow>
+                        <GoogleButton title={t('authContinueGoogle')} onPress={handleGoogle} loading={googleBusy} disabled={loading || appleBusy} compact />
+                        <AppleButton title={t('authContinueApple')} onPress={handleApple} loading={appleBusy} disabled={loading || googleBusy} compact />
+                      </SocialRow>
+                    ) : (
+                      <GoogleButton title={t('authContinueGoogle')} onPress={handleGoogle} loading={googleBusy} disabled={loading} />
+                    )}
                   </>
                 ) : null}
 

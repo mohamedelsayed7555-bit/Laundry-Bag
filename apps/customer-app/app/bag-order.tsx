@@ -7,6 +7,7 @@ import { useAuth } from '../src/contexts/AuthContext'
 import { useCustomAlert } from '../src/components/CustomAlert'
 import { useLanguage } from '../src/contexts/LanguageContext'
 import { supabase } from '../src/lib/supabase'
+import { usePaymentMethods, noteFor } from '../src/lib/paymentMethods'
 import { SkeletonPage } from '../src/components/Skeleton'
 import { serverErrorMessage } from '../src/lib/serverErrors'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -16,12 +17,6 @@ import { PrimaryButton } from '../src/components/auth/ui'
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://kjqtrmedkvqfofwymoni.supabase.co'
 
-const PAYMENT_METHODS = [
-  { key: 'cash', icon: '💵', labelKey: 'pmCash' },
-  { key: 'visa', icon: '💳', labelKey: 'pmVisa' },
-  { key: 'instapay', icon: '📱', labelKey: 'pmInstapay' },
-  { key: 'e_wallet', icon: '📲', labelKey: 'pmWallet' },
-]
 
 export default function BagOrderScreen() {
   const { profile } = useAuth()
@@ -36,6 +31,8 @@ export default function BagOrderScreen() {
   const [addresses, setAddresses] = useState<any[]>([])
   const [selectedAddress, setSelectedAddress] = useState<any>(null)
   const [paymentMethod, setPaymentMethod] = useState('cash')
+  // Offered methods come from the dashboard, not from a list baked into this build.
+  const { methods: paymentMethods } = usePaymentMethods(paymentMethod, setPaymentMethod)
   const bagPayScrollRef = useRef<ScrollView>(null)
   const [walletPhone, setWalletPhone] = useState('')
   const [paymentSettings, setPaymentSettings] = useState<{ instapay: string; wallet: string }>({ instapay: '', wallet: '' })
@@ -169,10 +166,10 @@ export default function BagOrderScreen() {
   const bagBadge = (!en && bagOffer.badge_text) || t('bagBadge')
   const bagSub = (!en && bagOffer.subtitle) || t('bagSubtitle')
   const rtl = I18nManager.isRTL
-  const payItems: Choice[] = PAYMENT_METHODS.map(pm => {
-    const c = paymentMethod === pm.key ? '#fff' : b.accentIcon
-    const Icon = pm.key === 'cash' ? Banknote : pm.key === 'visa' ? CreditCard : pm.key === 'instapay' ? Landmark : Wallet
-    return { key: pm.key, label: t(pm.labelKey), icon: <Icon size={15} color={c} /> }
+  const payItems: Choice[] = paymentMethods.map(pm => {
+    const c = paymentMethod === pm.code ? '#fff' : b.accentIcon
+    const Icon = pm.code === 'cash' ? Banknote : pm.code === 'visa' ? CreditCard : pm.code === 'instapay' ? Landmark : Wallet
+    return { key: pm.code, label: locale === 'en' ? pm.label_en : pm.label_ar, icon: <Icon size={15} color={c} /> }
   })
   const addrDetails = (a: any) => [a.building && `${t('bagBuilding')} ${a.building}`, a.floor && `${t('bagFloor')}${a.floor}`].filter(Boolean).join(' · ')
 
@@ -304,6 +301,11 @@ export default function BagOrderScreen() {
             <Text style={[s.sectionTitle, { color: b.ink }]}>{t('paymentMethod')}</Text>
           </View>
           <ChoiceGrid items={payItems} value={paymentMethod} onChange={setPaymentMethod} />
+          {noteFor(paymentMethods, paymentMethod, en) ? (
+            <Text style={{ fontSize: 12, lineHeight: 19, color: b.muted, marginTop: 8, paddingHorizontal: 2, textAlign: rtl ? 'right' : 'left' }}>
+              {noteFor(paymentMethods, paymentMethod, en)}
+            </Text>
+          ) : null}
 
           {paymentMethod === 'e_wallet' && (
             <Card style={{ marginTop: 10 }}>

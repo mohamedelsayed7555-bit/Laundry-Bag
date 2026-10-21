@@ -18,7 +18,12 @@ export default function EditProfileScreen() {
   const b = useBrand()
   const insets = useSafeAreaInsets()
   const { scrollY, onScroll } = useStickyHeader()
-  const { profile, refreshProfile, toggleBiometric, biometricEnabled } = useAuth()
+  const { profile, session, refreshProfile, toggleBiometric, biometricEnabled } = useAuth()
+  // An account created through Google or Apple has no password, so this section is
+  // offering a new one rather than changing an existing one — and it is optional.
+  const provider = session?.user.app_metadata?.provider
+  const providerName = provider === 'apple' ? 'Apple' : provider === 'google' ? 'Google' : null
+  const hasNoPassword = !!providerName
   const router = useRouter()
   const { showAlert, AlertComponent } = useCustomAlert()
   const [name, setName] = useState(profile?.name ?? '')
@@ -139,7 +144,7 @@ export default function EditProfileScreen() {
       setConfirmPassword('')
       setShowPassword(false)
       if (biometricEnabled) await toggleBiometric(false)
-      showAlert({ title: t('success'), message: t('passwordChanged'), type: 'success' })
+      showAlert({ title: t('success'), message: hasNoPassword ? t('passwordSet') : t('passwordChanged'), type: 'success' })
     }
   }
 
@@ -255,12 +260,17 @@ export default function EditProfileScreen() {
       <Card style={s.section} pad={false}>
         <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={s.pwHeader} activeOpacity={0.7} accessibilityRole="button" accessibilityState={{ expanded: showPassword }}>
           <View style={[s.pwIcon, { backgroundColor: b.tint }]}><KeyRound size={16} color={b.tintText} /></View>
-          <Text style={[s.pwTitle, { color: b.ink }]}>{t('changePassword')}</Text>
+          <Text style={[s.pwTitle, { color: b.ink }]}>{hasNoPassword ? t('setPassword') : t('changePassword')}</Text>
           {showPassword ? <ChevronUp size={18} color={b.faint} /> : <ChevronDown size={18} color={b.faint} />}
         </TouchableOpacity>
 
         {showPassword && (
           <View style={[s.passwordForm, { borderTopColor: b.divider }]}>
+            {hasNoPassword ? (
+              <Text style={[s.label, { color: b.muted, marginBottom: 12, lineHeight: 19 }]}>
+                {t('setPasswordHint', { provider: providerName })}
+              </Text>
+            ) : null}
             <Text style={[s.label, { color: b.ink2 }]}>{t('newPasswordLabel')}</Text>
             <View style={[s.field, { backgroundColor: b.field, borderColor: b.fieldBorder }]}>
               <View style={[s.fieldIcon, { backgroundColor: b.iconTile }]}><Lock size={15} color={b.accentIcon} /></View>
@@ -296,7 +306,7 @@ export default function EditProfileScreen() {
             )}
 
             <PrimaryButton
-              title={t('changePasswordBtn')}
+              title={hasNoPassword ? t('setPasswordBtn') : t('changePasswordBtn')}
               loadingTitle={t('changingPassword')}
               loading={savingPassword}
               disabled={pwDisabled}

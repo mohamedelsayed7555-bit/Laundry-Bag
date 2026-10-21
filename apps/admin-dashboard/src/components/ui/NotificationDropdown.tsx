@@ -134,8 +134,8 @@ export default function NotificationDropdown() {
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full mt-2 w-96 bg-white rounded-2xl shadow-premium-lg border border-surface-border/60 overflow-hidden z-50 animate-scale-in"
-          style={{ maxHeight: '480px' }}
+        <div className="fixed inset-x-3 top-[68px] sm:absolute sm:inset-x-auto sm:left-0 sm:top-full sm:mt-2 sm:w-96 bg-white rounded-2xl shadow-premium-lg border border-surface-border/60 overflow-hidden z-50 animate-scale-in"
+          style={{ maxHeight: 'min(480px, calc(100vh - 96px))' }}
         >
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-3.5 border-b border-surface-border/60">

@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, RefreshControl, Dimensions, FlatList, Animated, Switch } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, RefreshControl, Dimensions, FlatList, Animated, Switch , I18nManager} from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { User, Users, Home, Crown, Package, Sparkles, Check, Zap, CircleCheck, TriangleAlert, Hourglass, CreditCard, Wallet, Landmark, Smartphone, Settings2, RefreshCw } from 'lucide-react-native'
@@ -10,6 +10,7 @@ import { useAuth } from '../src/contexts/AuthContext'
 import { useLanguage } from '../src/contexts/LanguageContext'
 import { useCustomAlert } from '../src/components/CustomAlert'
 import { supabase } from '../src/lib/supabase'
+import { useSubscriptionPaymentMethods, noteFor } from '../src/lib/paymentMethods'
 import { SkeletonPage } from '../src/components/Skeleton'
 import { serverErrorMessage } from '../src/lib/serverErrors'
 
@@ -56,11 +57,6 @@ const tierColors: Record<string, string> = {
   premium: '#ef4444',
 }
 
-const paymentMethods = [
-  { key: 'visa', icon: '💳', label: 'فيزا / ماستركارد', labelEn: 'Visa / Mastercard' },
-  { key: 'wallet', icon: '📱', label: 'محفظة إلكترونية', labelEn: 'E-Wallet' },
-  { key: 'instapay', icon: '🏦', label: 'إنستاباي', labelEn: 'InstaPay' },
-]
 
 export default function PlansScreen() {
   const { profile } = useAuth()
@@ -84,6 +80,9 @@ export default function PlansScreen() {
   const [discountRates, setDiscountRates] = useState({ quarterly: 10, biannual: 15, annual: 20 })
   const [autoRenew, setAutoRenew] = useState(true)
   const [selectedPayment, setSelectedPayment] = useState('visa')
+  // Same switch the dashboard controls; a plan can never be bought with a method that
+  // is off for orders.
+  const { methods: paymentMethods } = useSubscriptionPaymentMethods(selectedPayment, setSelectedPayment)
   const [walletPhone, setWalletPhone] = useState('')
   const [refreshing, setRefreshing] = useState(false)
   const [serviceFilter, setServiceFilter] = useState('all')
@@ -221,8 +220,8 @@ export default function PlansScreen() {
     showAlert({
       title: `${locale === 'en' ? 'Subscribe' : 'اشتراك'} ${planName(plan.name)}`,
       message: locale === 'en'
-        ? `Duration: ${durLabel}\nPrice: ${price} EGP\n${plan.items_per_month} items/month\nPayment: ${paymentMethods.find(p => p.key === selectedPayment)?.labelEn}\nAuto-renew: ${autoRenew ? 'Yes' : 'No'}\n\n${selectedPayment === 'instapay' ? `Send ${price} EGP to InstaPay number:\n${instapayNumber}\n\nYour subscription will be activated after admin confirms payment.` : 'Your subscription will be activated automatically after payment'}`
-        : `المدة: ${durLabel}\nالسعر: ${price} ج.م\n${plan.items_per_month} قطعة/شهر\nطريقة الدفع: ${paymentMethods.find(p => p.key === selectedPayment)?.label}\nتجديد تلقائي: ${autoRenew ? 'نعم' : 'لا'}\n\n${selectedPayment === 'instapay' ? `حوّل ${price} ج.م على رقم إنستاباي:\n${instapayNumber}\n\nسيتم تفعيل اشتراكك بعد تأكيد الدفع من الإدارة.` : 'سيتم تفعيل اشتراكك تلقائياً بعد نجاح الدفع'}`,
+        ? `Duration: ${durLabel}\nPrice: ${price} EGP\n${plan.items_per_month} items/month\nPayment: ${paymentMethods.find(p => p.code === selectedPayment)?.label_en}\nAuto-renew: ${autoRenew ? 'Yes' : 'No'}\n\n${selectedPayment === 'instapay' ? `Send ${price} EGP to InstaPay number:\n${instapayNumber}\n\nYour subscription will be activated after admin confirms payment.` : 'Your subscription will be activated automatically after payment'}`
+        : `المدة: ${durLabel}\nالسعر: ${price} ج.م\n${plan.items_per_month} قطعة/شهر\nطريقة الدفع: ${paymentMethods.find(p => p.code === selectedPayment)?.label_ar}\nتجديد تلقائي: ${autoRenew ? 'نعم' : 'لا'}\n\n${selectedPayment === 'instapay' ? `حوّل ${price} ج.م على رقم إنستاباي:\n${instapayNumber}\n\nسيتم تفعيل اشتراكك بعد تأكيد الدفع من الإدارة.` : 'سيتم تفعيل اشتراكك تلقائياً بعد نجاح الدفع'}`,
       type: 'confirm',
       buttons: [
         { text: locale === 'en' ? 'Cancel' : 'إلغاء', style: 'cancel' },
@@ -286,11 +285,11 @@ export default function PlansScreen() {
     return <User size={20} color={color} />
   }
   const payItems: Choice[] = paymentMethods.map(pm => {
-    const c = selectedPayment === pm.key ? '#fff' : b.accentIcon
+    const c = selectedPayment === pm.code ? '#fff' : b.accentIcon
     return {
-      key: pm.key,
-      label: isEn ? pm.labelEn : pm.label,
-      icon: pm.key === 'visa' ? <CreditCard size={15} color={c} /> : pm.key === 'wallet' ? <Wallet size={15} color={c} /> : <Landmark size={15} color={c} />,
+      key: pm.code,
+      label: isEn ? pm.label_en : pm.label_ar,
+      icon: pm.code === 'visa' ? <CreditCard size={15} color={c} /> : pm.code === 'wallet' ? <Wallet size={15} color={c} /> : <Landmark size={15} color={c} />,
     }
   })
   const serviceLabels: Record<string, string> = isEn
@@ -610,6 +609,11 @@ export default function PlansScreen() {
 
           <Text style={[s.settingsLabel, { color: b.muted }]}>{isEn ? 'Payment method' : 'طريقة الدفع'}</Text>
           <ChoiceGrid items={payItems} value={selectedPayment} onChange={setSelectedPayment} />
+          {noteFor(paymentMethods, selectedPayment, isEn) ? (
+            <Text style={{ fontSize: 12, lineHeight: 19, color: b.muted, marginTop: 8, paddingHorizontal: 2, textAlign: I18nManager.isRTL ? 'right' : 'left' }}>
+              {noteFor(paymentMethods, selectedPayment, isEn)}
+            </Text>
+          ) : null}
 
           {selectedPayment === 'wallet' && (
             <View style={{ marginTop: 12 }}>
