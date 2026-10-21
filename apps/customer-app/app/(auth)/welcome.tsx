@@ -9,11 +9,13 @@ import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated'
 import * as Haptics from 'expo-haptics'
-import { Truck, WashingMachine, House, ShieldCheck, MessageCircle, Sparkles } from 'lucide-react-native'
+import { Truck, WashingMachine, House, ShieldCheck, MessageCircle, Sparkles, Fingerprint } from 'lucide-react-native'
 import { useLanguage } from '../../src/contexts/LanguageContext'
 import { supabase } from '../../src/lib/supabase'
 import { openLegalPage } from '../../src/lib/legal'
-import { F, HeroImage, LOGO, PHONE_RE, useAuthTheme, PhoneField, PrimaryButton, ForwardArrow, LangButton, SheetBackdrop, tapHaptic } from '../../src/components/auth/ui'
+import { useAuth } from '../../src/contexts/AuthContext'
+import { loadLastUser } from '../../src/lib/lastUser'
+import { F, HeroImage, LOGO, PHONE_RE, useAuthTheme, PhoneField, PrimaryButton, SecondaryButton, ForwardArrow, LangButton, SheetBackdrop, tapHaptic, GoogleButton, OrDivider } from '../../src/components/auth/ui'
 
 const SUPPORT_WHATSAPP_INTL = '201002438847'
 
@@ -32,6 +34,12 @@ export default function WelcomeScreen() {
   const [phone, setPhone] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [googleBusy, setGoogleBusy] = useState(false)
+  const { signInWithGoogle, googleAvailable, signInWithBiometric, biometricEnabled, biometricEmail } = useAuth()
+  // Someone who already turned the fingerprint on should not have to type his number
+  // again just to reach it; it only shows when it can actually sign this device in.
+  const [bioUser, setBioUser] = useState<{ name: string; phone: string } | null>(null)
+  const [bioBusy, setBioBusy] = useState(false)
   const [keyboardOpen, setKeyboardOpen] = useState(false)
   const [stepsW, setStepsW] = useState(0)
   const travel = useRef(new RNAnimated.Value(0)).current
@@ -62,6 +70,46 @@ export default function WelcomeScreen() {
     return () => { a.remove(); b.remove() }
   }, [])
 
+  // The whole sign-up can start here: Google already knows who this is, so there is
+  // nothing to type and no password to forget afterwards.
+  useEffect(() => {
+    let alive = true
+    if (!biometricEnabled) { setBioUser(null); return }
+    Promise.all([loadLastUser(), biometricEmail()]).then(([last, mail]) => {
+      if (!alive) return
+      const usable = last && last.email && mail && mail.toLowerCase() === last.email.toLowerCase()
+      setBioUser(usable ? { name: last!.name, phone: last!.phone } : null)
+    })
+    return () => { alive = false }
+  }, [biometricEnabled])
+
+  async function handleBiometric() {
+    setError(null)
+    setBioBusy(true)
+    const { error: err } = await signInWithBiometric()
+    setBioBusy(false)
+    if (err) { setError(err); return }
+    Keyboard.dismiss()
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+    router.replace('/(tabs)/home')
+  }
+
+  async function handleGoogle() {
+    setError(null)
+    setGoogleBusy(true)
+    const { error: err, cancelled, needsProfile } = await signInWithGoogle()
+    setGoogleBusy(false)
+    if (cancelled) return
+    if (err) {
+      setError(err)
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {})
+      return
+    }
+    Keyboard.dismiss()
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+    router.replace(needsProfile ? '/(auth)/complete-profile' : '/(tabs)/home')
+  }
+
   async function handleContinue() {
     const value = phone.trim()
     if (!PHONE_RE.test(value)) {
@@ -81,7 +129,9 @@ export default function WelcomeScreen() {
     router.push({ pathname: data ? '/(auth)/sign-in' : '/(auth)/sign-up', params: { phone: value } })
   }
 
-  const heroHeight = keyboardOpen ? 150 + insets.top : Math.max(300, Math.round(height * 0.5))
+  // 0.5 of the screen pushed the Google button below the fold, where customers never
+  // saw the one path that leaves them with no password to forget.
+  const heroHeight = keyboardOpen ? 150 + insets.top : Math.max(260, Math.round(height * 0.4))
   // The dashed line runs from 17% to 83% of the row, so the dot travels ±33% around the centre.
   const dotX = travel.interpolate({ inputRange: [0, 1], outputRange: [-stepsW * 0.33, stepsW * 0.33] })
 
@@ -185,6 +235,19 @@ export default function WelcomeScreen() {
               </View>
             )}
 
+            {googleAvailable ? (
+              <>
+                <GoogleButton
+                  title={t('authContinueGoogle')}
+                  onPress={handleGoogle}
+                  loading={googleBusy}
+                  disabled={loading}
+                  style={{ marginTop: 14 }}
+                />
+                <OrDivider label={t('authOr')} />
+              </>
+            ) : null}
+
             <Text style={[s.label, { color: th.ink, textAlign: isRTL ? 'right' : 'left' }]}>{t('authPhoneLabel')}</Text>
             <PhoneField
               value={phone}
@@ -208,6 +271,15 @@ export default function WelcomeScreen() {
               trailing={<ForwardArrow />}
               style={{ marginTop: 10 }}
             />
+
+            {bioUser ? (
+              <SecondaryButton
+                title={t('authBioCta')}
+                icon={<Fingerprint size={16} color={th.ink2} />}
+                onPress={handleBiometric}
+                style={{ marginTop: 10, opacity: bioBusy ? 0.6 : 1 }}
+              />
+            ) : null}
 
             <Text style={[s.legal, { color: th.faint }]}>
               {t('authContinueAgree')}{' '}

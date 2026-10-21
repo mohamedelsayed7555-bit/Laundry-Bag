@@ -37,6 +37,16 @@ export async function POST(request: NextRequest) {
     if (PRIVILEGED_ROLES.includes(target.role) && auth.role !== 'super_admin') {
       return NextResponse.json({ error: 'فقط الـ Super Admin يمكنه تعديل بيانات هذا الحساب' }, { status: 403 })
     }
+    // Nobody sets a customer's password, not even a super_admin: knowing it means being
+    // able to sign in as him, which is exactly what the customer is trusting us not to
+    // do. Support issues a recovery code instead (/api/issue-reset-code) and the
+    // customer chooses the password himself in the app.
+    if (password && target.role === 'customer') {
+      return NextResponse.json(
+        { error: 'لا يمكن تعيين كلمة مرور لعميل — أصدر كود استرجاع والعميل يحددها بنفسه' },
+        { status: 403 }
+      )
+    }
   }
 
   const updates: Record<string, any> = {}

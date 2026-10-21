@@ -15,7 +15,10 @@ import { PrimaryButton, SecondaryButton } from '../../src/components/auth/ui'
 import { openLegalPage } from '../../src/lib/legal'
 
 export default function ProfileScreen() {
-  const { profile, signOut, biometricEnabled, biometricAvailable, toggleBiometric } = useAuth()
+  const { profile, session, signOut, biometricEnabled, biometricAvailable, toggleBiometric } = useAuth()
+  // A Google account has no password, so there is nothing to ask for: the fingerprint
+  // gates a silent re-authentication with Google instead of replaying a stored secret.
+  const isGoogleAccount = session?.user.app_metadata?.provider === 'google'
   const { isDark, mode, setMode } = useTheme()
   const { t, locale, setLanguage } = useLanguage()
   const { showAlert, AlertComponent } = useCustomAlert()
@@ -161,6 +164,13 @@ export default function ProfileScreen() {
                 value={biometricEnabled}
                 onValueChange={async (val) => {
                   if (val) {
+                    if (isGoogleAccount) {
+                      const ok = await toggleBiometric(true)
+                      showAlert(ok
+                        ? { title: t('success'), message: t('biometricEnabled'), type: 'success' }
+                        : { title: t('error'), message: t('biometricFailed'), type: 'error' })
+                      return
+                    }
                     setBioEmail(profile?.email ?? '')
                     setBioPassword('')
                     setShowBioModal(true)

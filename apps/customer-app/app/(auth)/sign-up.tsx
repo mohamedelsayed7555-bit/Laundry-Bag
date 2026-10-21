@@ -12,7 +12,8 @@ import { useAuth } from '../../src/contexts/AuthContext'
 import { useLanguage } from '../../src/contexts/LanguageContext'
 import { supabase } from '../../src/lib/supabase'
 import { openLegalPage } from '../../src/lib/legal'
-import { F, useAuthTheme, AuthField, PrimaryButton, ErrorLine, RoundButton, BackArrow, TintBackground, ForwardArrow } from '../../src/components/auth/ui'
+import { suggestEmail } from '../../src/lib/emailTypo'
+import { F, useAuthTheme, AuthField, PrimaryButton, ErrorLine, RoundButton, BackArrow, TintBackground, ForwardArrow, GoogleButton, OrDivider } from '../../src/components/auth/ui'
 
 const GIFT_IMAGE = require('../../assets/auth/gift.webp')
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -23,7 +24,7 @@ export default function SignUpScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const { phone = '' } = useLocalSearchParams<{ phone: string }>()
-  const { signUp } = useAuth()
+  const { signUp, signInWithGoogle, googleAvailable } = useAuth()
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -31,7 +32,10 @@ export default function SignUpScreen() {
   const [agreed, setAgreed] = useState(false)
   const [errors, setErrors] = useState<{ name?: string; email?: string; password?: string; agree?: string; server?: string }>({})
   const [loading, setLoading] = useState(false)
+  const [googleBusy, setGoogleBusy] = useState(false)
   const [giftEnabled, setGiftEnabled] = useState(false)
+  // A mistyped domain is silent until the day he needs to recover the account.
+  const emailSuggestion = useMemo(() => suggestEmail(email), [email])
   const emailRef = useRef<TextInput>(null)
   const passwordRef = useRef<TextInput>(null)
 
@@ -49,11 +53,27 @@ export default function SignUpScreen() {
   const passed = rules.filter(r => r.ok).length
   const meterColor = passed <= 1 ? th.danger : passed < 4 ? '#F59E0B' : th.ok
 
+  async function handleGoogle() {
+    setGoogleBusy(true)
+    const { error, cancelled, needsProfile } = await signInWithGoogle()
+    setGoogleBusy(false)
+    if (cancelled) return
+    if (error) {
+      setErrors({ server: error })
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {})
+      return
+    }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+    router.replace(needsProfile ? '/(auth)/complete-profile' : '/(tabs)/home')
+  }
+
   async function handleCreate() {
     const next: typeof errors = {}
     if (name.trim().length < 2) next.name = t('authNameRequired')
-    // Email is optional — only reject it when the customer typed something invalid.
-    if (email.trim() && !EMAIL_RE.test(email.trim())) next.email = t('authEmailInvalid')
+    // Required: a password account with no inbox can only be reset by us, and the
+    // whole point is that the customer never has to depend on that.
+    if (!email.trim()) next.email = t('authEmailRequired')
+    else if (!EMAIL_RE.test(email.trim())) next.email = t('authEmailInvalid')
     if (passed < rules.length) next.password = t('authPasswordWeak')
     if (!agreed) next.agree = t('authAgreeRequired')
     setErrors(next)
@@ -110,7 +130,20 @@ export default function SignUpScreen() {
               </TouchableOpacity>
             </View>
 
-            <View style={{ gap: 10, marginTop: 14 }}>
+            {googleAvailable ? (
+              <>
+                <GoogleButton
+                  title={t('authContinueGoogle')}
+                  onPress={handleGoogle}
+                  loading={googleBusy}
+                  disabled={loading}
+                  style={{ marginTop: 16 }}
+                />
+                <OrDivider label={t('authOr')} />
+              </>
+            ) : null}
+
+            <View style={{ gap: 10, marginTop: googleAvailable ? 0 : 14 }}>
               <AuthField
                 label={t('authFullName')}
                 icon={User}
@@ -126,7 +159,8 @@ export default function SignUpScreen() {
               />
               <AuthField
                 ref={emailRef}
-                label={t('authEmailOptional')}
+                label={t('authEmailLabel')}
+                hint={t('authEmailWhy')}
                 icon={Mail}
                 ltr
                 value={email}
@@ -141,6 +175,18 @@ export default function SignUpScreen() {
                 valid={!!email.trim() && EMAIL_RE.test(email.trim())}
                 error={errors.email}
               />
+              {emailSuggestion && !errors.email ? (
+                <TouchableOpacity
+                  onPress={() => setEmail(emailSuggestion)}
+                  accessibilityRole="button"
+                  hitSlop={6}
+                  style={{ marginTop: -4, paddingHorizontal: 2 }}
+                >
+                  <Text style={[s.typo, { color: th.primary }, align]} maxFontSizeMultiplier={1.3}>
+                    {t('authEmailTypo', { email: emailSuggestion })}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
               <AuthField
                 ref={passwordRef}
                 label={t('authPassword')}
@@ -221,6 +267,7 @@ export default function SignUpScreen() {
 }
 
 const s = StyleSheet.create({
+  typo: { fontSize: 12, lineHeight: 18, fontFamily: F.semibold },
   root: { flex: 1 },
   nav: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 },
   steps: { flexDirection: 'row', gap: 4, direction: 'ltr' },

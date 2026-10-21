@@ -50,7 +50,7 @@ export default function PricesPage() {
 
   async function loadData() {
     const [pRes, cRes, sRes] = await Promise.all([
-      supabase.from('prices').select('id, item_type, service_type, price, is_active, category_id, categories(name)').order('item_type'),
+      supabase.from('prices').select('id, item_type, service_type, price, is_active, category_id, categories(name)').order('item_type').order('price'),
       supabase.from('categories').select('*').order('sort_order'),
       supabase.from('services').select('*').order('sort_order'),
     ])

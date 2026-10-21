@@ -8,6 +8,7 @@ import * as Device from 'expo-device'
 import type { Session } from '@supabase/supabase-js'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { saveLastUser } from '../lib/lastUser'
+import { clearGoogleSession, googleConfigured, signInWithGoogleNative, signInWithGoogleSilently } from '../lib/googleAuth'
 import type { User } from '../shared/types'
 
 async function isEn() {
@@ -19,7 +20,12 @@ const BIO_CREDS_KEY = 'bio_credentials'
 // Which account the fingerprint belongs to (not secret).
 const BIO_EMAIL_KEY = 'bio_email'
 // The password, encrypted by a hardware key that only opens after a successful fingerprint/face check.
+// Google accounts have no password, so for them this holds a marker instead and the
+// fingerprint only gates a silent re-authentication with Google.
 const BIO_SECRET_KEY = 'bio_secret'
+// 'password' | 'google' — which way the fingerprint signs this account back in.
+const BIO_METHOD_KEY = 'bio_method'
+const GOOGLE_BIO_MARKER = 'google'
 function bioSecretOptions(en: boolean): SecureStore.SecureStoreOptions {
   return {
     requireAuthentication: true,
@@ -39,6 +45,8 @@ interface AuthState {
 interface AuthContextType extends AuthState {
   signInWithPassword: (email: string, password: string) => Promise<{ error: string | null }>
   signUp: (email: string, password: string, name: string, phone: string) => Promise<{ error: string | null }>
+  signInWithGoogle: () => Promise<{ error: string | null; cancelled?: boolean; needsProfile?: boolean }>
+  googleAvailable: boolean
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
   toggleBiometric: (enable: boolean, email?: string, password?: string) => Promise<boolean>
@@ -117,11 +125,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function fetchProfile(session: Session) {
-    const { data } = await supabase
+    const COLUMNS = 'id, name, phone, email, role, customer_code, tier, points, is_active, avatar_url, fcm_token'
+    let { data } = await supabase
       .from('users')
-      .select('id, name, phone, email, role, customer_code, tier, points, is_active, avatar_url, fcm_token')
+      .select(COLUMNS)
       .eq('id', session.user.id)
       .single()
+
+    // A Google sign-in creates the auth user without going through our sign-up, so the
+    // profile row may not exist yet. Seed it from what Google gave us instead of
+    // signing the customer straight back out; the phone is collected on the next screen.
+    if (!data) {
+      const meta: any = session.user.user_metadata ?? {}
+      const seeded = await supabase
+        .from('users')
+        .upsert({
+          id: session.user.id,
+          email: session.user.email ?? null,
+          name: (meta.name || meta.full_name || '').trim() || null,
+          avatar_url: meta.avatar_url || meta.picture || null,
+          role: 'customer',
+          is_active: true,
+        }, { onConflict: 'id' })
+        .select(COLUMNS)
+        .single()
+      data = seeded.data
+    }
 
     if (!data || data.is_active === false || data.role !== 'customer') {
       await supabase.auth.signOut()
@@ -193,10 +222,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: phoneTaken } = await supabase.rpc('is_phone_registered', { p_phone: phone.trim() })
     if (phoneTaken) return { error: en ? 'Phone number already registered' : 'رقم الموبايل مسجل بالفعل' }
 
-    // Email is optional for customers. Supabase still needs an address as the login
-    // identity, so when it's blank we derive a stable, unique one from the phone
-    // (the phone is already guaranteed unique just above). Sign-in maps phone -> this.
-    const authEmail = email.trim() || `${phone.trim()}@cleano.temp`
+    // A password account must have a real inbox: it is the only way the customer can
+    // reset it himself. Whoever does not want to give one signs in with Google instead,
+    // and that account has no password to forget.
+    const authEmail = email.trim().toLowerCase()
+    if (!authEmail) return { error: en ? 'Email is required to recover your account' : 'البريد الإلكتروني مطلوب عشان تقدر ترجّع حسابك' }
 
     // Pass name/phone as sign-up metadata so the handle_new_user trigger writes the
     // real values into public.users at creation time. Otherwise the row is created
@@ -234,7 +264,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null }
   }
 
+  /**
+   * Google is the identity for these accounts: no password is created, so there is
+   * nothing for the customer to forget and nothing for us to reset on his behalf.
+   * Returns needsProfile when the phone is still missing (Google never gives one).
+   */
+  async function signInWithGoogle(): Promise<{ error: string | null; cancelled?: boolean; needsProfile?: boolean }> {
+    const en = await isEn()
+    const res = await signInWithGoogleNative(en)
+    if (res.cancelled) return { error: null, cancelled: true }
+    if (res.error || !res.idToken) return { error: res.error ?? (en ? 'Google sign-in failed' : 'تعذّر الدخول بجوجل') }
+
+    const { data, error } = await supabase.auth.signInWithIdToken({ provider: 'google', token: res.idToken })
+    if (error || !data.user) {
+      await clearGoogleSession()
+      // The e-mail is unique across accounts: this Gmail already has a password account.
+      if (/already|exists|duplicate|unique/i.test(error?.message ?? '')) {
+        return {
+          error: en
+            ? 'This email already has an account. Sign in with your password instead.'
+            : 'الإيميل ده عليه حساب بالفعل. ادخل بكلمة السر بدل كده.',
+        }
+      }
+      return { error: en ? 'Could not sign in with this account' : 'تعذّر الدخول بالحساب ده' }
+    }
+
+    const { data: row } = await supabase
+      .from('users')
+      .select('phone, is_active, role')
+      .eq('id', data.user.id)
+      .maybeSingle()
+
+    if (row && (row.is_active === false || row.role !== 'customer')) {
+      await supabase.auth.signOut()
+      await clearGoogleSession()
+      return { error: en ? 'This account cannot sign in here' : 'الحساب ده مش مسموح له بالدخول من هنا' }
+    }
+
+    return { error: null, needsProfile: !row?.phone }
+  }
+
   async function signOut() {
+    // The Google account stays cached on purpose: the fingerprint shortcut re-signs in
+    // silently with it. A manual "Continue with Google" always shows the picker anyway,
+    // because signInWithGoogleNative clears the cache right before it opens.
     // This device must stop receiving this account's notifications.
     const uid = state.session?.user.id
     if (uid) {
@@ -252,12 +325,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function toggleBiometric(enable: boolean, email?: string, password?: string): Promise<boolean> {
     if (enable) {
+      // A Google account has no password to protect, so the fingerprint instead gates a
+      // silent re-authentication with Google. Nothing secret is written to the device.
+      const isGoogle = state.session?.user.app_metadata?.provider === 'google'
+      if (isGoogle) {
+        const mail = email || state.session?.user.email
+        if (!mail) return false
+        try {
+          await SecureStore.setItemAsync(BIO_SECRET_KEY, GOOGLE_BIO_MARKER, bioSecretOptions(await isEn()))
+          await SecureStore.setItemAsync(BIO_EMAIL_KEY, mail)
+          await SecureStore.setItemAsync(BIO_METHOD_KEY, GOOGLE_BIO_MARKER)
+          setState(s => ({ ...s, biometricEnabled: true }))
+          return true
+        } catch {
+          await SecureStore.deleteItemAsync(BIO_SECRET_KEY).catch(() => {})
+          await SecureStore.deleteItemAsync(BIO_EMAIL_KEY).catch(() => {})
+          await SecureStore.deleteItemAsync(BIO_METHOD_KEY).catch(() => {})
+          return false
+        }
+      }
       if (!email || !password) return false
       try {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) return false
         await SecureStore.setItemAsync(BIO_SECRET_KEY, password, bioSecretOptions(await isEn()))
         await SecureStore.setItemAsync(BIO_EMAIL_KEY, email)
+        await SecureStore.setItemAsync(BIO_METHOD_KEY, 'password')
         setState(s => ({ ...s, biometricEnabled: true }))
         return true
       } catch {
@@ -269,6 +362,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         await SecureStore.deleteItemAsync(BIO_SECRET_KEY)
         await SecureStore.deleteItemAsync(BIO_EMAIL_KEY)
+        await SecureStore.deleteItemAsync(BIO_METHOD_KEY).catch(() => {})
         await SecureStore.deleteItemAsync(BIO_CREDS_KEY).catch(() => {})
         setState(s => ({ ...s, biometricEnabled: false }))
         return true
@@ -295,9 +389,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // The key was invalidated (e.g. a new fingerprint was added): sign in with the password and turn it on again.
         await SecureStore.deleteItemAsync(BIO_EMAIL_KEY).catch(() => {})
         await SecureStore.deleteItemAsync(BIO_SECRET_KEY).catch(() => {})
+        await SecureStore.deleteItemAsync(BIO_METHOD_KEY).catch(() => {})
         setState(s => ({ ...s, biometricEnabled: false }))
         return { error: en ? 'Please sign in with your password, then turn on biometric again' : 'ادخل بكلمة السر وفعّل البصمة تاني' }
       }
+
+      // Google account: the fingerprint has just been verified, so ask Google for a
+      // fresh token without showing the picker. No password exists to replay.
+      if (password === GOOGLE_BIO_MARKER) {
+        const res = await signInWithGoogleSilently(en)
+        if (res.error || !res.idToken) {
+          return { error: res.error ?? (en ? 'Sign in with Google again' : 'ادخل بجوجل تاني') }
+        }
+        const { error } = await supabase.auth.signInWithIdToken({ provider: 'google', token: res.idToken })
+        if (error) return { error: en ? 'Sign in with Google again' : 'ادخل بجوجل تاني' }
+        return { error: null }
+      }
+
       return signInWithPassword(email, password)
     } catch {
       const en = await isEn()
@@ -316,7 +424,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const value = useMemo(() => ({
-    ...state, signInWithPassword, signUp,
+    ...state, signInWithPassword, signUp, signInWithGoogle, googleAvailable: googleConfigured,
     signOut, refreshProfile, toggleBiometric, signInWithBiometric, biometricEmail,
   }), [state])
 

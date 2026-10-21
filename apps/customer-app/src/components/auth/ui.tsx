@@ -5,7 +5,7 @@ import {
   type TextInputProps, type StyleProp, type ViewStyle,
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
-import Svg, { Circle } from 'react-native-svg'
+import Svg, { Circle, Path } from 'react-native-svg'
 import * as Haptics from 'expo-haptics'
 import { Eye, EyeOff, CircleAlert, CircleCheck, ArrowLeft, ArrowRight, Globe } from 'lucide-react-native'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -85,6 +85,8 @@ type FieldProps = Omit<TextInputProps, 'style'> & {
   label: string
   icon: typeof CircleCheck
   error?: string | null
+  /** Shown under the field while there is no error — e.g. why we ask for this. */
+  hint?: string
   valid?: boolean
   secure?: boolean
   ltr?: boolean
@@ -92,7 +94,7 @@ type FieldProps = Omit<TextInputProps, 'style'> & {
 }
 
 export const AuthField = forwardRef<TextInput, FieldProps>(function AuthField(
-  { label, icon: Icon, error, valid, secure, ltr, style, onFocus, onBlur, ...input },
+  { label, icon: Icon, error, hint, valid, secure, ltr, style, onFocus, onBlur, ...input },
   ref,
 ) {
   const th = useAuthTheme()
@@ -139,6 +141,9 @@ export const AuthField = forwardRef<TextInput, FieldProps>(function AuthField(
         </View>
       </View>
       <ErrorLine message={error} />
+      {!error && hint ? (
+        <Text style={[s.hint, { color: th.muted, textAlign: isRTL ? 'right' : 'left' }]} maxFontSizeMultiplier={1.3}>{hint}</Text>
+      ) : null}
     </View>
   )
 })
@@ -310,6 +315,62 @@ export function SecondaryButton({ title, onPress, icon, style }: {
   )
 }
 
+/** Google's four-colour "G", drawn so it stays crisp and needs no asset. */
+function GoogleG({ size = 18 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 48 48">
+      <Path fill="#4285F4" d="M45.1 24.5c0-1.6-.1-3.2-.4-4.7H24v8.9h11.8c-.5 2.7-2.1 5-4.4 6.6v5.5h7.1c4.2-3.8 6.6-9.5 6.6-16.3z" />
+      <Path fill="#34A853" d="M24 46c6 0 11-2 14.5-5.3l-7.1-5.5c-2 1.3-4.5 2.1-7.4 2.1-5.7 0-10.5-3.8-12.2-9H4.5v5.7C8 41.3 15.4 46 24 46z" />
+      <Path fill="#FBBC05" d="M11.8 28.3c-.4-1.3-.7-2.7-.7-4.3s.3-3 .7-4.3v-5.7H4.5C2.9 17.1 2 20.4 2 24s.9 6.9 2.5 10l7.3-5.7z" />
+      <Path fill="#EA4335" d="M24 10.8c3.2 0 6.1 1.1 8.4 3.3l6.3-6.3C34.9 4.2 29.9 2 24 2 15.4 2 8 6.7 4.5 14l7.3 5.7c1.7-5.2 6.5-8.9 12.2-8.9z" />
+    </Svg>
+  )
+}
+
+/**
+ * The same button on sign-in and sign-up on purpose: Google decides whether this is
+ * a new or a returning customer, so there is nothing for him to choose here.
+ */
+export function GoogleButton({ title, onPress, loading, disabled, style }: {
+  title: string
+  onPress: () => void
+  loading?: boolean
+  disabled?: boolean
+  style?: StyleProp<ViewStyle>
+}) {
+  const th = useAuthTheme()
+  const off = loading || disabled
+  return (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={() => { if (off) return; tapHaptic(); onPress() }}
+      disabled={off}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !!off, busy: !!loading }}
+      style={[
+        s.google,
+        { backgroundColor: th.isDark ? '#1B2740' : '#FFFFFF', borderColor: th.isDark ? '#30405E' : '#DADCE0', opacity: off ? 0.6 : 1 },
+        style,
+      ]}
+    >
+      {loading ? <ActivityIndicator size="small" color={th.ink2} /> : <GoogleG size={19} />}
+      <Text style={[s.googleText, { color: th.isDark ? '#E8EDF6' : '#3C4043' }]} maxFontSizeMultiplier={1.3}>{title}</Text>
+    </TouchableOpacity>
+  )
+}
+
+/** "──── or ────" between the Google button and the form. */
+export function OrDivider({ label }: { label: string }) {
+  const th = useAuthTheme()
+  return (
+    <View style={s.orRow}>
+      <View style={[s.orLine, { backgroundColor: th.fieldBorder }]} />
+      <Text style={[s.orText, { color: th.muted }]} maxFontSizeMultiplier={1.2}>{label}</Text>
+      <View style={[s.orLine, { backgroundColor: th.fieldBorder }]} />
+    </View>
+  )
+}
+
 export function ForwardArrow({ color = '#fff', size = 18 }: { color?: string; size?: number }) {
   const { isRTL } = useLanguage()
   return isRTL ? <ArrowLeft size={size} color={color} /> : <ArrowRight size={size} color={color} />
@@ -467,4 +528,10 @@ const s = StyleSheet.create({
   btnFill: { ...StyleSheet.absoluteFillObject, borderRadius: 14, overflow: 'hidden' },
   btn2: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 44, borderRadius: 12, borderWidth: 1.5, paddingHorizontal: 16 },
   btn2Text: { fontSize: 14, fontFamily: F.semibold },
+  google: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, minHeight: 50, borderRadius: 14, borderWidth: 1.5, paddingHorizontal: 18 },
+  googleText: { fontSize: 15, fontFamily: F.semibold },
+  hint: { fontSize: 11.5, lineHeight: 17, fontFamily: F.regular, marginTop: 5, paddingHorizontal: 2 },
+  orRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 14 },
+  orLine: { flex: 1, height: 1 },
+  orText: { fontSize: 12.5, fontFamily: F.medium },
 })

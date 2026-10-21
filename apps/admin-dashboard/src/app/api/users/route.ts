@@ -1,7 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { rateLimit } from '@/lib/rate-limit'
-import { requireAdmin } from '@/lib/api-auth'
+import { requireAdmin, logAudit } from '@/lib/api-auth'
+import { issueResetCode, unknowablePassword, WELCOME_TTL_MINUTES } from '@/lib/reset-codes'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -39,22 +40,29 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  if (phone) {
-    if (!/^01[0125]\d{8}$/.test(phone.replace(/\s|-/g, ''))) {
+  // Normalise before checking AND before storing. The unique index compares strings, so
+  // "010 1111 1111" and "01011111111" would both get in and become two accounts for one
+  // number — and the phone is what recovery and dispatch look an account up by.
+  const normalizedPhone = phone ? String(phone).replace(/[\s-]/g, '') : ''
+  if (normalizedPhone) {
+    if (!/^01[0125]\d{8}$/.test(normalizedPhone)) {
       return NextResponse.json({ error: 'رقم الموبايل غير صحيح — يجب أن يبدأ بـ 01 ويكون 11 رقم' }, { status: 400 })
     }
-    const { data: existing } = await supabaseAdmin.from('users').select('id').eq('phone', phone).maybeSingle()
+    const { data: existing } = await supabaseAdmin.from('users').select('id').eq('phone', normalizedPhone).maybeSingle()
     if (existing) {
       return NextResponse.json({ error: 'رقم الموبايل مستخدم بالفعل' }, { status: 400 })
     }
   }
 
-  // An admin may set an initial password (so it can be handed to the customer to
-  // log in with); otherwise a random one is generated. Either way the value is
-  // returned to the caller to show once, since the account is unusable until
-  // someone knows it.
+  // A customer's password is his alone: staff neither choose it nor see it. The account
+  // is created with a value nobody will ever know, and the customer sets a real one with
+  // the recovery code handed to him below. Staff accounts are still provisioned with a
+  // password, because somebody has to give the new employee his first login.
+  const isCustomer = wanted === 'customer'
   let password = typeof body.password === 'string' ? body.password.trim() : ''
-  if (password) {
+  if (isCustomer) {
+    password = unknowablePassword()
+  } else if (password) {
     if (password.length < 8) {
       return NextResponse.json({ error: 'كلمة المرور يجب أن تكون 8 أحرف على الأقل' }, { status: 400 })
     }
@@ -77,12 +85,33 @@ export async function POST(request: NextRequest) {
   }
 
   const updates: Record<string, any> = { name, role: wanted }
-  if (phone) updates.phone = phone
+  if (normalizedPhone) updates.phone = normalizedPhone
   if (tier) updates.tier = tier
   if (vehicle_type) updates.vehicle_type = vehicle_type
   if (vehicle_number) updates.vehicle_number = vehicle_number
 
   await supabaseAdmin.from('users').update(updates).eq('id', authData.user.id)
+
+  await logAudit(auth.userId, 'create_user', 'user', authData.user.id, { name, role: wanted })
+
+  if (isCustomer) {
+    const issued = await issueResetCode(authData.user.id, auth.userId, WELCOME_TTL_MINUTES)
+    if (!issued) {
+      // The account exists but cannot be handed over; say so rather than pretend.
+      return NextResponse.json(
+        { error: 'تم إنشاء الحساب لكن تعذّر إصدار كود الاستلام — أصدره من زر المفتاح' },
+        { status: 500 }
+      )
+    }
+    return NextResponse.json({
+      success: true,
+      id: authData.user.id,
+      code: issued.code,
+      expiresInMinutes: issued.expiresInMinutes,
+      phone: normalizedPhone,
+      name,
+    })
+  }
 
   return NextResponse.json({ success: true, id: authData.user.id, password })
 }

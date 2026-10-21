@@ -56,6 +56,18 @@ export async function POST(request: NextRequest) {
       const { data: listData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 50 })
       const existingAuth = listData?.users?.find((u: any) => u.email === email)
       if (existingAuth) {
+        // This branch reuses an auth account that the public.users pre-check missed,
+        // and it overwrites the password. For a customer that is an account takeover
+        // dressed as a sign-up, so it stops here: support issues a recovery code and
+        // the customer sets his own password.
+        const { data: existingProfile } = await supabaseAdmin
+          .from('users').select('role').eq('id', existingAuth.id).maybeSingle()
+        if (existingProfile?.role === 'customer') {
+          return NextResponse.json(
+            { error: 'البريد الإلكتروني ده عليه حساب عميل — مينفعش تكتب فوقه' },
+            { status: 409 }
+          )
+        }
         await supabaseAdmin.auth.admin.updateUserById(existingAuth.id, { password, user_metadata: { name, role }, app_metadata: { role } })
         const updates: Record<string, any> = { name, role, email, permissions: permissions || [], is_active: true }
         if (phone) updates.phone = phone

@@ -16,6 +16,7 @@ import { useLanguage } from '../../src/contexts/LanguageContext'
 import { loadLastUser, loadLastLogin, markLastLogin } from '../../src/lib/lastUser'
 import {
   F, HeroImage, useAuthTheme, AuthField, PrimaryButton, SecondaryButton, ErrorLine, RoundButton, BackArrow, LangButton, SheetBackdrop,
+  GoogleButton, OrDivider,
 } from '../../src/components/auth/ui'
 
 function initialsOf(name: string) {
@@ -44,7 +45,7 @@ export default function SignInScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const { phone = '' } = useLocalSearchParams<{ phone: string }>()
-  const { signInWithPassword, signInWithBiometric, biometricEnabled, biometricAvailable, biometricEmail } = useAuth()
+  const { signInWithPassword, signInWithBiometric, signInWithGoogle, googleAvailable, biometricEnabled, biometricAvailable, biometricEmail } = useAuth()
 
   const [knownName, setKnownName] = useState<string | null>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
@@ -54,6 +55,7 @@ export default function SignInScreen() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [googleBusy, setGoogleBusy] = useState(false)
   const shake = useRef(new RNAnimated.Value(0)).current
   const pulse = useRef(new RNAnimated.Value(0)).current
   const pulse2 = useRef(new RNAnimated.Value(0)).current
@@ -127,6 +129,20 @@ export default function SignInScreen() {
       fail(wrong ? t('authWrongPassword') : err)
       return
     }
+    succeed()
+  }
+
+  // Google decides for itself whether this is a new or a returning customer, so the
+  // same button works here and on sign-up; we only route on what came back.
+  async function handleGoogle() {
+    setError(null)
+    setGoogleBusy(true)
+    const { error: err, cancelled, needsProfile } = await signInWithGoogle()
+    setGoogleBusy(false)
+    if (cancelled) return
+    if (err) { fail(err); return }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+    if (needsProfile) { router.replace('/(auth)/complete-profile'); return }
     succeed()
   }
 
@@ -273,12 +289,24 @@ export default function SignInScreen() {
                     error={error}
                   />
                 </RNAnimated.View>
-                <View style={[s.forgotRow, { justifyContent: 'flex-end' }]}>
+                {/* A customer whose account was created for him, or who was given a code on
+                    WhatsApp, has no password to type — he needs this link, not the password box. */}
+                <View style={[s.forgotRow, { justifyContent: 'space-between' }]}>
+                  <TouchableOpacity onPress={() => router.push({ pathname: '/(auth)/reset-code', params: { phone } })} hitSlop={8} accessibilityRole="button">
+                    <Text style={[s.link, { color: th.ink2 }]}>{t('authHaveCode')}</Text>
+                  </TouchableOpacity>
                   <TouchableOpacity onPress={() => router.push({ pathname: '/(auth)/forgot', params: { phone } })} hitSlop={8} accessibilityRole="button">
                     <Text style={[s.link, { color: th.primary }]}>{t('authForgot')}</Text>
                   </TouchableOpacity>
                 </View>
                 <PrimaryButton title={t('authSignIn')} onPress={handlePassword} loading={loading} style={{ marginTop: 14 }} />
+
+                {googleAvailable ? (
+                  <>
+                    <OrDivider label={t('authOr')} />
+                    <GoogleButton title={t('authContinueGoogle')} onPress={handleGoogle} loading={googleBusy} disabled={loading} />
+                  </>
+                ) : null}
 
                 {bioOk ? (
                   <SecondaryButton

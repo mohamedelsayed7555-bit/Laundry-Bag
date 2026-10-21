@@ -5,10 +5,10 @@ import { StatusBar } from 'expo-status-bar'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Animated, { FadeInDown } from 'react-native-reanimated'
-import { LockKeyhole, MessageCircle, Phone, UserCheck, LogIn, ShieldAlert, ChevronLeft, ChevronRight } from 'lucide-react-native'
+import { LockKeyhole, MessageCircle, Phone, UserCheck, LogIn, ShieldAlert, ChevronLeft, ChevronRight, KeyRound, Mail } from 'lucide-react-native'
 import { useLanguage } from '../../src/contexts/LanguageContext'
 import { supabase } from '../../src/lib/supabase'
-import { F, useAuthTheme, RoundButton, BackArrow, SecondaryButton, Halftone, tapHaptic } from '../../src/components/auth/ui'
+import { F, useAuthTheme, RoundButton, BackArrow, SecondaryButton, Halftone, tapHaptic, ErrorLine } from '../../src/components/auth/ui'
 
 const SUPPORT_PHONE = '01002438847'
 const SUPPORT_WHATSAPP_INTL = '201002438847'
@@ -30,6 +30,7 @@ export default function ForgotScreen() {
   const { width } = useWindowDimensions()
   const { phone = '' } = useLocalSearchParams<{ phone: string }>()
   const [hours, setHours] = useState<Hours | null>(null)
+  const [mailState, setMailState] = useState<{ busy: boolean; note: string | null; ok: boolean }>({ busy: false, note: null, ok: false })
   const pulse = useRef(new RNAnimated.Value(0)).current
   const pulse2 = useRef(new RNAnimated.Value(0)).current
   const en = locale === 'en'
@@ -51,6 +52,25 @@ export default function ForgotScreen() {
     a.start(); b.start()
     return () => { a.stop(); b.stop() }
   }, [])
+
+  // The one path that involves nobody here: the link goes to the customer's own inbox.
+  async function requestEmailLink() {
+    tapHaptic()
+    setMailState({ busy: true, note: null, ok: false })
+    const { data, error } = await supabase.functions.invoke('request-password-reset', {
+      body: { phone },
+    })
+    const res = (data ?? {}) as { sent?: boolean; masked?: string; retry?: boolean }
+    if (error) {
+      setMailState({ busy: false, note: t('authNetworkError'), ok: false })
+      return
+    }
+    if (res.sent) {
+      setMailState({ busy: false, note: t('authEmailLinkSent', { masked: res.masked ?? '' }), ok: true })
+      return
+    }
+    setMailState({ busy: false, note: res.retry ? t('authEmailLinkBusy') : t('authEmailLinkNone'), ok: false })
+  }
 
   function openWhatsapp() {
     tapHaptic()
@@ -156,6 +176,48 @@ export default function ForgotScreen() {
             <View style={{ flex: 1 }}>
               <Text style={[s.optTitle, { color: th.ink }, align]}>{t('authCall')}</Text>
               <Text style={[s.optSub, { color: th.muted }, align]}>{callSub}</Text>
+            </View>
+            <Chevron size={18} color={th.faint} />
+          </TouchableOpacity>
+        </Animated.View>
+
+        <Animated.View entering={FadeInDown.duration(450).delay(300)}>
+          <TouchableOpacity
+            onPress={requestEmailLink}
+            disabled={mailState.busy}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            style={[s.opt, { backgroundColor: th.field, borderColor: th.fieldBorder, marginTop: 10, opacity: mailState.busy ? 0.6 : 1 }]}
+          >
+            <View style={[s.optIcon, { backgroundColor: th.iconBg }]}>
+              <Mail size={20} color={th.iconFg} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.optTitle, { color: th.ink }, align]}>{t('authEmailLink')}</Text>
+              <Text style={[s.optSub, { color: th.muted }, align]}>{t('authEmailLinkSub')}</Text>
+            </View>
+            <Chevron size={18} color={th.faint} />
+          </TouchableOpacity>
+          {mailState.note ? (
+            mailState.ok
+              ? <Text style={[s.optSub, { color: th.ok, marginTop: 7, paddingHorizontal: 4 }, align]}>{mailState.note}</Text>
+              : <ErrorLine message={mailState.note} />
+          ) : null}
+        </Animated.View>
+
+        <Animated.View entering={FadeInDown.duration(450).delay(320)}>
+          <TouchableOpacity
+            onPress={() => { tapHaptic(); router.push({ pathname: '/(auth)/reset-code', params: { phone } }) }}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            style={[s.opt, { backgroundColor: th.field, borderColor: th.fieldBorder, marginTop: 10 }]}
+          >
+            <View style={[s.optIcon, { backgroundColor: th.iconBg }]}>
+              <KeyRound size={20} color={th.iconFg} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.optTitle, { color: th.ink }, align]}>{t('authHaveCode')}</Text>
+              <Text style={[s.optSub, { color: th.muted }, align]}>{t('authHaveCodeSub')}</Text>
             </View>
             <Chevron size={18} color={th.faint} />
           </TouchableOpacity>

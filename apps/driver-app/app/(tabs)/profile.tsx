@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Modal,
 import { LinearGradient } from 'expo-linear-gradient'
 import Animated, { FadeInDown } from 'react-native-reanimated'
 import { useRouter } from 'expo-router'
-import { Edit3, Fingerprint, LogOut, Truck, ChevronLeft } from 'lucide-react-native'
+import { Edit3, Fingerprint, LogOut, Truck, ChevronLeft, MapPin } from 'lucide-react-native'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { supabase } from '../../src/lib/supabase'
 import { colors } from '../../src/theme'
@@ -82,6 +82,23 @@ export default function DriverProfileScreen() {
             <Text style={s.statLabel}>{stat.label}</Text>
           </View>
         ))}
+      </Animated.View>
+
+      {/* The disclosure before the OS prompt is shown once. A driver whose location is
+          recorded deserves to be able to read what is collected whenever he wants, not
+          only at the moment he was asked. */}
+      <Animated.View entering={FadeInDown.duration(500).delay(360)} style={s.trackCard}>
+        <View style={s.trackHead}>
+          <View style={[s.menuIconWrap, { backgroundColor: colors.primaryGlow }]}>
+            <MapPin size={18} color={colors.primary} />
+          </View>
+          <Text style={s.trackTitle}>تتبّع الموقع</Text>
+        </View>
+        <Text style={s.trackLine}>• موقعك بيتسجّل <Text style={s.trackStrong}>بس وإنت ماسك طلب نشط</Text>، وبيقف لوحده أول ما تسلّم.</Text>
+        <Text style={s.trackLine}>• العميل بيشوف مكانك أثناء طلبه هو بس، عشان يعرف الطلب وصل فين.</Text>
+        <Text style={s.trackLine}>• بنحتفظ بـ <Text style={s.trackStrong}>آخر موقع بس</Text> — مفيش سجل لتحركاتك ولا تاريخ يتخزن.</Text>
+        <Text style={s.trackLine}>• لو وافقت على التتبّع والتطبيق مقفول، ده عشان العميل يفضل شايف الطلب وإنت بتسوق.</Text>
+        <Text style={s.trackLine}>• تقدر توقفه في أي وقت من إعدادات الموبايل ← أذونات التطبيق ← الموقع.</Text>
       </Animated.View>
 
       <Animated.View entering={FadeInDown.duration(500).delay(400)} style={s.menuSection}>
@@ -185,6 +202,11 @@ function MenuItem({ icon, label, glow, onPress }: { icon: React.ReactNode; label
 }
 
 const s = StyleSheet.create({
+  trackCard: { marginBottom: 14, padding: 16, borderRadius: 16, backgroundColor: colors.navy[800], borderWidth: 1, borderColor: colors.navy[700], gap: 7 },
+  trackHead: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 3 },
+  trackTitle: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  trackLine: { color: colors.navy[200], fontSize: 12.5, lineHeight: 20, textAlign: 'right' },
+  trackStrong: { color: '#fff', fontWeight: '700' },
   container: { flex: 1, backgroundColor: colors.navy[900] },
   contentContainer: { padding: 20, paddingTop: 56, paddingBottom: 100 },
   title: { fontSize: 24, fontWeight: '800', color: '#fff', marginBottom: 24 },

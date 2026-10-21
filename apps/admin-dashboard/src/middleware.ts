@@ -50,5 +50,8 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|api).*)'],
+  // Static files in /public were being redirected to /login like any other path, so the
+  // login page could never load its own logo or background. Anything with a file
+  // extension is an asset, not a route, and the session check does not apply to it.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|api|.*\\.[a-zA-Z0-9]+$).*)'],
 }

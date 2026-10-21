@@ -101,7 +101,7 @@ export default function TabsLayout() {
         tabBarStyle: [tb.bar, { flexDirection: 'row-reverse' }],
         tabBarBackground: () => <TabBarFrame b={b} />,
         tabBarLabelStyle: tb.label,
-        tabBarItemStyle: { paddingTop: 6 },
+        tabBarItemStyle: { paddingTop: 6, paddingHorizontal: 2 },
       }}
     >
       <Tabs.Screen
@@ -150,9 +150,9 @@ const tb = StyleSheet.create({
   // Same position/size as before (other screens offset their bottom bars from it)
   bar: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 24 : 16,
-    left: 24,
-    right: 24,
+    bottom: Platform.OS === 'ios' ? 24 : 18,
+    left: 20,
+    right: 20,
     borderRadius: 24,
     height: 68,
     borderTopWidth: 0,
@@ -160,6 +160,9 @@ const tb = StyleSheet.create({
     elevation: 0,
     shadowOpacity: 0,
     paddingBottom: 0,
+    // The rounded frame curves in at the ends, so the first and last tabs need room
+    // or their labels sit right on the curve.
+    paddingHorizontal: 8,
   },
   halo: { position: 'absolute', top: -4, bottom: -4, left: -4, right: -4, borderRadius: 28 },
   frame: {
