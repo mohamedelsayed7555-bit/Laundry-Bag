@@ -21,6 +21,24 @@ import {
  * he cannot remember: once the session is set he can choose a new one, and nobody at
  * Laundry Bag was part of any of it.
  */
+/**
+ * Pulls one value out of a "a=1&b=2" string.
+ *
+ * React Native ships an incomplete URLSearchParams: constructing one from a fragment
+ * and calling .get() returns nothing, so the tokens Supabase had already issued looked
+ * absent and a perfectly valid link was reported as expired.
+ */
+function readParam(serialised: string, name: string): string | null {
+  for (const pair of serialised.split('&')) {
+    const eq = pair.indexOf('=')
+    if (eq < 0) continue
+    if (decodeURIComponent(pair.slice(0, eq)) !== name) continue
+    const value = decodeURIComponent(pair.slice(eq + 1).replace(/\+/g, ' '))
+    return value.length > 0 ? value : null
+  }
+  return null
+}
+
 export default function ResetPasswordScreen() {
   const th = useAuthTheme()
   const { t, isRTL } = useLanguage()
@@ -53,9 +71,8 @@ export default function ResetPasswordScreen() {
 
       if (incoming) {
         const fragment = incoming.split('#')[1] ?? ''
-        const params = new URLSearchParams(fragment)
-        const access_token = params.get('access_token')
-        const refresh_token = params.get('refresh_token')
+        const access_token = readParam(fragment, 'access_token')
+        const refresh_token = readParam(fragment, 'refresh_token')
 
         if (access_token && refresh_token) {
           const { error } = await supabase.auth.setSession({ access_token, refresh_token })
@@ -64,7 +81,7 @@ export default function ResetPasswordScreen() {
         }
 
         const query = incoming.split('?')[1]?.split('#')[0] ?? ''
-        const code = new URLSearchParams(query).get('code')
+        const code = readParam(query, 'code')
         if (code) {
           const { error } = await supabase.auth.exchangeCodeForSession(code)
           finish(!error)
