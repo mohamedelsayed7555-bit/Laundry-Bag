@@ -9,17 +9,31 @@ import { supabase } from '../../src/lib/supabase'
 import { useBrand, F, type Brand } from '../../src/components/brand'
 import ContactFAB from '../../src/components/ContactFAB'
 
-const BRAND_EDGE = ['#38BDF8', '#818CF8', '#0EA5E9'] as const
+// Loaded defensively: an over-the-air update can reach a build that has no native blur
+// module, and the bar falls back to its tinted backing rather than failing to render.
+let BlurView: any = null
+try { BlurView = require('expo-blur').BlurView } catch {}
 
-// Opaque bar with a thin brand-gradient frame and a soft halo (a translucent bar picked up
-// Android's elevation shadow and looked muddy over the page).
+// Glass bar: the page's own colour shows through it, softened, with a hairline edge.
+// A heavy glow and a thick bright border made it read as a sticker laid over the page.
 function TabBarFrame({ b }: { b: Brand }) {
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <View style={[tb.halo, { backgroundColor: b.isDark ? 'rgba(56,189,248,0.20)' : 'rgba(14,165,233,0.12)' }]} />
-      <View style={[tb.frame, { backgroundColor: b.card }]}>
-        <LinearGradient colors={BRAND_EDGE} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFill, { borderRadius: 24 }]} />
-        <View style={[tb.inner, { backgroundColor: b.card }]} />
+      <View style={[tb.frame, { backgroundColor: b.isDark ? 'rgba(10,17,32,0.62)' : 'rgba(255,255,255,0.62)' }]}>
+        {BlurView ? (
+          <BlurView
+            intensity={34}
+            tint={b.isDark ? 'dark' : 'light'}
+            experimentalBlurMethod="dimezisBlurView"
+            style={StyleSheet.absoluteFill}
+          />
+        ) : null}
+        <View
+          style={[
+            tb.hairline,
+            { borderColor: b.isDark ? 'rgba(146,197,253,0.26)' : 'rgba(2,32,71,0.12)' },
+          ]}
+        />
       </View>
     </View>
   )
@@ -151,8 +165,11 @@ const tb = StyleSheet.create({
   bar: {
     position: 'absolute',
     bottom: Platform.OS === 'ios' ? 24 : 18,
-    left: 20,
-    right: 20,
+    // Margins, not insets: left/right were ignored here and the bar ran off both
+    // edges of the screen with its rounded corners cut away.
+    left: 0,
+    right: 0,
+    marginHorizontal: 20,
     borderRadius: 24,
     height: 68,
     borderTopWidth: 0,
@@ -164,17 +181,14 @@ const tb = StyleSheet.create({
     // or their labels sit right on the curve.
     paddingHorizontal: 8,
   },
-  halo: { position: 'absolute', top: -4, bottom: -4, left: -4, right: -4, borderRadius: 28 },
   frame: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: 24,
-    shadowColor: '#022047',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.16,
-    shadowRadius: 18,
-    elevation: 14,
+    // Clips the blur to the rounded shape, and keeps Android's elevation shadow off a
+    // translucent surface, where it turns the glass muddy.
+    overflow: 'hidden',
   },
-  inner: { position: 'absolute', top: 1.5, bottom: 1.5, left: 1.5, right: 1.5, borderRadius: 22.5 },
+  hairline: { ...StyleSheet.absoluteFillObject, borderWidth: 1, borderRadius: 24 },
   iconPill: { width: 44, height: 30, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   label: { fontSize: 10.5, fontFamily: F.bold, marginTop: 1 },
   fabRing: {
