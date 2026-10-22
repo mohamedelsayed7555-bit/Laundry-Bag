@@ -63,7 +63,7 @@ function BannerShell({ image, onPress, children }: { image: any; onPress: () => 
   const rtl = I18nManager.isRTL
   return (
     <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={cr.banner} accessibilityRole="button">
-      <Image source={image} style={StyleSheet.absoluteFill} resizeMode="cover" />
+      <Image source={image} style={s.tileImg} resizeMode="cover" />
       {/* Dark on the text (start) side, clear on the photo side. */}
       <LinearGradient
         colors={['rgba(7,22,46,0.94)', 'rgba(7,22,46,0.72)', 'rgba(7,22,46,0.05)']}
@@ -575,7 +575,7 @@ export default function HomeScreen() {
               onPress={() => router.push({ pathname: '/(tabs)/new-order', params: { service: svc.key } })}
               style={s.tile}
             >
-              <Image source={SERVICE_IMAGES[svc.key]} style={StyleSheet.absoluteFill} resizeMode="cover" />
+              <Image source={SERVICE_IMAGES[svc.key]} style={s.tileImg} resizeMode="cover" />
               <LinearGradient colors={['rgba(5,12,26,0)', 'rgba(5,12,26,0.82)']} locations={[0.38, 1]} style={StyleSheet.absoluteFill} />
               <View style={s.tileArrow}>{I18nManager.isRTL ? <ArrowUpLeft size={13} color="#fff" /> : <ArrowUpRight size={13} color="#fff" />}</View>
               <View style={s.tileText}>
@@ -593,7 +593,7 @@ export default function HomeScreen() {
           onPress={() => router.push({ pathname: '/(tabs)/new-order', params: { service: 'accessories' } })}
           style={[s.tile, s.tileWide]}
         >
-          <Image source={require('../../assets/services/shop-wide.webp')} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          <Image source={require('../../assets/services/shop-wide.webp')} style={s.tileImg} resizeMode="cover" />
           <LinearGradient colors={['rgba(5,12,26,0)', 'rgba(5,12,26,0.82)']} locations={[0.32, 1]} style={StyleSheet.absoluteFill} />
           <View style={s.tileArrow}>{I18nManager.isRTL ? <ArrowUpLeft size={13} color="#fff" /> : <ArrowUpRight size={13} color="#fff" />}</View>
           <View style={s.tileText}>
@@ -703,6 +703,9 @@ const s = StyleSheet.create({
 
   tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   tile: { height: 116, borderRadius: 18, overflow: 'hidden', backgroundColor: '#0F1A2E' },
+  // Sized explicitly: left to itself the photo rendered at its own pixel size and the
+  // tile showed one magnified corner of it.
+  tileImg: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
   tileWide: { width: '100%', height: 124 },
   tileArrow: { position: 'absolute', top: 8, end: 8, width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.18)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
   tileText: { position: 'absolute', start: 11, end: 11, bottom: 9 },

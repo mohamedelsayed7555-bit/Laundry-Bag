@@ -92,7 +92,7 @@ export default function WelcomeGiftPopup({ userId, onOrderNow }: Props) {
         <Animated.View style={[s.card, { backgroundColor: b.card, borderColor: b.cardBorder, transform: [{ scale: scaleAnim }] }]}>
           {/* Gift photo with confetti */}
           <View style={s.hero}>
-            <Image source={require('../../assets/auth/gift.webp')} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            <Image source={require('../../assets/auth/gift.webp')} style={fillImage} resizeMode="cover" />
             <LinearGradient colors={['rgba(0,0,0,0)', b.card]} locations={[0.55, 1]} style={StyleSheet.absoluteFill} />
             <View pointerEvents="none" style={[StyleSheet.absoluteFill, { direction: 'ltr' }]}>
               {CONFETTI.map((c, i) => (
@@ -183,3 +183,6 @@ const s = StyleSheet.create({
   freeTag: { fontSize: 11.5, fontFamily: F.bold },
   terms: { fontSize: 11, fontFamily: F.regular, marginTop: 10 },
 })
+
+// See home.tsx: an Image sized only by insets renders at its own pixel size.
+const fillImage = { position: 'absolute' as const, top: 0, left: 0, width: '100%' as const, height: '100%' as const }

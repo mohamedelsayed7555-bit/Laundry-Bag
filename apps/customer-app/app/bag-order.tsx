@@ -194,7 +194,7 @@ export default function BagOrderScreen() {
 
         {/* Offer hero: same look as the home banner */}
         <Animated.View entering={FadeInDown.duration(500)} style={s.hero}>
-          <Image source={require('../assets/banners/bag.webp')} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          <Image source={require('../assets/banners/bag.webp')} style={fillImage} resizeMode="cover" />
           <LinearGradient
             colors={['rgba(7,22,46,0.95)', 'rgba(7,22,46,0.75)', 'rgba(7,22,46,0.1)']}
             locations={[0, 0.5, 1]}
@@ -430,3 +430,7 @@ const s = StyleSheet.create({
   totalVal: { fontSize: 21, fontFamily: F.display },
   totalCur: { fontSize: 11, fontFamily: F.semibold },
 })
+
+// An Image needs its size stated: with insets alone it draws at its own pixel size and
+// the frame shows a magnified corner of the photo.
+const fillImage = { position: 'absolute' as const, top: 0, left: 0, width: '100%' as const, height: '100%' as const }
