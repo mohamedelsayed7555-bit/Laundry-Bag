@@ -539,8 +539,15 @@ const s = StyleSheet.create({
   card: { borderRadius: 18, borderWidth: 1 },
   segs: { flex: 1, flexDirection: 'row', gap: 3 },
   seg: { flex: 1, height: 4, borderRadius: 2 },
-  stepWrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  stepper: { flexDirection: 'row', alignItems: 'center', gap: 2, padding: 2, borderRadius: 11, borderWidth: 1, direction: 'ltr' },
+  // The whole control mirrors with the language, so it always reads outwards from the
+  // item's name: in Arabic remove, minus, count, plus; in English the other way round.
+  stepWrap: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
+  // Mirrors with the language like the wrapper around it. (Declaring direction: 'ltr'
+  // here looked like it controlled the order and did nothing at all.)
+  stepper: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center', gap: 2, padding: 2, borderRadius: 11, borderWidth: 1,
+  },
   stepBtn: { width: SIZE.STEP, height: SIZE.STEP, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   stepGlyph: { fontSize: 16, fontFamily: F.bold, lineHeight: 20 },
   stepQty: { minWidth: 24, textAlign: 'center', fontSize: 14, fontFamily: F.display },
