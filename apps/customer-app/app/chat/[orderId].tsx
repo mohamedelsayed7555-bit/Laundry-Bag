@@ -47,7 +47,10 @@ export default function ChatScreen() {
         .from('messages')
         .select('id, sender_id, receiver_id, body, read_at, created_at')
         .eq('order_id', orderId)
-        .order('created_at', { ascending: true })
+        // Newest first, then turned back around for display: asked for oldest first,
+        // the limit kept the start of a long conversation and hid everything said
+        // since, including the message that had just arrived.
+        .order('created_at', { ascending: false })
         .limit(200),
       supabase
         .from('orders')
@@ -57,7 +60,7 @@ export default function ChatScreen() {
         .single(),
     ])
 
-    setMessages(data ?? [])
+    setMessages((data ?? []).slice().reverse())
     if (orderData) { setOrderStatus(orderData.status); setOrderNumber(orderData.order_number) }
 
     const unread = (data ?? []).filter(m => m.receiver_id === profile.id && !m.read_at)

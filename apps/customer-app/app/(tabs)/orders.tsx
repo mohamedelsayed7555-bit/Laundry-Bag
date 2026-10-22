@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from 'react'
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Linking, AppState, Image, ScrollView, Animated as RNAnimated } from 'react-native'
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Linking, AppState, Image, ScrollView, ActivityIndicator, Animated as RNAnimated } from 'react-native'
 import { useRouter } from 'expo-router'
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated'
 import { useAuth } from '../../src/contexts/AuthContext'
@@ -13,6 +13,7 @@ import {
 import { useBrand, Card, Divider, Segments, Segmented, Chip, Pill, IconButton, FlowLines, F, money, shortDate, StickyBar, useStickyHeader, type Brand } from '../../src/components/brand'
 import { PrimaryButton } from '../../src/components/auth/ui'
 
+const PAGE = 50
 const statusFlow = ['pending', 'assigned', 'arrived', 'picked_up', 'processing', 'ready', 'delivering', 'delivered']
 
 const statusIcons: Record<string, typeof Clock> = {
@@ -77,20 +78,38 @@ export default function OrdersScreen() {
   const [refreshing, setRefreshing] = useState(false)
   const [tab, setTab] = useState<TabFilter>('active')
   const [dateRange, setDateRange] = useState<DateRange>('14')
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  // How many pages are on screen. A refresh — pull-down, or an order changing in
+  // realtime — refetches all of them, so a customer who scrolled back through his
+  // history does not get dropped at the top of the list again.
+  const pages = useRef(1)
 
   const router = useRouter()
   const loadOrders = useCallback(async () => {
     if (!profile) return
+    const wanted = pages.current * PAGE
     const { data } = await supabase
       .from('orders')
       .select('id, order_number, status, service_type, items_count, total, delivery_fee, cancellation_fee, notes, payment_status, subscription_id, created_at, driver:users!orders_driver_id_fkey(name, phone)')
       .eq('customer_id', profile.id)
       .order('created_at', { ascending: false })
-      .limit(50)
+      .range(0, wanted - 1)
     setOrders(data ?? [])
+    setHasMore((data?.length ?? 0) === wanted)
     setLoading(false)
     setRefreshing(false)
+    setLoadingMore(false)
   }, [profile])
+
+  // Older orders used to be unreachable: the list stopped at the newest fifty and
+  // offered no way back past them.
+  const loadMore = useCallback(() => {
+    if (loadingMore || !hasMore || loading) return
+    setLoadingMore(true)
+    pages.current += 1
+    loadOrders()
+  }, [loadingMore, hasMore, loading, loadOrders])
 
   useEffect(() => { loadOrders() }, [loadOrders])
   useRealtimeOrders(profile?.id, loadOrders)
@@ -102,7 +121,7 @@ export default function OrdersScreen() {
     return () => sub.remove()
   }, [loadOrders])
 
-  const onRefresh = () => { setRefreshing(true); loadOrders() }
+  const onRefresh = () => { setRefreshing(true); pages.current = 1; loadOrders() }
 
   const activeStatuses = ['scheduled', 'pending', 'assigned', 'arrived', 'picked_up', 'processing', 'ready', 'delivering']
   const filteredOrders = orders.filter(o => {
@@ -266,6 +285,9 @@ export default function OrdersScreen() {
         showsVerticalScrollIndicator={false}
         onScroll={onScroll}
         scrollEventThrottle={16}
+        onEndReached={showList ? loadMore : undefined}
+        onEndReachedThreshold={0.4}
+        ListFooterComponent={loadingMore ? <View style={{ paddingVertical: 18 }}><ActivityIndicator color={b.primary} /></View> : null}
       />
     </View>
   )
