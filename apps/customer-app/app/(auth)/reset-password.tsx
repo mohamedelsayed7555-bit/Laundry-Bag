@@ -9,6 +9,7 @@ import * as Haptics from 'expo-haptics'
 import { Lock, CircleCheck, Circle, ShieldCheck } from 'lucide-react-native'
 import { useLanguage } from '../../src/contexts/LanguageContext'
 import { supabase } from '../../src/lib/supabase'
+import { takeIncomingUrl, onIncomingUrl } from '../../src/lib/incomingUrl'
 import {
   F, useAuthTheme, AuthField, PrimaryButton, SecondaryButton, ErrorLine, TintBackground,
 } from '../../src/components/auth/ui'
@@ -55,6 +56,9 @@ export default function ResetPasswordScreen() {
   useEffect(() => {
     let alive = true
     let settled = false
+    // The link may still be on its way when this screen mounts, so a late arrival
+    // restarts the check rather than being missed.
+    const stopWaiting = onIncomingUrl(() => { if (alive && !settled) openLink() })
 
     function finish(valid: boolean) {
       if (!alive || settled) return
@@ -67,7 +71,7 @@ export default function ResetPasswordScreen() {
       // The link may arrive as a fragment (#access_token=…) or as ?code=… depending on
       // the flow, and useURL() can be null when the app was already running — so the
       // initial URL is checked too.
-      const incoming = url ?? (await Linking.getInitialURL())
+      const incoming = url ?? takeIncomingUrl() ?? (await Linking.getInitialURL())
 
       if (incoming) {
         const fragment = incoming.split('#')[1] ?? ''
@@ -97,7 +101,7 @@ export default function ResetPasswordScreen() {
     openLink()
     // Whatever happens, the screen must stop spinning and say something.
     const bail = setTimeout(() => finish(false), 8000)
-    return () => { alive = false; clearTimeout(bail) }
+    return () => { alive = false; stopWaiting(); clearTimeout(bail) }
   }, [url])
 
   const rules = useMemo(() => [

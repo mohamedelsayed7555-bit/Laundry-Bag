@@ -8,6 +8,9 @@ import { CartProvider } from '../src/contexts/CartContext'
 import { ThemeProvider, useTheme } from '../src/contexts/ThemeContext'
 import { LanguageProvider, useLanguage } from '../src/contexts/LanguageContext'
 import { supabase } from '../src/lib/supabase'
+// Imported for its side effect: it starts listening for deep links before any screen
+// mounts, so a recovery link is not lost in the gap.
+import '../src/lib/incomingUrl'
 import { useNotifications } from '../src/hooks/useNotifications'
 import { colors } from '../src/theme'
 import AsyncStorage from '@react-native-async-storage/async-storage'
