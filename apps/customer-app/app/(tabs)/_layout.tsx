@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { Tabs } from 'expo-router'
-import { View, StyleSheet, Platform } from 'react-native'
+import { View, StyleSheet, Platform, UIManager } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Home, ClipboardList, Plus, MessageCircle, User } from 'lucide-react-native'
 import { useLanguage } from '../../src/contexts/LanguageContext'
@@ -9,17 +9,40 @@ import { supabase } from '../../src/lib/supabase'
 import { useBrand, F, type Brand } from '../../src/components/brand'
 import ContactFAB from '../../src/components/ContactFAB'
 
-// Loaded defensively: an over-the-air update can reach a build that has no native blur
-// module, and the bar falls back to its tinted backing rather than failing to render.
+// An over-the-air update can reach a build that was made before the blur module was
+// added. Importing it there succeeds and the app then dies when the view is drawn, so
+// the native side is what gets asked about, not the JavaScript one. Without it the bar
+// keeps its tinted backing — the same thing a phone too slow to blur will show.
+const blurIsNative = (() => {
+  try {
+    return !!UIManager.getViewManagerConfig?.('ExpoBlurView')
+  } catch {
+    return false
+  }
+})()
 let BlurView: any = null
-try { BlurView = require('expo-blur').BlurView } catch {}
+if (blurIsNative) {
+  try { BlurView = require('expo-blur').BlurView } catch { BlurView = null }
+}
+
+/**
+ * How solid the bar is behind the blur.
+ *
+ * Glass only works when what shows through is softened. Without the blur the page
+ * stays sharp behind the bar and its text reads straight through the buttons, so the
+ * backing closes up almost completely and the bar simply looks solid.
+ */
+function backing(isDark: boolean): string {
+  const alpha = blurIsNative ? 0.62 : 0.94
+  return isDark ? `rgba(10,17,32,${alpha})` : `rgba(255,255,255,${alpha})`
+}
 
 // Glass bar: the page's own colour shows through it, softened, with a hairline edge.
 // A heavy glow and a thick bright border made it read as a sticker laid over the page.
 function TabBarFrame({ b }: { b: Brand }) {
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <View style={[tb.frame, { backgroundColor: b.isDark ? 'rgba(10,17,32,0.62)' : 'rgba(255,255,255,0.62)' }]}>
+      <View style={[tb.frame, { backgroundColor: backing(b.isDark) }]}>
         {BlurView ? (
           <BlurView
             intensity={34}
