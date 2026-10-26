@@ -127,6 +127,10 @@ export default function AddressesScreen() {
   const [locatingMe, setLocatingMe] = useState(false)
   const [geocoding, setGeocoding] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
+  // Set while the form is closing and the confirmation is waiting to take its place.
+  const pendingConfirm = useRef(false)
+  // The mirror of it: going back from the confirmation to the form.
+  const pendingForm = useRef(false)
   const webviewRef = useRef<WebView>(null)
   const formScrollRef = useRef<ScrollView>(null)
   const mapExpanded = useRef(false)
@@ -226,8 +230,31 @@ export default function AddressesScreen() {
     if (!form.label.trim()) e.label = t('addressNameRequired')
     setFormErrors(e)
     if (Object.keys(e).length > 0) return
+    // iOS refuses a second sheet while the first is still dismissing, and its dismissal
+    // takes longer than any delay worth guessing at — the confirmation simply never
+    // arrived and the address could not be added at all. So the close is awaited
+    // rather than timed: onDismiss on iOS, a short delay on Android, which has none.
     setShowModal(false)
-    setTimeout(() => setShowConfirm(true), 300)
+    pendingConfirm.current = true
+    if (Platform.OS !== 'ios') setTimeout(openConfirm, 300)
+  }
+
+  function openConfirm() {
+    if (!pendingConfirm.current) return
+    pendingConfirm.current = false
+    setShowConfirm(true)
+  }
+
+  function backToForm() {
+    setShowConfirm(false)
+    pendingForm.current = true
+    if (Platform.OS !== 'ios') setTimeout(openForm, 300)
+  }
+
+  function openForm() {
+    if (!pendingForm.current) return
+    pendingForm.current = false
+    setShowModal(true)
   }
 
   async function confirmSave() {
@@ -383,7 +410,7 @@ export default function AddressesScreen() {
 
       <StickyBar scrollY={scrollY} title={t('myAddressesTitle')} onBack={() => isOnboarding ? router.replace('/(tabs)/home') : router.back()} />
 
-      <Modal visible={showModal} animationType="slide" transparent>
+      <Modal visible={showModal} animationType="slide" transparent onDismiss={openConfirm}>
         <KeyboardAvoidingView style={st.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={[st.sheet, { backgroundColor: b.card, borderTopColor: b.tintBorder }]}>
             <SheetChrome b={b} />
@@ -447,7 +474,7 @@ export default function AddressesScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      <Modal visible={showConfirm} animationType="fade" transparent>
+      <Modal visible={showConfirm} animationType="fade" transparent onDismiss={openForm}>
         <View style={st.modalOverlay}>
           <View style={[st.sheet, { maxHeight: '80%', backgroundColor: b.card, borderTopColor: b.tintBorder }]}>
             <SheetChrome b={b} />
@@ -473,7 +500,7 @@ export default function AddressesScreen() {
             </ScrollView>
             <View style={st.modalActions}>
               <PrimaryButton title={t('confirmAndSave')} onPress={confirmSave} leading={<Check size={18} color="#fff" />} style={{ flex: 1.4 }} />
-              <SecondaryButton title={t('edit')} icon={<Pencil size={15} color={b.ink2} />} onPress={() => { setShowConfirm(false); setTimeout(() => setShowModal(true), 300) }} style={{ flex: 1 }} />
+              <SecondaryButton title={t('edit')} icon={<Pencil size={15} color={b.ink2} />} onPress={backToForm} style={{ flex: 1 }} />
             </View>
           </View>
         </View>

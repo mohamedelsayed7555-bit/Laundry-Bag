@@ -27,6 +27,7 @@ const BIO_SECRET_KEY = 'bio_secret'
 // 'password' | 'google' — which way the fingerprint signs this account back in.
 const BIO_METHOD_KEY = 'bio_method'
 const GOOGLE_BIO_MARKER = 'google'
+const APPLE_BIO_MARKER = 'apple'
 function bioSecretOptions(en: boolean): SecureStore.SecureStoreOptions {
   return {
     requireAuthentication: true,
@@ -381,14 +382,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (enable) {
       // A Google account has no password to protect, so the fingerprint instead gates a
       // silent re-authentication with Google. Nothing secret is written to the device.
-      const isGoogle = state.session?.user.app_metadata?.provider === 'google'
-      if (isGoogle) {
+      // Apple accounts have no password either, and asking for one left the customer
+      // staring at a field he could never fill.
+      const provider = state.session?.user.app_metadata?.provider
+      const marker = provider === 'google' ? GOOGLE_BIO_MARKER : provider === 'apple' ? APPLE_BIO_MARKER : null
+      if (marker) {
         const mail = email || state.session?.user.email
         if (!mail) return false
         try {
-          await SecureStore.setItemAsync(BIO_SECRET_KEY, GOOGLE_BIO_MARKER, bioSecretOptions(await isEn()))
+          await SecureStore.setItemAsync(BIO_SECRET_KEY, marker, bioSecretOptions(await isEn()))
           await SecureStore.setItemAsync(BIO_EMAIL_KEY, mail)
-          await SecureStore.setItemAsync(BIO_METHOD_KEY, GOOGLE_BIO_MARKER)
+          await SecureStore.setItemAsync(BIO_METHOD_KEY, marker)
           setState(s => ({ ...s, biometricEnabled: true }))
           return true
         } catch {
@@ -457,6 +461,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         const { error } = await supabase.auth.signInWithIdToken({ provider: 'google', token: res.idToken })
         if (error) return { error: en ? 'Sign in with Google again' : 'ادخل بجوجل تاني' }
+        return { error: null }
+      }
+
+      // Apple cannot be asked for a token in the background, but its own sheet is a
+      // single Face ID confirmation, which is lighter than a password nobody set.
+      if (password === APPLE_BIO_MARKER) {
+        const res = await signInWithAppleNative(en)
+        if (res.error || !res.idToken) {
+          return { error: res.error ?? (en ? 'Sign in with Apple again' : 'ادخل بـ Apple تاني') }
+        }
+        const { error } = await supabase.auth.signInWithIdToken({ provider: 'apple', token: res.idToken })
+        if (error) return { error: en ? 'Sign in with Apple again' : 'ادخل بـ Apple تاني' }
         return { error: null }
       }
 

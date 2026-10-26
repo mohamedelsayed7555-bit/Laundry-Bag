@@ -18,7 +18,10 @@ export default function ProfileScreen() {
   const { profile, session, signOut, biometricEnabled, biometricAvailable, toggleBiometric } = useAuth()
   // A Google account has no password, so there is nothing to ask for: the fingerprint
   // gates a silent re-authentication with Google instead of replaying a stored secret.
-  const isGoogleAccount = session?.user.app_metadata?.provider === 'google'
+  // Signed in through Google or Apple: no password was ever set, so the fingerprint
+  // gates a fresh sign-in with the provider instead of replaying one.
+  const provider = session?.user.app_metadata?.provider
+  const isGoogleAccount = provider === 'google' || provider === 'apple'
   const { isDark, mode, setMode } = useTheme()
   const { t, locale, setLanguage } = useLanguage()
   const { showAlert, AlertComponent } = useCustomAlert()
