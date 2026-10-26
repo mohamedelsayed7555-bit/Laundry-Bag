@@ -7,6 +7,7 @@ import { useAuth } from '../../src/contexts/AuthContext'
 import { useLanguage } from '../../src/contexts/LanguageContext'
 import { supabase } from '../../src/lib/supabase'
 import { notifyMessage } from '../../src/hooks/useNotifications'
+import Skeleton from '../../src/components/Skeleton'
 import { useBrand, Card, F, clock, shortDate } from '../../src/components/brand'
 
 type Conversation = {
@@ -76,9 +77,19 @@ export default function MessagesScreen() {
       <Text style={[s.title, { color: b.ink }]}>{t('messages')}</Text>
 
       {loading ? (
-        <View style={s.loading}>
-          <ActivityIndicator color={b.primary} />
-          <Text style={[s.emptyText, { color: b.muted }]}>{t('loading')}</Text>
+        // Rows in the shape of the conversations about to arrive: the list settles into
+        // place instead of replacing a spinner, and nothing claims there are no
+        // messages before anyone has looked.
+        <View style={s.pad}>
+          {[0, 1, 2, 3, 4].map(i => (
+            <View key={i} style={s.skelRow}>
+              <Skeleton width={46} height={46} borderRadius={23} />
+              <View style={s.skelText}>
+                <Skeleton width="45%" height={13} />
+                <Skeleton width="75%" height={11} />
+              </View>
+            </View>
+          ))}
         </View>
       ) : conversations.length === 0 ? (
         <View style={s.pad}>
@@ -146,6 +157,8 @@ const s = StyleSheet.create({
   title: { fontSize: 20, fontFamily: F.display, paddingHorizontal: 16, marginBottom: 8 },
   pad: { paddingHorizontal: 16, paddingTop: 8 },
   loading: { alignItems: 'center', gap: 10, paddingTop: 40 },
+  skelRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 },
+  skelText: { flex: 1, gap: 8 },
   emptyCard: { alignItems: 'center', paddingVertical: 32, paddingHorizontal: 20 },
   emptyIcon: { width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   emptyText: { fontSize: 14, fontFamily: F.medium, textAlign: 'center' },

@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useMemo } from 'react'
-import { View, Text, StyleSheet, Linking } from 'react-native'
+import { View, Text, StyleSheet, Linking , ActivityIndicator } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Car, Phone, MessageCircle, MapPin, TriangleAlert } from 'lucide-react-native'
@@ -73,6 +73,9 @@ export default function TrackingScreen() {
   const [order, setOrder] = useState<any>(null)
   const [driverLoc, setDriverLoc] = useState<{ lat: number; lng: number; at?: string | null } | null>(null)
   const [mapSeed, setMapSeed] = useState<{ lat: number; lng: number } | null>(null)
+  // False until the driver's location has actually been looked for. Without it the
+  // screen announced "location unavailable" in the instant before the answer arrived.
+  const [locChecked, setLocChecked] = useState(false)
 
   useEffect(() => {
     loadOrder()
@@ -89,14 +92,17 @@ export default function TrackingScreen() {
     setMapSeed(null)
     if (!order?.driver_id || !TRACK_STATUSES.includes(order?.status)) {
       setDriverLoc(null)
+      setLocChecked(!!order)
       return
     }
+    setLocChecked(false)
     supabase.from('driver_locations').select('lat, lng, updated_at').eq('driver_id', order.driver_id).single()
       .then(({ data }) => {
         if (data) {
           setDriverLoc({ lat: data.lat, lng: data.lng, at: data.updated_at })
           setMapSeed(prev => prev ?? { lat: data.lat, lng: data.lng })
         }
+        setLocChecked(true)
       })
 
     const ch = supabase
@@ -170,6 +176,10 @@ export default function TrackingScreen() {
           startInLoadingState
           originWhitelist={['*']}
         />
+      ) : !locChecked ? (
+        <View style={[n.noMap, { backgroundColor: b.page }]}>
+          <ActivityIndicator size="large" color={b.primary} />
+        </View>
       ) : (
         <View style={[n.noMap, { backgroundColor: b.page }]}>
           <View style={[n.noMapIcon, { backgroundColor: b.iconTile }]}><MapPin size={34} color={b.faint} /></View>
