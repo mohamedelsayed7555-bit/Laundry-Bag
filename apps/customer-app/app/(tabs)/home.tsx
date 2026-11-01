@@ -6,7 +6,7 @@ import Animated, { FadeInLeft, FadeInRight } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
   ShoppingBag, Bell, MapPin, ChevronDown, Phone, Truck, Clock3, CircleCheck, CircleX, Package, WashingMachine,
-  Sparkles, ArrowUpLeft, ArrowUpRight, ClipboardList,
+  Sparkles, ArrowUpLeft, ArrowUpRight, ClipboardList, LogIn,
 } from 'lucide-react-native'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { useLanguage } from '../../src/contexts/LanguageContext'
@@ -226,7 +226,7 @@ function BannersCarousel({ bagOffer, activeSub, t, locale, onBagPress, onNewOrde
 }
 
 export default function HomeScreen() {
-  const { profile } = useAuth()
+  const { profile, session } = useAuth()
   const b = useBrand()
   const insets = useSafeAreaInsets()
   const { t, locale } = useLanguage()
@@ -378,8 +378,18 @@ export default function HomeScreen() {
   useRealtimeOrders(profile?.id, handleOrderUpdate)
 
   useEffect(() => {
-    if (!profile) { setLoading(false); return }
-    Promise.all([
+    // Services, prices and offers are open to a visitor too (App Review 5.1.1(v)); only
+    // the customer's own orders, plan and notifications wait for an account.
+    const shared = [loadBagOffer(), loadMinPrices(), loadActiveServices()]
+    if (!profile) {
+      setRecentOrders([])
+      setActiveSub(null)
+      setUnreadCount(0)
+      setDefaultAddress(undefined)
+      setLoading(false)
+    }
+    Promise.all(!profile ? shared : [
+      ...shared,
       supabase.from('orders').select(ORDER_FIELDS)
         .eq('customer_id', profile.id).order('created_at', { ascending: false }).limit(3)
         .then(({ data }) => { setRecentOrders(data ?? []); setLoading(false) }),
@@ -389,11 +399,8 @@ export default function HomeScreen() {
       supabase.from('notifications').select('id', { count: 'exact', head: true })
         .eq('user_id', profile.id).is('read_at', null)
         .then(({ count }) => setUnreadCount(count ?? 0)),
-      loadBagOffer(),
       checkUnratedOrder(),
       loadDefaultAddress(),
-      loadMinPrices(),
-      loadActiveServices(),
     ])
 
     const channel = supabase
@@ -490,7 +497,13 @@ export default function HomeScreen() {
         </TouchableOpacity>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={[s.greetSmall, { color: b.muted }]}>{greeting()} 👋</Text>
-          <Text style={[s.greetName, { color: b.ink }]} numberOfLines={1}>{profile?.name ?? ''}</Text>
+          <Text style={[s.greetName, { color: b.ink }]} numberOfLines={1}>{profile?.name ?? (session ? '' : t('guestHello'))}</Text>
+          {!session && (
+            <TouchableOpacity onPress={() => router.push('/(auth)/welcome')} hitSlop={HIT} accessibilityRole="button" style={[s.addrChip, { backgroundColor: b.tint }]}>
+              <LogIn size={12} color={b.tintText} />
+              <Text style={[s.addrText, { color: b.tintText }]} numberOfLines={1}>{t('guestSignIn')}</Text>
+            </TouchableOpacity>
+          )}
           {defaultAddress !== undefined && (
             <TouchableOpacity onPress={() => router.push('/addresses')} hitSlop={HIT} accessibilityRole="button" style={[s.addrChip, { backgroundColor: b.tint }]}>
               <MapPin size={12} color={b.tintText} />
@@ -507,7 +520,7 @@ export default function HomeScreen() {
             </View>
           )}
         </IconButton>
-        <IconButton onPress={() => router.push('/notifications')} label="Notifications">
+        <IconButton onPress={() => router.push(session ? '/notifications' : '/(auth)/welcome')} label="Notifications">
           <Bell size={19} color={b.ink} />
           {unreadCount > 0 && (
             <View style={[s.badge, { backgroundColor: '#EF4444', borderColor: b.raised }]}>
@@ -559,7 +572,7 @@ export default function HomeScreen() {
         activeSub={activeSub}
         t={t}
         locale={locale}
-        onBagPress={() => router.push('/bag-order')}
+        onBagPress={() => router.push(session ? '/bag-order' : '/(auth)/welcome')}
         onNewOrderPress={() => router.push('/(tabs)/new-order')}
         onPlansPress={() => router.push('/plans')}
       />

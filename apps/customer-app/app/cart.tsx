@@ -284,8 +284,22 @@ export default function CartScreen() {
 
   const itemName = (name: string) => isEn ? (t(`item:${name}`) !== `item:${name}` ? t(`item:${name}`) : name) : name
 
+  // A visitor can fill the cart and see the total; the order itself needs an account.
+  // The cart survives signing in (CartContext carries it over).
+  function askToSignIn() {
+    showAlert({
+      title: t('guestTitle'),
+      message: t('guestCheckoutSub'),
+      type: 'info',
+      buttons: [
+        { text: t('guestNotNow'), style: 'cancel' },
+        { text: t('guestSignInShort'), onPress: () => router.push('/(auth)/welcome') },
+      ],
+    })
+  }
+
   async function handleSubmit() {
-    if (!profile) return
+    if (!profile) { askToSignIn(); return }
     if (!selectedAddress) {
       showAlert({ title: isEn ? 'Notice' : 'تنبيه', message: isEn ? 'Select pickup address' : 'اختر عنوان الاستلام', type: 'warning' })
       return
@@ -475,7 +489,7 @@ export default function CartScreen() {
           </TouchableOpacity>
         )
       })}
-      <TouchableOpacity style={[s.dashedRow, { borderTopColor: b.divider }]} onPress={() => router.push('/addresses')} accessibilityRole="button">
+      <TouchableOpacity style={[s.dashedRow, { borderTopColor: b.divider }]} onPress={() => profile ? router.push('/addresses') : askToSignIn()} accessibilityRole="button">
         <Plus size={15} color={b.accentIcon} />
         <Text style={[s.addAddressText, { color: b.accentIcon }]}>{isEn ? 'Add new address' : 'إضافة عنوان جديد'}</Text>
       </TouchableOpacity>

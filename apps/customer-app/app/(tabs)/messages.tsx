@@ -9,6 +9,7 @@ import { supabase } from '../../src/lib/supabase'
 import { notifyMessage } from '../../src/hooks/useNotifications'
 import Skeleton from '../../src/components/Skeleton'
 import { useBrand, Card, F, clock, shortDate } from '../../src/components/brand'
+import { GuestGate } from '../../src/components/GuestGate'
 
 type Conversation = {
   order_id: string
@@ -23,7 +24,7 @@ type Conversation = {
 const AVATAR = 46
 
 export default function MessagesScreen() {
-  const { profile } = useAuth()
+  const { profile, session } = useAuth()
   const b = useBrand()
   const { t, locale } = useLanguage()
   const isEn = locale === 'en'
@@ -71,6 +72,8 @@ export default function MessagesScreen() {
     if (d.toDateString() === yesterday.toDateString()) return t('chatYesterday')
     return shortDate(d, isEn)
   }
+
+  if (!session) return <GuestGate title={t('messages')} message={t('guestMessagesSub')} icon={<MessageCircle size={30} color={b.tintText} />} />
 
   return (
     <View style={[s.container, { backgroundColor: b.page }]}>

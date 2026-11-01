@@ -45,14 +45,23 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
     if (cartKey === `${CART_PREFIX}${currentUserId}`) return
 
+    // A visitor fills the cart before signing in; those items come along into the
+    // account's cart instead of being replaced by it.
+    const guestItems = currentUserId ? [] : cart
     setCurrentUserId(profile?.id ?? null)
     setLoaded(false)
     AsyncStorage.getItem(cartKey).then(raw => {
+      let saved: CartItem[] = []
       if (raw) {
-        try { setCart(JSON.parse(raw)) } catch { setCart([]) }
-      } else {
-        setCart([])
+        try { saved = JSON.parse(raw) } catch { saved = [] }
       }
+      const merged = [...saved]
+      for (const item of guestItems) {
+        const idx = merged.findIndex(c => c.name === item.name && c.service_type === item.service_type)
+        if (idx >= 0) merged[idx] = { ...merged[idx], quantity: merged[idx].quantity + item.quantity }
+        else merged.push(item)
+      }
+      setCart(merged)
       setLoaded(true)
     })
   }, [cartKey])

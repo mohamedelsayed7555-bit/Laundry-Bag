@@ -1,3 +1,42 @@
+# الرفض التاني — Guideline 5.1.1(v) (28 أكتوبر 2026، build 6)
+
+Apple رفضت لأن التطبيق كان بيطلب تسجيل قبل ما تشوف أي حاجة. المطلوب: الخدمات والأسعار
+والباقات تتشاف من غير حساب، والتسجيل يتطلب بس للحاجات اللي محتاجة حساب (الطلب، الاشتراك،
+الطلبات، الرسائل).
+
+اللي اتعمل في build 7:
+- زرار **"تصفح من غير حساب"** في شاشة الترحيب، يدخل على الرئيسية على طول.
+- الزائر يشوف الخدمات والأسعار والعروض والباقات، ويضيف للسلة ويشوف الإجمالي.
+- تأكيد الطلب أو الاشتراك أو إضافة عنوان بيطلب تسجيل دخول، والسلة بتفضل بعد الدخول.
+- تبويبات الطلبات والرسائل وحسابي بتعرض للزائر شاشة "سجّل دخولك" بزرار دخول.
+- Migration `supabase/migrations/20261028_open_catalog_to_visitors.sql` بتفتح قراءة الأسعار
+  والباقات وإعدادات معينة للزائر — **لازم تتنفذ على قاعدة البيانات قبل الـ Resubmit**،
+  وإلا الزائر هيشوف الأسعار فاضية.
+
+### الرد (Reply to App Review)
+
+```
+Hello,
+
+Thank you for the feedback. We have revised the app in build 1.0.0 (7) so that registration is no longer required to use the features that are not account based.
+
+On the first screen, "Browse without an account" opens the app directly. Without signing in, users can browse all services and their prices, view offers and monthly plans with their prices, and add items to the cart to see the order total.
+
+Registration is requested only for features that are account based: placing a pickup order (we need the customer's address and phone number to collect and deliver the laundry), subscribing to a plan, saving addresses, and viewing personal orders and chats with the driver.
+
+The demo account in the Sign-In Information field still works for reviewing the account-based features.
+
+Thank you.
+```
+
+### سطر يتضاف أول الـ Notes (App Review Information)
+
+```
+NO ACCOUNT NEEDED TO BROWSE: on the first screen tap "Browse without an account" to see services, prices, offers and plans and to fill the cart. Signing in is only asked for when placing an order or subscribing.
+```
+
+---
+
 # الرد على رفض Apple — Guideline 2.1 (Information Needed)
 
 الرفض مش بسبب crash ولا كود، Apple طالبة **معلومات + فيديو**. فيه 3 حاجات:

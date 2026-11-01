@@ -288,7 +288,7 @@ export default function NewOrderScreen() {
         {addresses.length === 0 ? (
           <TouchableOpacity
             style={[s.dashedBtn, { borderColor: b.isDark ? 'rgba(56,189,248,0.35)' : '#BFDDF7' }]}
-            onPress={() => router.push('/addresses')}
+            onPress={() => router.push(profile ? '/addresses' : '/(auth)/welcome')}
             accessibilityRole="button"
           >
             <MapPin size={16} color={b.accentIcon} />

@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useBrand, Card, FlowLines, ForwardChevron, F, SIZE, type Brand } from '../../src/components/brand'
 import { PrimaryButton, SecondaryButton } from '../../src/components/auth/ui'
 import { openLegalPage } from '../../src/lib/legal'
+import { GuestGate } from '../../src/components/GuestGate'
 
 export default function ProfileScreen() {
   const { profile, session, signOut, biometricEnabled, biometricAvailable, toggleBiometric } = useAuth()
@@ -62,6 +63,8 @@ export default function ProfileScreen() {
   }
 
   const subBadge = activeSub ? (locale === 'en' && activeSub.plans?.name ? (t(`plan:${activeSub.plans.name}` as any) !== `plan:${activeSub.plans.name}` ? t(`plan:${activeSub.plans.name}` as any) : activeSub.plans.name) : activeSub.plans?.name) : undefined
+
+  if (!session) return <GuestGate title={t('myAccount')} message={t('guestProfileSub')} />
 
   return (
     <>

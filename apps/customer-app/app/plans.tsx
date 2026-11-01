@@ -193,7 +193,19 @@ export default function PlansScreen() {
   }
 
   async function handleSubscribe(plan: Plan) {
-    if (!profile) return
+    // Plans and their prices are open to a visitor; subscribing needs an account.
+    if (!profile) {
+      showAlert({
+        title: t('guestTitle'),
+        message: t('guestSubscribeSub'),
+        type: 'info',
+        buttons: [
+          { text: t('guestNotNow'), style: 'cancel' },
+          { text: t('guestSignInShort'), onPress: () => router.push('/(auth)/welcome') },
+        ],
+      })
+      return
+    }
     const pendingForPlan = pendingSubs.find(s => s.plan_id === plan.id)
     if (pendingForPlan) {
       showAlert({ title: locale === 'en' ? 'Notice' : 'تنبيه', message: locale === 'en' ? 'You already have a pending request for this plan' : 'لديك طلب اشتراك قيد المراجعة لهذه الباقة بالفعل', type: 'warning' })

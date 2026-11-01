@@ -9,7 +9,7 @@ import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated'
 import * as Haptics from 'expo-haptics'
-import { Truck, WashingMachine, House, ShieldCheck, MessageCircle, Sparkles, Fingerprint } from 'lucide-react-native'
+import { Truck, WashingMachine, House, ShieldCheck, MessageCircle, Sparkles, Fingerprint, Compass } from 'lucide-react-native'
 import { useLanguage } from '../../src/contexts/LanguageContext'
 import { supabase } from '../../src/lib/supabase'
 import { openLegalPage } from '../../src/lib/legal'
@@ -152,6 +152,15 @@ export default function WelcomeScreen() {
   // The dashed line runs from 17% to 83% of the row, so the dot travels ±33% around the centre.
   const dotX = travel.interpolate({ inputRange: [0, 1], outputRange: [-stepsW * 0.33, stepsW * 0.33] })
 
+  // App Review 5.1.1(v): services, prices and plans must be reachable without an
+  // account, so a visitor can look around first and is asked to sign in only to order.
+  // Not router.back(): below this screen there is usually only the start route, which
+  // sends a signed-out visitor straight back here.
+  function browseAsGuest() {
+    Keyboard.dismiss()
+    router.replace('/(tabs)/home')
+  }
+
   function openWhatsapp() {
     tapHaptic()
     Linking.openURL(`https://wa.me/${SUPPORT_WHATSAPP_INTL}`).catch(() => {})
@@ -287,6 +296,13 @@ export default function WelcomeScreen() {
               loading={loading}
               disabled={phone.length !== 11}
               trailing={<ForwardArrow />}
+              style={{ marginTop: 10 }}
+            />
+
+            <SecondaryButton
+              title={t('guestBrowse')}
+              icon={<Compass size={16} color={th.ink2} />}
+              onPress={browseAsGuest}
               style={{ marginTop: 10 }}
             />
 

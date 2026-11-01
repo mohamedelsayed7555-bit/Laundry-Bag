@@ -12,6 +12,7 @@ import {
 } from 'lucide-react-native'
 import { useBrand, Card, Divider, Segments, Segmented, Chip, Pill, IconButton, FlowLines, F, money, shortDate, StickyBar, useStickyHeader, type Brand } from '../../src/components/brand'
 import { PrimaryButton } from '../../src/components/auth/ui'
+import { GuestGate } from '../../src/components/GuestGate'
 
 const PAGE = 50
 const statusFlow = ['pending', 'assigned', 'arrived', 'picked_up', 'processing', 'ready', 'delivering', 'delivered']
@@ -68,7 +69,7 @@ const prog = StyleSheet.create({
 type TabFilter = 'active' | 'completed'
 type DateRange = '7' | '14' | '30' | 'all'
 export default function OrdersScreen() {
-  const { profile } = useAuth()
+  const { profile, session } = useAuth()
   const b = useBrand()
   const { t, locale } = useLanguage()
   const isEn = locale === 'en'
@@ -270,6 +271,8 @@ export default function OrdersScreen() {
 
   const showList = !loading && filteredOrders.length > 0
   const { scrollY, onScroll } = useStickyHeader(true)
+
+  if (!session) return <GuestGate title={t('myOrders')} message={t('guestOrdersSub')} />
 
   return (
     <View style={[s.container, { backgroundColor: b.page }]}>
