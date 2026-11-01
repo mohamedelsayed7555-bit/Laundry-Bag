@@ -4,7 +4,7 @@ Apple رفضت لأن التطبيق كان بيطلب تسجيل قبل ما ت
 والباقات تتشاف من غير حساب، والتسجيل يتطلب بس للحاجات اللي محتاجة حساب (الطلب، الاشتراك،
 الطلبات، الرسائل).
 
-اللي اتعمل في build 7:
+اللي اتعمل في build 9:
 - زرار **"تصفح من غير حساب"** في شاشة الترحيب، يدخل على الرئيسية على طول.
 - الزائر يشوف الخدمات والأسعار والعروض والباقات، ويضيف للسلة ويشوف الإجمالي.
 - تأكيد الطلب أو الاشتراك أو إضافة عنوان بيطلب تسجيل دخول، والسلة بتفضل بعد الدخول.
@@ -18,7 +18,7 @@ Apple رفضت لأن التطبيق كان بيطلب تسجيل قبل ما ت
 ```
 Hello,
 
-Thank you for the feedback. We have revised the app in build 1.0.0 (7) so that registration is no longer required to use the features that are not account based.
+Thank you for the feedback. We have revised the app in build 1.0.0 (9) so that registration is no longer required to use the features that are not account based.
 
 On the first screen, "Browse without an account" opens the app directly. Without signing in, users can browse all services and their prices, view offers and monthly plans with their prices, and add items to the cart to see the order total.
 
