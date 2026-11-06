@@ -99,8 +99,24 @@ export default function ActionsPage() {
   }
 
   async function confirmSub(id: string) {
+    // The end date decides when the plan expires and how many days are left, so it has
+    // to be written here too — activating from the subscriptions page sets both, and a
+    // subscription activated from here used to get a start date and nothing else.
+    const { data: sub, error: readErr } = await supabase
+      .from('subscriptions').select('duration').eq('id', id).single()
+    if (readErr || !sub) { toast('حدث خطأ', 'error'); loadTab(); return }
+
+    const months = sub.duration === 'monthly' ? 1 : sub.duration === 'quarterly' ? 3 : sub.duration === 'biannual' ? 6 : 12
+    const now = new Date()
+    const endDate = new Date(now)
+    endDate.setMonth(endDate.getMonth() + months)
+
     setRows(prev => prev.filter(r => r.id !== id))
-    const { error } = await supabase.from('subscriptions').update({ status: 'active', start_date: new Date().toISOString() }).eq('id', id)
+    const { error } = await supabase.from('subscriptions').update({
+      status: 'active',
+      start_date: now.toISOString().split('T')[0],
+      end_date: endDate.toISOString().split('T')[0],
+    }).eq('id', id)
     if (error) { toast('حدث خطأ', 'error'); loadTab() } else { toast('تم تفعيل الاشتراك', 'success'); refresh() }
   }
 
