@@ -144,7 +144,30 @@ export default function SettingsPage() {
     setSaving(true)
     try {
       for (const s of settings) {
-        let val: any = s.key === 'org_name' ? orgName : s.key === 'org_phone' ? orgPhone : (editValues[s.id] ?? s.value)
+        let val: any
+        if (s.key === 'org_name') {
+          val = orgName
+        } else if (s.key === 'org_phone') {
+          val = orgPhone
+        } else {
+          const isJson = typeof s.value === 'object' && s.value !== null
+          // The box shows JSON settings as text. Saving the text back as text is what
+          // turned payment_methods, bag_offer and the rest into strings and took
+          // ordering down, so a setting nobody touched is left exactly as it is.
+          const asShown = isJson ? JSON.stringify(s.value) : String(s.value)
+          const edited = editValues[s.id]
+          if (edited === undefined || edited === asShown) continue
+          if (isJson) {
+            try {
+              val = JSON.parse(edited)
+            } catch {
+              toast(`"${s.key}" مش JSON صحيح — اتساب زي ما هو`, 'error')
+              continue
+            }
+          } else {
+            val = edited
+          }
+        }
         if (typeof val === 'string' && !isNaN(Number(val)) && val.trim() !== '') {
           // Keep phone/account-like values as text — a leading zero (e.g. an InstaPay
           // or mobile number) or a very long digit string must not be turned into a

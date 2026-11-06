@@ -12,6 +12,8 @@ const MESSAGES: Record<string, Msg> = {
   out_of_zone: { ar: 'عنوان الاستلام خارج نطاق التوصيل', en: 'Pickup address is outside our delivery zone' },
   delivery_out_of_zone: { ar: 'عنوان التسليم خارج نطاق التوصيل', en: 'Delivery address is outside our delivery zone' },
   invalid_payment_method: { ar: 'طريقة الدفع غير صحيحة', en: 'Invalid payment method' },
+  // The method was switched off from the dashboard after the screen was opened.
+  payment_method_disabled: { ar: 'وسيلة الدفع دي مش متاحة دلوقتي، اختار غيرها', en: 'This payment method is not available right now, pick another' },
   invalid_schedule: { ar: 'اختار ميعاد في المستقبل', en: 'Choose a time in the future' },
   coupon_invalid: { ar: 'كود الخصم غير صالح', en: 'This coupon code is invalid' },
   coupon_expired: { ar: 'كود الخصم منتهي الصلاحية', en: 'This coupon has expired' },
