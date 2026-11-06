@@ -16,3 +16,6 @@ Thumbs.db
 # Firebase service account keys (secret — never commit)
 *firebase-adminsdk*.json
 serviceAccountKey.json
+
+# Store-review demo account, submitted to Apple and Google but not kept in the repo
+docs/review-account.local.md

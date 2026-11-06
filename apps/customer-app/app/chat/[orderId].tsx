@@ -30,6 +30,9 @@ export default function ChatScreen() {
   const isEn = locale === 'en'
   const router = useRouter()
   const [messages, setMessages] = useState<Message[]>([])
+  // False until the conversation has been fetched once. Without it the screen invited
+  // the customer to start a chat that was already there, for as long as the fetch took.
+  const [loaded, setLoaded] = useState(false)
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const [otherName, setOtherName] = useState(t('theDriver'))
@@ -61,6 +64,7 @@ export default function ChatScreen() {
     ])
 
     setMessages((data ?? []).slice().reverse())
+    setLoaded(true)
     if (orderData) { setOrderStatus(orderData.status); setOrderNumber(orderData.order_number) }
 
     const unread = (data ?? []).filter(m => m.receiver_id === profile.id && !m.read_at)
@@ -245,11 +249,13 @@ export default function ChatScreen() {
           )
         }}
         ListEmptyComponent={
-          <View style={s.emptyChat}>
-            <View style={[s.emptyPill, { backgroundColor: b.isDark ? '#16223A' : '#FFFFFF' }]}>
-              <Text style={[s.emptyChatText, { color: b.muted }]}>{t('startChat')}</Text>
+          loaded ? (
+            <View style={s.emptyChat}>
+              <View style={[s.emptyPill, { backgroundColor: b.isDark ? '#16223A' : '#FFFFFF' }]}>
+                <Text style={[s.emptyChatText, { color: b.muted }]}>{t('startChat')}</Text>
+              </View>
             </View>
-          </View>
+          ) : null
         }
       />
 

@@ -17,7 +17,7 @@ import { useAuth } from '../../src/contexts/AuthContext'
 import { loadLastUser } from '../../src/lib/lastUser'
 import { F, HeroImage, LOGO, PHONE_RE, useAuthTheme, PhoneField, PrimaryButton, SecondaryButton, ForwardArrow, LangButton, SheetBackdrop, tapHaptic, GoogleButton, AppleButton, SocialRow, OrDivider } from '../../src/components/auth/ui'
 
-const SUPPORT_WHATSAPP_INTL = '201002438847'
+const SUPPORT_WHATSAPP_INTL = '201006646641'
 
 const STEP_IMAGES = {
   pickup: require('../../assets/auth/step-pickup.webp'),

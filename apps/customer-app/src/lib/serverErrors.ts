@@ -2,6 +2,8 @@ type Msg = { ar: string; en: string }
 
 const MESSAGES: Record<string, Msg> = {
   not_authenticated: { ar: 'سجّل دخولك الأول', en: 'Please sign in first' },
+  // place_order refuses an account with no phone: the order is dispatched by phone.
+  phone_required: { ar: 'ضيف رقم موبايلك الأول من صفحة حسابي', en: 'Add your phone number first, from your profile' },
   empty_cart: { ar: 'السلة فاضية', en: 'Your cart is empty' },
   too_many_items: { ar: 'عدد الأصناف كبير جداً', en: 'Too many different items' },
   invalid_quantity: { ar: 'كمية غير صحيحة', en: 'Invalid quantity' },

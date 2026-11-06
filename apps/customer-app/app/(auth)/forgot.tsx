@@ -10,8 +10,8 @@ import { useLanguage } from '../../src/contexts/LanguageContext'
 import { supabase } from '../../src/lib/supabase'
 import { F, useAuthTheme, RoundButton, BackArrow, SecondaryButton, Halftone, tapHaptic, ErrorLine } from '../../src/components/auth/ui'
 
-const SUPPORT_PHONE = '01002438847'
-const SUPPORT_WHATSAPP_INTL = '201002438847'
+const SUPPORT_PHONE = '01006646641'
+const SUPPORT_WHATSAPP_INTL = '201006646641'
 
 type Hours = { enabled: boolean; open?: string; close?: string; is_open: boolean }
 

@@ -40,6 +40,7 @@ const SERVICE_IMAGES: Record<string, any> = {
   carpet: require('../../assets/services/cards/carpet.webp'),
   accessories: require('../../assets/services/cards/shop.webp'),
 }
+const SHOP_WIDE = require('../../assets/services/shop-wide.webp')
 const BANNER_IMAGES = {
   bag: require('../../assets/banners/bag.webp'),
   newOrder: require('../../assets/banners/new-order.webp'),
@@ -441,7 +442,14 @@ export default function HomeScreen() {
   // flashes empty on first render. Once the set loads, hide anything the dashboard disabled.
   const services = activeServices ? allServices.filter(s => activeServices.has(s.key)) : allServices
   const accessoriesEnabled = activeServices ? activeServices.has('accessories') : true
+  // An odd number of active services would leave the last tile alone with a hole beside it.
+  // The accessories tile drops to half width and pairs with it; with accessories switched
+  // off there is nothing to pair with, so the last service spans the row instead.
+  const oddServices = services.length % 2 === 1
+  const accessoriesHalf = oddServices && accessoriesEnabled
   const accessoriesLabel = en ? 'Accessories & Products' : 'منتجات وإكسسوارات'
+  // The full name does not fit a half-width tile.
+  const accessoriesTileLabel = accessoriesHalf ? (en ? 'Products' : 'منتجات') : accessoriesLabel
   // The small kicker shows the other language: English words on the Arabic UI, Arabic on the English UI.
   const AR_NAMES: Record<string, string> = { wash: 'غسيل', dry_clean: 'تنظيف جاف', iron: 'كي فقط', wash_iron: 'غسيل وكي', housekeeping: 'تنظيف منازل', carpet: 'سجاد وبطاطين', accessories: 'منتجات' }
 
@@ -580,13 +588,15 @@ export default function HomeScreen() {
       {/* Services */}
       <SectionTitle eyebrow={t('homeEyebrowServices')} title={t('services')} />
       <View style={s.tiles}>
-        {services.map((svc, i) => (
-          <Animated.View key={svc.key} entering={SlideIn.duration(250).delay(50 + i * 20)} style={{ width: TILE_WIDTH }}>
+        {services.map((svc, i) => {
+          const solo = oddServices && !accessoriesEnabled && i === services.length - 1
+          return (
+          <Animated.View key={svc.key} entering={SlideIn.duration(250).delay(50 + i * 20)} style={{ width: solo ? '100%' : TILE_WIDTH }}>
             <TouchableOpacity
               activeOpacity={0.85}
               accessibilityRole="button"
               onPress={() => router.push({ pathname: '/(tabs)/new-order', params: { service: svc.key } })}
-              style={s.tile}
+              style={[s.tile, solo && s.tileSolo]}
             >
               <Image source={SERVICE_IMAGES[svc.key]} style={s.tileImg} resizeMode="cover" />
               <LinearGradient colors={['rgba(5,12,26,0)', 'rgba(5,12,26,0.82)']} locations={[0.38, 1]} style={StyleSheet.absoluteFill} />
@@ -598,20 +608,21 @@ export default function HomeScreen() {
               </View>
             </TouchableOpacity>
           </Animated.View>
-        ))}
+          )
+        })}
         {accessoriesEnabled && (
         <TouchableOpacity
           activeOpacity={0.85}
           accessibilityRole="button"
           onPress={() => router.push({ pathname: '/(tabs)/new-order', params: { service: 'accessories' } })}
-          style={[s.tile, s.tileWide]}
+          style={[s.tile, accessoriesHalf ? s.tileHalf : s.tileWide]}
         >
-          <Image source={require('../../assets/services/shop-wide.webp')} style={s.tileImg} resizeMode="cover" />
-          <LinearGradient colors={['rgba(5,12,26,0)', 'rgba(5,12,26,0.82)']} locations={[0.32, 1]} style={StyleSheet.absoluteFill} />
+          <Image source={accessoriesHalf ? SERVICE_IMAGES.accessories : SHOP_WIDE} style={s.tileImg} resizeMode="cover" />
+          <LinearGradient colors={['rgba(5,12,26,0)', 'rgba(5,12,26,0.82)']} locations={accessoriesHalf ? [0.38, 1] : [0.32, 1]} style={StyleSheet.absoluteFill} />
           <View style={s.tileArrow}>{I18nManager.isRTL ? <ArrowUpLeft size={13} color="#fff" /> : <ArrowUpRight size={13} color="#fff" />}</View>
           <View style={s.tileText}>
-            <Text style={s.kicker}>{en ? AR_NAMES.accessories : 'SHOP'}</Text>
-            <Text style={s.tileName}>{accessoriesLabel}</Text>
+            <Text style={s.kicker} numberOfLines={1}>{en ? AR_NAMES.accessories : 'SHOP'}</Text>
+            <Text style={s.tileName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{accessoriesTileLabel}</Text>
             {priceFrom('accessories') ? <Text style={s.tilePrice}>{priceFrom('accessories')}</Text> : null}
           </View>
         </TouchableOpacity>
@@ -720,6 +731,8 @@ const s = StyleSheet.create({
   // tile showed one magnified corner of it.
   tileImg: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
   tileWide: { width: '100%', height: 124 },
+  tileHalf: { width: TILE_WIDTH },
+  tileSolo: { height: 124 },
   tileArrow: { position: 'absolute', top: 8, end: 8, width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.18)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
   tileText: { position: 'absolute', start: 11, end: 11, bottom: 9 },
   kicker: { fontFamily: F.displaySemi, fontSize: 9, letterSpacing: 1.8, color: '#7DD3FC' },
