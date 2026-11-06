@@ -247,11 +247,19 @@ export default function SubscriptionsPage() {
     const endDate = new Date(now)
     endDate.setMonth(endDate.getMonth() + months)
 
-    await supabase.from('subscriptions').update({
+    // Tell the user when the server refuses. Without this the success toast showed
+    // even on a rejected request, which is how a failing activation went unnoticed.
+    const { error: activateError } = await supabase.from('subscriptions').update({
       status: 'active',
       start_date: now.toISOString().split('T')[0],
       end_date: endDate.toISOString().split('T')[0],
     }).eq('id', sub.id)
+
+    if (activateError) {
+      console.error('Subscription activation failed:', activateError)
+      toast(`تعذّر تفعيل الاشتراك: ${activateError.message}`, 'error')
+      return
+    }
 
     const planName = sub.plans?.name ?? 'الباقة'
     const { data: userData } = await supabase.from('users').select('fcm_token, preferred_language').eq('id', sub.user_id).single()
@@ -288,20 +296,22 @@ export default function SubscriptionsPage() {
   }
 
   async function rejectSub(id: string) {
-    await supabase.from('subscriptions').update({ status: 'cancelled', cancelled_at: new Date().toISOString() }).eq('id', id)
+    const { error } = await supabase.from('subscriptions').update({ status: 'cancelled', cancelled_at: new Date().toISOString() }).eq('id', id)
+    if (error) { toast(`تعذّر رفض الاشتراك: ${error.message}`, 'error'); return }
     loadSubs()
     setDetail(null)
     toast('تم رفض الاشتراك', 'warning')
   }
 
   async function cancelSub(id: string) {
-    await supabase.from('subscriptions').update({ status: 'cancelled', cancelled_at: new Date().toISOString() }).eq('id', id)
+    const { error } = await supabase.from('subscriptions').update({ status: 'cancelled', cancelled_at: new Date().toISOString() }).eq('id', id)
+    if (error) { toast(`تعذّر إلغاء الاشتراك: ${error.message}`, 'error'); return }
     loadSubs()
     setDetail(null)
     toast('تم إلغاء الاشتراك', 'warning')
   }
 
-  const allStatuses = ['all', 'pending', 'active', 'cancelled', 'expired']
+  const allStatuses = ['all', 'pending', 'active', 'cancelled', 'expired', 'upgraded']
   const filtered = subs.filter(s => statusFilter === 'all' || s.status === statusFilter)
   const pendingCount = subs.filter(s => s.status === 'pending').length
 
