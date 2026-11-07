@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Linking, AppState, ScrollView } from 'react-native'
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Linking, AppState, ScrollView, Platform } from 'react-native'
 import { useRouter } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated'
@@ -21,6 +21,81 @@ function getDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number): 
   const dLng = toRad(lng2 - lng1)
   const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+type Point = { lat: number; lng: number }
+
+function asPoint(loc: any): Point | null {
+  return typeof loc?.lat === 'number' && typeof loc?.lng === 'number'
+    ? { lat: loc.lat, lng: loc.lng }
+    : null
+}
+
+/**
+ * Chain the stops into a route instead of ranking each one from wherever the
+ * driver happens to be standing.
+ *
+ * Ranking by distance-from-driver lists an 8 km stop, a 10 km stop and an 11 km
+ * stop in that order even when the 8 and the 11 are next door to each other and
+ * the 10 is the opposite way - so the driver crosses town and comes back. Taking
+ * the nearest stop, then the nearest to THAT one, and so on, is not the shortest
+ * route there is, but it removes nearly all of the doubling back.
+ *
+ * Stops with no usable coordinates keep their incoming order and go last, so a
+ * missing location can never hide a job from the driver.
+ *
+ * Returns the ordered list and the last stop reached, so the next group of stops
+ * can carry on from there rather than starting over from the driver.
+ */
+function routeFrom<T>(items: T[], start: Point | null, locOf: (item: T) => any): { ordered: T[]; end: Point | null } {
+  const placed: T[] = []
+  const unplaced: T[] = []
+  for (const it of items) (asPoint(locOf(it)) ? placed : unplaced).push(it)
+
+  if (!start || placed.length < 2) return { ordered: [...placed, ...unplaced], end: start }
+
+  const remaining = [...placed]
+  const ordered: T[] = []
+  let cursor: Point = start
+
+  while (remaining.length > 0) {
+    let bestIndex = 0
+    let bestDist = Infinity
+    for (let i = 0; i < remaining.length; i++) {
+      const p = asPoint(locOf(remaining[i]))!
+      const d = getDistanceKm(cursor.lat, cursor.lng, p.lat, p.lng)
+      if (d < bestDist) { bestDist = d; bestIndex = i }
+    }
+    const [next] = remaining.splice(bestIndex, 1)
+    ordered.push(next)
+    cursor = asPoint(locOf(next))!
+  }
+
+  return { ordered: [...ordered, ...unplaced], end: cursor }
+}
+
+/**
+ * Status still decides which stops come first - an order the driver has already
+ * arrived at must stay at the top. Within each status the stops are chained, and
+ * the chain carries on into the next status instead of jumping back to the driver.
+ */
+function routeByStatus<T extends { status: string }>(
+  items: T[],
+  priority: Record<string, number>,
+  start: Point | null,
+  locOf: (item: T) => any,
+): T[] {
+  const statuses = [...new Set(items.map(o => o.status))]
+    .sort((a, b) => (priority[a] ?? 9) - (priority[b] ?? 9))
+
+  const out: T[] = []
+  let cursor = start
+  for (const st of statuses) {
+    const { ordered, end } = routeFrom(items.filter(o => o.status === st), cursor, locOf)
+    out.push(...ordered)
+    cursor = end
+  }
+  return out
 }
 
 const statusConfig: Record<string, { label: string; color: string; icon: string }> = {
@@ -75,25 +150,50 @@ export default function DriverOrdersScreen() {
   const [dateRange, setDateRange] = useState<DateRange>('14')
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [pickupSub, setPickupSub] = useState<'all' | 'waiting' | 'picked_up'>('all')
-  const driverLocRef = useRef<{ lat: number; lng: number } | null>(null)
+  const driverLocRef = useRef<Point | null>(null)
   const lastLoadRef = useRef(0)
+  const lastLocRef = useRef(0)
+
+  // The ref is what loadOrders reads (keeping it out of its deps, so refreshing
+  // the position can never retrigger a load). The state is what the route sort
+  // reads, so a position that arrives after the first paint actually re-sorts
+  // the list instead of sitting in a ref nothing re-renders for.
+  const [driverLoc, setDriverLoc] = useState<Point | null>(null)
+  const applyDriverLoc = useCallback((p: Point) => {
+    driverLocRef.current = p
+    setDriverLoc(prev => (prev && prev.lat === p.lat && prev.lng === p.lng ? prev : p))
+  }, [])
+
+  const refreshDriverLoc = useCallback(async () => {
+    // GPS first; the last position we stored for this driver is the fallback.
+    try {
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
+      applyDriverLoc({ lat: loc.coords.latitude, lng: loc.coords.longitude })
+      return
+    } catch {}
+    if (!profile) return
+    try {
+      const { data: dl } = await supabase.from('driver_locations').select('lat, lng').eq('driver_id', profile.id).single()
+      if (dl && typeof dl.lat === 'number' && typeof dl.lng === 'number') applyDriverLoc({ lat: dl.lat, lng: dl.lng })
+    } catch {}
+  }, [profile, applyDriverLoc])
 
   useEffect(() => {
     if (!profile) return
-    Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
-      .then(loc => { driverLocRef.current = { lat: loc.coords.latitude, lng: loc.coords.longitude } })
-      .catch(() => {})
-  }, [profile])
+    refreshDriverLoc()
+  }, [profile, refreshDriverLoc])
 
   const loadOrders = useCallback(async (force = false) => {
     if (!profile) return
     if (!force && Date.now() - lastLoadRef.current < 10000) return
     lastLoadRef.current = Date.now()
-    if (!driverLocRef.current) {
-      try {
-        const { data: dl } = await supabase.from('driver_locations').select('lat, lng').eq('driver_id', profile.id).single()
-        if (dl) driverLocRef.current = { lat: dl.lat, lng: dl.lng }
-      } catch {}
+    // The driver moves between stops, so a position read once at launch makes the
+    // route wrong for the rest of the shift. Refresh it alongside a forced reload
+    // (pull-to-refresh, or a status change), throttled so realtime bursts cannot
+    // hammer the GPS. Deliberately not awaited: the list must not wait on a fix.
+    if (!driverLocRef.current || (force && Date.now() - lastLocRef.current > 60000)) {
+      lastLocRef.current = Date.now()
+      refreshDriverLoc()
     }
     const { data } = await supabase
       .from('orders')
@@ -122,30 +222,22 @@ export default function DriverOrdersScreen() {
 
   const onRefresh = () => { setRefreshing(true); loadOrders(true) }
 
-  function distFromDriver(loc: any): number {
-    if (!driverLocRef.current || !loc?.lat || !loc?.lng) return Infinity
-    return getDistanceKm(driverLocRef.current.lat, driverLocRef.current.lng, loc.lat, loc.lng)
-  }
+  // Pickup: status first, then chained into a route rather than ranked by how far
+  // each stop is from the driver (which sent him across town and back).
+  const pickupOrders = routeByStatus(
+    orders.filter(o => ['assigned', 'arrived', 'picked_up'].includes(o.status)),
+    { arrived: 0, assigned: 1, picked_up: 2 },
+    driverLoc,
+    o => o.pickup_location,
+  )
 
-  // Pickup: assigned, picked_up — sorted by status then distance from driver
-  const pickupOrders = orders
-    .filter(o => ['assigned', 'arrived', 'picked_up'].includes(o.status))
-    .sort((a, b) => {
-      const p: Record<string, number> = { arrived: 0, assigned: 1, picked_up: 2 }
-      const statusDiff = (p[a.status] ?? 9) - (p[b.status] ?? 9)
-      if (statusDiff !== 0) return statusDiff
-      return distFromDriver(a.pickup_location) - distFromDriver(b.pickup_location)
-    })
-
-  // Delivery: ready, delivering — sorted by status then distance from driver
-  const deliveryOrders = orders
-    .filter(o => ['ready', 'delivering'].includes(o.status))
-    .sort((a, b) => {
-      const p: Record<string, number> = { ready: 0, delivering: 1 }
-      const statusDiff = (p[a.status] ?? 9) - (p[b.status] ?? 9)
-      if (statusDiff !== 0) return statusDiff
-      return distFromDriver(a.delivery_location) - distFromDriver(b.delivery_location)
-    })
+  // Delivery: same rule, chained over the delivery addresses.
+  const deliveryOrders = routeByStatus(
+    orders.filter(o => ['ready', 'delivering'].includes(o.status)),
+    { ready: 0, delivering: 1 },
+    driverLoc,
+    o => o.delivery_location,
+  )
 
   const completedOrders = orders.filter(o => {
     if (o.status !== 'delivered') return false
@@ -254,7 +346,13 @@ export default function DriverOrdersScreen() {
               <Text style={s.customerAvatarText}>{item.customer?.name?.[0] ?? '؟'}</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.customerName}>{item.customer?.name}</Text>
+              <View style={s.customerNameRow}>
+                <Text style={s.customerName} numberOfLines={1}>{item.customer?.name}</Text>
+                {/* The code the bag is labelled with, so the driver can match bag to customer. */}
+                {item.customer?.customer_code && (
+                  <Text style={s.customerCode}>{item.customer.customer_code}</Text>
+                )}
+              </View>
               {item.customer?.phone && <Text style={s.customerPhone}>{item.customer.phone}</Text>}
             </View>
             {item.customer?.phone && (
@@ -525,7 +623,15 @@ const s = StyleSheet.create({
     backgroundColor: colors.accent + '25', justifyContent: 'center', alignItems: 'center',
   },
   customerAvatarText: { fontSize: 16, fontWeight: '700', color: colors.accent },
-  customerName: { fontSize: 14, color: '#fff', fontWeight: '700' },
+  customerNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  customerName: { fontSize: 14, color: '#fff', fontWeight: '700', flexShrink: 1 },
+  // Monospaced so CLN-00007 and CLN-00070 cannot be misread off a bag label.
+  customerCode: {
+    fontSize: 11, fontWeight: '800', color: colors.primary,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, overflow: 'hidden',
+  },
   customerPhone: { fontSize: 12, color: colors.navy[300], marginTop: 2 },
   quickCallBtn: {
     width: 36, height: 36, borderRadius: 18,
