@@ -3,7 +3,14 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      // lucide-react-native is hoisted to the monorepo root, but react-native-svg
+      // is installed here, so TypeScript cannot resolve the SvgProps that every
+      // icon's props extend - which silently stripped `color`, `strokeWidth` and
+      // the rest from every icon and buried the real type errors in the noise.
+      // Pointing at the package folder (not a .d.ts) keeps Metro resolving it
+      // exactly where it already does.
+      "react-native-svg": ["./node_modules/react-native-svg"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]
