@@ -156,62 +156,37 @@ export default function NotificationsPage() {
     }))
     await supabase.from('notifications').insert(notifRows)
 
-    // Send push to users with tokens.
-    // Expo answers 200 even when every message in the batch was rejected: the
-    // verdict is per message, inside the body. Counting on res.ok alone
-    // reported a send as delivered when none of it had been accepted.
+    // Expo's push endpoint sends no CORS header, so the browser refused this
+    // request and no broadcast ever left the page. It goes through our own
+    // server now, which also checks that the caller really is an admin.
     const tokens = allUsers.map(u => u.fcm_token).filter(Boolean)
     let successCount = 0
     let failedCount = 0
-    const failReasons: Record<string, number> = {}
-    const ticketIds: string[] = []
-    for (let i = 0; i < tokens.length; i += 100) {
-      const batch = tokens.slice(i, i + 100)
+    let failReasons: Record<string, number> = {}
+    if (tokens.length > 0) {
       try {
-        const messages = batch.map(token => ({
-          to: token,
-          title: title.trim(),
-          body: body.trim(),
-          sound: 'offer.wav',
-          channelId: 'offers-v1',
-          data: { type: 'broadcast' },
-        }))
-        const res = await fetch('https://exp.host/--/api/v2/push/send', {
+        const res = await fetch('/api/broadcast-push', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(messages),
+          body: JSON.stringify({ tokens, title: title.trim(), body: body.trim() }),
         })
-        if (!res.ok) {
-          failedCount += batch.length
-          failReasons[`HTTP ${res.status}`] = (failReasons[`HTTP ${res.status}`] ?? 0) + batch.length
-          continue
-        }
         const json = await res.json().catch(() => null)
-        const tickets: any[] = Array.isArray(json?.data) ? json.data : []
-        if (tickets.length === 0) {
-          // a shape we do not recognise: count it as unknown rather than as sent
-          failedCount += batch.length
-          failReasons['رد غير مفهوم من Expo'] = (failReasons['رد غير مفهوم من Expo'] ?? 0) + batch.length
-          continue
-        }
-        tickets.forEach(t => {
-          if (t?.status === 'ok') {
-            successCount++
-            if (t.id) ticketIds.push(t.id)
-          } else {
-            failedCount++
-            const why = t?.details?.error ?? t?.message ?? 'سبب غير معروف'
-            failReasons[why] = (failReasons[why] ?? 0) + 1
+        if (!res.ok || !json || typeof json.sent !== 'number') {
+          failedCount = tokens.length
+          failReasons = { [json?.error ?? `HTTP ${res.status}`]: tokens.length }
+        } else {
+          successCount = json.sent
+          failedCount = json.failed ?? 0
+          failReasons = json.reasons ?? {}
+          if (Array.isArray(json.ticketIds) && json.ticketIds.length > 0) {
+            console.info('[broadcast] expo ticket ids', json.ticketIds)
           }
-        })
+        }
       } catch (e: any) {
-        failedCount += batch.length
-        const why = e?.message ?? 'تعذّر الاتصال بـ Expo'
-        failReasons[why] = (failReasons[why] ?? 0) + batch.length
+        failedCount = tokens.length
+        failReasons = { [e?.message ?? 'تعذّر الاتصال بالخادم']: tokens.length }
       }
     }
-    // the ticket ids are what the delivery receipts are looked up with later
-    if (ticketIds.length > 0) console.info('[broadcast] expo ticket ids', ticketIds)
     if (failedCount > 0) console.warn('[broadcast] failures', failReasons)
 
     await supabase.from('broadcast_messages').insert({
