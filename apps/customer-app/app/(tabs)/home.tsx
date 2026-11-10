@@ -247,6 +247,7 @@ export default function HomeScreen() {
   const [ratingDriver, setRatingDriver] = useState(0)
   const [ratingNote, setRatingNote] = useState('')
   const [ratingSubmitting, setRatingSubmitting] = useState(false)
+  const [ratingError, setRatingError] = useState<string | null>(null)
   const [defaultAddress, setDefaultAddress] = useState<{ label: string } | null | undefined>(undefined)
   const [minPrices, setMinPrices] = useState<Record<string, number>>({})
   // Active service codes from the DB (dashboard → prices → services tab controls this).
@@ -351,13 +352,16 @@ export default function HomeScreen() {
   async function handleSubmitRating() {
     if (!ratingOrder || ratingService === 0) return
     setRatingSubmitting(true)
-    await supabase.from('orders').update({
+    setRatingError(null)
+    // the failure used to be dropped: the sheet closed and the rating vanished
+    const { error } = await supabase.from('orders').update({
       rating_service: ratingService,
       rating_driver: ratingDriver || null,
       rating_note: ratingNote || null,
       rated_at: new Date().toISOString(),
     }).eq('id', ratingOrder.id)
     setRatingSubmitting(false)
+    if (error) { setRatingError(t('ratingFailed')); return }
     setRatingOrder(null)
     setRatingService(0)
     setRatingDriver(0)
@@ -365,6 +369,7 @@ export default function HomeScreen() {
   }
 
   function dismissRating() {
+    setRatingError(null)
     setRatingOrder(null)
     setRatingService(0)
     setRatingDriver(0)
@@ -693,6 +698,7 @@ export default function HomeScreen() {
       driver={ratingDriver}
       note={ratingNote}
       submitting={ratingSubmitting}
+      error={ratingError}
       onService={setRatingService}
       onDriver={setRatingDriver}
       onNote={setRatingNote}

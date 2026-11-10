@@ -164,7 +164,7 @@ export default function ResetPasswordScreen() {
     <View style={[s.root, { backgroundColor: th.bg }]}>
       <StatusBar style={th.isDark ? 'light' : 'dark'} />
       <TintBackground />
-      <KeyboardAvoidingView style={s.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={s.root} behavior="padding">
         <ScrollView
           contentContainerStyle={{ paddingTop: insets.top + 32, paddingBottom: insets.bottom + 24, paddingHorizontal: 20 }}
           keyboardShouldPersistTaps="handled"

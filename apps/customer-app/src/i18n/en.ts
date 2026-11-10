@@ -253,6 +253,7 @@ export default {
   later: 'Later',
   submittingRating: 'Submitting...',
   submitRating: 'Submit Rating',
+  ratingFailed: "Couldn't send your rating. Check your connection and try again.",
   cancelOrder: 'Cancel Order',
   cancelOrderTitle: 'Cancel Order',
   driverPickedUp: 'The driver already picked up the order.\n\nIf you cancel, you will pay delivery fees only:\n💰',

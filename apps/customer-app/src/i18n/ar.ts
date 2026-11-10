@@ -197,6 +197,7 @@ export default {
   later: 'لاحقاً',
   submittingRating: 'جاري الإرسال...',
   submitRating: 'إرسال التقييم',
+  ratingFailed: 'تعذّر إرسال التقييم. تأكد من الإنترنت وحاول تاني.',
   cancelOrder: 'إلغاء الطلب',
   cancelOrderTitle: 'إلغاء الطلب',
   driverPickedUp: 'السائق استلم الطلب بالفعل.\n\nفي حالة الإلغاء هتدفع رسوم التوصيل فقط:\n💰',

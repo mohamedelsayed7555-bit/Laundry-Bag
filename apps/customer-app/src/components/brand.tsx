@@ -186,7 +186,7 @@ export function Chip({ label, active, onPress, icon, style }: { label: string; a
   )
 }
 
-export function Pill({ label, tone = 'info', icon }: { label: string; tone?: 'info' | 'ok' | 'warn' | 'danger' | 'neutral'; icon?: ReactNode }) {
+export function Pill({ label, tone = 'info', icon, style }: { label: string; tone?: 'info' | 'ok' | 'warn' | 'danger' | 'neutral'; icon?: ReactNode; style?: StyleProp<ViewStyle> }) {
   const b = useBrand()
   const map = {
     info: [b.tint, b.tintText],
@@ -197,7 +197,7 @@ export function Pill({ label, tone = 'info', icon }: { label: string; tone?: 'in
   } as const
   const [bg, fg] = map[tone]
   return (
-    <View style={[s.pill, { backgroundColor: bg }]}>
+    <View style={[s.pill, { backgroundColor: bg }, style]}>
       {icon}
       <Text style={[s.pillText, { color: fg }]} numberOfLines={1}>{label}</Text>
     </View>

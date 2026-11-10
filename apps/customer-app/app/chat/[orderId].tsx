@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Vibration, I18nManager } from 'react-native'
+import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Keyboard, Vibration, I18nManager } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Check, CheckCheck, SendHorizontal, WashingMachine, Shirt, Droplet, Sparkles, Truck, Package, Wind, Sun } from 'lucide-react-native'
@@ -85,6 +85,16 @@ export default function ChatScreen() {
   }, [profile, orderId])
 
   useEffect(() => { load() }, [load])
+
+  // The window no longer shrinks for the keyboard on current Android, so the
+  // composer sat behind it and you could not see what you were typing. The
+  // measurement below is a no-op on any build where the window does resize.
+  useEffect(() => {
+    const sub = Keyboard.addListener('keyboardDidShow', () => {
+      flatListRef.current?.scrollToEnd({ animated: true })
+    })
+    return () => sub.remove()
+  }, [])
 
   // While this chat is open its messages only get a soft in-chat sound, not a banner.
   useEffect(() => {
@@ -182,7 +192,7 @@ export default function ChatScreen() {
   const theirsBg = b.isDark ? '#1A2740' : '#FFFFFF'
 
   return (
-    <KeyboardAvoidingView style={[s.container, { backgroundColor: wallBg }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
+    <KeyboardAvoidingView style={[s.container, { backgroundColor: wallBg }]} behavior="padding" keyboardVerticalOffset={0}>
       <View pointerEvents="none" style={[StyleSheet.absoluteFill, { overflow: 'hidden', direction: 'ltr' }]}>
         {doodles.map((d, i) => (
           <View key={i} style={{ position: 'absolute', left: d.x, top: d.y, transform: [{ rotate: d.r + 'deg' }] }}>

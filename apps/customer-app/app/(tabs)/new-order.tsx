@@ -54,6 +54,72 @@ function StepTitle({ n, title, b }: { n: number; title: string; b: Brand }) {
   )
 }
 
+/**
+ * The category picker. It used to be small scrolling chips, which most people
+ * never noticed: they read the list under them as the whole catalogue and never
+ * found the other two groups. Three equal, full-width segments make it read as
+ * a switch, and the piece count tells you there is something inside the others.
+ */
+function CatTabs({
+  cats, activeId, onPick, label, b, locale,
+}: {
+  cats: any[]
+  activeId: string | null
+  onPick: (id: string) => void
+  label: (name: string) => string
+  b: Brand
+  locale: string
+}) {
+  // equal segments only while they still fit; more groups fall back to a scroll
+  const equal = cats.length <= 3
+
+  // kinds of item, not quantities: "8 pieces" read like a cart count
+  const kinds = (n: number) =>
+    locale === 'en'
+      ? `${n} ${n === 1 ? 'type' : 'types'}`
+      : n === 1 ? 'صنف واحد' : n === 2 ? 'صنفان' : n <= 10 ? `${n} أصناف` : `${n} صنف`
+
+  const tabs = cats.map(cat => {
+    const on = cat.id === activeId
+    const n = cat.itemTypes.length
+    return (
+      <TouchableOpacity
+        key={cat.id}
+        onPress={() => onPick(cat.id)}
+        activeOpacity={0.85}
+        accessibilityRole="tab"
+        accessibilityState={{ selected: on }}
+        accessibilityLabel={`${label(cat.name)}، ${kinds(n)}`}
+        style={[
+          s.catTab,
+          equal ? { flex: 1 } : { backgroundColor: b.card, borderWidth: 1, borderColor: b.cardBorder },
+          on && { backgroundColor: b.primary, borderColor: b.primary },
+          on && !b.isDark && { shadowColor: b.primary, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
+        ]}
+      >
+        <View style={s.catTabHead}>
+          {cat.icon ? <Text style={s.catTabIcon}>{cat.icon}</Text> : null}
+          <Text style={[s.catTabName, { color: on ? '#fff' : b.ink }]} numberOfLines={1}>
+            {label(cat.name)}
+          </Text>
+        </View>
+        <Text style={[s.catTabCount, { color: on ? 'rgba(255,255,255,0.88)' : b.muted }]} numberOfLines={1}>
+          {kinds(n)}
+        </Text>
+      </TouchableOpacity>
+    )
+  })
+
+  if (equal) {
+    return <View style={[s.catTrack, { backgroundColor: b.card, borderColor: b.cardBorder }]}>{tabs}</View>
+  }
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.bleed} contentContainerStyle={s.catTrackScroll}>
+      {tabs}
+    </ScrollView>
+  )
+}
+
 function PinTile() {
   return (
     <LinearGradient colors={['#38BDF8', '#0284C7']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.pinTile}>
@@ -381,17 +447,14 @@ export default function NewOrderScreen() {
         {selectedService && categoriesWithItems.length > 0 && (
           <PulseHighlight active={nextStep === 'items'} radius={14}>
             <StepTitle n={3} title={locale === 'en' ? 'Choose item' : 'اختر القطعة'} b={b} />
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.bleed} contentContainerStyle={s.catRow}>
-              {categoriesWithItems.map(cat => (
-                <Chip
-                  key={cat.id}
-                  label={catName(cat.name)}
-                  active={activeCatId === cat.id}
-                  onPress={() => setActiveCatId(cat.id)}
-                  icon={cat.icon ? <Text style={s.catEmoji}>{cat.icon}</Text> : undefined}
-                />
-              ))}
-            </ScrollView>
+            <CatTabs
+              cats={categoriesWithItems}
+              activeId={activeCatId}
+              onPick={setActiveCatId}
+              label={catName}
+              b={b}
+              locale={locale}
+            />
             {categoriesWithItems.filter(cat => cat.id === activeCatId).map(cat => (
               <Card key={cat.id} pad={false} style={s.itemsCard}>
                 {cat.itemTypes.map((itemType: string, idx: number) => {
@@ -543,6 +606,13 @@ const s = StyleSheet.create({
 
   catRow: { gap: 7, paddingHorizontal: 16, paddingVertical: 2 },
   catEmoji: { fontSize: 13 },
+  catTrack: { flexDirection: 'row', gap: 4, padding: 4, marginTop: 10, borderRadius: 18, borderWidth: 1 },
+  catTrackScroll: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 2 },
+  catTab: { minHeight: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, paddingVertical: 7, gap: 2 },
+  catTabHead: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  catTabIcon: { fontSize: 16 },
+  catTabName: { fontSize: 13.5, fontFamily: F.bold, flexShrink: 1 },
+  catTabCount: { fontSize: 10.5, fontFamily: F.medium },
   itemsCard: { marginTop: 12, overflow: 'hidden' },
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 58, paddingHorizontal: 12, paddingVertical: 9 },
   itemBody: { flex: 1, minWidth: 0 },

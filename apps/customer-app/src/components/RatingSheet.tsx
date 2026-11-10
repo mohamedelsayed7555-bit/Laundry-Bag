@@ -1,4 +1,7 @@
-import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput } from 'react-native'
+import {
+  View, Text, StyleSheet, TouchableOpacity, Modal, TextInput, ScrollView,
+  KeyboardAvoidingView, Platform, Pressable, Keyboard,
+} from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Path } from 'react-native-svg'
 import { useLanguage } from '../contexts/LanguageContext'
@@ -36,7 +39,7 @@ function Stars({ value, onChange, color }: { value: number; onChange: (n: number
 
 /** Shared rating sheet — used from the home screen and the order details screen. */
 export default function RatingSheet({
-  visible, orderNumber, showDriver, service, driver, note, submitting,
+  visible, orderNumber, showDriver, service, driver, note, submitting, error,
   onService, onDriver, onNote, onSubmit, onDismiss,
 }: {
   visible: boolean
@@ -46,6 +49,7 @@ export default function RatingSheet({
   driver: number
   note: string
   submitting?: boolean
+  error?: string | null
   onService: (n: number) => void
   onDriver: (n: number) => void
   onNote: (v: string) => void
@@ -60,58 +64,83 @@ export default function RatingSheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onDismiss}>
-      <View style={s.overlay}>
-        <View style={[s.card, { backgroundColor: b.card, borderColor: b.cardBorder, paddingBottom: Math.max(insets.bottom, 12) + 14 }]}>
-          <View style={[s.handle, { backgroundColor: b.cardBorder }]} />
-          <Text style={[s.title, { color: b.ink }]}>{t('rateOrderTitle')}</Text>
-          {num ? <Text style={[s.subtitle, { color: b.muted }]}>{t('orderHash')}{num}</Text> : null}
+      {/* On iOS the keyboard floats over the sheet, so the note hid the submit
+          button and the sheet looked frozen. Android resizes the window itself. */}
+      <KeyboardAvoidingView style={s.flex} behavior="padding">
+        <View style={s.overlay}>
+          {/* tapping the dim area closes the keyboard, keeping the typed note */}
+          <Pressable style={StyleSheet.absoluteFill} onPress={Keyboard.dismiss} accessible={false} />
 
-          <Text style={[s.label, { color: b.ink2 }]}>{t('serviceRating')}</Text>
-          <Stars value={service} onChange={onService} color={b.faint} />
+          <View style={[s.card, { backgroundColor: b.card, borderColor: b.cardBorder, paddingBottom: Math.max(insets.bottom, 12) + 14 }]}>
+            <View style={[s.handle, { backgroundColor: b.cardBorder }]} />
 
-          {showDriver && (
-            <>
-              <Text style={[s.label, { color: b.ink2 }]}>{t('driverRating')}</Text>
-              <Stars value={driver} onChange={onDriver} color={b.faint} />
-            </>
-          )}
+            <ScrollView
+              bounces={false}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={s.scroll}
+            >
+              <Text style={[s.title, { color: b.ink }]}>{t('rateOrderTitle')}</Text>
+              {num ? <Text style={[s.subtitle, { color: b.muted }]}>{t('orderHash')}{num}</Text> : null}
 
-          <Text style={[s.label, { color: b.ink2 }]}>{t('notesLabel')}</Text>
-          <TextInput
-            style={[s.input, { backgroundColor: b.field, color: b.ink, borderColor: b.fieldBorder }]}
-            placeholder={t('ratingNotes')}
-            placeholderTextColor={b.faint}
-            value={note}
-            onChangeText={onNote}
-            multiline
-            textAlign={isEn ? 'left' : 'right'}
-          />
+              <Text style={[s.label, { color: b.ink2 }]}>{t('serviceRating')}</Text>
+              <Stars value={service} onChange={onService} color={b.faint} />
 
-          <View style={s.actions}>
-            <SecondaryButton title={t('later')} onPress={onDismiss} style={{ flex: 1 }} />
-            <PrimaryButton
-              title={t('submitRating')}
-              loadingTitle={t('submittingRating')}
-              loading={submitting}
-              disabled={service === 0}
-              onPress={onSubmit}
-              style={{ flex: 2 }}
-            />
+              {showDriver && (
+                <>
+                  <Text style={[s.label, { color: b.ink2 }]}>{t('driverRating')}</Text>
+                  <Stars value={driver} onChange={onDriver} color={b.faint} />
+                </>
+              )}
+
+              <Text style={[s.label, { color: b.ink2 }]}>{t('notesLabel')}</Text>
+              <TextInput
+                style={[s.input, { backgroundColor: b.field, color: b.ink, borderColor: b.fieldBorder }]}
+                placeholder={t('ratingNotes')}
+                placeholderTextColor={b.faint}
+                value={note}
+                onChangeText={onNote}
+                multiline
+                textAlign={isEn ? 'left' : 'right'}
+              />
+
+              {error ? (
+                <View style={[s.error, { backgroundColor: b.dangerTint, borderColor: b.dangerBorder }]}>
+                  <Text style={[s.errorText, { color: b.dangerText }]}>{error}</Text>
+                </View>
+              ) : null}
+
+              <View style={s.actions}>
+                <SecondaryButton title={t('later')} onPress={onDismiss} style={{ flex: 1 }} />
+                <PrimaryButton
+                  title={t('submitRating')}
+                  loadingTitle={t('submittingRating')}
+                  loading={submitting}
+                  disabled={service === 0}
+                  onPress={onSubmit}
+                  style={{ flex: 2 }}
+                />
+              </View>
+            </ScrollView>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   )
 }
 
 const s = StyleSheet.create({
+  flex: { flex: 1 },
+  scroll: { paddingBottom: 2 },
   overlay: { flex: 1, backgroundColor: 'rgba(2,6,14,0.62)', justifyContent: 'flex-end' },
-  card: { borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingTop: 8, paddingHorizontal: 18, borderWidth: 1, borderBottomWidth: 0 },
+  card: { maxHeight: '92%', borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingTop: 8, paddingHorizontal: 18, borderWidth: 1, borderBottomWidth: 0 },
   handle: { width: 38, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
   title: { fontSize: 19, fontFamily: F.display, textAlign: 'center' },
   subtitle: { fontSize: 12.5, fontFamily: F.regular, textAlign: 'center', marginTop: 2 },
   label: { fontSize: 12.5, fontFamily: F.bold, marginTop: 14, marginHorizontal: 2 },
   starsRow: { flexDirection: 'row', gap: 10, marginTop: 8, alignSelf: 'center' },
   input: { borderRadius: SIZE.rL, padding: 12, fontSize: 13.5, fontFamily: F.regular, minHeight: 62, marginTop: 8, borderWidth: 1, textAlignVertical: 'top' },
+  error: { marginTop: 12, borderRadius: 12, borderWidth: 1, paddingVertical: 9, paddingHorizontal: 12 },
+  errorText: { fontSize: 12.5, fontFamily: F.medium, textAlign: 'center' },
   actions: { flexDirection: 'row', gap: 10, marginTop: 18 },
 })

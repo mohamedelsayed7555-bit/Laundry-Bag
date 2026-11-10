@@ -210,7 +210,7 @@ export default function OrderDetailsScreen() {
       rated_at: new Date().toISOString(),
     }).eq('id', id).eq('customer_id', profile!.id)
     setSubmitting(false)
-    if (error) showAlert({ title: t('error'), message: t('connectionError'), type: 'error' })
+    if (error) showAlert({ title: t('error'), message: t('ratingFailed'), type: 'error' })
     else { setShowRating(false); loadOrder() }
   }
 
@@ -335,7 +335,7 @@ export default function OrderDetailsScreen() {
       {currentStep >= 0 && (
         <Card style={n.card}>
           <Text style={[n.eyebrow, { color: b.muted }]}>{t('trackOrder')} · {currentStep + 1} {isEn ? 'of' : 'من'} {steps.length}</Text>
-          <View style={{ marginVertical: 10 }}><Segments total={steps.length} done={currentStep} current /></View>
+          <View style={{ marginVertical: 10 }}><Segments total={steps.length} done={currentStep + 1} current={currentStep < steps.length - 1} /></View>
           <View style={n.nowRow}>
             <View style={[n.nowIcon, { backgroundColor: status.color + '22' }]}><StatusIcon size={19} color={status.color} /></View>
             <View style={{ flex: 1 }}>
@@ -450,7 +450,7 @@ export default function OrderDetailsScreen() {
         <View style={[n.payRow, { backgroundColor: b.iconTile }]}>
           <PayIcon size={16} color={b.accentIcon} />
           <Text style={[n.payText, { color: b.ink }]} numberOfLines={1}>{payLabel}</Text>
-          <Pill tone={payTone as any} label={payStatus} icon={order.payment_status === 'confirmed' ? <Check size={11} color={b.okText} /> : undefined} />
+          <Pill tone={payTone as any} label={payStatus} icon={order.payment_status === 'confirmed' ? <Check size={11} color={b.okText} /> : undefined} style={{ alignSelf: 'center' }} />
         </View>
         {order.notes ? <Text style={[n.notes, { color: b.muted }]}>{t('notesLabel')}: {order.notes}</Text> : null}
       </Card>

@@ -183,7 +183,7 @@ export default function SignInScreen() {
   return (
     <View style={[s.root, { backgroundColor: th.sheet }]}>
       <StatusBar style="light" />
-      <KeyboardAvoidingView style={s.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={s.root} behavior="padding">
         <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled" bounces={false} showsVerticalScrollIndicator={false}>
           <View style={{ height: 250 + insets.top, overflow: 'hidden' }}>
             <HeroImage height={250 + insets.top} />
