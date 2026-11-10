@@ -93,7 +93,10 @@
     },
     "owner": "mohamedhassan12",
     "updates": {
-      "url": "https://u.expo.dev/8f59b30a-bef7-4b6b-9a10-f43fc7aba175"
+      "url": "https://u.expo.dev/8f59b30a-bef7-4b6b-9a10-f43fc7aba175",
+      "requestHeaders": {
+        "expo-channel-name": "production"
+      }
     }
   }
 }
