@@ -53,6 +53,9 @@ export async function POST(request: NextRequest) {
   let failed = 0
   const reasons: Record<string, number> = {}
   const ticketIds: string[] = []
+  // kept so the audit row can say which customer was reached and which was not
+  const deliveredTokens: string[] = []
+  const failedTokens: string[] = []
   const note = (why: string, n: number) => { reasons[why] = (reasons[why] ?? 0) + n }
 
   const message = (to: string) => ({
@@ -86,15 +89,18 @@ export async function POST(request: NextRequest) {
     const tickets: Ticket[] = Array.isArray(json?.data) ? json.data : []
     // an answer we do not recognise is not proof of delivery
     if (tickets.length !== batch.length) return { handled: false, reason: 'رد غير مفهوم من Expo' }
-    for (const t of tickets) {
+    tickets.forEach((t, idx) => {
+      const token = batch[idx]
       if (t?.status === 'ok') {
         sent++
+        deliveredTokens.push(token)
         if (t.id) ticketIds.push(t.id)
       } else {
         failed++
+        failedTokens.push(token)
         note(t?.details?.error ?? t?.message ?? 'سبب غير معروف', 1)
       }
-    }
+    })
     return { handled: true }
   }
 
@@ -109,6 +115,7 @@ export async function POST(request: NextRequest) {
     if (outcome.handled) continue
     if (batch.length === 1) {
       failed++
+      failedTokens.push(batch[0])
       note(outcome.reason ?? 'سبب غير معروف', 1)
       continue
     }
@@ -117,17 +124,21 @@ export async function POST(request: NextRequest) {
         const one = await post([token])
         if (!one.handled) {
           failed++
+          failedTokens.push(token)
           note(one.reason ?? 'سبب غير معروف', 1)
         }
       } catch (e) {
         failed++
+        failedTokens.push(token)
         note(e instanceof Error ? e.message : 'تعذّر الاتصال بـ Expo', 1)
       }
     }
   }
 
-  await logAudit(auth.userId, 'broadcast_push', 'notification', '-', {
+  await logAudit(auth.userId, 'broadcast_push', 'notification', null, {
     title, recipients: tokens.length, sent, failed, reasons,
+    deliveredTokens: deliveredTokens.slice(0, 500),
+    failedTokens: failedTokens.slice(0, 500),
   })
 
   return NextResponse.json({ sent, failed, reasons, ticketIds })

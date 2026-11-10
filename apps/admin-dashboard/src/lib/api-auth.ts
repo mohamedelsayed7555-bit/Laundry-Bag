@@ -35,7 +35,9 @@ export async function requireAdmin(req: NextRequest): Promise<{ userId: string; 
   return { userId: user.id, role: profile.role }
 }
 
-export async function logAudit(userId: string, action: string, entityType: string, entityId: string, details?: Record<string, unknown>) {
+// entityId is null for an action that is not about one row, such as a broadcast.
+// The column is a uuid, so a placeholder string makes the insert fail silently.
+export async function logAudit(userId: string, action: string, entityType: string, entityId: string | null, details?: Record<string, unknown>) {
   try {
     await supabaseAdmin.from('audit_logs').insert({
       user_id: userId,
