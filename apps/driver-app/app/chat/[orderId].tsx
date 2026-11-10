@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Vibration } from 'react-native'
+import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Vibration, Keyboard } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { supabase } from '../../src/lib/supabase'
@@ -69,6 +69,15 @@ export default function ChatScreen() {
 
   useEffect(() => { load() }, [load])
 
+  // Android stopped resizing its window for the keyboard once the app targeted
+  // SDK 36, so the composer sat behind it; keep the newest message in view too.
+  useEffect(() => {
+    const sub = Keyboard.addListener('keyboardDidShow', () => {
+      flatListRef.current?.scrollToEnd({ animated: true })
+    })
+    return () => sub.remove()
+  }, [])
+
   // While this chat is open its messages only get a soft sound, not a banner.
   useEffect(() => {
     if (!orderId) return
@@ -134,7 +143,7 @@ export default function ChatScreen() {
   const isMe = (msg: Message) => msg.sender_id === profile?.id
 
   return (
-    <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
+    <KeyboardAvoidingView style={s.container} behavior="padding" keyboardVerticalOffset={0}>
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={s.backText}>→</Text>

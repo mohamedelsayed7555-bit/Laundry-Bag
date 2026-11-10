@@ -188,7 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       if (finalStatus !== 'granted') return
       const tokenData = await Notifications.getExpoPushTokenAsync({
-        projectId: '178256af-c74c-4880-9722-8d30ba1e3e8b',
+        projectId: '278296f6-7a0c-4237-97ae-326fab30b0c6',
       })
       const token = tokenData.data
       await supabase.from('users').update({ fcm_token: token }).eq('id', userId)
