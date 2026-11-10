@@ -156,9 +156,15 @@ export default function NotificationsPage() {
     }))
     await supabase.from('notifications').insert(notifRows)
 
-    // Send push to users with tokens
+    // Send push to users with tokens.
+    // Expo answers 200 even when every message in the batch was rejected: the
+    // verdict is per message, inside the body. Counting on res.ok alone
+    // reported a send as delivered when none of it had been accepted.
     const tokens = allUsers.map(u => u.fcm_token).filter(Boolean)
     let successCount = 0
+    let failedCount = 0
+    const failReasons: Record<string, number> = {}
+    const ticketIds: string[] = []
     for (let i = 0; i < tokens.length; i += 100) {
       const batch = tokens.slice(i, i + 100)
       try {
@@ -175,9 +181,38 @@ export default function NotificationsPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(messages),
         })
-        if (res.ok) successCount += batch.length
-      } catch {}
+        if (!res.ok) {
+          failedCount += batch.length
+          failReasons[`HTTP ${res.status}`] = (failReasons[`HTTP ${res.status}`] ?? 0) + batch.length
+          continue
+        }
+        const json = await res.json().catch(() => null)
+        const tickets: any[] = Array.isArray(json?.data) ? json.data : []
+        if (tickets.length === 0) {
+          // a shape we do not recognise: count it as unknown rather than as sent
+          failedCount += batch.length
+          failReasons['رد غير مفهوم من Expo'] = (failReasons['رد غير مفهوم من Expo'] ?? 0) + batch.length
+          continue
+        }
+        tickets.forEach(t => {
+          if (t?.status === 'ok') {
+            successCount++
+            if (t.id) ticketIds.push(t.id)
+          } else {
+            failedCount++
+            const why = t?.details?.error ?? t?.message ?? 'سبب غير معروف'
+            failReasons[why] = (failReasons[why] ?? 0) + 1
+          }
+        })
+      } catch (e: any) {
+        failedCount += batch.length
+        const why = e?.message ?? 'تعذّر الاتصال بـ Expo'
+        failReasons[why] = (failReasons[why] ?? 0) + batch.length
+      }
     }
+    // the ticket ids are what the delivery receipts are looked up with later
+    if (ticketIds.length > 0) console.info('[broadcast] expo ticket ids', ticketIds)
+    if (failedCount > 0) console.warn('[broadcast] failures', failReasons)
 
     await supabase.from('broadcast_messages').insert({
       title: title.trim(),
@@ -187,7 +222,16 @@ export default function NotificationsPage() {
       recipients_count: allUsers.length,
     })
 
-    toast(`تم إرسال الإشعار لـ ${allUsers.length} عميل (${successCount} push)`)
+    const noToken = allUsers.length - tokens.length
+    const parts = [`${successCount} إشعار وصل`]
+    if (failedCount > 0) parts.push(`${failedCount} فشل`)
+    if (noToken > 0) parts.push(`${noToken} بدون إشعارات`)
+    if (failedCount > 0) {
+      const top = Object.entries(failReasons).sort((a, b) => b[1] - a[1])[0]
+      toast(`${parts.join(' · ')} — أكثر سبب: ${top[0]}`, successCount > 0 ? 'success' : 'error')
+    } else {
+      toast(`تم الحفظ لـ ${allUsers.length} عميل · ${parts.join(' · ')}`)
+    }
     setTitle('')
     setBody('')
     setSending(false)
