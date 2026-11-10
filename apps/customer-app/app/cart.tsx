@@ -7,7 +7,7 @@ import { useRouter, useFocusEffect } from 'expo-router'
 import DateTimePicker from '@react-native-community/datetimepicker'
 import { useAuth } from '../src/contexts/AuthContext'
 import { useLanguage } from '../src/contexts/LanguageContext'
-import { haversineKm } from '../src/utils/distance'
+import { haversineKm, num, parseZones, inZone, deliveryFeeFor, type Zone } from '../src/utils/distance'
 import { useCart } from '../src/contexts/CartContext'
 import { useCustomAlert } from '../src/components/CustomAlert'
 import { playNotificationSound } from '../src/hooks/useNotifications'
@@ -69,7 +69,11 @@ export default function CartScreen() {
   const [deliveryFee, setDeliveryFee] = useState(0)
   const [deliveryFeeBase, setDeliveryFeeBase] = useState(0)
   const [minOrderItems, setMinOrderItems] = useState(0)
-  const [zoneSettings, setZoneSettings] = useState({ max_zone_km: 30, price_per_km: 2, base_delivery_km: 5, laundry_lat: 30.0444, laundry_lng: 31.2357 })
+  // These apply only until the settings arrive. They used to point at Downtown Cairo,
+  // 25 km from the laundry, so on a bad connection every customer was measured from
+  // the wrong city centre and shown a fee to match.
+  const [zoneSettings, setZoneSettings] = useState({ max_zone_km: 30, price_per_km: 2, base_delivery_km: 5, laundry_lat: 29.9666603, laundry_lng: 31.4813897 })
+  const [zones, setZones] = useState<Zone[]>([])
   const [distanceKm, setDistanceKm] = useState<number | null>(null)
   const [outOfZone, setOutOfZone] = useState(false)
   const [deliveryOutOfZone, setDeliveryOutOfZone] = useState(false)
@@ -86,6 +90,19 @@ export default function CartScreen() {
   const [showNotes, setShowNotes] = useState(false)
 
   const isEn = locale === 'en'
+
+  // With a list of zones there is no single maximum distance, so the limit is only
+  // quoted back to the customer when the covered area really is one circle.
+  const outOfZoneText = (what: 'pickup' | 'delivery' | 'address', km: number | null) => {
+    if (zones.length > 0) {
+      return isEn ? 'This address is outside our delivery area' : 'العنوان خارج نطاق التوصيل'
+    }
+    const en = what === 'pickup' ? 'Pickup address' : what === 'delivery' ? 'Delivery address' : 'Address'
+    const ar = what === 'pickup' ? 'عنوان الاستلام' : what === 'delivery' ? 'عنوان التسليم' : 'العنوان'
+    return isEn
+      ? `${en} is ${km} km away — max ${zoneSettings.max_zone_km} km`
+      : `${ar} يبعد ${km} كم — الحد الأقصى ${zoneSettings.max_zone_km} كم`
+  }
 
   const loadAddresses = useCallback(async () => {
     if (!profile) return
@@ -105,23 +122,26 @@ export default function CartScreen() {
 
   const loadCartData = useCallback(async () => {
     const [settingsRes, addrRes, subRes] = await Promise.all([
-      supabase.from('settings').select('key, value').in('key', ['delivery_fee', 'max_zone_km', 'price_per_km', 'base_delivery_km', 'laundry_lat', 'laundry_lng', 'min_order_items', 'instapay_number', 'wallet_number']),
+      supabase.from('settings').select('key, value').in('key', ['delivery_fee', 'max_zone_km', 'price_per_km', 'base_delivery_km', 'laundry_lat', 'laundry_lng', 'min_order_items', 'instapay_number', 'wallet_number', 'delivery_zones']),
       profile ? supabase.from('addresses').select('id, label, lat, lng, is_default, building, floor, apartment, landmark').eq('user_id', profile.id).order('is_default', { ascending: false }) : null,
       profile ? supabase.from('subscriptions').select('*, plans(name, covered_services, includes_all_services)').eq('user_id', profile.id).eq('status', 'active') : null,
     ])
     if (settingsRes?.data) {
       const s: any = {}
       settingsRes.data.forEach((r: any) => { s[r.key] = r.value })
-      const baseFee = Number(s.delivery_fee) || 0
+      const baseFee = num(s.delivery_fee, 0)
       setDeliveryFee(baseFee)
       setDeliveryFeeBase(baseFee)
-      setMinOrderItems(Number(s.min_order_items) || 0)
+      setMinOrderItems(num(s.min_order_items, 0))
+      setZones(parseZones(s.delivery_zones))
       setZoneSettings({
-        max_zone_km: Number(s.max_zone_km) || 30,
-        price_per_km: Number(s.price_per_km) || 2,
-        base_delivery_km: Number(s.base_delivery_km) || 5,
-        laundry_lat: Number(s.laundry_lat) || 30.0444,
-        laundry_lng: Number(s.laundry_lng) || 31.2357,
+        max_zone_km: num(s.max_zone_km, 30),
+        // num, not `|| 2`: a rate of 0 is a real setting and means no per-kilometre
+        // charge, which is how a flat delivery fee is expressed.
+        price_per_km: num(s.price_per_km, 2),
+        base_delivery_km: num(s.base_delivery_km, 5),
+        laundry_lat: num(s.laundry_lat, 29.9666603),
+        laundry_lng: num(s.laundry_lng, 31.4813897),
       })
       const inst = s.instapay_number
       const wal = s.wallet_number
@@ -154,15 +174,17 @@ export default function CartScreen() {
     if (selectedAddress?.lat && selectedAddress?.lng) {
       const dist = haversineKm(zoneSettings.laundry_lat, zoneSettings.laundry_lng, selectedAddress.lat, selectedAddress.lng)
       setDistanceKm(Math.round(dist * 10) / 10)
-      setOutOfZone(dist > zoneSettings.max_zone_km)
-      if (dist > zoneSettings.base_delivery_km) {
-        const extraKm = dist - zoneSettings.base_delivery_km
-        setDeliveryFee(deliveryFeeBase + Math.round(extraKm * zoneSettings.price_per_km))
-      } else {
-        setDeliveryFee(deliveryFeeBase)
-      }
+      setOutOfZone(!inZone(selectedAddress.lat, selectedAddress.lng, zones,
+        zoneSettings.laundry_lat, zoneSettings.laundry_lng, zoneSettings.max_zone_km))
+      setDeliveryFee(deliveryFeeFor(selectedAddress.lat, selectedAddress.lng, zones, {
+        base: deliveryFeeBase,
+        perKm: zoneSettings.price_per_km,
+        freeKm: zoneSettings.base_delivery_km,
+        laundryLat: zoneSettings.laundry_lat,
+        laundryLng: zoneSettings.laundry_lng,
+      }))
     }
-  }, [selectedAddress, zoneSettings, deliveryFeeBase])
+  }, [selectedAddress, zoneSettings, zones, deliveryFeeBase])
 
   useEffect(() => {
     if (sameAddress) {
@@ -173,12 +195,13 @@ export default function CartScreen() {
     if (deliveryAddress?.lat && deliveryAddress?.lng) {
       const dist = haversineKm(zoneSettings.laundry_lat, zoneSettings.laundry_lng, deliveryAddress.lat, deliveryAddress.lng)
       setDeliveryDistanceKm(Math.round(dist * 10) / 10)
-      setDeliveryOutOfZone(dist > zoneSettings.max_zone_km)
+      setDeliveryOutOfZone(!inZone(deliveryAddress.lat, deliveryAddress.lng, zones,
+        zoneSettings.laundry_lat, zoneSettings.laundry_lng, zoneSettings.max_zone_km))
     } else {
       setDeliveryOutOfZone(false)
       setDeliveryDistanceKm(null)
     }
-  }, [deliveryAddress, sameAddress, zoneSettings])
+  }, [deliveryAddress, sameAddress, zoneSettings, zones])
 
   // Build coverage from all active subscriptions
   const subCoverage = useMemo(() => {
@@ -317,11 +340,11 @@ export default function CartScreen() {
       return
     }
     if (outOfZone) {
-      showAlert({ title: isEn ? 'Out of zone' : 'خارج نطاق التوصيل', message: isEn ? `Pickup address is ${distanceKm} km away — max ${zoneSettings.max_zone_km} km` : `عنوان الاستلام يبعد ${distanceKm} كم — الحد الأقصى ${zoneSettings.max_zone_km} كم`, type: 'warning' })
+      showAlert({ title: isEn ? 'Out of zone' : 'خارج نطاق التوصيل', message: outOfZoneText('pickup', distanceKm), type: 'warning' })
       return
     }
     if (deliveryOutOfZone) {
-      showAlert({ title: isEn ? 'Out of zone' : 'خارج نطاق التوصيل', message: isEn ? `Delivery address is ${deliveryDistanceKm} km away — max ${zoneSettings.max_zone_km} km` : `عنوان التسليم يبعد ${deliveryDistanceKm} كم — الحد الأقصى ${zoneSettings.max_zone_km} كم`, type: 'warning' })
+      showAlert({ title: isEn ? 'Out of zone' : 'خارج نطاق التوصيل', message: outOfZoneText('delivery', deliveryDistanceKm), type: 'warning' })
       return
     }
 
@@ -587,7 +610,7 @@ export default function CartScreen() {
           <View style={[s.banner, { backgroundColor: b.dangerTint, borderColor: b.dangerBorder }]}>
             <TriangleAlert size={18} color={b.dangerText} />
             <Text style={[s.bannerText, { color: b.dangerText }]}>
-              {isEn ? `Address is ${distanceKm} km away — max ${zoneSettings.max_zone_km} km` : `العنوان يبعد ${distanceKm} كم — الحد الأقصى ${zoneSettings.max_zone_km} كم`}
+              {outOfZoneText('address', distanceKm)}
             </Text>
           </View>
         )}

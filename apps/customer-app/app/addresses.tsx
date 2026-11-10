@@ -12,7 +12,13 @@ import * as Location from 'expo-location'
 import { useBrand, IconButton, BackIcon, Pill, Halftone, F, SIZE, HIT, DotsBackdrop, cardShadow, useStickyHeader, StickyBar, type Brand } from '../src/components/brand'
 import { PrimaryButton, SecondaryButton, ErrorLine } from '../src/components/auth/ui'
 
-const CAIRO = { latitude: 30.0444, longitude: 31.2357 }
+// The pin used to start in Downtown Cairo, 25 km from the laundry, so an address
+// saved without the customer moving the map - GPS denied, or a quick tap through the
+// first-run flow - landed outside the delivery area and was refused at checkout.
+// It starts at the laundry instead: a pin nobody moved is then wrong by a few
+// kilometres rather than sitting in another part of the city. The real coordinates
+// come from settings; these are only the fallback for a cold start.
+const DEFAULT_PIN = { latitude: 29.9666603, longitude: 31.4813897 }
 
 function buildPickerMapHTML(lat: number, lng: number) {
   return `<!DOCTYPE html>
@@ -123,7 +129,10 @@ export default function AddressesScreen() {
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<any>(null)
   const [form, setForm] = useState({ label: '', building: '', floor: '', apartment: '', landmark: '', notes: '' })
-  const [pin, setPin] = useState({ latitude: CAIRO.latitude, longitude: CAIRO.longitude })
+  const [pin, setPin] = useState({ latitude: DEFAULT_PIN.latitude, longitude: DEFAULT_PIN.longitude })
+  // Where a fresh pin is dropped. Read from settings so it follows the laundry if it
+  // ever moves, and never left on a point outside the delivery area.
+  const defaultPin = useRef(DEFAULT_PIN)
   const [locatingMe, setLocatingMe] = useState(false)
   const [geocoding, setGeocoding] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
@@ -169,12 +178,21 @@ export default function AddressesScreen() {
     const { data } = await supabase.from('addresses').select('id, label, lat, lng, building, floor, apartment, landmark, notes, is_default, user_id').eq('user_id', profile.id).order('is_default', { ascending: false })
     setAddresses(data ?? [])
     setLoading(false)
+    // Keep the fallback if the settings are unreachable or hold something unusable:
+    // a bad value here would drop every new pin on the wrong spot.
+    const { data: s } = await supabase.from('settings').select('key, value').in('key', ['laundry_lat', 'laundry_lng'])
+    const at = (k: string) => Number(s?.find((r: any) => r.key === k)?.value)
+    const lat = at('laundry_lat')
+    const lng = at('laundry_lng')
+    if (Number.isFinite(lat) && Number.isFinite(lng) && lat !== 0 && lng !== 0) {
+      defaultPin.current = { latitude: lat, longitude: lng }
+    }
   }
 
   function openAdd() {
     setEditing(null)
     setForm({ label: '', building: '', floor: '', apartment: '', landmark: '', notes: '' })
-    setPin({ latitude: CAIRO.latitude, longitude: CAIRO.longitude })
+    setPin({ latitude: defaultPin.current.latitude, longitude: defaultPin.current.longitude })
     setShowModal(true)
   }
 
@@ -188,7 +206,7 @@ export default function AddressesScreen() {
       landmark: addr.landmark || '',
       notes: addr.notes || '',
     })
-    setPin({ latitude: addr.lat ?? CAIRO.latitude, longitude: addr.lng ?? CAIRO.longitude })
+    setPin({ latitude: addr.lat ?? defaultPin.current.latitude, longitude: addr.lng ?? defaultPin.current.longitude })
     setShowModal(true)
   }
 
@@ -411,7 +429,7 @@ export default function AddressesScreen() {
       <StickyBar scrollY={scrollY} title={t('myAddressesTitle')} onBack={() => isOnboarding ? router.replace('/(tabs)/home') : router.back()} />
 
       <Modal visible={showModal} animationType="slide" transparent onDismiss={openConfirm}>
-        <KeyboardAvoidingView style={st.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView style={st.modalOverlay} behavior="padding">
           <View style={[st.sheet, { backgroundColor: b.card, borderTopColor: b.tintBorder }]}>
             <SheetChrome b={b} />
             <ScrollView ref={formScrollRef} contentContainerStyle={{ paddingBottom: 12 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} nestedScrollEnabled>
