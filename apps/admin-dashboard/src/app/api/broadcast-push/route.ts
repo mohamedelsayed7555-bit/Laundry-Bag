@@ -55,43 +55,74 @@ export async function POST(request: NextRequest) {
   const ticketIds: string[] = []
   const note = (why: string, n: number) => { reasons[why] = (reasons[why] ?? 0) + n }
 
+  const message = (to: string) => ({
+    to, title, body, sound, channelId, priority: 'high',
+    data: { type: 'broadcast' },
+  })
+
+  // Expo refuses a whole request whose tokens belong to more than one project
+  // (PUSH_TOO_MANY_EXPERIENCE_IDS), and our customers' tokens were registered
+  // under two. Rather than lose the good ones with the bad, a rejected batch is
+  // retried one message at a time so every token gets its own verdict.
+  async function post(batch: string[]): Promise<{ handled: boolean; reason?: string }> {
+    const res = await fetch(EXPO_PUSH, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept-Encoding': 'gzip, deflate' },
+      body: JSON.stringify(batch.map(message)),
+    })
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      let why = `HTTP ${res.status}`
+      try {
+        const parsed = JSON.parse(text)
+        const first = Array.isArray(parsed?.errors) ? parsed.errors[0] : null
+        if (first?.code || first?.message) why = first.code ?? first.message
+      } catch {
+        if (text) why = `HTTP ${res.status}: ${text.slice(0, 120)}`
+      }
+      return { handled: false, reason: why }
+    }
+    const json = await res.json().catch(() => null)
+    const tickets: Ticket[] = Array.isArray(json?.data) ? json.data : []
+    // an answer we do not recognise is not proof of delivery
+    if (tickets.length !== batch.length) return { handled: false, reason: 'رد غير مفهوم من Expo' }
+    for (const t of tickets) {
+      if (t?.status === 'ok') {
+        sent++
+        if (t.id) ticketIds.push(t.id)
+      } else {
+        failed++
+        note(t?.details?.error ?? t?.message ?? 'سبب غير معروف', 1)
+      }
+    }
+    return { handled: true }
+  }
+
   for (let i = 0; i < tokens.length; i += BATCH) {
     const batch = tokens.slice(i, i + BATCH)
-    const messages = batch.map(to => ({
-      to, title, body, sound, channelId, priority: 'high',
-      data: { type: 'broadcast' },
-    }))
+    let outcome: { handled: boolean; reason?: string }
     try {
-      const res = await fetch(EXPO_PUSH, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept-Encoding': 'gzip, deflate' },
-        body: JSON.stringify(messages),
-      })
-      if (!res.ok) {
-        failed += batch.length
-        note(`HTTP ${res.status}`, batch.length)
-        continue
-      }
-      const json = await res.json().catch(() => null)
-      const tickets: Ticket[] = Array.isArray(json?.data) ? json.data : []
-      if (tickets.length === 0) {
-        // an answer we do not recognise is not proof of delivery
-        failed += batch.length
-        note('رد غير مفهوم من Expo', batch.length)
-        continue
-      }
-      for (const t of tickets) {
-        if (t?.status === 'ok') {
-          sent++
-          if (t.id) ticketIds.push(t.id)
-        } else {
-          failed++
-          note(t?.details?.error ?? t?.message ?? 'سبب غير معروف', 1)
-        }
-      }
+      outcome = await post(batch)
     } catch (e) {
-      failed += batch.length
-      note(e instanceof Error ? e.message : 'تعذّر الاتصال بـ Expo', batch.length)
+      outcome = { handled: false, reason: e instanceof Error ? e.message : 'تعذّر الاتصال بـ Expo' }
+    }
+    if (outcome.handled) continue
+    if (batch.length === 1) {
+      failed++
+      note(outcome.reason ?? 'سبب غير معروف', 1)
+      continue
+    }
+    for (const token of batch) {
+      try {
+        const one = await post([token])
+        if (!one.handled) {
+          failed++
+          note(one.reason ?? 'سبب غير معروف', 1)
+        }
+      } catch (e) {
+        failed++
+        note(e instanceof Error ? e.message : 'تعذّر الاتصال بـ Expo', 1)
+      }
     }
   }
 
