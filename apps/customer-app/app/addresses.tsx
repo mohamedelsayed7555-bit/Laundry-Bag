@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, type ReactNode } from 'react'
+import { useEffect, useState, useRef, useMemo, type ReactNode } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Modal, ActivityIndicator, Platform, ScrollView, KeyboardAvoidingView, Image, useWindowDimensions, Animated } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -144,7 +144,11 @@ export default function AddressesScreen() {
   const formScrollRef = useRef<ScrollView>(null)
   const mapExpanded = useRef(false)
 
-  async function reverseGeocode(lat: number, lng: number) {
+  const [area, setArea] = useState('')
+  // the last landmark the map filled in, so a typed one is never overwritten
+  const autoLandmark = useRef('')
+
+  async function reverseGeocode(lat: number, lng: number, moved = false) {
     setGeocoding(true)
     try {
       const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=ar`, {
@@ -152,12 +156,23 @@ export default function AddressesScreen() {
       })
       const data = await res.json()
       const addr = data.address || {}
-      setForm(f => ({
-        ...f,
-        label: f.label || addr.suburb || addr.neighbourhood || addr.city_district || addr.city || 'عنوان جديد',
-        building: f.building || addr.house_number || '',
-        landmark: f.landmark || addr.road || '',
-      }))
+      const area = addr.suburb || addr.neighbourhood || addr.city_district || addr.city || ''
+      const street = addr.road || ''
+      setArea(area)
+      setForm(f => {
+        // A deliberate move refreshes the street, but only while the landmark is
+        // still the one we put there. Once the customer has typed their own, it
+        // is theirs: a nudge of the pin must not wipe what they wrote.
+        const ours = f.landmark === autoLandmark.current
+        const landmark = (moved && ours) || !f.landmark ? (street || f.landmark) : f.landmark
+        autoLandmark.current = landmark
+        return {
+          ...f,
+          label: f.label || area || 'عنوان جديد',
+          building: f.building || addr.house_number || '',
+          landmark,
+        }
+      })
     } catch {}
     setGeocoding(false)
   }
@@ -190,6 +205,8 @@ export default function AddressesScreen() {
   }
 
   function openAdd() {
+    setArea('')
+    autoLandmark.current = ''
     setEditing(null)
     setForm({ label: '', building: '', floor: '', apartment: '', landmark: '', notes: '' })
     setPin({ latitude: defaultPin.current.latitude, longitude: defaultPin.current.longitude })
@@ -197,6 +214,8 @@ export default function AddressesScreen() {
   }
 
   function openEdit(addr: any) {
+    setArea('')
+    autoLandmark.current = ''
     setEditing(addr)
     setForm({
       label: addr.label || '',
@@ -223,19 +242,28 @@ export default function AddressesScreen() {
       const coord = { latitude: loc.coords.latitude, longitude: loc.coords.longitude }
       setPin(coord)
       webviewRef.current?.injectJavaScript(`window.setCenter(${coord.latitude}, ${coord.longitude}); true;`)
-      reverseGeocode(coord.latitude, coord.longitude)
+      reverseGeocode(coord.latitude, coord.longitude, true)
     } catch {
       showAlert({ title: t('error'), message: t('locationError'), type: 'error' })
     }
     setLocatingMe(false)
   }
 
+  // The map HTML is built once per opening of the sheet. Deriving it from `pin`
+  // meant every drag handed the WebView a new document: it reloaded, the marker
+  // jumped back and the move looked like it had done nothing.
+  const mapHTML = useMemo(
+    () => buildPickerMapHTML(pin.latitude, pin.longitude),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [showModal, editing?.id],
+  )
+
   const handleMapMessage = (event: any) => {
     try {
       const msg = JSON.parse(event.nativeEvent.data)
       if (msg.type === 'pin') {
         setPin({ latitude: msg.lat, longitude: msg.lng })
-        reverseGeocode(msg.lat, msg.lng)
+        reverseGeocode(msg.lat, msg.lng, true)
         setTimeout(() => formScrollRef.current?.scrollTo({ y: 280, animated: true }), 500)
       }
     } catch {}
@@ -290,12 +318,13 @@ export default function AddressesScreen() {
       notes: form.notes.trim() || null,
       lat: pin.latitude,
       lng: pin.longitude,
-      is_default: addresses.length === 0,
     }
 
+    // is_default belongs to the first address a customer ever saves. Sending it
+    // on an edit too meant editing the default address quietly un-defaulted it.
     const { error } = editing
       ? await supabase.from('addresses').update(payload).eq('id', editing.id)
-      : await supabase.from('addresses').insert(payload)
+      : await supabase.from('addresses').insert({ ...payload, is_default: addresses.length === 0 })
 
     if (error) {
       showAlert({ title: t('error'), message: error.message || t('addressSaveError'), type: 'error' })
@@ -311,9 +340,27 @@ export default function AddressesScreen() {
     showAlert({ title: t('deleteAddress'), message: t('deleteAddressConfirm'), type: 'confirm', buttons: [
       { text: t('cancel'), style: 'cancel' },
       { text: t('delete'), style: 'destructive', onPress: async () => {
+        // A live order is the one case worth naming on its own: the driver is
+        // on his way to this address right now.
+        const { data: live } = await supabase.from('orders')
+          .select('id')
+          .eq('address_id', id)
+          .not('status', 'in', '(delivered,cancelled,refunded)')
+          .limit(1)
+        if (live && live.length > 0) {
+          showAlert({ title: t('cannotDelete'), message: t('addressHasActiveOrder'), type: 'warning' })
+          return
+        }
         const { error } = await supabase.from('addresses').delete().eq('id', id)
         if (error) {
-          showAlert({ title: t('error'), message: error.message, type: 'error' })
+          // An address an order points at cannot go: the order would lose where
+          // it is being delivered. Say that, instead of the raw constraint.
+          const inUse = (error as any)?.code === '23503' || /foreign key/i.test(error.message ?? '')
+          showAlert({
+            title: inUse ? t('cannotDelete') : t('error'),
+            message: inUse ? t('addressInUse') : (error.message || t('addressSaveError')),
+            type: 'error',
+          })
           return
         }
         loadAddresses()
@@ -436,10 +483,15 @@ export default function AddressesScreen() {
               <Text style={[st.sheetTitle, { color: b.ink }]}>{editing ? t('editAddress') : t('addNewAddress')}</Text>
 
               <Text style={[st.lbl, { color: b.muted }, align]}>{t('selectMapLocation')}</Text>
+              {area ? (
+                <Text style={[st.lbl, { color: b.tintText, marginTop: -2 }, align]} numberOfLines={1}>
+                  الموقع على الخريطة: {area}
+                </Text>
+              ) : null}
               <View style={[st.mapContainer, { backgroundColor: b.iconTile }]}>
                 <WebView
                   ref={webviewRef}
-                  source={{ html: buildPickerMapHTML(pin.latitude, pin.longitude) }}
+                  source={{ html: mapHTML }}
                   style={st.map}
                   onMessage={handleMapMessage}
                   javaScriptEnabled

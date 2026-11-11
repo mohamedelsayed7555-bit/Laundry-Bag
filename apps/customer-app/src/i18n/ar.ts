@@ -376,6 +376,9 @@ export default {
   locationPermissionMsg: 'يرجى السماح بالوصول للموقع من الإعدادات',
   locationError: 'لم نتمكن من تحديد موقعك',
   addressSaveError: 'حدث خطأ أثناء حفظ العنوان',
+  addressInUse: 'العنوان ده مربوط بطلبات سابقة، فمش ممكن يتمسح. تقدر تعدّله أو تضيف عنوان جديد وتخليه الافتراضي.',
+  cannotDelete: 'مش ممكن نمسحه',
+  addressHasActiveOrder: 'العنوان ده عليه طلب شغال دلوقتي والسائق رايحله. استنى لما الطلب يخلص، أو عدّل العنوان بدل ما تمسحه.',
   addressNameRequired: 'اسم العنوان مطلوب',
 
   // Bag notification

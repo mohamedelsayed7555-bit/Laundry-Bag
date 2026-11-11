@@ -535,6 +535,9 @@ export default {
   locationPermissionMsg: 'Please allow location access from Settings',
   locationError: 'Could not determine your location',
   addressSaveError: 'An error occurred while saving',
+  addressInUse: "This address is attached to past orders, so it can't be deleted. You can edit it, or add a new one and make it your default.",
+  cannotDelete: "Can't delete this",
+  addressHasActiveOrder: 'This address has an order in progress and the driver is on his way to it. Wait until it is finished, or edit the address instead of deleting it.',
   addressNameRequired: 'Address name is required',
 
   // Bag notification
