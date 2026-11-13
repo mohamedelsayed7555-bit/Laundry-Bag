@@ -1,7 +1,8 @@
-import { Component, type ReactNode } from 'react'
+import { Component, useEffect, type ReactNode } from 'react'
 import { Slot } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { I18nManager, View, Text, TouchableOpacity, StyleSheet } from 'react-native'
+import { I18nManager, View, Text, TouchableOpacity, StyleSheet, AppState } from 'react-native'
+import * as Updates from 'expo-updates'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext'
 import { useNotifications } from '../src/hooks/useNotifications'
@@ -46,7 +47,31 @@ function NotificationSetup() {
   return null
 }
 
+function useOTAUpdates() {
+  useEffect(() => {
+    if (__DEV__) return
+
+    async function fetchUpdate() {
+      try {
+        const update = await Updates.checkForUpdateAsync()
+        if (update.isAvailable) {
+          await Updates.fetchUpdateAsync()
+        }
+      } catch {}
+    }
+
+    fetchUpdate()
+
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') fetchUpdate()
+    })
+    return () => sub.remove()
+  }, [])
+}
+
 export default function RootLayout() {
+  useOTAUpdates()
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ErrorBoundary>

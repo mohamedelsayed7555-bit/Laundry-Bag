@@ -1,7 +1,8 @@
 import { Component, useEffect, type ReactNode } from 'react'
 import { Slot } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { I18nManager, View, Text, TouchableOpacity, StyleSheet } from 'react-native'
+import { I18nManager, View, Text, TouchableOpacity, StyleSheet, AppState } from 'react-native'
+import * as Updates from 'expo-updates'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext'
 import { CartProvider } from '../src/contexts/CartContext'
@@ -100,6 +101,28 @@ function NotificationSetup() {
   return null
 }
 
+function useOTAUpdates() {
+  useEffect(() => {
+    if (__DEV__) return
+
+    async function fetchUpdate() {
+      try {
+        const update = await Updates.checkForUpdateAsync()
+        if (update.isAvailable) {
+          await Updates.fetchUpdateAsync()
+        }
+      } catch {}
+    }
+
+    fetchUpdate()
+
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') fetchUpdate()
+    })
+    return () => sub.remove()
+  }, [])
+}
+
 function SplashGate() {
   const { loading } = useAuth()
   useEffect(() => {
@@ -122,6 +145,9 @@ export default function RootLayout() {
     Alexandria_600SemiBold,
     Alexandria_700Bold,
   })
+
+  // Must run before the early return below, or the hook count changes between renders.
+  useOTAUpdates()
 
   // The native splash is still showing here. If fonts fail, the app still opens with system fonts.
   if (!fontsLoaded && !fontError) {

@@ -251,8 +251,10 @@ export default function HomeScreen() {
   const [defaultAddress, setDefaultAddress] = useState<{ label: string } | null | undefined>(undefined)
   const [minPrices, setMinPrices] = useState<Record<string, number>>({})
   // Active service codes from the DB (dashboard → prices → services tab controls this).
-  // Starts as null so we don't flash an "all hidden" state before the first fetch.
   const [activeServices, setActiveServices] = useState<Set<string> | null>(null)
+  // Separates "not fetched yet" from "fetch failed": both leave activeServices null, but
+  // only the second should fall back to showing every tile.
+  const [servicesLoading, setServicesLoading] = useState(true)
   const shownRatingIds = useRef(new Set<string>())
 
   // Extra fields for the live order card and the order list (service, pieces, driver).
@@ -290,9 +292,19 @@ export default function HomeScreen() {
   // network isn't reachable (old builds, offline), fall back to "show everything"
   // so the home never looks broken.
   const loadActiveServices = useCallback(async () => {
-    const { data, error } = await supabase.from('services').select('code').eq('is_active', true)
-    if (error || !data) { setActiveServices(null); return }
-    setActiveServices(new Set(data.map(r => r.code)))
+    try {
+      const { data, error } = await supabase.from('services').select('code').eq('is_active', true)
+      // A failed refetch keeps the last good answer rather than clearing it. Clearing would
+      // fall back to "show everything", so one dropped pull-to-refresh would bring a
+      // disabled service back. On the first load there is nothing to keep and the fallback
+      // still applies.
+      if (error || !data) return
+      setActiveServices(new Set(data.map(r => r.code)))
+    } catch {
+      // Offline or DNS failures throw instead of returning an error; same handling.
+    } finally {
+      setServicesLoading(false)
+    }
   }, [])
 
   const onRefresh = useCallback(async () => {
@@ -443,10 +455,12 @@ export default function HomeScreen() {
     { label: t('housekeeping'), en: 'HOME', key: 'housekeeping' },
     { label: t('carpet') || 'سجاد وبطاطين', en: 'CARPETS', key: 'carpet' },
   ]
-  // Null (not yet loaded, or offline fallback) = show everything so the home never
-  // flashes empty on first render. Once the set loads, hide anything the dashboard disabled.
-  const services = activeServices ? allServices.filter(s => activeServices.has(s.key)) : allServices
-  const accessoriesEnabled = activeServices ? activeServices.has('accessories') : true
+  // Three states, not two. Loaded: show what the dashboard enabled. Still loading: show
+  // nothing, so a disabled service never flashes up before the answer arrives. Failed:
+  // show everything, so an unreachable table leaves the home usable rather than empty.
+  const services = activeServices ? allServices.filter(s => activeServices.has(s.key))
+    : servicesLoading ? [] : allServices
+  const accessoriesEnabled = activeServices ? activeServices.has('accessories') : !servicesLoading
   // An odd number of active services would leave the last tile alone with a hole beside it.
   // The accessories tile drops to half width and pairs with it; with accessories switched
   // off there is nothing to pair with, so the last service spans the row instead.
@@ -466,7 +480,9 @@ export default function HomeScreen() {
   const serviceLabel = (key?: string | null) => {
     if (!key) return ''
     const first = key.split('+')[0]
-    const svc = services.find(s => s.key === first)
+    // Looked up in the full list, not the enabled one: a past order keeps its service
+    // name after the dashboard switches that service off.
+    const svc = allServices.find(s => s.key === first)
     return svc?.label ?? (first === 'accessories' ? accessoriesLabel : '')
   }
 

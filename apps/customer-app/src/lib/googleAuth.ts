@@ -7,8 +7,16 @@ import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-si
  * also how the customer recovers the account without going through support.
  */
 
-const WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? ''
-const IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? ''
+// OAuth client IDs, which ship inside the app and are not secrets — they already sit in
+// eas.json and, for iOS, in app.json's URL scheme. They are kept as a fallback because
+// only `eas build` injects the EXPO_PUBLIC_* vars: an `eas update` bundle is built
+// without them, which left WEB_CLIENT_ID empty and silently hid the Google button on
+// every device that took the update. supabase.ts guards its own keys the same way.
+const FALLBACK_WEB_CLIENT_ID = '598928646055-60lh85f47mv8pe5cjvkk4m5k9tdk6pv6.apps.googleusercontent.com'
+const FALLBACK_IOS_CLIENT_ID = '598928646055-b1n8maj84o9pq91stocdmlcsr740o1i8.apps.googleusercontent.com'
+
+const WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || FALLBACK_WEB_CLIENT_ID
+const IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || FALLBACK_IOS_CLIENT_ID
 
 export const googleConfigured = WEB_CLIENT_ID.length > 0
 

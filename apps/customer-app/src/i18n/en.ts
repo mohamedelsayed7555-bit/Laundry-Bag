@@ -539,6 +539,10 @@ export default {
   cannotDelete: "Can't delete this",
   addressHasActiveOrder: 'This address has an order in progress and the driver is on his way to it. Wait until it is finished, or edit the address instead of deleting it.',
   addressNameRequired: 'Address name is required',
+  cannotEditAddress: 'This address cannot be edited',
+  cannotEditAddressMsg: 'An order is on its way to this address and the driver is using it now. You can edit it once the order arrives, or contact us to change the order’s address.',
+  outOfZoneTitle: 'Address outside the delivery area',
+  outOfZoneMsg: 'This spot is outside the areas we currently serve. Move the pin somewhere inside the delivery area.',
 
   // Bag notification
   bagOrderCreated: 'Laundry Bag order created',

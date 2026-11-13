@@ -380,6 +380,10 @@ export default {
   cannotDelete: 'مش ممكن نمسحه',
   addressHasActiveOrder: 'العنوان ده عليه طلب شغال دلوقتي والسائق رايحله. استنى لما الطلب يخلص، أو عدّل العنوان بدل ما تمسحه.',
   addressNameRequired: 'اسم العنوان مطلوب',
+  cannotEditAddress: 'لا يمكن تعديل هذا العنوان',
+  cannotEditAddressMsg: 'هذا العنوان مرتبط بطلب جارٍ والسائق يستخدمه الآن. يمكنك تعديله بعد استلام الطلب، أو التواصل معنا لتغيير عنوان الطلب.',
+  outOfZoneTitle: 'العنوان خارج نطاق التوصيل',
+  outOfZoneMsg: 'هذا الموقع خارج المناطق التي نخدمها حاليًا. حرّك الدبوس إلى مكان داخل نطاق التوصيل.',
 
   // Bag notification
   bagOrderCreated: 'تم إنشاء طلب شنطة Laundry Bag',
