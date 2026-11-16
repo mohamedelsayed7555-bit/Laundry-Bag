@@ -30,12 +30,14 @@ const SERVICE_IMG: Record<string, any> = {
 
 
 const services = [
-  { key: 'wash', label: 'غسيل', labelEn: 'Wash' },
-  { key: 'dry_clean', label: 'تنظيف جاف', labelEn: 'Dry Clean' },
-  { key: 'iron', label: 'كي فقط', labelEn: 'Iron Only' },
+// only read by key, for the service name on a cart line; kept in the same order
+// as the other screens so the four lists never drift apart
   { key: 'wash_iron', label: 'غسيل وكي', labelEn: 'Wash & Iron' },
-  { key: 'housekeeping', label: 'تنظيف منازل', labelEn: 'House Keeping' },
+  { key: 'wash', label: 'غسيل', labelEn: 'Wash' },
+  { key: 'iron', label: 'كي فقط', labelEn: 'Iron Only' },
+  { key: 'dry_clean', label: 'تنظيف جاف', labelEn: 'Dry Clean' },
   { key: 'carpet', label: 'سجاد وبطاطين', labelEn: 'Carpets & Blankets' },
+  { key: 'housekeeping', label: 'تنظيف منازل', labelEn: 'House Keeping' },
   { key: 'accessories', label: 'منتجات وإكسسوارات', labelEn: 'Accessories & Products' },
 ]
 

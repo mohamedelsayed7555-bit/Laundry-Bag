@@ -447,11 +447,15 @@ export default function HomeScreen() {
     return t('goodEvening')
   }
 
+  // Same order as the service row on the new-order screen: the most asked-for
+  // service first, then the laundry services from fullest to plainest, then what
+  // is not clothing. Carpets stay last of the six, so the tile that pairs with
+  // accessories at the bottom of the grid is the same one as before.
   const allServices = [
-    { label: t('wash'), en: 'WASH', key: 'wash' },
-    { label: t('dryClean'), en: 'DRY CLEAN', key: 'dry_clean' },
-    { label: t('ironOnly'), en: 'IRON', key: 'iron' },
     { label: t('washIron'), en: 'WASH & IRON', key: 'wash_iron' },
+    { label: t('wash'), en: 'WASH', key: 'wash' },
+    { label: t('ironOnly'), en: 'IRON', key: 'iron' },
+    { label: t('dryClean'), en: 'DRY CLEAN', key: 'dry_clean' },
     { label: t('housekeeping'), en: 'HOME', key: 'housekeeping' },
     { label: t('carpet') || 'سجاد وبطاطين', en: 'CARPETS', key: 'carpet' },
   ]

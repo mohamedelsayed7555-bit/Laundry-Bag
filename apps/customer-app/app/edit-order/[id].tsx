@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { TriangleAlert, Shirt, Plus, Minus, Check, Ruler } from 'lucide-react-native'
 import SizeSheet, { parseSize, type SizePick } from '../../src/components/SizeSheet'
+import { byArabic } from '../../src/utils/arabicSort'
 import { useBrand, Card, Chip, Stepper, IconButton, BackIcon, FlowLines, money, F, SIZE, HIT, useStickyHeader, StickyBar } from '../../src/components/brand'
 import { PrimaryButton, SecondaryButton } from '../../src/components/auth/ui'
 import { useLocalSearchParams, useRouter } from 'expo-router'
@@ -15,12 +16,13 @@ import { useLanguage } from '../../src/contexts/LanguageContext'
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://kjqtrmedkvqfofwymoni.supabase.co'
 
 const servicesMap = [
-  { key: 'wash', label: 'غسيل', labelEn: 'Wash' },
-  { key: 'dry_clean', label: 'تنظيف جاف', labelEn: 'Dry Clean' },
-  { key: 'iron', label: 'كي فقط', labelEn: 'Iron Only' },
+// same order as the new-order screen, so editing an order looks like placing one
   { key: 'wash_iron', label: 'غسيل وكي', labelEn: 'Wash & Iron' },
-  { key: 'housekeeping', label: 'تنظيف منازل', labelEn: 'House Keeping' },
+  { key: 'wash', label: 'غسيل', labelEn: 'Wash' },
+  { key: 'iron', label: 'كي فقط', labelEn: 'Iron Only' },
+  { key: 'dry_clean', label: 'تنظيف جاف', labelEn: 'Dry Clean' },
   { key: 'carpet', label: 'سجاد وبطاطين', labelEn: 'Carpets & Blankets' },
+  { key: 'housekeeping', label: 'تنظيف منازل', labelEn: 'House Keeping' },
   { key: 'accessories', label: 'منتجات وإكسسوارات', labelEn: 'Accessories & Products' },
 ]
 
@@ -121,7 +123,9 @@ export default function EditOrderScreen() {
         id: cat.id as string,
         name: cat.name as string,
         icon: (cat.icon ?? null) as string | null,
-        itemTypes: [...new Set(prices.filter(p => p.category_id === cat.id && p.service_type === selectedService).map((p: any) => p.item_type))] as string[],
+        // same ordering as the new-order screen, so the two lists match
+        itemTypes: ([...new Set(prices.filter(p => p.category_id === cat.id && p.service_type === selectedService).map((p: any) => p.item_type))] as string[])
+          .sort(byArabic),
       }))
       .filter(c => c.itemTypes.length > 0)
   }, [selectedService, categories, prices])

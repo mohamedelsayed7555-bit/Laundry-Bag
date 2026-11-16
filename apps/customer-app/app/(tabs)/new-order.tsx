@@ -8,19 +8,26 @@ import { MapPin, Plus, Check, Lock, Crown, Settings2, Ruler } from 'lucide-react
 import { useAuth } from '../../src/contexts/AuthContext'
 import { useCart } from '../../src/contexts/CartContext'
 import SizeSheet, { type SizePick } from '../../src/components/SizeSheet'
+import { byArabic } from '../../src/utils/arabicSort'
 import { useLanguage } from '../../src/contexts/LanguageContext'
 import { useCustomAlert } from '../../src/components/CustomAlert'
 import { SkeletonPage } from '../../src/components/Skeleton'
 import { supabase } from '../../src/lib/supabase'
-import { useBrand, Card, Chip, Pill, Stepper, PulseHighlight, DotsBackdrop, ForwardIcon, money, cardShadow, F, SIZE, HIT, type Brand } from '../../src/components/brand'
+import { useBrand, Card, Chip, Stepper, PulseHighlight, DotsBackdrop, ForwardIcon, money, cardShadow, F, SIZE, HIT, type Brand } from '../../src/components/brand'
 
 const services = [
-  { key: 'wash', icon: '👔', label: 'غسيل', labelEn: 'Wash' },
-  { key: 'dry_clean', icon: '🧹', label: 'تنظيف جاف', labelEn: 'Dry Clean' },
-  { key: 'iron', icon: '👕', label: 'كي فقط', labelEn: 'Iron Only' },
+// The row reads left to right as the first choice a customer makes, so the most
+// asked-for service leads and the laundry services run from the fullest to the
+// plainest: wash AND iron, wash alone, iron alone, dry clean. What is not
+// clothing at all — carpets, the house, the products on the shelf — sits at the
+// end rather than in the middle of that run.
+// Order here is display order only: every lookup in the app is by `key`.
   { key: 'wash_iron', icon: '✨', label: 'غسيل وكي', labelEn: 'Wash & Iron' },
-  { key: 'housekeeping', icon: '🏠', label: 'تنظيف منازل', labelEn: 'House Keeping' },
+  { key: 'wash', icon: '👔', label: 'غسيل', labelEn: 'Wash' },
+  { key: 'iron', icon: '👕', label: 'كي فقط', labelEn: 'Iron Only' },
+  { key: 'dry_clean', icon: '🧹', label: 'تنظيف جاف', labelEn: 'Dry Clean' },
   { key: 'carpet', icon: '🛋️', label: 'سجاد وبطاطين', labelEn: 'Carpets & Blankets' },
+  { key: 'housekeeping', icon: '🏠', label: 'تنظيف منازل', labelEn: 'House Keeping' },
   { key: 'accessories', icon: '🛍️', label: 'منتجات وإكسسوارات', labelEn: 'Accessories & Products' },
 ]
 
@@ -258,7 +265,11 @@ export default function NewOrderScreen() {
   const categoriesWithItems = useMemo(() => {
     if (!selectedService) return []
     return categories.map(cat => {
-      const itemTypes = [...new Set(prices.filter(p => p.category_id === cat.id && p.service_type === selectedService).map(p => p.item_type))] as string[]
+      // the catalogue query has no ordering of its own, so without this the list
+      // arrives in whatever order the database felt like and the three rugs end
+      // up at the top, the middle and the bottom of the same screen
+      const itemTypes = ([...new Set(prices.filter(p => p.category_id === cat.id && p.service_type === selectedService).map(p => p.item_type))] as string[])
+        .sort(byArabic)
       return { ...cat, itemTypes }
     }).filter(cat => cat.itemTypes.length > 0)
   }, [selectedService, categories, prices])
@@ -502,7 +513,6 @@ export default function NewOrderScreen() {
                     ? cart.map((c, i) => ({ c, i })).filter(({ c }) => c.name === itemType && c.service_type === selectedService)
                     : []
                   const inCart = bySqm ? undefined : cart.find(c => c.name === itemType && c.service_type === selectedService)
-                  const isFirst = idx === 0
                   const tinted = (bySqm ? sizeLines.length > 0 : !!inCart) || justAdded === itemType
                   return (
                     <View
@@ -511,9 +521,12 @@ export default function NewOrderScreen() {
                     >
                       <View style={s.itemRow}>
                         <View style={s.itemBody}>
+                          {/* the "most ordered" badge used to sit on whichever row
+                              happened to be first, which after sorting would be a
+                              baby blanket. It comes back when it is driven by what
+                              customers actually order. */}
                           <View style={s.itemNameRow}>
                             <Text style={[s.itemName, { color: b.ink }]} numberOfLines={1}>{itemName(itemType)}</Text>
-                            {isFirst && <Pill tone="warn" label={locale === 'en' ? '🔥 Most ordered' : '🔥 الأكثر طلباً'} />}
                           </View>
                           <Text style={[s.itemPrice, { color: b.muted }]} numberOfLines={1}>
                             <Text style={[s.itemPriceNum, { color: b.isDark ? '#38BDF8' : '#0284C7' }]}>{money(price)}</Text>
