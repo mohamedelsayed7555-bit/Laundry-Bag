@@ -132,6 +132,9 @@ export interface Price {
   price: number
   is_active: boolean
   updated_at: string
+  /** 'sqm' means the price is per square metre and the order line's quantity is
+   *  an area, not a count of pieces. Absent on rows saved before the column. */
+  unit?: 'piece' | 'sqm'
 }
 
 export interface Plan {

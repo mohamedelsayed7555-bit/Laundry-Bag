@@ -59,9 +59,11 @@ export default function OrdersPage() {
   const [cancelReason, setCancelReason] = useState('')
   const [cancelledByFilter, setCancelledByFilter] = useState<'all' | 'admin' | 'customer'>('all')
   const [deliveryFeeSetting, setDeliveryFeeSetting] = useState(0)
-  const [prices, setPrices] = useState<{ item_type: string; service_type: string; price: number }[]>([])
-  const [orderItems, setOrderItems] = useState<{ name: string; service_type: string; quantity: number; price: number }[]>([])
-  const [pick, setPick] = useState<{ item_type: string; service_type: string; quantity: number }>({ item_type: '', service_type: '', quantity: 1 })
+  const [prices, setPrices] = useState<{ item_type: string; service_type: string; price: number; unit?: string }[]>([])
+  // `quantity` is whole square metres on a line the catalogue prices by area,
+  // and `size` is the measurement it was worked out from
+  const [orderItems, setOrderItems] = useState<{ name: string; service_type: string; quantity: number; price: number; size?: string }[]>([])
+  const [pick, setPick] = useState<{ item_type: string; service_type: string; quantity: number; len: string; wid: string }>({ item_type: '', service_type: '', quantity: 1, len: '', wid: '' })
   const [page, setPage] = useState(0)
   const [totalCount, setTotalCount] = useState(0)
   const [payFilter, setPayFilter] = useState('all')
@@ -85,8 +87,8 @@ export default function OrdersPage() {
     supabase.from('settings').select('value').eq('key', 'delivery_fee').single().then(({ data }) => {
       if (data) setDeliveryFeeSetting(Number(data.value) || 0)
     })
-    supabase.from('prices').select('item_type, service_type, price').eq('is_active', true).then(({ data }) => {
-      if (data) setPrices(data.map((p: any) => ({ item_type: p.item_type, service_type: p.service_type, price: Number(p.price) })))
+    supabase.from('prices').select('item_type, service_type, price, unit').eq('is_active', true).then(({ data }) => {
+      if (data) setPrices(data.map((p: any) => ({ item_type: p.item_type, service_type: p.service_type, price: Number(p.price), unit: p.unit ?? 'piece' })))
     })
     const ch = supabase.channel('orders-rt')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => debouncedLoadOrders())
@@ -282,21 +284,33 @@ export default function OrdersPage() {
     if (!pick.item_type || !pick.service_type) { toast('اختر نوع القطعة ونوع الخدمة', 'error'); return }
     const row = prices.find(p => p.item_type === pick.item_type && p.service_type === pick.service_type)
     if (!row) { toast('لا يوجد سعر لهذه القطعة والخدمة', 'error'); return }
-    const qty = Math.max(1, pick.quantity || 1)
+    // A rug is charged by the whole square metre, rounded up, so the staff type
+    // the measurement and the area follows from it — the same rule the customer
+    // app applies, or the two would disagree on the same rug.
+    const bySqm = row.unit === 'sqm'
+    let qty = Math.max(1, pick.quantity || 1)
+    let size: string | undefined
+    if (bySqm) {
+      const l = parseFloat(pick.len), w = parseFloat(pick.wid)
+      if (!(l > 0 && w > 0 && l <= 30 && w <= 30)) { toast('اكتب طول وعرض القطعة بالمتر', 'error'); return }
+      qty = Math.max(1, Math.ceil(l * w))
+      size = `${Math.round(l * 100) / 100}×${Math.round(w * 100) / 100}`
+    }
+    if (qty > 500) { toast('المساحة أكبر من اللي الطلب الواحد يشيله', 'error'); return }
     setOrderItems(prev => {
-      const idx = prev.findIndex(i => i.name === pick.item_type && i.service_type === pick.service_type)
+      const idx = prev.findIndex(i => i.name === pick.item_type && i.service_type === pick.service_type && i.size === size)
       if (idx >= 0) {
         const next = [...prev]
-        next[idx] = { ...next[idx], quantity: next[idx].quantity + qty }
+        next[idx] = { ...next[idx], quantity: Math.min(500, next[idx].quantity + qty) }
         return next
       }
-      return [...prev, { name: pick.item_type, service_type: pick.service_type, quantity: qty, price: row.price }]
+      return [...prev, { name: pick.item_type, service_type: pick.service_type, quantity: qty, price: row.price, ...(size ? { size } : {}) }]
     })
-    setPick({ item_type: '', service_type: '', quantity: 1 })
+    setPick({ item_type: '', service_type: '', quantity: 1, len: '', wid: '' })
   }
 
   function updateOrderItemQty(i: number, delta: number) {
-    setOrderItems(prev => prev.map((it, idx) => idx === i ? { ...it, quantity: Math.max(1, it.quantity + delta) } : it))
+    setOrderItems(prev => prev.map((it, idx) => idx === i ? { ...it, quantity: Math.min(500, Math.max(1, it.quantity + delta)) } : it))
   }
   function removeOrderItem(i: number) {
     setOrderItems(prev => prev.filter((_, idx) => idx !== i))
@@ -335,7 +349,7 @@ export default function OrdersPage() {
     if (!error) {
       setShowAdd(false)
       setForm({ customer_id: '', notes: '', order_type: 'delivery', walkin_name: '', walkin_phone: '' })
-      setOrderItems([]); setPick({ item_type: '', service_type: '', quantity: 1 })
+      setOrderItems([]); setPick({ item_type: '', service_type: '', quantity: 1, len: '', wid: '' })
       loadOrders(); toast(isWalkin ? 'تم إضافة طلب من المحل' : 'تم إضافة الطلب')
     } else { console.error('Order insert error:', error); toast('حدث خطأ', 'error') }
   }
@@ -592,12 +606,17 @@ export default function OrdersPage() {
                     <div key={i} className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2">
                         <span className="text-gray-800 font-medium">{item.name}</span>
+                        {item.size && (
+                          <span className="text-[10px] text-sky-700 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded whitespace-nowrap">
+                            {item.size} م
+                          </span>
+                        )}
                         <span className="text-[10px] text-gray-400 bg-surface-muted px-1.5 py-0.5 rounded">
                           {SERVICE_TYPE_LABELS[item.service_type as ServiceType] ?? item.service_type}
                         </span>
                       </div>
                       <div className="flex items-center gap-3 text-gray-500">
-                        <span className="text-xs">×{item.quantity}</span>
+                        <span className="text-xs">{item.size ? `${item.quantity} م²` : `×${item.quantity}`}</span>
                         <span className="font-semibold text-gray-700">{(item.price * item.quantity).toFixed(2)} ج.م</span>
                       </div>
                     </div>
@@ -765,9 +784,10 @@ export default function OrdersPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
                         <span className="text-sm font-medium text-gray-800 truncate">{it.name}</span>
+                        {it.size && <span className="text-[10px] text-sky-700 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded whitespace-nowrap">{it.size} م</span>}
                         <span className="text-[10px] text-gray-400 bg-surface-muted px-1.5 py-0.5 rounded">{SERVICE_TYPE_LABELS[it.service_type as ServiceType] ?? it.service_type}</span>
                       </div>
-                      <span className="text-[11px] text-gray-400">{it.price} ج.م × {it.quantity} = {(it.price * it.quantity).toFixed(2)} ج.م</span>
+                      <span className="text-[11px] text-gray-400">{it.price} ج.م × {it.quantity}{it.size ? ' م²' : ''} = {(it.price * it.quantity).toFixed(2)} ج.م</span>
                     </div>
                     <div className="flex items-center gap-1 flex-none">
                       <button type="button" onClick={() => updateOrderItemQty(i, -1)} className="w-7 h-7 rounded-lg bg-surface-muted text-gray-600 hover:bg-surface-border flex items-center justify-center">−</button>
@@ -797,10 +817,38 @@ export default function OrdersPage() {
                   </select>
                 </div>
               </div>
-              <div className="flex gap-2">
-                <input type="number" min={1} value={pick.quantity} onChange={e => setPick({ ...pick, quantity: Math.max(1, +e.target.value || 1) })} className={inputClass + ' w-24'} aria-label="العدد" />
-                <button type="button" onClick={addPickToOrder} className="flex-1 bg-primary-50 text-primary-600 border border-primary-200 rounded-xl text-sm font-semibold hover:bg-primary-100 transition-colors">+ أضف للطلب</button>
-              </div>
+              {(() => {
+                const row = prices.find(p => p.item_type === pick.item_type && p.service_type === pick.service_type)
+                const bySqm = row?.unit === 'sqm'
+                const l = parseFloat(pick.len), w = parseFloat(pick.wid)
+                const area = l > 0 && w > 0 ? Math.max(1, Math.ceil(l * w)) : 0
+                return (
+                  <>
+                    {bySqm && (
+                      <div className="flex items-end gap-2">
+                        <div className="flex-1">
+                          <label className="block text-[10px] text-gray-400 mb-1">الطول (متر)</label>
+                          <input type="number" min={0} max={30} step="0.1" value={pick.len} onChange={e => setPick({ ...pick, len: e.target.value })} className={inputClass} placeholder="0" dir="ltr" />
+                        </div>
+                        <span className="pb-3 text-gray-400">×</span>
+                        <div className="flex-1">
+                          <label className="block text-[10px] text-gray-400 mb-1">العرض (متر)</label>
+                          <input type="number" min={0} max={30} step="0.1" value={pick.wid} onChange={e => setPick({ ...pick, wid: e.target.value })} className={inputClass} placeholder="0" dir="ltr" />
+                        </div>
+                        <div className="pb-2.5 text-xs font-semibold text-gray-600 whitespace-nowrap">
+                          {area > 0 ? `= ${area} م² · ${(area * (row?.price ?? 0)).toFixed(2)} ج.م` : '= — م²'}
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      {!bySqm && (
+                        <input type="number" min={1} value={pick.quantity} onChange={e => setPick({ ...pick, quantity: Math.max(1, +e.target.value || 1) })} className={inputClass + ' w-24'} aria-label="العدد" />
+                      )}
+                      <button type="button" onClick={addPickToOrder} className="flex-1 bg-primary-50 text-primary-600 border border-primary-200 rounded-xl text-sm font-semibold hover:bg-primary-100 transition-colors">+ أضف للطلب</button>
+                    </div>
+                  </>
+                )
+              })()}
             </div>
 
             {orderItems.length > 0 && (

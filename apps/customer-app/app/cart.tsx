@@ -380,7 +380,9 @@ export default function CartScreen() {
     // Prices, delivery fee, plan coverage, coupon and the welcome gift are all decided on the server.
     const { data: placed, error } = await supabase.rpc('place_order', {
       p: {
-        items: cart.map((i: any) => ({ name: i.name, service_type: i.service_type, quantity: i.quantity })),
+        // `size` travels with a line priced by area; the server drops it on any
+        // other line, so sending it unconditionally is safe
+        items: cart.map((i: any) => ({ name: i.name, service_type: i.service_type, quantity: i.quantity, size: i.size ?? null })),
         address_id: selectedAddress.id,
         delivery_address_id: sameAddress ? null : deliveryAddress?.id ?? null,
         payment_method: paymentMethod,
@@ -538,23 +540,39 @@ export default function CartScreen() {
       >
         {/* Items */}
         <Card pad={false} style={{ overflow: 'hidden' }}>
-          {cart.map((item, i) => (
-            <View key={i} style={[s.itemRow, i > 0 && { borderTopWidth: 1, borderTopColor: b.divider }]}>
-              <Image source={SERVICE_IMG[item.service_type] ?? SERVICE_IMG.wash} style={s.itemImg} />
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={[s.cartItemName, { color: b.ink }]} numberOfLines={1}>{itemName(item.name)}</Text>
-                <Text style={[s.cartItemPrice, { color: b.muted }]} numberOfLines={1}>
-                  <Text style={[s.cartItemPriceNum, { color: b.isDark ? '#38BDF8' : '#0284C7' }]}>{money(item.price)}</Text> {t('currency')} / {isEn ? 'item' : 'قطعة'} · {serviceLabel(item.service_type)}
-                </Text>
+          {cart.map((item, i) => {
+            // a line priced by area counts whole pieces, each one `area` m², so
+            // the stepper moves by that step and the row shows the measurement
+            const step = item.area && item.area > 0 ? item.area : 0
+            const pieces = step > 0 ? Math.max(1, Math.round(item.quantity / step)) : item.quantity
+            return (
+              <View key={i} style={[s.itemRow, i > 0 && { borderTopWidth: 1, borderTopColor: b.divider }]}>
+                <Image source={SERVICE_IMG[item.service_type] ?? SERVICE_IMG.wash} style={s.itemImg} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={[s.cartItemName, { color: b.ink }]} numberOfLines={1}>
+                    {itemName(item.name)}{item.size ? ` · ${item.size} ${isEn ? 'm' : 'م'}` : ''}
+                  </Text>
+                  <Text style={[s.cartItemPrice, { color: b.muted }]} numberOfLines={1}>
+                    <Text style={[s.cartItemPriceNum, { color: b.isDark ? '#38BDF8' : '#0284C7' }]}>{money(item.price)}</Text>
+                    {' '}{t('currency')} / {step > 0 ? (isEn ? 'm²' : 'م²') : (isEn ? 'item' : 'قطعة')}
+                    {step > 0 ? ` · ${item.quantity} ${isEn ? 'm²' : 'م²'}` : ''} · {serviceLabel(item.service_type)}
+                  </Text>
+                </View>
+                <Stepper
+                  qty={pieces}
+                  onRemove={() => removeItem(i)}
+                  onMinus={() => {
+                    if (step > 0) { if (pieces <= 1) removeItem(i); else updateQuantity(i, item.quantity - step) }
+                    else updateQuantity(i, item.quantity - 1)
+                  }}
+                  onPlus={() => {
+                    const next = item.quantity + (step > 0 ? step : 1)
+                    if (next <= 500) updateQuantity(i, next)
+                  }}
+                />
               </View>
-              <Stepper
-                qty={item.quantity}
-                onRemove={() => removeItem(i)}
-                onMinus={() => updateQuantity(i, item.quantity - 1)}
-                onPlus={() => updateQuantity(i, item.quantity + 1)}
-              />
-            </View>
-          ))}
+            )
+          })}
         </Card>
 
         <TouchableOpacity

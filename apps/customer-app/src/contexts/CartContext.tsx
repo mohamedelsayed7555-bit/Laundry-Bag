@@ -7,9 +7,22 @@ const CART_PREFIX = 'cleano_cart_'
 export type CartItem = {
   name: string
   service_type: string
+  /** pieces — or whole square metres for an item the catalogue prices by area */
   quantity: number
   price: number
+  /** "2×3", only on an item priced by area */
+  size?: string
+  /** whole m² of ONE piece that size, so the stepper can add a whole rug at a time */
+  area?: number
 }
+
+/**
+ * Two rugs of the same kind in different sizes are two different things to buy,
+ * so the measurement is part of what makes a line its own line. Without this
+ * they collapsed into one row and the second rug's size was lost.
+ */
+export const cartKeyOf = (i: Pick<CartItem, 'name' | 'service_type' | 'size'>) =>
+  `${i.name}\u0000${i.service_type}\u0000${i.size ?? ''}`
 
 type CartContextType = {
   cart: CartItem[]
@@ -57,7 +70,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       }
       const merged = [...saved]
       for (const item of guestItems) {
-        const idx = merged.findIndex(c => c.name === item.name && c.service_type === item.service_type)
+        const idx = merged.findIndex(c => cartKeyOf(c) === cartKeyOf(item))
         if (idx >= 0) merged[idx] = { ...merged[idx], quantity: merged[idx].quantity + item.quantity }
         else merged.push(item)
       }
@@ -74,7 +87,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const addItem = useCallback((item: CartItem) => {
     setCart(prev => {
-      const idx = prev.findIndex(c => c.name === item.name && c.service_type === item.service_type)
+      const idx = prev.findIndex(c => cartKeyOf(c) === cartKeyOf(item))
       if (idx >= 0) {
         const updated = [...prev]
         updated[idx] = { ...updated[idx], quantity: updated[idx].quantity + item.quantity }

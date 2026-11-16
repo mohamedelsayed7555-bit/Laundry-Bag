@@ -1,9 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Linking, AppState, ScrollView, Platform } from 'react-native'
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Linking, AppState, ScrollView, Platform, TextInput, Image } from 'react-native'
 import { useRouter } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated'
-import { Phone, MessageCircle, Navigation, MapPin, Package, Truck } from 'lucide-react-native'
+import { Phone, MessageCircle, Navigation, MapPin, Package, Truck, Search, X } from 'lucide-react-native'
 import * as Location from 'expo-location'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { supabase } from '../../src/lib/supabase'
@@ -150,6 +150,15 @@ export default function DriverOrdersScreen() {
   const [dateRange, setDateRange] = useState<DateRange>('14')
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [pickupSub, setPickupSub] = useState<'all' | 'waiting' | 'picked_up'>('all')
+  const [query, setQuery] = useState('')
+  // The card showed a bare count ("9 قطعة"), so a driver at the door had no way
+  // to check what he was collecting. The list folds out of that same chip rather
+  // than sitting open, because a shift can hold a dozen orders at once and a
+  // card per order with fifteen lines in it is a list nobody can scroll.
+  const [openItems, setOpenItems] = useState<Record<string, boolean>>({})
+  const toggleItems = useCallback((id: string) => {
+    setOpenItems(prev => ({ ...prev, [id]: !prev[id] }))
+  }, [])
   const driverLocRef = useRef<Point | null>(null)
   const lastLoadRef = useRef(0)
   const lastLocRef = useRef(0)
@@ -197,7 +206,7 @@ export default function DriverOrdersScreen() {
     }
     const { data } = await supabase
       .from('orders')
-      .select('id, order_number, status, service_type, items_count, total, notes, payment_method, payment_status, order_type, pickup_location, delivery_location, created_at, is_scheduled, scheduled_at, rating_driver, rating_note, gift_included, customer:users!orders_customer_id_fkey(name, phone, customer_code), address:addresses(label, building, floor, apartment, landmark, lat, lng)')
+      .select('id, order_number, status, service_type, items, items_count, total, notes, payment_method, payment_status, order_type, pickup_location, delivery_location, created_at, is_scheduled, scheduled_at, rating_driver, rating_note, gift_included, customer:users!orders_customer_id_fkey(name, phone, customer_code, avatar_url), address:addresses(label, building, floor, apartment, landmark, lat, lng)')
       .eq('driver_id', profile.id)
       .not('status', 'in', '("scheduled","cancelled","refunded")')
       .order('created_at', { ascending: false })
@@ -248,7 +257,30 @@ export default function DriverOrdersScreen() {
   })
 
   const visiblePickup = pickupSub === 'all' ? pickupOrders : pickupSub === 'waiting' ? pickupOrders.filter(o => ['assigned', 'arrived'].includes(o.status)) : pickupOrders.filter(o => o.status === 'picked_up')
-  const filteredOrders = filter === 'pickup' ? visiblePickup : filter === 'delivery' ? deliveryOrders : completedOrders
+  const tabOrders = filter === 'pickup' ? visiblePickup : filter === 'delivery' ? deliveryOrders : completedOrders
+
+  // One box for four things the driver might have in front of him: a name, a
+  // customer code, an order number or a phone. Digits are normalised so an
+  // Arabic-Indic number typed on an Arabic keyboard still matches, and
+  // separators are dropped so "010 0664" finds "01006646641".
+  const norm = (v: string) =>
+    (v ?? '')
+      .replace(/[٠-٩]/g, c => String(c.charCodeAt(0) - 0x0660))
+      .replace(/[۰-۹]/g, c => String(c.charCodeAt(0) - 0x06F0))
+      .toLowerCase()
+      .trim()
+  const digits = (v: string) => norm(v).replace(/\D/g, '')
+
+  const q = norm(query)
+  const qd = digits(query)
+  const filteredOrders = !q ? tabOrders : tabOrders.filter(o => {
+    const name = norm(o.customer?.name ?? '')
+    const code = norm(o.customer?.customer_code ?? '')
+    const num = norm(o.order_number ?? '')
+    const tel = digits(o.customer?.phone ?? '')
+    if (name.includes(q) || code.includes(q) || num.includes(q)) return true
+    return qd.length >= 3 && (tel.includes(qd) || digits(num).includes(qd) || digits(code).includes(qd))
+  })
 
   async function updateStatus(orderId: string, newStatus: string) {
     // Validate transition and ownership
@@ -342,8 +374,14 @@ export default function DriverOrdersScreen() {
           <View style={s.divider} />
 
           <View style={s.customerInfo}>
+            {/* The photo when the customer has one, their initial when not: a
+                face is quicker to match at the door than a name. A broken or
+                slow image falls back to the letter underneath it. */}
             <View style={s.customerAvatar}>
               <Text style={s.customerAvatarText}>{item.customer?.name?.[0] ?? '؟'}</Text>
+              {item.customer?.avatar_url ? (
+                <Image source={{ uri: item.customer.avatar_url }} style={s.customerAvatarImg} />
+              ) : null}
             </View>
             <View style={{ flex: 1 }}>
               <View style={s.customerNameRow}>
@@ -402,13 +440,56 @@ export default function DriverOrdersScreen() {
             <View style={s.detailChip}>
               <Text style={s.detailChipLabel}>{item.service_type?.includes('+') ? item.service_type.split('+').map((s: string) => serviceLabel[s.trim()] ?? s.trim()).join(' + ') : (serviceLabel[item.service_type] ?? item.service_type)}</Text>
             </View>
-            <View style={s.detailChip}>
-              <Text style={s.detailChipLabel}>{item.items_count} قطعة</Text>
-            </View>
+            {(() => {
+              const lines = Array.isArray(item.items) ? item.items : []
+              const open = !!openItems[item.id]
+              // nothing to fold out for an order saved without its item list
+              if (lines.length === 0) {
+                return (
+                  <View style={s.detailChip}>
+                    <Text style={s.detailChipLabel}>{item.items_count} قطعة</Text>
+                  </View>
+                )
+              }
+              return (
+                <TouchableOpacity
+                  onPress={() => toggleItems(item.id)}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: open }}
+                  accessibilityLabel={`${item.items_count} قطعة، ${open ? 'إخفاء' : 'عرض'} التفاصيل`}
+                  style={[s.detailChip, s.itemsChip, open && s.itemsChipOpen]}
+                >
+                  <Text style={[s.detailChipLabel, open && { color: colors.primary }]}>{item.items_count} قطعة</Text>
+                  <Text style={[s.itemsChevron, open && { color: colors.primary }]}>{open ? '⌃' : '⌄'}</Text>
+                </TouchableOpacity>
+              )
+            })()}
             <View style={[s.detailChip, { backgroundColor: colors.primaryGlow, borderColor: colors.primary + '30' }]}>
               <Text style={[s.detailChipLabel, { color: colors.primary }]}>{item.total?.toFixed(2)} ج.م</Text>
             </View>
           </View>
+
+          {openItems[item.id] && Array.isArray(item.items) && item.items.length > 0 ? (
+            <ScrollView
+              style={s.itemsBox}
+              contentContainerStyle={s.itemsBoxInner}
+              nestedScrollEnabled
+              showsVerticalScrollIndicator={false}
+            >
+              {item.items.map((line: any, i: number) => (
+                <View key={i} style={[s.itemLine, i > 0 && s.itemLineDivided]}>
+                  <Text style={s.itemLineName} numberOfLines={2}>{line?.name ?? '—'}</Text>
+                  {/* a rug is sold by the square metre, so its measurement is the
+                      thing the driver has to check, not a piece count */}
+                  {line?.size ? <Text style={s.itemLineSize}>{line.size} م</Text> : null}
+                  <Text style={s.itemLineQty}>
+                    {line?.size ? `${line?.quantity ?? 0} م²` : `×${line?.quantity ?? 0}`}
+                  </Text>
+                </View>
+              ))}
+            </ScrollView>
+          ) : null}
 
           <View style={s.paymentRow}>
             <View style={s.paymentItem}>
@@ -520,6 +601,25 @@ export default function DriverOrdersScreen() {
         </TouchableOpacity>
       </Animated.View>
 
+      <View style={s.searchRow}>
+        <Search size={16} color={colors.navy[300]} />
+        <TextInput
+          style={s.searchInput}
+          value={query}
+          onChangeText={setQuery}
+          placeholder="اسم العميل · كود العميل · رقم الطلب · الموبايل"
+          placeholderTextColor={colors.navy[300]}
+          textAlign="right"
+          returnKeyType="search"
+          autoCorrect={false}
+        />
+        {query.length > 0 && (
+          <TouchableOpacity onPress={() => setQuery('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <X size={16} color={colors.navy[300]} />
+          </TouchableOpacity>
+        )}
+      </View>
+
       {filter === 'pickup' && pickupOrders.length > 0 && (
         <View style={s.subFilterRow}>
           {([
@@ -562,8 +662,15 @@ export default function DriverOrdersScreen() {
         </Animated.View>
       ) : filteredOrders.length === 0 ? (
         <Animated.View entering={FadeInDown.duration(500).delay(300)} style={s.emptyCard}>
-          <Text style={s.emptyIcon}>{filter === 'pickup' ? '📦' : filter === 'delivery' ? '🚗' : '📋'}</Text>
-          <Text style={s.emptyText}>{filter === 'pickup' ? 'لا توجد طلبات للاستلام' : filter === 'delivery' ? 'لا توجد طلبات للتوصيل' : 'لا توجد طلبات مكتملة'}</Text>
+          {/* An empty search is a different dead end from an empty tab, and the
+              driver needs to know which one he is looking at. */}
+          <Text style={s.emptyIcon}>{q ? '🔍' : filter === 'pickup' ? '📦' : filter === 'delivery' ? '🚗' : '📋'}</Text>
+          <Text style={s.emptyText}>{q
+            ? `مفيش نتيجة لـ "${query.trim()}"`
+            : filter === 'pickup' ? 'لا توجد طلبات للاستلام' : filter === 'delivery' ? 'لا توجد طلبات للتوصيل' : 'لا توجد طلبات مكتملة'}</Text>
+          {q ? (
+            <Text style={s.emptyHint}>البحث بيدوّر في تبويب «{filter === 'pickup' ? 'استلام' : filter === 'delivery' ? 'توصيل' : 'مكتمل'}» بس — جرّب تبويب تاني</Text>
+          ) : null}
           {filter === 'delivery' && orders.some(o => o.status === 'processing') && (
             <Text style={s.emptyHint}>⏳ {orders.filter(o => o.status === 'processing').length} طلبات في المغسلة — ستظهر هنا لما تجهز</Text>
           )}
@@ -595,6 +702,12 @@ const s = StyleSheet.create({
   },
   headerAvatarText: { fontSize: 18, color: '#fff', fontWeight: '800' },
 
+  searchRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: colors.navy[800], borderWidth: 1, borderColor: colors.navy[700],
+    borderRadius: 14, paddingHorizontal: 14, height: 46, marginBottom: 10,
+  },
+  searchInput: { flex: 1, color: '#fff', fontSize: 13.5, padding: 0 },
   filterRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
   filterBtn: { flex: 1, paddingVertical: 10, borderRadius: 14, alignItems: 'center', backgroundColor: colors.navy[800], borderWidth: 1, borderColor: colors.navy[700] },
   filterActive: { backgroundColor: colors.primary + '20', borderColor: colors.primary },
@@ -623,6 +736,7 @@ const s = StyleSheet.create({
     backgroundColor: colors.accent + '25', justifyContent: 'center', alignItems: 'center',
   },
   customerAvatarText: { fontSize: 16, fontWeight: '700', color: colors.accent },
+  customerAvatarImg: { ...StyleSheet.absoluteFillObject, borderRadius: 20 },
   customerNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   customerName: { fontSize: 14, color: '#fff', fontWeight: '700', flexShrink: 1 },
   // Monospaced so CLN-00007 and CLN-00070 cannot be misread off a bag label.
@@ -663,6 +777,18 @@ const s = StyleSheet.create({
     borderRadius: 10, borderWidth: 1, borderColor: colors.navy[600],
   },
   detailChipLabel: { fontSize: 12, color: colors.navy[100], fontWeight: '600' },
+  itemsChip: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  itemsChipOpen: { backgroundColor: colors.primaryGlow, borderColor: colors.primary + '40' },
+  itemsChevron: { fontSize: 13, lineHeight: 15, color: colors.navy[200], fontWeight: '700' },
+
+  // capped so a twenty-line order scrolls inside the card instead of stretching it
+  itemsBox: { maxHeight: 190, marginBottom: 8, backgroundColor: colors.navy[700] + '55', borderRadius: 12, borderWidth: 1, borderColor: colors.navy[600] },
+  itemsBoxInner: { paddingHorizontal: 12, paddingVertical: 4 },
+  itemLine: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
+  itemLineDivided: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.navy[600] },
+  itemLineName: { flex: 1, minWidth: 0, fontSize: 12.5, color: colors.navy[100], fontWeight: '600' },
+  itemLineSize: { fontSize: 11.5, color: colors.primary, fontWeight: '700' },
+  itemLineQty: { fontSize: 12, color: colors.navy[200], fontWeight: '700', minWidth: 46, textAlign: 'left' },
 
   paymentRow: {
     flexDirection: 'row', gap: 12, marginTop: 8, marginBottom: 4,

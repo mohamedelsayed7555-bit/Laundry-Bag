@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Image, Animated } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { TriangleAlert, Shirt, Plus, Minus, Check } from 'lucide-react-native'
+import { TriangleAlert, Shirt, Plus, Minus, Check, Ruler } from 'lucide-react-native'
+import SizeSheet, { parseSize, type SizePick } from '../../src/components/SizeSheet'
 import { useBrand, Card, Chip, Stepper, IconButton, BackIcon, FlowLines, money, F, SIZE, HIT, useStickyHeader, StickyBar } from '../../src/components/brand'
 import { PrimaryButton, SecondaryButton } from '../../src/components/auth/ui'
 import { useLocalSearchParams, useRouter } from 'expo-router'
@@ -33,7 +34,28 @@ const SERVICE_IMG: Record<string, any> = {
   accessories: require('../../assets/services/shop.webp'),
 }
 
-type OrderItem = { name: string; service_type: string; quantity: number; price: number }
+type OrderItem = {
+  name: string
+  service_type: string
+  /** pieces — or whole square metres on a line the catalogue prices by area */
+  quantity: number
+  price: number
+  size?: string
+  area?: number
+}
+
+/** A saved order keeps the measurement but not the per-piece area, so it is
+ *  worked back out of the size the same way the picker rounded it. */
+function areaOfSize(size?: string | null) {
+  const { l, w } = parseSize(size)
+  const a = Math.ceil(parseFloat(l) * parseFloat(w))
+  return Number.isFinite(a) && a > 0 ? a : 0
+}
+const stepOf = (item: OrderItem) => (item.area && item.area > 0 ? item.area : areaOfSize(item.size))
+const piecesOf = (item: OrderItem) => {
+  const st = stepOf(item)
+  return st > 0 ? Math.max(1, Math.round(item.quantity / st)) : item.quantity
+}
 
 export default function EditOrderScreen() {
   const b = useBrand()
@@ -53,6 +75,7 @@ export default function EditOrderScreen() {
   const [categories, setCategories] = useState<any[]>([])
   const [selectedService, setSelectedService] = useState('')
   const [activeCatId, setActiveCatId] = useState<string | null>(null)
+  const [sizeFor, setSizeFor] = useState<{ itemType: string; index: number | null } | null>(null)
 
   useEffect(() => {
     loadData()
@@ -61,7 +84,7 @@ export default function EditOrderScreen() {
   async function loadData() {
     const [orderRes, pricesRes, catsRes] = await Promise.all([
       supabase.from('orders').select('id, order_number, status, items, items_count, subtotal, total, discount, delivery_fee, subscription_id, service_type, payment_method, payment_status').eq('id', id).eq('customer_id', profile!.id).single(),
-      supabase.from('prices').select('id, item_type, service_type, price, category_id').eq('is_active', true).limit(200),
+      supabase.from('prices').select('id, item_type, service_type, price, category_id, unit').eq('is_active', true).limit(200),
       supabase.from('categories').select('id, name, icon, sort_order').eq('is_active', true).order('sort_order'),
     ])
 
@@ -79,6 +102,9 @@ export default function EditOrderScreen() {
 
   const getPrice = (itemType: string, serviceType: string) => {
     return prices.find(p => p.item_type === itemType && p.service_type === serviceType)?.price ?? 0
+  }
+  const getUnit = (itemType: string, serviceType: string) => {
+    return prices.find(p => p.item_type === itemType && p.service_type === serviceType)?.unit ?? 'piece'
   }
 
   // Services that actually have prices, and the categories/items for the chosen service —
@@ -115,7 +141,9 @@ export default function EditOrderScreen() {
     const unitPrice = getPrice(itemType, selectedService)
     if (!selectedService || unitPrice === 0) return
     setCart(prev => {
-      const existing = prev.findIndex(c => c.name === itemType && c.service_type === selectedService)
+      // a by-area line is identified by its measurement too, so two rugs of the
+      // same kind in different sizes stay two lines
+      const existing = prev.findIndex(c => c.name === itemType && c.service_type === selectedService && !c.size)
       if (existing >= 0) {
         const updated = [...prev]
         updated[existing] = { ...updated[existing], quantity: updated[existing].quantity + 1 }
@@ -127,12 +155,36 @@ export default function EditOrderScreen() {
 
   const removeFromCart = (index: number) => setCart(cart.filter((_, i) => i !== index))
 
+  /** `delta` is in pieces; a by-area line moves by one whole piece's area. */
   const updateQty = (index: number, delta: number) => {
     setCart(prev => prev.map((item, i) => {
       if (i !== index) return item
-      const newQty = item.quantity + delta
-      return newQty < 1 ? item : { ...item, quantity: newQty }
+      const step = stepOf(item) || 1
+      const newQty = item.quantity + delta * step
+      return newQty < 1 || newQty > 500 ? item : { ...item, quantity: newQty }
     }))
+  }
+
+  const handleSizePick = ({ size, area, count }: SizePick) => {
+    const target = sizeFor
+    setSizeFor(null)
+    if (!target || !selectedService) return
+    const unitPrice = getPrice(target.itemType, selectedService)
+    if (unitPrice === 0) return
+    setCart(prev => {
+      const rest = target.index !== null ? prev.filter((_, i) => i !== target.index) : prev
+      const line: OrderItem = {
+        name: target.itemType, service_type: selectedService,
+        quantity: area * count, price: unitPrice, size, area,
+      }
+      const same = rest.findIndex(c => c.name === line.name && c.service_type === line.service_type && c.size === line.size)
+      if (same >= 0) {
+        const updated = [...rest]
+        updated[same] = { ...updated[same], quantity: Math.min(500, updated[same].quantity + line.quantity) }
+        return updated
+      }
+      return [...rest, line]
+    })
   }
 
   const totalPrice = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
@@ -201,7 +253,7 @@ export default function EditOrderScreen() {
     // The server re-prices the items, adjusts the plan balance and works out any amount still due.
     const { data: result, error } = await supabase.rpc('edit_order_items', {
       p_order_id: id,
-      p_items: cart.map(i => ({ name: i.name, service_type: i.service_type, quantity: i.quantity })),
+      p_items: cart.map(i => ({ name: i.name, service_type: i.service_type, quantity: i.quantity, size: i.size ?? null })),
     })
 
     if (error || !result) {
@@ -296,21 +348,29 @@ export default function EditOrderScreen() {
         {/* Current items */}
         <Card style={n.card}>
           <Text style={[n.eyebrow, { color: b.muted }]}>{isEn ? `Items (${totalItems})` : `القطع (${totalItems})`}</Text>
-          {cart.map((item, i) => (
-            <View key={i} style={[n.item, i > 0 && { borderTopWidth: 1, borderTopColor: b.divider }]}>
-              <View style={[n.thumb, { backgroundColor: b.iconTile }]}><Shirt size={18} color={b.accentIcon} /></View>
-              <View style={n.itemInfo}>
-                <Text style={[n.itemName, { color: b.ink }]} numberOfLines={1}>{itemName(item.name)} — {serviceLabel(item.service_type)}</Text>
-                <Text style={[n.itemSub, { color: b.muted }]}>{item.quantity} × {money(item.price)} = {money(item.quantity * item.price)} {cur}</Text>
+          {cart.map((item, i) => {
+            const step = stepOf(item)
+            const pieces = piecesOf(item)
+            return (
+              <View key={i} style={[n.item, i > 0 && { borderTopWidth: 1, borderTopColor: b.divider }]}>
+                <View style={[n.thumb, { backgroundColor: b.iconTile }]}><Shirt size={18} color={b.accentIcon} /></View>
+                <View style={n.itemInfo}>
+                  <Text style={[n.itemName, { color: b.ink }]} numberOfLines={1}>
+                    {itemName(item.name)}{item.size ? ` · ${item.size} ${isEn ? 'm' : 'م'}` : ''} — {serviceLabel(item.service_type)}
+                  </Text>
+                  <Text style={[n.itemSub, { color: b.muted }]}>
+                    {item.quantity}{step > 0 ? ` ${isEn ? 'm²' : 'م²'}` : ''} × {money(item.price)} = {money(item.quantity * item.price)} {cur}
+                  </Text>
+                </View>
+                <Stepper
+                  qty={pieces}
+                  onMinus={() => { if (step > 0 && pieces <= 1) removeFromCart(i); else updateQty(i, -1) }}
+                  onPlus={() => updateQty(i, 1)}
+                  onRemove={() => removeFromCart(i)}
+                />
               </View>
-              <Stepper
-                qty={item.quantity}
-                onMinus={() => updateQty(i, -1)}
-                onPlus={() => updateQty(i, 1)}
-                onRemove={() => removeFromCart(i)}
-              />
-            </View>
-          ))}
+            )
+          })}
         </Card>
 
         {/* Service type */}
@@ -368,17 +428,38 @@ export default function EditOrderScreen() {
               <Card key={cat.id} pad={false} style={n.itemsCard}>
                 {cat.itemTypes.map((itemType, idx) => {
                   const price = getPrice(itemType, selectedService)
-                  const inCartIdx = cart.findIndex(c => c.name === itemType && c.service_type === selectedService)
+                  const bySqm = getUnit(itemType, selectedService) === 'sqm'
+                  // a by-area item's lines live in the "Items" card above, each
+                  // with its own measurement, so this row only opens the picker
+                  const inCartIdx = bySqm
+                    ? -1
+                    : cart.findIndex(c => c.name === itemType && c.service_type === selectedService && !c.size)
                   const inCart = inCartIdx >= 0 ? cart[inCartIdx] : null
+                  const used = bySqm
+                    ? cart.some(c => c.name === itemType && c.service_type === selectedService)
+                    : !!inCart
                   return (
-                    <View key={itemType} style={[n.pickRow, idx > 0 && { borderTopWidth: 1, borderTopColor: b.divider }, inCart ? { backgroundColor: b.isDark ? 'rgba(14,165,233,0.08)' : '#F0F8FF' } : null]}>
+                    <View key={itemType} style={[n.pickRow, idx > 0 && { borderTopWidth: 1, borderTopColor: b.divider }, used ? { backgroundColor: b.isDark ? 'rgba(14,165,233,0.08)' : '#F0F8FF' } : null]}>
                       <View style={n.pickBody}>
                         <Text style={[n.pickName, { color: b.ink }]} numberOfLines={1}>{itemName(itemType)}</Text>
                         <Text style={[n.pickPrice, { color: b.muted }]} numberOfLines={1}>
-                          <Text style={[n.pickPriceNum, { color: b.isDark ? '#38BDF8' : '#0284C7' }]}>{money(price)}</Text> {cur} · {isEn ? 'per piece' : 'لكل قطعة'}
+                          <Text style={[n.pickPriceNum, { color: b.isDark ? '#38BDF8' : '#0284C7' }]}>{money(price)}</Text> {cur} · {bySqm
+                            ? (isEn ? 'per square metre' : 'للمتر المربع')
+                            : (isEn ? 'per piece' : 'لكل قطعة')}
                         </Text>
                       </View>
-                      {inCart ? (
+                      {bySqm ? (
+                        <TouchableOpacity
+                          onPress={() => setSizeFor({ itemType, index: null })}
+                          hitSlop={HIT}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${isEn ? 'Choose size' : 'اختار المقاس'} — ${itemName(itemType)}`}
+                          style={[n.sizeBtn, { backgroundColor: b.primary }]}
+                        >
+                          <Ruler size={14} color="#fff" />
+                          <Text style={n.sizeBtnText}>{isEn ? 'Choose size' : 'اختار المقاس'}</Text>
+                        </TouchableOpacity>
+                      ) : inCart ? (
                         <Stepper
                           qty={inCart.quantity}
                           onMinus={() => updateQty(inCartIdx, -1)}
@@ -439,6 +520,18 @@ export default function EditOrderScreen() {
         </View>
       </View>
     </View>
+    {sizeFor ? (
+      <SizeSheet
+        visible
+        itemName={itemName(sizeFor.itemType)}
+        unitPrice={getPrice(sizeFor.itemType, selectedService)}
+        initial={sizeFor.index !== null && cart[sizeFor.index]
+          ? { size: cart[sizeFor.index].size, count: piecesOf(cart[sizeFor.index]) }
+          : null}
+        onAdd={handleSizePick}
+        onDismiss={() => setSizeFor(null)}
+      />
+    ) : null}
     {AlertComponent}
     </>
   )
@@ -495,4 +588,6 @@ const n = StyleSheet.create({
   pickPrice: { fontSize: 11.5, fontFamily: F.medium, marginTop: 2 },
   pickPriceNum: { fontSize: 13.5, fontFamily: F.display },
   plusBtn: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  sizeBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, height: 36, borderRadius: 12, paddingHorizontal: 11 },
+  sizeBtnText: { color: '#fff', fontSize: 12.5, fontFamily: F.bold },
 })

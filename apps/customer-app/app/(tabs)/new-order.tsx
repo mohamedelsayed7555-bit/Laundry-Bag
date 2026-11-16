@@ -4,9 +4,10 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withSequence, withTiming } from 'react-native-reanimated'
-import { MapPin, Plus, Check, Lock, Crown, Settings2 } from 'lucide-react-native'
+import { MapPin, Plus, Check, Lock, Crown, Settings2, Ruler } from 'lucide-react-native'
 import { useAuth } from '../../src/contexts/AuthContext'
 import { useCart } from '../../src/contexts/CartContext'
+import SizeSheet, { type SizePick } from '../../src/components/SizeSheet'
 import { useLanguage } from '../../src/contexts/LanguageContext'
 import { useCustomAlert } from '../../src/components/CustomAlert'
 import { SkeletonPage } from '../../src/components/Skeleton'
@@ -168,7 +169,7 @@ export default function NewOrderScreen() {
 
   const loadData = useCallback(async () => {
     const [pricesRes, catsRes, settingsRes] = await Promise.all([
-      supabase.from('prices').select('id, item_type, service_type, price, category_id').eq('is_active', true),
+      supabase.from('prices').select('id, item_type, service_type, price, category_id, unit').eq('is_active', true),
       supabase.from('categories').select('id, name, icon, sort_order').eq('is_active', true).order('sort_order'),
       supabase.from('settings').select('key, value').in('key', ['open_hour', 'close_hour', 'working_hours_enabled']),
     ])
@@ -242,6 +243,13 @@ export default function NewOrderScreen() {
     return prices.find(p => p.item_type === itemType && p.service_type === serviceType)?.price ?? 0
   }, [prices])
 
+  // 'sqm' means the price is per square metre, so the row asks for a measurement
+  // instead of offering a plus button. Anything the catalogue has not marked is
+  // a piece, including a row saved before the column existed.
+  const getUnit = useCallback((itemType: string, serviceType: string) => {
+    return prices.find(p => p.item_type === itemType && p.service_type === serviceType)?.unit ?? 'piece'
+  }, [prices])
+
   const availableServicesForScreen = useMemo(() => {
     const activeServiceKeys = [...new Set(prices.map(p => p.service_type))]
     return services.filter(s => activeServiceKeys.includes(s.key))
@@ -274,15 +282,44 @@ export default function NewOrderScreen() {
   }, [categoriesWithItems])
 
   const [justAdded, setJustAdded] = useState<string | null>(null)
+  // which item the size sheet is open for, and the cart line it is editing
+  const [sizeFor, setSizeFor] = useState<{ itemType: string; index: number | null } | null>(null)
+
+  const flashAdded = (itemType: string) => {
+    setJustAdded(itemType)
+    setTimeout(() => setJustAdded(null), 800)
+  }
 
   const handleAddItem = (itemType: string) => {
     if (!selectedService) return
     const unitPrice = getPrice(itemType, selectedService)
     if (unitPrice === 0) return
     addItem({ name: itemType, service_type: selectedService, quantity: 1, price: unitPrice })
-    setJustAdded(itemType)
-    setTimeout(() => setJustAdded(null), 800)
+    flashAdded(itemType)
   }
+
+  /**
+   * The line's quantity is its total area, so editing a size rebuilds the line
+   * rather than patching it: the measurement is part of what identifies it, and
+   * a size changed into one already in the cart should join that line.
+   */
+  const handleSizePick = ({ size, area, count }: SizePick) => {
+    const target = sizeFor
+    setSizeFor(null)
+    if (!target || !selectedService) return
+    const unitPrice = getPrice(target.itemType, selectedService)
+    if (unitPrice === 0) return
+    if (target.index !== null) removeItem(target.index)
+    addItem({
+      name: target.itemType, service_type: selectedService,
+      quantity: area * count, price: unitPrice, size, area,
+    })
+    flashAdded(target.itemType)
+  }
+
+  // how many whole pieces a by-area line stands for
+  const piecesOf = (line: { quantity: number; area?: number }) =>
+    line.area && line.area > 0 ? Math.max(1, Math.round(line.quantity / line.area)) : 1
 
   const catName = (name: string) => locale === 'en' ? (t(`cat:${name}`) !== `cat:${name}` ? t(`cat:${name}`) : name) : name
   const itemName = (name: string) => locale === 'en' ? (t(`item:${name}`) !== `item:${name}` ? t(`item:${name}`) : name) : name
@@ -459,47 +496,101 @@ export default function NewOrderScreen() {
               <Card key={cat.id} pad={false} style={s.itemsCard}>
                 {cat.itemTypes.map((itemType: string, idx: number) => {
                   const price = getPrice(itemType, selectedService)
-                  const inCart = cart.find(c => c.name === itemType && c.service_type === selectedService)
+                  const bySqm = getUnit(itemType, selectedService) === 'sqm'
+                  // a by-area item can hold several lines at once, one per size
+                  const sizeLines = bySqm
+                    ? cart.map((c, i) => ({ c, i })).filter(({ c }) => c.name === itemType && c.service_type === selectedService)
+                    : []
+                  const inCart = bySqm ? undefined : cart.find(c => c.name === itemType && c.service_type === selectedService)
                   const isFirst = idx === 0
-                  const tinted = !!inCart || justAdded === itemType
+                  const tinted = (bySqm ? sizeLines.length > 0 : !!inCart) || justAdded === itemType
                   return (
                     <View
                       key={itemType}
-                      style={[s.itemRow, idx > 0 && { borderTopWidth: 1, borderTopColor: b.divider }, tinted && { backgroundColor: inCartTint }]}
+                      style={[idx > 0 && { borderTopWidth: 1, borderTopColor: b.divider }, tinted && { backgroundColor: inCartTint }]}
                     >
-                      <View style={s.itemBody}>
-                        <View style={s.itemNameRow}>
-                          <Text style={[s.itemName, { color: b.ink }]} numberOfLines={1}>{itemName(itemType)}</Text>
-                          {isFirst && <Pill tone="warn" label={locale === 'en' ? '🔥 Most ordered' : '🔥 الأكثر طلباً'} />}
+                      <View style={s.itemRow}>
+                        <View style={s.itemBody}>
+                          <View style={s.itemNameRow}>
+                            <Text style={[s.itemName, { color: b.ink }]} numberOfLines={1}>{itemName(itemType)}</Text>
+                            {isFirst && <Pill tone="warn" label={locale === 'en' ? '🔥 Most ordered' : '🔥 الأكثر طلباً'} />}
+                          </View>
+                          <Text style={[s.itemPrice, { color: b.muted }]} numberOfLines={1}>
+                            <Text style={[s.itemPriceNum, { color: b.isDark ? '#38BDF8' : '#0284C7' }]}>{money(price)}</Text>
+                            {' '}{t('currency')} · {bySqm
+                              ? (locale === 'en' ? 'per square metre' : 'للمتر المربع')
+                              : (locale === 'en' ? 'per piece' : 'لكل قطعة')}
+                          </Text>
                         </View>
-                        <Text style={[s.itemPrice, { color: b.muted }]} numberOfLines={1}>
-                          <Text style={[s.itemPriceNum, { color: b.isDark ? '#38BDF8' : '#0284C7' }]}>{money(price)}</Text>
-                          {' '}{t('currency')} · {locale === 'en' ? 'per piece' : 'لكل قطعة'}
-                        </Text>
+                        {bySqm ? (
+                          <TouchableOpacity
+                            onPress={() => !closed && setSizeFor({ itemType, index: null })}
+                            disabled={closed}
+                            hitSlop={HIT}
+                            accessibilityRole="button"
+                            accessibilityLabel={`${locale === 'en' ? 'Choose size' : 'اختار المقاس'} — ${itemName(itemType)}`}
+                            style={[
+                              s.sizeBtn,
+                              { backgroundColor: closed ? b.disabled : b.primary },
+                              !closed && { shadowColor: b.primary, shadowOpacity: 0.35, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
+                            ]}
+                          >
+                            <Ruler size={14} color="#fff" />
+                            <Text style={s.sizeBtnText}>{locale === 'en' ? 'Choose size' : 'اختار المقاس'}</Text>
+                          </TouchableOpacity>
+                        ) : inCart ? (
+                          <Stepper
+                            qty={inCart.quantity}
+                            onRemove={() => { const i = cart.indexOf(inCart); removeItem(i) }}
+                            onMinus={() => { const i = cart.indexOf(inCart); updateQuantity(i, inCart.quantity - 1) }}
+                            onPlus={() => { const i = cart.indexOf(inCart); updateQuantity(i, inCart.quantity + 1) }}
+                          />
+                        ) : (
+                          <TouchableOpacity
+                            onPress={() => !closed && handleAddItem(itemType)}
+                            disabled={closed}
+                            hitSlop={HIT}
+                            accessibilityRole="button"
+                            accessibilityLabel={`+ ${itemName(itemType)}`}
+                            style={[
+                              s.addBtn,
+                              { backgroundColor: closed ? b.disabled : b.primary },
+                              !closed && { shadowColor: b.primary, shadowOpacity: 0.35, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
+                            ]}
+                          >
+                            <Plus size={18} color="#fff" />
+                          </TouchableOpacity>
+                        )}
                       </View>
-                      {inCart ? (
-                        <Stepper
-                          qty={inCart.quantity}
-                          onRemove={() => { const i = cart.indexOf(inCart); removeItem(i) }}
-                          onMinus={() => { const i = cart.indexOf(inCart); updateQuantity(i, inCart.quantity - 1) }}
-                          onPlus={() => { const i = cart.indexOf(inCart); updateQuantity(i, inCart.quantity + 1) }}
-                        />
-                      ) : (
-                        <TouchableOpacity
-                          onPress={() => !closed && handleAddItem(itemType)}
-                          disabled={closed}
-                          hitSlop={HIT}
-                          accessibilityRole="button"
-                          accessibilityLabel={`+ ${itemName(itemType)}`}
-                          style={[
-                            s.addBtn,
-                            { backgroundColor: closed ? b.disabled : b.primary },
-                            !closed && { shadowColor: b.primary, shadowOpacity: 0.35, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
-                          ]}
-                        >
-                          <Plus size={18} color="#fff" />
-                        </TouchableOpacity>
-                      )}
+
+                      {sizeLines.map(({ c, i }) => {
+                        const pieces = piecesOf(c)
+                        const step = c.area && c.area > 0 ? c.area : 1
+                        return (
+                          <View key={`${c.size ?? ''}-${i}`} style={[s.sizeLine, { borderTopColor: b.divider }]}>
+                            <TouchableOpacity
+                              onPress={() => setSizeFor({ itemType, index: i })}
+                              style={s.sizeLineBody}
+                              accessibilityRole="button"
+                              accessibilityLabel={`${locale === 'en' ? 'Edit size' : 'تعديل المقاس'} ${c.size ?? ''}`}
+                            >
+                              <Text style={[s.sizeLineDim, { color: b.ink2 }]} numberOfLines={1}>
+                                {c.size} {locale === 'en' ? 'm' : 'م'}
+                                {pieces > 1 ? ` · ${pieces} ${locale === 'en' ? 'pieces' : 'قطع'}` : ''}
+                              </Text>
+                              <Text style={[s.sizeLineMeta, { color: b.muted }]} numberOfLines={1}>
+                                {c.quantity} {locale === 'en' ? 'm²' : 'م²'} · {money(c.price * c.quantity)} {t('currency')}
+                              </Text>
+                            </TouchableOpacity>
+                            <Stepper
+                              qty={pieces}
+                              onRemove={() => removeItem(i)}
+                              onMinus={() => { if (pieces <= 1) removeItem(i); else updateQuantity(i, c.quantity - step) }}
+                              onPlus={() => { if (c.quantity + step <= 500) updateQuantity(i, c.quantity + step) }}
+                            />
+                          </View>
+                        )
+                      })}
                     </View>
                   )
                 })}
@@ -553,6 +644,19 @@ export default function NewOrderScreen() {
           </View>
         </Animated.View>
       )}
+
+      {sizeFor ? (
+        <SizeSheet
+          visible
+          itemName={itemName(sizeFor.itemType)}
+          unitPrice={getPrice(sizeFor.itemType, selectedService)}
+          initial={sizeFor.index !== null && cart[sizeFor.index]
+            ? { size: cart[sizeFor.index].size, count: piecesOf(cart[sizeFor.index]) }
+            : null}
+          onAdd={handleSizePick}
+          onDismiss={() => setSizeFor(null)}
+        />
+      ) : null}
 
       {AlertComponent}
     </>
@@ -621,6 +725,12 @@ const s = StyleSheet.create({
   itemPrice: { fontSize: 11.5, fontFamily: F.medium, marginTop: 2 },
   itemPriceNum: { fontSize: 13.5, fontFamily: F.display },
   addBtn: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  sizeBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, height: 36, borderRadius: 12, paddingHorizontal: 11 },
+  sizeBtnText: { color: '#fff', fontSize: 12.5, fontFamily: F.bold },
+  sizeLine: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth },
+  sizeLineBody: { flex: 1, minWidth: 0 },
+  sizeLineDim: { fontSize: 13, fontFamily: F.semibold },
+  sizeLineMeta: { fontSize: 11.5, fontFamily: F.medium, marginTop: 1 },
 
   floatingBar: { position: 'absolute', left: 12, right: 12 },
   barRing: { borderRadius: 22, padding: 4 },

@@ -7,7 +7,7 @@ import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
 import { SERVICE_TYPE_LABELS } from '@cleano/shared-types'
 import type { ServiceType } from '@cleano/shared-types'
-import { Plus, Edit2, Power, Tag, Layers, Sparkles, AlertTriangle, Users, Crown, ArrowLeft } from 'lucide-react'
+import { Plus, Edit2, Power, Tag, Layers, Sparkles, AlertTriangle, Users, Crown, ArrowLeft, Search, X } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useToast } from '@/components/ui/Toast'
 import Tooltip from '@/components/ui/Tooltip'
@@ -27,13 +27,15 @@ export default function PricesPage() {
   const [showAdd, setShowAdd] = useState(false)
   const [editItem, setEditItem] = useState<any>(null)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ item_type: '', service_type: 'wash', price: 0, category_id: '' })
+  const [form, setForm] = useState({ item_type: '', service_type: 'wash', price: 0, category_id: '', unit: 'piece' })
   const [catForm, setCatForm] = useState({ name: '', icon: '👕', sort_order: 0 })
   const [showAddCat, setShowAddCat] = useState(false)
   const [editCat, setEditCat] = useState<any>(null)
   const [editSvc, setEditSvc] = useState<any>(null)
   const [svcForm, setSvcForm] = useState({ name_ar: '', icon: '🧺', sort_order: 0 })
   const [svcImpact, setSvcImpact] = useState<any>(null)
+  const [query, setQuery] = useState('')
+  const [svcFilter, setSvcFilter] = useState('all')
   const { toast } = useToast()
   const { hasPermission } = useAuth()
 
@@ -50,7 +52,7 @@ export default function PricesPage() {
 
   async function loadData() {
     const [pRes, cRes, sRes] = await Promise.all([
-      supabase.from('prices').select('id, item_type, service_type, price, is_active, category_id, categories(name)').order('item_type').order('price'),
+      supabase.from('prices').select('id, item_type, service_type, price, is_active, category_id, unit, categories(name)').order('item_type').order('price'),
       supabase.from('categories').select('*').order('sort_order'),
       supabase.from('services').select('*').order('sort_order'),
     ])
@@ -66,16 +68,16 @@ export default function PricesPage() {
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
-    const { error } = await supabase.from('prices').insert({ item_type: form.item_type, service_type: form.service_type, price: form.price, category_id: form.category_id || null, is_active: true })
+    const { error } = await supabase.from('prices').insert({ item_type: form.item_type, service_type: form.service_type, price: form.price, category_id: form.category_id || null, unit: form.unit, is_active: true })
     setSaving(false)
-    if (!error) { setShowAdd(false); setForm({ item_type: '', service_type: 'wash', price: 0, category_id: '' }); loadData(); toast('تم إضافة السعر بنجاح') }
+    if (!error) { setShowAdd(false); setForm({ item_type: '', service_type: 'wash', price: 0, category_id: '', unit: 'piece' }); loadData(); toast('تم إضافة السعر بنجاح') }
     else { toast('حدث خطأ أثناء الإضافة', 'error') }
   }
 
   async function handleEdit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
-    const { error } = await supabase.from('prices').update({ item_type: form.item_type, service_type: form.service_type, price: form.price, category_id: form.category_id || null }).eq('id', editItem.id)
+    const { error } = await supabase.from('prices').update({ item_type: form.item_type, service_type: form.service_type, price: form.price, category_id: form.category_id || null, unit: form.unit }).eq('id', editItem.id)
     setSaving(false)
     if (!error) { setEditItem(null); loadData(); toast('تم تعديل السعر') }
     else { toast('حدث خطأ أثناء التعديل', 'error') }
@@ -90,7 +92,7 @@ export default function PricesPage() {
   }
 
   function openEdit(item: any) {
-    setForm({ item_type: item.item_type, service_type: item.service_type, price: item.price, category_id: item.category_id || '' })
+    setForm({ item_type: item.item_type, service_type: item.service_type, price: item.price, category_id: item.category_id || '', unit: item.unit ?? 'piece' })
     setEditItem(item)
   }
 
@@ -168,9 +170,43 @@ export default function PricesPage() {
     else { toast(error.message, 'error') }
   }
 
+  // --- Search ---------------------------------------------------------
+  // Arabic is typed loosely: أ/إ/آ for ا, ة for ه, ى for ي. Folding them means
+  // "قميص" finds the row whether or not the hamza was typed.
+  const fold = (v: string) =>
+    (v ?? '')
+      .replace(/[أإآ]/g, 'ا')
+      .replace(/ة/g, 'ه')
+      .replace(/ى/g, 'ي')
+      .replace(/[ً-ْـ]/g, '')
+      .toLowerCase()
+      .trim()
+
+  const svcLabel = (code: string) =>
+    services.find(s => s.code === code)?.name_ar
+    ?? SERVICE_TYPE_LABELS[code as ServiceType]
+    ?? code
+
+  const q = fold(query)
+  const shownPrices = prices.filter(p => {
+    if (svcFilter !== 'all' && p.service_type !== svcFilter) return false
+    if (!q) return true
+    return [p.item_type, p.categories?.name, svcLabel(p.service_type), String(p.price)]
+      .some(v => fold(String(v ?? '')).includes(q))
+  })
+  const shownCats = !q ? categories : categories.filter(c => fold(c.name).includes(q))
+  const shownSvcs = !q ? services : services.filter(sv => fold(sv.name_ar ?? sv.code).includes(q))
+
   // --- Columns ---
   const priceColumns = [
-    { key: 'item_type', label: 'نوع القطعة', render: (item: any) => <span className="font-semibold">{item.item_type}</span> },
+    { key: 'item_type', label: 'نوع القطعة', render: (item: any) => (
+      <span className="inline-flex items-center gap-1.5">
+        <span className="font-semibold">{item.item_type}</span>
+        {item.unit === 'sqm' && (
+          <span className="text-[10px] text-sky-700 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded whitespace-nowrap">م²</span>
+        )}
+      </span>
+    )},
     { key: 'category', label: 'التصنيف', render: (item: any) => (
       <span className="text-xs text-gray-400">{item.categories?.name ?? '—'}</span>
     )},
@@ -245,7 +281,25 @@ export default function PricesPage() {
         </select>
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1.5">السعر (ج.م) <span className="text-red-400">*</span></label>
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">السعر يتحسب بـ <span className="text-red-400">*</span></label>
+        <div className="flex gap-2">
+          {([['piece', 'القطعة'], ['sqm', 'المتر المربع']] as const).map(([val, label]) => (
+            <button key={val} type="button" onClick={() => setForm({ ...form, unit: val })}
+              className={`flex-1 p-2.5 rounded-xl text-sm font-semibold transition-all ${form.unit === val ? 'bg-primary-500 text-white' : 'bg-navy-50 text-gray-500 hover:bg-navy-100'}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+        {form.unit === 'sqm' && (
+          <p className="text-[11px] text-gray-400 mt-1.5 leading-5">
+            العميل هيختار طول وعرض القطعة والتطبيق يحسب المساحة ويضربها في السعر ده. التقريب لأعلى لأقرب متر.
+          </p>
+        )}
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">
+          السعر {form.unit === 'sqm' ? 'للمتر المربع' : 'للقطعة'} (ج.م) <span className="text-red-400">*</span>
+        </label>
         <input type="number" min={0} step={0.5} value={form.price} onChange={e => setForm({ ...form, price: +e.target.value })} required
           className="w-full p-3 border border-surface-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all" dir="ltr" />
       </div>
@@ -301,7 +355,7 @@ export default function PricesPage() {
           <p className="text-sm text-gray-400 mt-0.5">{prices.length} سعر · {categories.length} تصنيف · {services.length} خدمة</p>
         </div>
         {hasPermission('prices.create') && tab !== 'services' && (
-          <button onClick={() => tab === 'prices' ? (setForm({ item_type: '', service_type: 'wash', price: 0, category_id: '' }), setShowAdd(true)) : (setCatForm({ name: '', icon: '👕', sort_order: 0 }), setShowAddCat(true))}
+          <button onClick={() => tab === 'prices' ? (setForm({ item_type: '', service_type: 'wash', price: 0, category_id: '', unit: 'piece' }), setShowAdd(true)) : (setCatForm({ name: '', icon: '👕', sort_order: 0 }), setShowAddCat(true))}
             className="flex items-center gap-2 bg-gradient-to-l from-primary-500 to-primary-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:shadow-glow-green transition-all duration-300">
             <Plus size={16} /> {tab === 'prices' ? 'سعر جديد' : 'تصنيف جديد'}
           </button>
@@ -324,12 +378,49 @@ export default function PricesPage() {
         </button>
       </div>
 
+      {/* Search: the catalogue is 243 rows, so reaching one item by eye is a scroll.
+          The service dropdown narrows it to one service, which is how the price
+          of a given piece is actually looked up. */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[240px]">
+          <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder={tab === 'prices' ? 'ابحث باسم القطعة أو التصنيف أو الخدمة أو السعر' : 'ابحث بالاسم'}
+            className="w-full bg-surface-muted border border-surface-border rounded-xl py-2.5 pr-10 pl-9 text-sm outline-none focus:border-primary-500 transition-colors"
+          />
+          {query && (
+            <button onClick={() => setQuery('')} aria-label="مسح البحث"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              <X size={15} />
+            </button>
+          )}
+        </div>
+
+        {tab === 'prices' && (
+          <select value={svcFilter} onChange={e => setSvcFilter(e.target.value)}
+            className="bg-surface-muted border border-surface-border rounded-xl py-2.5 px-3 text-sm outline-none focus:border-primary-500 transition-colors">
+            <option value="all">كل الخدمات</option>
+            {(services.length ? services : Object.keys(SERVICE_TYPE_LABELS).map(code => ({ code, name_ar: null })))
+              .map((sv: any) => <option key={sv.code} value={sv.code}>{svcLabel(sv.code)}</option>)}
+          </select>
+        )}
+
+        {(query || svcFilter !== 'all') && (
+          <span className="text-xs text-gray-400">
+            {tab === 'prices' ? shownPrices.length : tab === 'categories' ? shownCats.length : shownSvcs.length} نتيجة
+          </span>
+        )}
+      </div>
+
       {loading ? <div className="flex items-center justify-center h-32"><div className="w-6 h-6 border-3 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>
         : tab === 'prices'
-          ? <DataTable columns={priceColumns} data={prices} emptyMessage="لا توجد أسعار" />
+          ? <DataTable columns={priceColumns} data={shownPrices} emptyMessage={query || svcFilter !== 'all' ? 'لا توجد نتائج مطابقة' : 'لا توجد أسعار'} />
           : tab === 'categories'
-            ? <DataTable columns={catColumns} data={categories} emptyMessage="لا توجد تصنيفات" />
-            : <DataTable columns={svcColumns} data={services} emptyMessage="لا توجد خدمات — طبّق migration services_table أولاً" />
+            ? <DataTable columns={catColumns} data={shownCats} emptyMessage={query ? 'لا توجد نتائج مطابقة' : 'لا توجد تصنيفات'} />
+            : <DataTable columns={svcColumns} data={shownSvcs} emptyMessage={query ? 'لا توجد نتائج مطابقة' : 'لا توجد خدمات — طبّق migration services_table أولاً'} />
       }
 
       {/* Price Modals */}
