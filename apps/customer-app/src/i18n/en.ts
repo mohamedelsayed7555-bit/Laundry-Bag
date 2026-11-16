@@ -414,6 +414,8 @@ export default {
   'item:لحاف كبير': 'Large Duvet',
   'item:مخدة صغيرة': 'Small Pillow',
   'item:مخدة كبيرة': 'Large Pillow',
+  'item:مشاية صغيرة': 'Small Runner Rug',
+  'item:مشاية كبيرة': 'Large Runner Rug',
   'item:تقصير / تطويل': 'Shorten / Lengthen',
   'item:تضييق / توسيع': 'Take In / Let Out',
   'item:تغيير سوستة': 'Zipper Replacement',
