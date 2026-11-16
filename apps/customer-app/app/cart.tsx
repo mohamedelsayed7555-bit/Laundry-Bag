@@ -547,6 +547,10 @@ export default function CartScreen() {
             // the stepper moves by that step and the row shows the measurement
             const step = item.area && item.area > 0 ? item.area : 0
             const pieces = step > 0 ? Math.max(1, Math.round(item.quantity / step)) : item.quantity
+            // a size with two sides is an area, a single number is a length;
+            // the stored measurement is the only thing that says which
+            const sqm = !!item.size && /[x×*]/.test(item.size)
+            const uLabel = sqm ? (isEn ? 'm²' : 'م²') : (isEn ? 'm' : 'م')
             return (
               <View key={i} style={[s.itemRow, i > 0 && { borderTopWidth: 1, borderTopColor: b.divider }]}>
                 <Image source={SERVICE_IMG[item.service_type] ?? SERVICE_IMG.wash} style={s.itemImg} />
@@ -556,8 +560,8 @@ export default function CartScreen() {
                   </Text>
                   <Text style={[s.cartItemPrice, { color: b.muted }]} numberOfLines={1}>
                     <Text style={[s.cartItemPriceNum, { color: b.isDark ? '#38BDF8' : '#0284C7' }]}>{money(item.price)}</Text>
-                    {' '}{t('currency')} / {step > 0 ? (isEn ? 'm²' : 'م²') : (isEn ? 'item' : 'قطعة')}
-                    {step > 0 ? ` · ${item.quantity} ${isEn ? 'm²' : 'م²'}` : ''} · {serviceLabel(item.service_type)}
+                    {' '}{t('currency')} / {step > 0 ? uLabel : (isEn ? 'item' : 'قطعة')}
+                    {step > 0 ? ` · ${item.quantity} ${uLabel}` : ''} · {serviceLabel(item.service_type)}
                   </Text>
                 </View>
                 <Stepper

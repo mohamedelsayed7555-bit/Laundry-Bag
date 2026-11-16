@@ -507,7 +507,10 @@ export default function NewOrderScreen() {
               <Card key={cat.id} pad={false} style={s.itemsCard}>
                 {cat.itemTypes.map((itemType: string, idx: number) => {
                   const price = getPrice(itemType, selectedService)
-                  const bySqm = getUnit(itemType, selectedService) === 'sqm'
+                  const unit = getUnit(itemType, selectedService)
+                  // both 'sqm' (a rug) and 'meter' (a curtain) are measured
+                  // rather than counted, so both open the size sheet
+                  const bySqm = unit === 'sqm' || unit === 'meter'
                   // a by-area item can hold several lines at once, one per size
                   const sizeLines = bySqm
                     ? cart.map((c, i) => ({ c, i })).filter(({ c }) => c.name === itemType && c.service_type === selectedService)
@@ -530,8 +533,10 @@ export default function NewOrderScreen() {
                           </View>
                           <Text style={[s.itemPrice, { color: b.muted }]} numberOfLines={1}>
                             <Text style={[s.itemPriceNum, { color: b.isDark ? '#38BDF8' : '#0284C7' }]}>{money(price)}</Text>
-                            {' '}{t('currency')} · {bySqm
+                            {' '}{t('currency')} · {unit === 'sqm'
                               ? (locale === 'en' ? 'per square metre' : 'للمتر المربع')
+                              : unit === 'meter'
+                              ? (locale === 'en' ? 'per metre' : 'للمتر')
                               : (locale === 'en' ? 'per piece' : 'لكل قطعة')}
                           </Text>
                         </View>
@@ -592,7 +597,7 @@ export default function NewOrderScreen() {
                                 {pieces > 1 ? ` · ${pieces} ${locale === 'en' ? 'pieces' : 'قطع'}` : ''}
                               </Text>
                               <Text style={[s.sizeLineMeta, { color: b.muted }]} numberOfLines={1}>
-                                {c.quantity} {locale === 'en' ? 'm²' : 'م²'} · {money(c.price * c.quantity)} {t('currency')}
+                                {c.quantity} {unit === 'sqm' ? (locale === 'en' ? 'm²' : 'م²') : (locale === 'en' ? 'm' : 'م')} · {money(c.price * c.quantity)} {t('currency')}
                               </Text>
                             </TouchableOpacity>
                             <Stepper
@@ -663,6 +668,7 @@ export default function NewOrderScreen() {
           visible
           itemName={itemName(sizeFor.itemType)}
           unitPrice={getPrice(sizeFor.itemType, selectedService)}
+          unit={getUnit(sizeFor.itemType, selectedService) === 'meter' ? 'meter' : 'sqm'}
           initial={sizeFor.index !== null && cart[sizeFor.index]
             ? { size: cart[sizeFor.index].size, count: piecesOf(cart[sizeFor.index]) }
             : null}

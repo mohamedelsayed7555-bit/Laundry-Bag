@@ -9,13 +9,25 @@ import { useLanguage } from '../contexts/LanguageContext'
 import { useBrand, F, SIZE, money } from './brand'
 import { PrimaryButton, SecondaryButton } from './auth/ui'
 
-/** The four a customer can recognise without a tape measure. */
+/** Sold by the square metre: a rug, measured on the floor. */
 export const PRESETS: { l: number; w: number; ar: string; en: string }[] = [
   { l: 1, w: 1.5, ar: 'صغيرة', en: 'Small' },
   { l: 2, w: 3, ar: 'متوسطة', en: 'Medium' },
   { l: 3, w: 4, ar: 'كبيرة', en: 'Large' },
   { l: 4, w: 5, ar: 'كبيرة جداً', en: 'Extra large' },
 ]
+
+/** Sold by the running metre: a curtain, measured across its width — the way
+ *  curtain fabric is sold and tailored, and the one side you can reach while
+ *  it is still hanging. */
+export const RUN_PRESETS: { l: number; ar: string; en: string }[] = [
+  { l: 2, ar: 'شباك', en: 'Window' },
+  { l: 3, ar: 'باب أو بلكونة', en: 'Door or balcony' },
+  { l: 4, ar: 'كبيرة', en: 'Large' },
+  { l: 6, ar: 'صالة', en: 'Living room' },
+]
+
+export type PriceUnit = 'sqm' | 'meter'
 
 const MAX_SIDE = 30
 // _price_items rejects a line over 500, and the line's quantity here is an area
@@ -48,10 +60,13 @@ const fmt = (n: number) => String(Math.round(n * 100) / 100)
 
 export type SizePick = { size: string; area: number; count: number }
 
-/** Parses "2×3" back into its two sides so an existing line can be reopened. */
+/** Parses a stored size back into its sides so an existing line can be reopened.
+ *  Handles both "2×3" and the single "3" a running-metre item carries. */
 export function parseSize(size?: string | null): { l: string; w: string } {
-  const m = /^([0-9.]+)\s*[x×*]\s*([0-9.]+)$/.exec((size ?? '').trim())
-  return m ? { l: m[1], w: m[2] } : { l: '', w: '' }
+  const s = (size ?? '').trim()
+  const pair = /^([0-9.]+)\s*[x×*]\s*([0-9.]+)$/.exec(s)
+  if (pair) return { l: pair[1], w: pair[2] }
+  return /^[0-9.]+$/.test(s) ? { l: s, w: '' } : { l: '', w: '' }
 }
 
 /**
@@ -61,11 +76,13 @@ export function parseSize(size?: string | null): { l: string; w: string } {
  * rather than replacing them, so the number stays visible and editable.
  */
 export default function SizeSheet({
-  visible, itemName, unitPrice, initial, onAdd, onDismiss,
+  visible, itemName, unitPrice, unit = 'sqm', initial, onAdd, onDismiss,
 }: {
   visible: boolean
   itemName: string
   unitPrice: number
+  /** 'sqm' asks for a length and a width; 'meter' asks for one side. */
+  unit?: PriceUnit
   initial?: { size?: string; count?: number } | null
   onAdd: (pick: SizePick) => void
   onDismiss: () => void
@@ -88,22 +105,31 @@ export default function SizeSheet({
     setCount(Math.max(1, initial?.count ?? 1))
   }, [visible, initial?.size, initial?.count])
 
+  const byArea = unit === 'sqm'
   const l = num(len)
   const w = num(wid)
-  const valid = l > 0 && w > 0 && l <= MAX_SIDE && w <= MAX_SIDE
+  const valid = byArea
+    ? l > 0 && w > 0 && l <= MAX_SIDE && w <= MAX_SIDE
+    : l > 0 && l <= MAX_SIDE
   // charged by the whole metre, rounded up — the trade's own convention, and it
   // keeps the quantity an integer the way every other line in the order is
-  const area = valid ? Math.max(1, Math.ceil(l * w)) : 0
+  const area = valid ? Math.max(1, Math.ceil(byArea ? l * w : l)) : 0
   const qty = area * count
   const over = qty > MAX_QTY
   const maxCount = area > 0 ? Math.max(1, Math.floor(MAX_QTY / area)) : 1
 
   const activePreset = useMemo(
-    () => PRESETS.findIndex(p => p.l === l && p.w === w),
-    [l, w],
+    () => byArea
+      ? PRESETS.findIndex(p => p.l === l && p.w === w)
+      : RUN_PRESETS.findIndex(p => p.l === l),
+    [byArea, l, w],
   )
 
   const sideText = isEn ? 'm' : 'م'
+  const unitText = byArea ? (isEn ? 'm²' : 'م²') : (isEn ? 'm' : 'م')
+  const perUnit = byArea
+    ? (isEn ? 'per square metre' : 'للمتر المربع')
+    : (isEn ? 'per metre' : 'للمتر')
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onDismiss}>
@@ -117,19 +143,19 @@ export default function SizeSheet({
             <ScrollView bounces={false} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
               <Text style={[s.title, { color: b.ink }]} numberOfLines={2}>{itemName}</Text>
               <Text style={[s.subtitle, { color: b.muted }]}>
-                {money(unitPrice)} {t('currency')} · {isEn ? 'per square metre' : 'للمتر المربع'}
+                {money(unitPrice)} {t('currency')} · {perUnit}
               </Text>
 
               <Text style={[s.label, { color: b.ink2 }]}>
                 {isEn ? "Don't know the size? Pick the closest:" : 'مش عارف المقاس؟ اختار الأقرب:'}
               </Text>
               <View style={s.presetGrid}>
-                {PRESETS.map((p, i) => {
+                {(byArea ? PRESETS : RUN_PRESETS).map((p: any, i: number) => {
                   const on = i === activePreset
                   return (
                     <TouchableOpacity
                       key={p.ar}
-                      onPress={() => { setLen(fmt(p.l)); setWid(fmt(p.w)) }}
+                      onPress={() => { setLen(fmt(p.l)); if (byArea) setWid(fmt(p.w)) }}
                       activeOpacity={0.85}
                       accessibilityRole="button"
                       accessibilityState={{ selected: on }}
@@ -143,7 +169,7 @@ export default function SizeSheet({
                         {isEn ? p.en : p.ar}
                       </Text>
                       <Text style={[s.presetDim, { color: on ? 'rgba(255,255,255,0.9)' : b.muted }]} numberOfLines={1}>
-                        {fmt(p.l)}×{fmt(p.w)} {sideText}
+                        {byArea ? `${fmt(p.l)}×${fmt(p.w)} ${sideText}` : `${fmt(p.l)} ${sideText}`}
                       </Text>
                     </TouchableOpacity>
                   )
@@ -155,7 +181,9 @@ export default function SizeSheet({
               </Text>
               <View style={s.dimRow}>
                 <View style={s.dimField}>
-                  <Text style={[s.dimLabel, { color: b.muted }]}>{isEn ? 'Length' : 'الطول'}</Text>
+                  <Text style={[s.dimLabel, { color: b.muted }]}>
+                    {byArea ? (isEn ? 'Length' : 'الطول') : (isEn ? 'Width of the curtain' : 'عرض الستارة')}
+                  </Text>
                   <View style={[s.input, { backgroundColor: b.field, borderColor: b.fieldBorder }]}>
                     <TextInput
                       style={[s.inputText, { color: b.ink }]}
@@ -166,31 +194,34 @@ export default function SizeSheet({
                       placeholderTextColor={b.faint}
                       maxLength={6}
                       textAlign="center"
-                      accessibilityLabel={isEn ? 'Length in metres' : 'الطول بالمتر'}
+                      accessibilityLabel={isEn ? 'Metres' : 'بالمتر'}
                     />
                     <Text style={[s.inputUnit, { color: b.muted }]}>{sideText}</Text>
                   </View>
                 </View>
 
-                <Text style={[s.times, { color: b.faint }]}>×</Text>
-
-                <View style={s.dimField}>
-                  <Text style={[s.dimLabel, { color: b.muted }]}>{isEn ? 'Width' : 'العرض'}</Text>
-                  <View style={[s.input, { backgroundColor: b.field, borderColor: b.fieldBorder }]}>
-                    <TextInput
-                      style={[s.inputText, { color: b.ink }]}
-                      value={wid}
-                      onChangeText={v => setWid(normalise(v))}
-                      keyboardType="decimal-pad"
-                      placeholder="0"
-                      placeholderTextColor={b.faint}
-                      maxLength={6}
-                      textAlign="center"
-                      accessibilityLabel={isEn ? 'Width in metres' : 'العرض بالمتر'}
-                    />
-                    <Text style={[s.inputUnit, { color: b.muted }]}>{sideText}</Text>
-                  </View>
-                </View>
+                {byArea ? (
+                  <>
+                    <Text style={[s.times, { color: b.faint }]}>×</Text>
+                    <View style={s.dimField}>
+                      <Text style={[s.dimLabel, { color: b.muted }]}>{isEn ? 'Width' : 'العرض'}</Text>
+                      <View style={[s.input, { backgroundColor: b.field, borderColor: b.fieldBorder }]}>
+                        <TextInput
+                          style={[s.inputText, { color: b.ink }]}
+                          value={wid}
+                          onChangeText={v => setWid(normalise(v))}
+                          keyboardType="decimal-pad"
+                          placeholder="0"
+                          placeholderTextColor={b.faint}
+                          maxLength={6}
+                          textAlign="center"
+                          accessibilityLabel={isEn ? 'Width in metres' : 'العرض بالمتر'}
+                        />
+                        <Text style={[s.inputUnit, { color: b.muted }]}>{sideText}</Text>
+                      </View>
+                    </View>
+                  </>
+                ) : null}
               </View>
 
               <View style={[s.countRow, { borderColor: b.divider }]}>
@@ -227,8 +258,8 @@ export default function SizeSheet({
                   <Text style={[s.summaryArea, { color: b.ink }]} numberOfLines={1}>
                     {valid
                       ? count > 1
-                        ? `${area} ${isEn ? 'm² each' : 'م² للقطعة'} · ${qty} ${isEn ? 'm² total' : 'م² إجمالي'}`
-                        : `${area} ${isEn ? 'm²' : 'م²'}`
+                        ? `${area} ${unitText} ${isEn ? 'each' : 'للقطعة'} · ${qty} ${unitText} ${isEn ? 'total' : 'إجمالي'}`
+                        : `${area} ${unitText}`
                       : isEn ? 'Enter the size' : 'اكتب المقاس'}
                   </Text>
                   <Text style={[s.summaryHint, { color: b.muted }]}>
@@ -243,8 +274,8 @@ export default function SizeSheet({
               {over ? (
                 <Text style={[s.warn, { color: b.dangerText }]}>
                   {isEn
-                    ? `That comes to ${qty} m², more than one order can carry. Split it over two orders.`
-                    : `ده بيطلع ${qty} م²، أكبر من اللي الطلب الواحد يشيله. قسّمه على طلبين.`}
+                    ? `That comes to ${qty} ${unitText}, more than one order can carry. Split it over two orders.`
+                    : `ده بيطلع ${qty} ${unitText}، أكبر من اللي الطلب الواحد يشيله. قسّمه على طلبين.`}
                 </Text>
               ) : null}
 
@@ -262,7 +293,7 @@ export default function SizeSheet({
                 <PrimaryButton
                   title={initial?.size ? (isEn ? 'Save' : 'حفظ') : (isEn ? 'Add to order' : 'أضف للطلب')}
                   disabled={!valid || over}
-                  onPress={() => onAdd({ size: `${fmt(l)}×${fmt(w)}`, area, count })}
+                  onPress={() => onAdd({ size: byArea ? `${fmt(l)}×${fmt(w)}` : fmt(l), area, count })}
                   style={{ flex: 2 }}
                 />
               </View>

@@ -288,13 +288,18 @@ export default function OrdersPage() {
     // the measurement and the area follows from it — the same rule the customer
     // app applies, or the two would disagree on the same rug.
     const bySqm = row.unit === 'sqm'
+    const byMetre = row.unit === 'meter'
     let qty = Math.max(1, pick.quantity || 1)
     let size: string | undefined
-    if (bySqm) {
+    if (bySqm || byMetre) {
       const l = parseFloat(pick.len), w = parseFloat(pick.wid)
-      if (!(l > 0 && w > 0 && l <= 30 && w <= 30)) { toast('اكتب طول وعرض القطعة بالمتر', 'error'); return }
-      qty = Math.max(1, Math.ceil(l * w))
-      size = `${Math.round(l * 100) / 100}×${Math.round(w * 100) / 100}`
+      if (!(l > 0 && l <= 30 && (!bySqm || (w > 0 && w <= 30)))) {
+        toast(bySqm ? 'اكتب طول وعرض القطعة بالمتر' : 'اكتب عرض الستارة بالمتر', 'error'); return
+      }
+      qty = Math.max(1, Math.ceil(bySqm ? l * w : l))
+      size = bySqm
+        ? `${Math.round(l * 100) / 100}×${Math.round(w * 100) / 100}`
+        : `${Math.round(l * 100) / 100}`
     }
     if (qty > 500) { toast('المساحة أكبر من اللي الطلب الواحد يشيله', 'error'); return }
     setOrderItems(prev => {
@@ -616,7 +621,7 @@ export default function OrdersPage() {
                         </span>
                       </div>
                       <div className="flex items-center gap-3 text-gray-500">
-                        <span className="text-xs">{item.size ? `${item.quantity} م²` : `×${item.quantity}`}</span>
+                        <span className="text-xs">{item.size ? `${item.quantity} ${/[x\u00d7*]/.test(item.size) ? 'م²' : 'م'}` : `×${item.quantity}`}</span>
                         <span className="font-semibold text-gray-700">{(item.price * item.quantity).toFixed(2)} ج.م</span>
                       </div>
                     </div>
@@ -787,7 +792,7 @@ export default function OrdersPage() {
                         {it.size && <span className="text-[10px] text-sky-700 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded whitespace-nowrap">{it.size} م</span>}
                         <span className="text-[10px] text-gray-400 bg-surface-muted px-1.5 py-0.5 rounded">{SERVICE_TYPE_LABELS[it.service_type as ServiceType] ?? it.service_type}</span>
                       </div>
-                      <span className="text-[11px] text-gray-400">{it.price} ج.م × {it.quantity}{it.size ? ' م²' : ''} = {(it.price * it.quantity).toFixed(2)} ج.م</span>
+                      <span className="text-[11px] text-gray-400">{it.price} ج.م × {it.quantity}{it.size ? (/[x\u00d7*]/.test(it.size) ? ' م²' : ' م') : ''} = {(it.price * it.quantity).toFixed(2)} ج.م</span>
                     </div>
                     <div className="flex items-center gap-1 flex-none">
                       <button type="button" onClick={() => updateOrderItemQty(i, -1)} className="w-7 h-7 rounded-lg bg-surface-muted text-gray-600 hover:bg-surface-border flex items-center justify-center">−</button>
@@ -820,28 +825,34 @@ export default function OrdersPage() {
               {(() => {
                 const row = prices.find(p => p.item_type === pick.item_type && p.service_type === pick.service_type)
                 const bySqm = row?.unit === 'sqm'
+                const measured = bySqm || row?.unit === 'meter'
                 const l = parseFloat(pick.len), w = parseFloat(pick.wid)
-                const area = l > 0 && w > 0 ? Math.max(1, Math.ceil(l * w)) : 0
+                const area = bySqm
+                  ? (l > 0 && w > 0 ? Math.max(1, Math.ceil(l * w)) : 0)
+                  : (l > 0 ? Math.max(1, Math.ceil(l)) : 0)
+                const uLabel = bySqm ? 'م²' : 'م'
                 return (
                   <>
-                    {bySqm && (
+                    {measured && (
                       <div className="flex items-end gap-2">
                         <div className="flex-1">
-                          <label className="block text-[10px] text-gray-400 mb-1">الطول (متر)</label>
+                          <label className="block text-[10px] text-gray-400 mb-1">{bySqm ? 'الطول (متر)' : 'عرض الستارة (متر)'}</label>
                           <input type="number" min={0} max={30} step="0.1" value={pick.len} onChange={e => setPick({ ...pick, len: e.target.value })} className={inputClass} placeholder="0" dir="ltr" />
                         </div>
-                        <span className="pb-3 text-gray-400">×</span>
+                        {bySqm && <span className="pb-3 text-gray-400">×</span>}
+                        {bySqm && (
                         <div className="flex-1">
                           <label className="block text-[10px] text-gray-400 mb-1">العرض (متر)</label>
                           <input type="number" min={0} max={30} step="0.1" value={pick.wid} onChange={e => setPick({ ...pick, wid: e.target.value })} className={inputClass} placeholder="0" dir="ltr" />
                         </div>
+                        )}
                         <div className="pb-2.5 text-xs font-semibold text-gray-600 whitespace-nowrap">
-                          {area > 0 ? `= ${area} م² · ${(area * (row?.price ?? 0)).toFixed(2)} ج.م` : '= — م²'}
+                          {area > 0 ? `= ${area} ${uLabel} · ${(area * (row?.price ?? 0)).toFixed(2)} ج.م` : `= — ${uLabel}`}
                         </div>
                       </div>
                     )}
                     <div className="flex gap-2">
-                      {!bySqm && (
+                      {!measured && (
                         <input type="number" min={1} value={pick.quantity} onChange={e => setPick({ ...pick, quantity: Math.max(1, +e.target.value || 1) })} className={inputClass + ' w-24'} aria-label="العدد" />
                       )}
                       <button type="button" onClick={addPickToOrder} className="flex-1 bg-primary-50 text-primary-600 border border-primary-200 rounded-xl text-sm font-semibold hover:bg-primary-100 transition-colors">+ أضف للطلب</button>

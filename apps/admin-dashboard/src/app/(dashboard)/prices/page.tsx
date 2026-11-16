@@ -202,8 +202,8 @@ export default function PricesPage() {
     { key: 'item_type', label: 'نوع القطعة', render: (item: any) => (
       <span className="inline-flex items-center gap-1.5">
         <span className="font-semibold">{item.item_type}</span>
-        {item.unit === 'sqm' && (
-          <span className="text-[10px] text-sky-700 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded whitespace-nowrap">م²</span>
+        {(item.unit === 'sqm' || item.unit === 'meter') && (
+          <span className="text-[10px] text-sky-700 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded whitespace-nowrap">{item.unit === 'sqm' ? 'م²' : 'م'}</span>
         )}
       </span>
     )},
@@ -283,13 +283,18 @@ export default function PricesPage() {
       <div>
         <label className="block text-xs font-medium text-gray-500 mb-1.5">السعر يتحسب بـ <span className="text-red-400">*</span></label>
         <div className="flex gap-2">
-          {([['piece', 'القطعة'], ['sqm', 'المتر المربع']] as const).map(([val, label]) => (
+          {([['piece', 'القطعة'], ['sqm', 'المتر المربع'], ['meter', 'المتر الطولي']] as const).map(([val, label]) => (
             <button key={val} type="button" onClick={() => setForm({ ...form, unit: val })}
               className={`flex-1 p-2.5 rounded-xl text-sm font-semibold transition-all ${form.unit === val ? 'bg-primary-500 text-white' : 'bg-navy-50 text-gray-500 hover:bg-navy-100'}`}>
               {label}
             </button>
           ))}
         </div>
+        {form.unit === 'meter' && (
+          <p className="text-[11px] text-gray-400 mt-1.5 leading-5">
+            العميل هيكتب مقاس واحد بالمتر (زي عرض الستارة) والتطبيق يضربه في السعر ده. التقريب لأعلى لأقرب متر.
+          </p>
+        )}
         {form.unit === 'sqm' && (
           <p className="text-[11px] text-gray-400 mt-1.5 leading-5">
             العميل هيختار طول وعرض القطعة والتطبيق يحسب المساحة ويضربها في السعر ده. التقريب لأعلى لأقرب متر.
@@ -298,7 +303,7 @@ export default function PricesPage() {
       </div>
       <div>
         <label className="block text-xs font-medium text-gray-500 mb-1.5">
-          السعر {form.unit === 'sqm' ? 'للمتر المربع' : 'للقطعة'} (ج.م) <span className="text-red-400">*</span>
+          السعر {form.unit === 'sqm' ? 'للمتر المربع' : form.unit === 'meter' ? 'للمتر' : 'للقطعة'} (ج.م) <span className="text-red-400">*</span>
         </label>
         <input type="number" min={0} step={0.5} value={form.price} onChange={e => setForm({ ...form, price: +e.target.value })} required
           className="w-full p-3 border border-surface-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/15 focus:border-primary-500/30 transition-all" dir="ltr" />

@@ -50,9 +50,12 @@ type OrderItem = {
  *  worked back out of the size the same way the picker rounded it. */
 function areaOfSize(size?: string | null) {
   const { l, w } = parseSize(size)
-  const a = Math.ceil(parseFloat(l) * parseFloat(w))
+  // "2x3" is an area; a bare "3" is a length, which is its own quantity
+  const a = Math.ceil(w ? parseFloat(l) * parseFloat(w) : parseFloat(l))
   return Number.isFinite(a) && a > 0 ? a : 0
 }
+/** true when the stored size names two sides, so the quantity is square metres */
+const isArea = (size?: string | null) => /[x×*]/.test(size ?? '')
 const stepOf = (item: OrderItem) => (item.area && item.area > 0 ? item.area : areaOfSize(item.size))
 const piecesOf = (item: OrderItem) => {
   const st = stepOf(item)
@@ -363,7 +366,7 @@ export default function EditOrderScreen() {
                     {itemName(item.name)}{item.size ? ` · ${item.size} ${isEn ? 'm' : 'م'}` : ''} — {serviceLabel(item.service_type)}
                   </Text>
                   <Text style={[n.itemSub, { color: b.muted }]}>
-                    {item.quantity}{step > 0 ? ` ${isEn ? 'm²' : 'م²'}` : ''} × {money(item.price)} = {money(item.quantity * item.price)} {cur}
+                    {item.quantity}{step > 0 ? ` ${isArea(item.size) ? (isEn ? 'm²' : 'م²') : (isEn ? 'm' : 'م')}` : ''} × {money(item.price)} = {money(item.quantity * item.price)} {cur}
                   </Text>
                 </View>
                 <Stepper
@@ -432,7 +435,8 @@ export default function EditOrderScreen() {
               <Card key={cat.id} pad={false} style={n.itemsCard}>
                 {cat.itemTypes.map((itemType, idx) => {
                   const price = getPrice(itemType, selectedService)
-                  const bySqm = getUnit(itemType, selectedService) === 'sqm'
+                  const unit = getUnit(itemType, selectedService)
+                  const bySqm = unit === 'sqm' || unit === 'meter'
                   // a by-area item's lines live in the "Items" card above, each
                   // with its own measurement, so this row only opens the picker
                   const inCartIdx = bySqm
@@ -447,8 +451,10 @@ export default function EditOrderScreen() {
                       <View style={n.pickBody}>
                         <Text style={[n.pickName, { color: b.ink }]} numberOfLines={1}>{itemName(itemType)}</Text>
                         <Text style={[n.pickPrice, { color: b.muted }]} numberOfLines={1}>
-                          <Text style={[n.pickPriceNum, { color: b.isDark ? '#38BDF8' : '#0284C7' }]}>{money(price)}</Text> {cur} · {bySqm
+                          <Text style={[n.pickPriceNum, { color: b.isDark ? '#38BDF8' : '#0284C7' }]}>{money(price)}</Text> {cur} · {unit === 'sqm'
                             ? (isEn ? 'per square metre' : 'للمتر المربع')
+                            : unit === 'meter'
+                            ? (isEn ? 'per metre' : 'للمتر')
                             : (isEn ? 'per piece' : 'لكل قطعة')}
                         </Text>
                       </View>
@@ -529,6 +535,7 @@ export default function EditOrderScreen() {
         visible
         itemName={itemName(sizeFor.itemType)}
         unitPrice={getPrice(sizeFor.itemType, selectedService)}
+        unit={getUnit(sizeFor.itemType, selectedService) === 'meter' ? 'meter' : 'sqm'}
         initial={sizeFor.index !== null && cart[sizeFor.index]
           ? { size: cart[sizeFor.index].size, count: piecesOf(cart[sizeFor.index]) }
           : null}
